@@ -109,9 +109,9 @@ const CURRENCIES = {
 const AVAILABLE_SIZES_LIST = ["S", "M", "L", "XL", "Standard", "One Size"];
 
 export default function App() {
-  // Clear old localStorage product cache so local images load properly
   const [products, setProducts] = useState(() => {
-    return INITIAL_PRODUCTS;
+    const saved = localStorage.getItem('kyvro_products');
+    return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
   });
 
   const [cart, setCart] = useState(() => {
