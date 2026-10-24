@@ -168,7 +168,7 @@ export default function App() {
     return () => clearInterval(timer);
   }, [banners.length]);
 
-  // Admin Login States
+  // Admin & Firebase Auth States
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [adminPin, setAdminPin] = useState('');
   const [loggedInUserEmail, setLoggedInUserEmail] = useState('');
@@ -289,7 +289,7 @@ export default function App() {
       setIsAdminLoggedIn(true);
       setLoggedInUserEmail(result.user.email);
     } catch (error) {
-      alert('Google Sign-In Note: ' + error.message);
+      alert('Google Sign-In Error: ' + error.message);
     }
   };
 
@@ -911,7 +911,7 @@ export default function App() {
                     type="password" 
                     value={adminPin}
                     onChange={(e) => setAdminPin(e.target.value)}
-                    placeholder="Enter Admin PIN (e.g. admin123)"
+                    placeholder="Enter Admin PIN"
                     className={`w-full border p-3 text-xs rounded focus:outline-none focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
                   />
                 </div>
@@ -1146,7 +1146,7 @@ export default function App() {
               <li><button onClick={() => { setSelectedCategory("Men"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Men's Collection</button></li>
               <li><button onClick={() => { setSelectedCategory("Women"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Women's Collection</button></li>
               <li><button onClick={() => { setSelectedCategory("Shoes"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Shoes</button></li>
-              <li><button onClick={() => { setSelectedCategory("Wallets"); setCurrentVw('shop'); }} className="hover:text-[#D4AF37]">Wallets</button></li>
+              <li><button onClick={() => { setSelectedCategory("Wallets"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Wallets</button></li>
               <li><button onClick={() => { setSelectedCategory("Watches"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Watches</button></li>
             </ul>
           </div>
