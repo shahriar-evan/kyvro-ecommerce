@@ -7,10 +7,6 @@ import {
 } from 'lucide-react';
 import logoImg from './logo.png';
 import heroBannerImg from './hero-banner.png';
-import banner1Img from './style.png';
-import banner2Img from './punjabi.png';
-import banner3Img from './shirts.png';
-import banner4Img from './snekers.png';
 
 const INITIAL_PRODUCTS = [
   {
@@ -154,12 +150,15 @@ export default function App() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  
-  // Default isDarkMode set to false so website opens in White Mode first
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // Banners Slider State
-  const banners = [banner1Img, banner2Img, banner3Img, banner4Img];
+  // Banner images via online luxury Unsplash links
+  const banners = [
+    "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&q=80&w=1600",
+    "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&q=80&w=1600",
+    "https://images.unsplash.com/photo-1445205170230-053b83016050?auto=format&fit=crop&q=80&w=1600",
+    "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=1600"
+  ];
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
 
   useEffect(() => {
