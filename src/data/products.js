@@ -1,0 +1,91 @@
+import shirtImg from '../assets/shirts.png';
+import punjabiImg from '../assets/punjabi.png';
+import sneakersImg from '../assets/Snekers.png';
+
+export const INITIAL_PRODUCTS = [
+  {
+    id: 1,
+    name: "Kyvro Signature Executive Watch",
+    category: "Watches",
+    gender: "Watches",
+    price: 3490,
+    originalPrice: 5816,
+    image: sneakersImg,
+    images: [sneakersImg],
+    description: "Crafted with precision sapphire crystal and matte black stainless steel. Designed for the modern leader who wears their story with confidence.",
+    colors: ["Matte Black", "Champagne Gold", "Silver"],
+    sizes: ["Standard"],
+    stock: 15,
+    isNew: true,
+    isFeatured: true,
+    isBestSeller: true
+  },
+  {
+    id: 2,
+    name: "Minimalist Italian Leather Wallet",
+    category: "Wallets",
+    gender: "Wallets",
+    price: 890,
+    originalPrice: 1780,
+    image: sneakersImg,
+    images: [sneakersImg],
+    description: "Genuine full-grain Italian leather wallet featuring RFID blocking technology and a sleek, slim profile.",
+    colors: ["Black", "Charcoal", "Tan"],
+    sizes: ["One Size"],
+    stock: 25,
+    isNew: true,
+    isFeatured: true,
+    isBestSeller: false
+  },
+  {
+    id: 3,
+    name: "Luxury Silk Sharee",
+    category: "Sharee",
+    gender: "Women",
+    price: 2890,
+    originalPrice: 4816,
+    image: shirtImg,
+    images: [shirtImg],
+    description: "An epitome of elegance. Flowing pure silk sharee designed to capture timeless sophistication at any formal occasion.",
+    colors: ["Champagne Gold", "Midnight Black"],
+    sizes: ["Standard"],
+    stock: 10,
+    isNew: true,
+    isFeatured: true,
+    isBestSeller: true
+  },
+  {
+    id: 4,
+    name: "Tailored Oxford Shirt",
+    category: "Shirt",
+    gender: "Men",
+    price: 3190,
+    originalPrice: 5316,
+    image: shirtImg,
+    images: [shirtImg],
+    description: "Impeccably tailored menswear engineered from breathable, premium cotton for effortless styling.",
+    colors: ["Charcoal", "Matte Black", "Navy"],
+    sizes: ["S", "M", "L", "XL"],
+    stock: 8,
+    isNew: false,
+    isFeatured: true,
+    isBestSeller: true
+  },
+  {
+    id: 5,
+    name: "Designer Executive Punjabi",
+    category: "Punjabi",
+    gender: "Men",
+    price: 2490,
+    originalPrice: 4980,
+    image: punjabiImg,
+    images: [punjabiImg],
+    description: "Traditional yet modern designer Punjabi crafted for festive and formal elegance.",
+    colors: ["Matte Black", "Dark Brown"],
+    sizes: ["M", "L", "XL"],
+    stock: 12,
+    isNew: true,
+    isFeatured: false,
+    isBestSeller: true
+  }
+];
