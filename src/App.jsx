@@ -389,11 +389,11 @@ export default function App() {
   });
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans relative transition-colors duration-300 ${isDarkMode ? 'bg-[#0f0f0f] text-gray-100' : 'bg-white text-gray-900'}`}>
+    <div className={`min-h-screen flex flex-col font-sans relative transition-colors duration-300 overflow-x-hidden ${isDarkMode ? 'bg-[#0f0f0f] text-gray-100' : 'bg-white text-gray-900'}`}>
       
       {/* 1. ANNOUNCEMENT BAR */}
-      <div className={`text-xs font-semibold py-2 overflow-hidden whitespace-nowrap border-b tracking-wider ${isDarkMode ? 'bg-[#1a1a1a] text-[#D4AF37] border-gray-800' : 'bg-gray-100 text-black border-gray-200'}`}>
-        <div className="animate-ticker inline-block">
+      <div className={`text-[11px] sm:text-xs font-semibold py-2 overflow-hidden whitespace-nowrap border-b tracking-wider ${isDarkMode ? 'bg-[#1a1a1a] text-[#D4AF37] border-gray-800' : 'bg-gray-100 text-black border-gray-200'}`}>
+        <div className="animate-ticker inline-block px-4">
           {announcementText} &nbsp;&nbsp;&nbsp;&nbsp;&bull;&nbsp;&nbsp;&nbsp;&nbsp; 24/7 VIP Customer Support: kyvrofashion@gmail.com &nbsp;&nbsp;&nbsp;&nbsp;&bull;&nbsp;&nbsp;&nbsp;&nbsp; {announcementText}
         </div>
       </div>
@@ -402,21 +402,21 @@ export default function App() {
       <header className={`sticky top-0 z-40 backdrop-blur border-b ${isDarkMode ? 'bg-[#121212]/95 border-gray-800' : 'bg-white/95 border-gray-200'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3 sm:gap-6">
             <button 
               onClick={() => setIsMobileMenuOpen(true)}
-              className={`md:hidden ${isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'}`}
+              className={`md:hidden p-1 ${isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'}`}
             >
               <Menu size={24} />
             </button>
             <div 
               onClick={() => { setCurrentView('home'); setSelectedCategory('All'); }}
-              className="cursor-pointer flex items-center gap-3"
+              className="cursor-pointer flex items-center gap-2 sm:gap-3"
             >
-              <img src={logoImg} alt="Kyvro Logo" className="h-10 w-auto object-contain" />
+              <img src={logoImg} alt="Kyvro Logo" className="h-8 sm:h-10 w-auto object-contain" />
               <div className="flex flex-col items-start">
-                <span className={`text-xl sm:text-2xl font-serif font-bold tracking-widest ${isDarkMode ? 'text-white' : 'text-black'}`}>KYVRO</span>
-                <span className={`text-[9px] tracking-[0.3em] font-sans -mt-1 ${isDarkMode ? 'text-[#D4AF37]' : 'text-black font-semibold'}`}>কাইভ্রো &bull; WEAR YOUR STORY</span>
+                <span className={`text-lg sm:text-2xl font-serif font-bold tracking-widest ${isDarkMode ? 'text-white' : 'text-black'}`}>KYVRO</span>
+                <span className={`text-[8px] sm:text-[9px] tracking-[0.2em] sm:tracking-[0.3em] font-sans -mt-1 ${isDarkMode ? 'text-[#D4AF37]' : 'text-black font-semibold'}`}>কাইভ্রো &bull; WEAR YOUR STORY</span>
               </div>
             </div>
           </div>
@@ -430,8 +430,8 @@ export default function App() {
             <button onClick={() => { setCurrentView('shop'); setSelectedCategory("Watches"); }} className="hover:text-[#D4AF37] transition">WATCHES</button>
           </nav>
 
-          <div className="flex items-center gap-4">
-            <div className={`flex items-center gap-1 px-2.5 py-1.5 rounded border text-xs font-semibold ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-white' : 'bg-gray-100 border-gray-300 text-black'}`}>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className={`hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded border text-xs font-semibold ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-white' : 'bg-gray-100 border-gray-300 text-black'}`}>
               <span>{curr.flag}</span>
               <select 
                 value={currencyKey} 
@@ -451,30 +451,30 @@ export default function App() {
               className={`p-2 rounded-full border transition flex items-center justify-center ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-[#D4AF37] hover:bg-[#222]' : 'bg-gray-100 border-gray-300 text-black hover:bg-gray-200'}`}
               title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
             >
-              {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+              {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
             </button>
 
             <button 
               onClick={() => setCurrentView('shop')}
-              className={`transition ${isDarkMode ? 'text-gray-300 hover:text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]'}`}
+              className={`transition p-1 ${isDarkMode ? 'text-gray-300 hover:text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]'}`}
               title="Search"
             >
-              <Search size={20} />
+              <Search size={18} />
             </button>
 
             <button 
               onClick={() => setCurrentView('admin')}
-              className={`transition relative ${isDarkMode ? 'text-gray-300 hover:text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]'}`}
+              className={`transition relative p-1 ${isDarkMode ? 'text-gray-300 hover:text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]'}`}
               title="Admin Panel"
             >
-              <User size={20} />
+              <User size={18} />
             </button>
 
             <button 
               onClick={() => setIsCartOpen(true)}
-              className={`transition relative flex items-center gap-1 px-3 py-1.5 rounded-full border ${isDarkMode ? 'text-gray-300 bg-[#1a1a1a] border-gray-800' : 'text-gray-800 bg-gray-100 border-gray-300'}`}
+              className={`transition relative flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-full border ${isDarkMode ? 'text-gray-300 bg-[#1a1a1a] border-gray-800' : 'text-gray-800 bg-gray-100 border-gray-300'}`}
             >
-              <ShoppingBag size={18} className="text-[#D4AF37]" />
+              <ShoppingBag size={16} className="text-[#D4AF37]" />
               <span className={`text-xs font-bold ${isDarkMode ? 'text-white' : 'text-black'}`}>
                 {cart.reduce((sum, item) => sum + item.quantity, 0)}
               </span>
@@ -605,17 +605,17 @@ export default function App() {
       {/* HOME VIEW */}
       {currentView === 'home' && (
         <div className="flex-1">
-          <section className="relative h-[80vh] flex flex-col justify-between items-center text-center bg-cover bg-center py-6" style={{ backgroundImage: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(${heroBannerImg})` }}>
-            <div className="w-full flex justify-center pt-2 px-4">
-              <span className={`text-xs uppercase tracking-[0.4em] font-semibold px-6 py-2 rounded-full border shadow-xl ${isDarkMode ? 'bg-black/70 text-[#D4AF37] border-[#D4AF37]/50' : 'bg-white/90 text-black border-black/20'}`}>
+          <section className="relative h-[70vh] sm:h-[80vh] flex flex-col justify-between items-center text-center bg-cover bg-center py-6 px-4" style={{ backgroundImage: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(${heroBannerImg})` }}>
+            <div className="w-full flex justify-center pt-2">
+              <span className={`text-[10px] sm:text-xs uppercase tracking-[0.3em] sm:tracking-[0.4em] font-semibold px-4 sm:px-6 py-2 rounded-full border shadow-xl ${isDarkMode ? 'bg-black/70 text-[#D4AF37] border-[#D4AF37]/50' : 'bg-white/90 text-black border-black/20'}`}>
                 KYVRO &bull; কাইভ্রো LUXURY COLLECTION
               </span>
             </div>
             <div></div>
-            <div className="w-full flex justify-center pb-20">
+            <div className="w-full flex justify-center pb-12 sm:pb-20">
               <button 
                 onClick={() => setCurrentView('shop')}
-                className="bg-[#D4AF37] text-black font-bold px-8 py-4 rounded text-xs tracking-[0.2em] uppercase hover:bg-white transition shadow-2xl transform hover:scale-105"
+                className="bg-[#D4AF37] text-black font-bold px-6 sm:px-8 py-3.5 sm:py-4 rounded text-xs tracking-[0.2em] uppercase hover:bg-white transition shadow-2xl transform hover:scale-105"
               >
                 Explore Collection
               </button>
@@ -623,8 +623,8 @@ export default function App() {
           </section>
 
           {/* AUTOMATIC BANNERS SLIDER */}
-          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-4">
-            <div className="relative h-[350px] sm:h-[450px] md:h-[500px] rounded-2xl overflow-hidden shadow-2xl border border-gray-800 bg-transparent">
+          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16 pb-4">
+            <div className="relative h-[280px] sm:h-[400px] md:h-[500px] rounded-2xl overflow-hidden shadow-2xl border border-gray-800 bg-transparent">
               {banners.map((img, idx) => (
                 <div 
                   key={idx}
@@ -634,7 +634,7 @@ export default function App() {
                   <div className="absolute inset-x-0 bottom-6 z-20 flex justify-center">
                     <button 
                       onClick={() => setCurrentView('shop')}
-                      className="bg-[#D4AF37] text-black text-xs font-bold px-8 py-3 uppercase tracking-widest rounded shadow-2xl hover:bg-white transition transform hover:scale-105"
+                      className="bg-[#D4AF37] text-black text-xs font-bold px-6 sm:px-8 py-2.5 sm:py-3 uppercase tracking-widest rounded shadow-2xl hover:bg-white transition transform hover:scale-105"
                     >
                       Shop Now
                     </button>
@@ -647,7 +647,7 @@ export default function App() {
                   <button 
                     key={idx}
                     onClick={() => setCurrentBannerIndex(idx)}
-                    className={`w-3 h-3 rounded-full transition ${idx === currentBannerIndex ? 'bg-[#D4AF37] w-8' : 'bg-white/50'}`}
+                    className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full transition ${idx === currentBannerIndex ? 'bg-[#D4AF37] w-6 sm:w-8' : 'bg-white/50'}`}
                   />
                 ))}
               </div>
@@ -655,13 +655,13 @@ export default function App() {
           </section>
 
           {/* Shop by Category */}
-          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-            <div className="text-center mb-12">
-              <h2 className="text-2xl sm:text-3xl font-serif font-bold tracking-wider">SHOP BY CATEGORY</h2>
+          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
+            <div className="text-center mb-10 sm:mb-12">
+              <h2 className="text-xl sm:text-3xl font-serif font-bold tracking-wider">SHOP BY CATEGORY</h2>
               <div className="w-12 h-0.5 bg-[#D4AF37] mx-auto mt-3"></div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
               {[
                 { name: "Men", label: "Men's Collection", image: shirtImg },
                 { name: "Women", label: "Women's Collection", image: shirtImg },
@@ -672,12 +672,12 @@ export default function App() {
                 <div 
                   key={idx}
                   onClick={() => { setSelectedCategory(cat.name); setCurrentView('shop'); }}
-                  className="group relative h-80 rounded-lg overflow-hidden cursor-pointer shadow-xl border border-gray-800"
+                  className="group relative h-60 sm:h-80 rounded-lg overflow-hidden cursor-pointer shadow-xl border border-gray-800"
                 >
                   <img src={cat.image} alt={cat.label} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent flex flex-col justify-end p-6">
-                    <h3 className="text-lg font-serif font-bold text-white group-hover:text-[#D4AF37] transition">{cat.label}</h3>
-                    <p className="text-xs text-gray-300 mt-1 flex items-center gap-1">Shop Now <ChevronRight size={12} /></p>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent flex flex-col justify-end p-4 sm:p-6">
+                    <h3 className="text-sm sm:text-lg font-serif font-bold text-white group-hover:text-[#D4AF37] transition">{cat.label}</h3>
+                    <p className="text-[11px] sm:text-xs text-gray-300 mt-1 flex items-center gap-1">Shop Now <ChevronRight size={12} /></p>
                   </div>
                 </div>
               ))}
@@ -685,12 +685,12 @@ export default function App() {
           </section>
 
           {/* Featured & New Arrivals */}
-          <section className={`py-20 border-y ${isDarkMode ? 'bg-[#121212] border-gray-800' : 'bg-gray-100 border-gray-200'}`}>
+          <section className={`py-16 sm:py-20 border-y ${isDarkMode ? 'bg-[#121212] border-gray-800' : 'bg-gray-100 border-gray-200'}`}>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex justify-between items-end mb-12">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-10 sm:mb-12 gap-3">
                 <div>
-                  <span className="text-xs font-semibold uppercase tracking-[0.3em] text-[#D4AF37]">Curated Masterpieces</span>
-                  <h2 className="text-2xl sm:text-3xl font-serif font-bold mt-1">FEATURED & NEW ARRIVALS</h2>
+                  <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-[0.3em] text-[#D4AF37]">Curated Masterpieces</span>
+                  <h2 className="text-xl sm:text-3xl font-serif font-bold mt-1">FEATURED & NEW ARRIVALS</h2>
                 </div>
                 <button 
                   onClick={() => setCurrentView('shop')}
@@ -700,12 +700,12 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
                 {products.slice(0, 4).map(product => {
                   const discountPct = calculateDiscountPercent(product.price, product.originalPrice);
                   return (
                     <div key={product.id} className={`group rounded-lg overflow-hidden border flex flex-col ${isDarkMode ? 'bg-[#181818] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
-                      <div className="relative h-72 overflow-hidden bg-gray-900 cursor-pointer" onClick={() => { setSelectedProduct(product); setCurrentView('product-detail'); }}>
+                      <div className="relative h-64 sm:h-72 overflow-hidden bg-gray-900 cursor-pointer" onClick={() => { setSelectedProduct(product); setCurrentView('product-detail'); }}>
                         <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
                         {product.isNew && (
                           <span className="absolute top-3 left-3 bg-[#D4AF37] text-black text-[10px] font-bold px-2.5 py-1 tracking-wider uppercase">
@@ -719,17 +719,17 @@ export default function App() {
                         )}
                       </div>
 
-                      <div className="p-5 flex-1 flex flex-col justify-between">
+                      <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between">
                         <div>
-                          <span className="text-[11px] text-[#D4AF37] uppercase tracking-wider">{product.category}</span>
+                          <span className="text-[10px] sm:text-[11px] text-[#D4AF37] uppercase tracking-wider">{product.category}</span>
                           <h3 
                             onClick={() => { setSelectedProduct(product); setCurrentView('product-detail'); }}
-                            className="text-base font-serif font-semibold mt-1 cursor-pointer hover:text-[#D4AF37] transition line-clamp-1"
+                            className="text-sm sm:text-base font-serif font-semibold mt-1 cursor-pointer hover:text-[#D4AF37] transition line-clamp-1"
                           >
                             {product.name}
                           </h3>
                           <div className="flex items-center gap-3 mt-2">
-                            <span className="text-base font-bold">{formatPrice(product.price)}</span>
+                            <span className="text-sm sm:text-base font-bold">{formatPrice(product.price)}</span>
                             {product.originalPrice > product.price && (
                               <span className="text-xs text-gray-500 line-through">{formatPrice(product.originalPrice)}</span>
                             )}
@@ -769,8 +769,8 @@ export default function App() {
           </section>
 
           {/* Why Choose Kyvro */}
-          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-center">
+          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 text-center">
               {[
                 { icon: Shield, title: "Uncompromising Quality", desc: "Hand-selected fabrics, genuine leather, and premium stainless steel materials." },
                 { icon: Truck, title: "Secure Worldwide Delivery", desc: "Fast, insured shipping directly to your doorstep with real-time tracking." },
@@ -779,9 +779,9 @@ export default function App() {
               ].map((item, idx) => {
                 const IconComponent = item.icon;
                 return (
-                  <div key={idx} className={`p-8 rounded-lg border ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
-                    <IconComponent size={36} className="mx-auto text-[#D4AF37] mb-4" />
-                    <h4 className="font-serif font-bold mb-2">{item.title}</h4>
+                  <div key={idx} className={`p-6 sm:p-8 rounded-lg border ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
+                    <IconComponent size={32} className="mx-auto text-[#D4AF37] mb-3 sm:mb-4" />
+                    <h4 className="font-serif font-bold text-sm sm:text-base mb-2">{item.title}</h4>
                     <p className="text-xs text-gray-500">{item.desc}</p>
                   </div>
                 );
@@ -793,22 +793,22 @@ export default function App() {
 
       {/* SHOP CATALOG VIEW */}
       {currentView === 'shop' && (
-        <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
+        <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 w-full">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b gap-4 mb-8">
             <div>
-              <h1 className="text-3xl font-serif font-bold">
+              <h1 className="text-2xl sm:text-3xl font-serif font-bold">
                 {selectedCategory === 'All' ? 'Complete Collection' : `${selectedCategory} Collection`}
               </h1>
               <p className="text-xs text-gray-500 mt-1">Showing {filteredProducts.length} luxury products</p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4 w-full md:w-auto">
               <input 
                 type="text"
                 placeholder="Search products..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`border px-4 py-2 text-xs rounded focus:outline-none focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#181818] border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`}
+                className={`flex-1 md:flex-none border px-4 py-2 text-xs rounded focus:outline-none focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#181818] border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`}
               />
               <select 
                 value={sortBy}
@@ -882,14 +882,14 @@ export default function App() {
       )}
 
       {/* FOOTER */}
-      <footer className={`border-t pt-16 pb-12 mt-auto ${isDarkMode ? 'bg-[#121212] border-gray-800 text-gray-300' : 'bg-white border-gray-200 text-gray-700'}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-4 gap-10 text-xs">
+      <footer className={`border-t pt-12 sm:pt-16 pb-12 mt-auto ${isDarkMode ? 'bg-[#121212] border-gray-800 text-gray-300' : 'bg-white border-gray-200 text-gray-700'}`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 sm:gap-10 text-xs">
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <img src={logoImg} alt="Kyvro Logo" className="h-12 w-auto object-contain" />
+              <img src={logoImg} alt="Kyvro Logo" className="h-10 sm:h-12 w-auto object-contain" />
               <div className="flex flex-col items-start">
-                <span className={`text-xl font-serif font-bold tracking-widest ${isDarkMode ? 'text-white' : 'text-black'}`}>KYVRO</span>
-                <span className={`text-[9px] tracking-[0.3em] font-sans -mt-1 ${isDarkMode ? 'text-[#D4AF37]' : 'text-black font-semibold'}`}>কাইভ্রো &bull; WEAR YOUR STORY</span>
+                <span className={`text-lg sm:text-xl font-serif font-bold tracking-widest ${isDarkMode ? 'text-white' : 'text-black'}`}>KYVRO</span>
+                <span className={`text-[8px] sm:text-[9px] tracking-[0.3em] font-sans -mt-1 ${isDarkMode ? 'text-[#D4AF37]' : 'text-black font-semibold'}`}>কাইভ্রো &bull; WEAR YOUR STORY</span>
               </div>
             </div>
             <p className="leading-relaxed">
@@ -899,7 +899,7 @@ export default function App() {
           </div>
 
           <div>
-            <h4 className={`font-bold uppercase tracking-wider mb-4 ${isDarkMode ? 'text-white' : 'text-black'}`}>Customer Care</h4>
+            <h4 className={`font-bold uppercase tracking-wider mb-3 sm:mb-4 ${isDarkMode ? 'text-white' : 'text-black'}`}>Customer Care</h4>
             <ul className="space-y-2">
               <li><button onClick={() => setCurrentView('shop')} className="hover:text-[#D4AF37]">Shop Collection</button></li>
               <li><a href="mailto:kyvrofashion@gmail.com" className="hover:text-[#D4AF37]">24/7 Support: kyvrofashion@gmail.com</a></li>
@@ -910,7 +910,7 @@ export default function App() {
           </div>
 
           <div>
-            <h4 className={`font-bold uppercase tracking-wider mb-4 ${isDarkMode ? 'text-white' : 'text-black'}`}>Categories</h4>
+            <h4 className={`font-bold uppercase tracking-wider mb-3 sm:mb-4 ${isDarkMode ? 'text-white' : 'text-black'}`}>Categories</h4>
             <ul className="space-y-2">
               <li><button onClick={() => { setSelectedCategory("Men"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Men's Collection</button></li>
               <li><button onClick={() => { setSelectedCategory("Women"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Women's Collection</button></li>
@@ -921,7 +921,7 @@ export default function App() {
           </div>
 
           <div>
-            <h4 className={`font-bold uppercase tracking-wider mb-4 ${isDarkMode ? 'text-white' : 'text-black'}`}>Secure Shopping</h4>
+            <h4 className={`font-bold uppercase tracking-wider mb-3 sm:mb-4 ${isDarkMode ? 'text-white' : 'text-black'}`}>Secure Shopping</h4>
             <p className="leading-relaxed mb-4">
               All transactions and customer details are encrypted and securely handled.
             </p>
@@ -934,7 +934,7 @@ export default function App() {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-6 border-t text-center text-gray-500 text-[11px]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10 sm:mt-12 pt-6 border-t text-center text-gray-500 text-[11px]">
           &copy; 2026 Kyvro - কাইভ্রো &bull; www.kyvro.store. All rights reserved.
         </div>
       </footer>
