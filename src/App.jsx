@@ -9,7 +9,7 @@ import logoImg from './logo.png';
 import heroBannerImg from './hero-banner.png';
 import shirtImg from './shirts.png';
 import punjabiImg from './punjabi.png';
-import sneakersImg from './snekers.png';
+import sneakersImg from './Snekers.png';
 
 const INITIAL_PRODUCTS = [
   {
@@ -901,13 +901,39 @@ export default function App() {
           <div>
             <h4 className={`font-bold uppercase tracking-wider mb-4 ${isDarkMode ? 'text-white' : 'text-black'}`}>Customer Care</h4>
             <ul className="space-y-2">
-              <li><span>Email: kyvrofashion@gmail.com</span></li>
-              <li><span>Instagram: kyvro_fashion</span></li>
+              <li><button onClick={() => setCurrentView('shop')} className="hover:text-[#D4AF37]">Shop Collection</button></li>
+              <li><a href="mailto:kyvrofashion@gmail.com" className="hover:text-[#D4AF37]">24/7 Support: kyvrofashion@gmail.com</a></li>
               <li><span>Facebook: www.facebook.com/kyvrofashion</span></li>
+              <li><span>Instagram: @kyvro_fashion</span></li>
               <li><span>TikTok: tiktok.com/@kyvro.store</span></li>
             </ul>
           </div>
+
+          <div>
+            <h4 className={`font-bold uppercase tracking-wider mb-4 ${isDarkMode ? 'text-white' : 'text-black'}`}>Categories</h4>
+            <ul className="space-y-2">
+              <li><button onClick={() => { setSelectedCategory("Men"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Men's Collection</button></li>
+              <li><button onClick={() => { setSelectedCategory("Women"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Women's Collection</button></li>
+              <li><button onClick={() => { setSelectedCategory("Shoes"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Shoes</button></li>
+              <li><button onClick={() => { setSelectedCategory("Wallets"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Wallets</button></li>
+              <li><button onClick={() => { setSelectedCategory("Watches"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Watches</button></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className={`font-bold uppercase tracking-wider mb-4 ${isDarkMode ? 'text-white' : 'text-black'}`}>Secure Shopping</h4>
+            <p className="leading-relaxed mb-4">
+              All transactions and customer details are encrypted and securely handled.
+            </p>
+            <button 
+              onClick={() => setCurrentView('admin')}
+              className={`border px-4 py-2 rounded font-bold transition ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-[#D4AF37] hover:bg-[#222]' : 'bg-gray-100 border-gray-300 text-black hover:bg-gray-200'}`}
+            >
+              Admin Portal Login
+            </button>
+          </div>
         </div>
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-6 border-t text-center text-gray-500 text-[11px]">
           &copy; 2026 Kyvro - কাইভ্রো &bull; www.kyvro.store. All rights reserved.
         </div>
