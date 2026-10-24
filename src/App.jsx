@@ -5,11 +5,27 @@ import {
   Lock, Settings, PlusCircle, Edit3, Eye, DollarSign, Package, 
   BarChart2, Globe, Mail, Phone, ExternalLink, AlertCircle, Send, Check, MessageCircle, Sun, Moon, Upload
 } from 'lucide-react';
+import { initializeApp } from "firebase/app";
+import { getAuth, signInWithEmailAndPassword, updatePassword, createUserWithEmailAndPassword } from "firebase/auth";
 import logoImg from './logo.png';
 import heroBannerImg from './hero-banner.png';
 import shirtImg from './shirts.png';
 import punjabiImg from './punjabi.png';
 import sneakersImg from './Snekers.png';
+
+// FIREBASE CONFIGURATION
+const firebaseConfig = {
+  apiKey: "AIzaSyDAiO5af_CFN1jMZkngS1lHCTp_I84Sel0",
+  authDomain: "kyvro-admin-auth.firebaseapp.com",
+  projectId: "kyvro-admin-auth",
+  storageBucket: "kyvro-admin-auth.appspot.com",
+  messagingSenderId: "26731438378",
+  appId: "1:26731438378:web:45571f4a21768719b2fe53",
+  measurementId: "G-QV58XT3CT4"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 
 const INITIAL_PRODUCTS = [
   {
@@ -106,8 +122,6 @@ const CURRENCIES = {
   MYR: { symbol: 'RM', rate: 0.038, flag: '🇲🇾', name: 'RINGGIT' }
 };
 
-const AVAILABLE_SIZES_LIST = ["S", "M", "L", "XL", "Standard", "One Size"];
-
 export default function App() {
   const [products, setProducts] = useState(() => {
     const saved = localStorage.getItem('kyvro_products');
@@ -141,7 +155,6 @@ export default function App() {
 
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   const banners = [heroBannerImg, shirtImg, punjabiImg, sneakersImg];
@@ -154,10 +167,16 @@ export default function App() {
     return () => clearInterval(timer);
   }, [banners.length]);
 
+  // Admin & Firebase States
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-  const [adminPin, setAdminPin] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   const [adminTab, setAdminTab] = useState('products');
   
+  const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+
   const [newProductForm, setNewProductForm] = useState({
     name: '', gender: 'Men', category: 'Shirt', price: '', originalPrice: '', image: '', description: '', colors: 'Matte Black, Charcoal', sizes: ['M', 'L'], stock: '10', isNew: true, isFeatured: false, isBestSeller: false
   });
@@ -189,42 +208,6 @@ export default function App() {
   const calculateDiscountPercent = (price, originalPrice) => {
     if (!originalPrice || originalPrice <= price) return 0;
     return Math.round(((originalPrice - price) / originalPrice) * 100);
-  };
-
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewProductForm(prev => ({ ...prev, image: reader.result }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleSizeCheckboxChange = (size) => {
-    setNewProductForm(prev => {
-      const currentSizes = prev.sizes || [];
-      if (currentSizes.includes(size)) {
-        return { ...prev, sizes: currentSizes.filter(s => s !== size) };
-      } else {
-        return { ...prev, sizes: [...currentSizes, size] };
-      }
-    });
-  };
-
-  const handleGenderChange = (genderVal) => {
-    let defaultCat = 'Shirt';
-    if (genderVal === 'Women') defaultCat = 'Sharee';
-    if (genderVal === 'Shoes') defaultCat = 'Shoes';
-    if (genderVal === 'Wallets') defaultCat = 'Wallets';
-    if (genderVal === 'Watches') defaultCat = 'Watches';
-
-    setNewProductForm(prev => ({
-      ...prev,
-      gender: genderVal,
-      category: defaultCat
-    }));
   };
 
   const addToCart = (product, selectedColor, selectedSize, quantity = 1) => {
@@ -280,13 +263,46 @@ export default function App() {
     setCurrentView('order-success');
   };
 
-  const handleAdminLogin = (e) => {
+  // Firebase Admin Login Handler
+  const handleFirebaseAdminLogin = async (e) => {
     e.preventDefault();
-    if (adminPin === 'admin123' || adminPin === 'kyvro2026') {
+    try {
+      await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
       setIsAdminLoggedIn(true);
-      setAdminPin('');
+      setAdminEmail('');
+      setAdminPassword('');
+    } catch (error) {
+      alert('Login Failed: ' + error.message);
+    }
+  };
+
+  // Firebase Password Change Handler
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    const user = auth.currentUser;
+    if (user && newPasswordInput) {
+      try {
+        await updatePassword(user, newPasswordInput);
+        alert('Admin password updated successfully in Firebase!');
+        setNewPasswordInput('');
+      } catch (error) {
+        alert('Error updating password: ' + error.message);
+      }
     } else {
-      alert('Invalid Admin PIN. (Hint: use admin123)');
+      alert('Please enter a valid new password.');
+    }
+  };
+
+  // Firebase Add New Admin Handler
+  const handleAddNewAdmin = async (e) => {
+    e.preventDefault();
+    try {
+      await createUserWithEmailAndPassword(auth, newAdminEmail, newAdminPassword);
+      alert(`New Admin account created successfully for ${newAdminEmail}!`);
+      setNewAdminEmail('');
+      setNewAdminPassword('');
+    } catch (error) {
+      alert('Error creating new admin: ' + error.message);
     }
   };
 
@@ -502,7 +518,6 @@ export default function App() {
                 <button onClick={() => { setCurrentView('shop'); setSelectedCategory("Shoes"); setIsMobileMenuOpen(false); }} className="text-left py-2 border-b border-gray-300 hover:text-[#D4AF37]">SHOES</button>
                 <button onClick={() => { setCurrentView('shop'); setSelectedCategory("Wallets"); setIsMobileMenuOpen(false); }} className="text-left py-2 border-b border-gray-300 hover:text-[#D4AF37]">WALLETS</button>
                 <button onClick={() => { setCurrentView('shop'); setSelectedCategory("Watches"); setIsMobileMenuOpen(false); }} className="text-left py-2 border-b border-gray-300 hover:text-[#D4AF37]">WATCHES</button>
-                <button onClick={() => { setCurrentView('admin'); setIsMobileMenuOpen(false); }} className="text-left py-2 border-b border-gray-300 text-[#D4AF37]">ADMIN LOGIN</button>
               </div>
             </div>
             <div className="text-xs text-gray-500">
@@ -881,6 +896,276 @@ export default function App() {
         </div>
       )}
 
+      {/* ADMIN PORTAL VIEW WITH FIREBASE SETTINGS */}
+      {currentView === 'admin' && (
+        <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
+          {!isAdminLoggedIn ? (
+            <div className={`max-w-md mx-auto p-8 rounded-xl border shadow-2xl space-y-6 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200'}`}>
+              <div className="text-center space-y-2">
+                <Lock size={40} className="mx-auto text-[#D4AF37]" />
+                <h2 className="text-2xl font-serif font-bold">FIREBASE ADMIN LOGIN</h2>
+                <p className="text-xs text-gray-500">Sign in with your Firebase admin email and password.</p>
+              </div>
+
+              <form onSubmit={handleFirebaseAdminLogin} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Admin Email</label>
+                  <input 
+                    type="email" 
+                    required
+                    value={adminEmail}
+                    onChange={(e) => setAdminEmail(e.target.value)}
+                    placeholder="admin@kyvrostore.com"
+                    className={`w-full border p-3 text-xs rounded focus:outline-none focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Password</label>
+                  <input 
+                    type="password" 
+                    required
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    placeholder="Password"
+                    className={`w-full border p-3 text-xs rounded focus:outline-none focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
+                  />
+                </div>
+                <button type="submit" className="w-full bg-[#D4AF37] text-black font-bold py-3.5 rounded text-xs uppercase tracking-widest hover:opacity-90 transition">
+                  Login via Firebase
+                </button>
+              </form>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 rounded-lg border gap-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
+                <div>
+                  <h1 className="text-2xl font-serif font-bold">Kyvro Management Dashboard (Firebase)</h1>
+                  <p className="text-xs text-gray-500">Logged in securely | Domain: www.kyvro.store</p>
+                </div>
+                <button 
+                  onClick={() => setIsAdminLoggedIn(false)}
+                  className="bg-gray-800 hover:bg-red-900 text-gray-300 px-4 py-2 rounded text-xs font-bold transition"
+                >
+                  Logout Admin
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-2 border-b pb-4">
+                <button 
+                  onClick={() => setAdminTab('products')} 
+                  className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'products' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
+                >
+                  Products ({products.length})
+                </button>
+                <button 
+                  onClick={() => { setEditingProductId(null); setAdminTab('add-product'); }} 
+                  className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'add-product' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
+                >
+                  {editingProductId ? 'Edit Product' : '+ Add Product'}
+                </button>
+                <button 
+                  onClick={() => setAdminTab('orders')} 
+                  className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'orders' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
+                >
+                  Orders ({orders.length})
+                </button>
+                <button 
+                  onClick={() => setAdminTab('settings')} 
+                  className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'settings' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
+                >
+                  Admin Settings & Security
+                </button>
+              </div>
+
+              {adminTab === 'products' && (
+                <div className={`rounded-lg border overflow-x-auto ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
+                  <table className="w-full text-left text-xs">
+                    <thead className={`uppercase tracking-wider border-b ${isDarkMode ? 'bg-[#1f1f1f] text-gray-400 border-gray-800' : 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                      <tr>
+                        <th className="p-4">Product</th>
+                        <th className="p-4">Category</th>
+                        <th className="p-4">Price</th>
+                        <th className="p-4">Stock</th>
+                        <th className="p-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {products.map(p => (
+                        <tr key={p.id} className="hover:bg-gray-100 dark:hover:bg-[#1a1a1a]">
+                          <td className="p-4 flex items-center gap-3">
+                            <img src={p.image} alt={p.name} className="w-10 h-10 object-cover rounded" />
+                            <span className="font-semibold">{p.name}</span>
+                          </td>
+                          <td className="p-4 text-gray-500">{p.gender} / {p.category}</td>
+                          <td className="p-4 text-[#D4AF37] font-bold">{formatPrice(p.price)}</td>
+                          <td className="p-4 text-gray-500">{p.stock} units</td>
+                          <td className="p-4 text-right space-x-2">
+                            <button onClick={() => startEditProduct(p)} className="text-gray-500 hover:text-black dark:hover:text-white px-2 py-1 bg-gray-200 dark:bg-gray-800 rounded">Edit</button>
+                            <button onClick={() => deleteProduct(p.id)} className="text-red-400 hover:text-red-300 px-2 py-1 bg-red-950/40 rounded">Delete</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {adminTab === 'add-product' && (
+                <form onSubmit={handleSaveProduct} className={`p-8 rounded-lg border space-y-6 max-w-3xl ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
+                  <h3 className="text-lg font-serif font-bold border-b pb-3">
+                    {editingProductId ? 'Edit Product Details' : 'Add New Luxury Product'}
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">Product Name *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={newProductForm.name}
+                        onChange={e => setNewProductForm({...newProductForm, name: e.target.value})}
+                        className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">Main Collection / Gender *</label>
+                      <select 
+                        value={newProductForm.gender}
+                        onChange={e => handleGenderChange(e.target.value)}
+                        className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
+                      >
+                        <option value="Men">Men's Collection</option>
+                        <option value="Women">Women's Collection</option>
+                        <option value="Shoes">Shoes</option>
+                        <option value="Wallets">Wallets</option>
+                        <option value="Watches">Watches</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">Selling Price (BDT) *</label>
+                      <input 
+                        type="number" 
+                        required 
+                        value={newProductForm.price}
+                        onChange={e => setNewProductForm({...newProductForm, price: e.target.value})}
+                        className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">Stock Quantity *</label>
+                      <input 
+                        type="number" 
+                        required 
+                        value={newProductForm.stock}
+                        onChange={e => setNewProductForm({...newProductForm, stock: e.target.value})}
+                        className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">Product Image URL / Upload *</label>
+                      <input 
+                        type="url" 
+                        value={newProductForm.image}
+                        onChange={e => setNewProductForm({...newProductForm, image: e.target.value})}
+                        className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
+                        placeholder="https://images.unsplash.com/..."
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">Description *</label>
+                      <textarea 
+                        rows="3"
+                        required 
+                        value={newProductForm.description}
+                        onChange={e => setNewProductForm({...newProductForm, description: e.target.value})}
+                        className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
+                      ></textarea>
+                    </div>
+                  </div>
+
+                  <button type="submit" className="bg-[#D4AF37] text-black font-bold px-8 py-3 rounded text-xs uppercase tracking-widest hover:opacity-90 transition">
+                    {editingProductId ? 'Update Product' : 'Save Product to Store'}
+                  </button>
+                </form>
+              )}
+
+              {adminTab === 'orders' && (
+                <div className="space-y-6">
+                  <div className={`flex justify-between items-center p-4 rounded border ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
+                    <p className="text-xs text-gray-500">Total Orders: <strong className="font-bold">{orders.length}</strong></p>
+                    <button onClick={exportOrdersCSV} className="bg-[#D4AF37] text-black text-xs font-bold px-4 py-2 rounded uppercase tracking-wider">
+                      Export Orders to CSV
+                    </button>
+                  </div>
+                  {orders.map((ord, idx) => (
+                    <div key={idx} className={`p-6 rounded-lg border space-y-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
+                      <div className="flex justify-between border-b pb-3">
+                        <span className="text-sm font-bold text-[#D4AF37]">{ord.orderNumber}</span>
+                        <span className="text-sm font-bold">{formatPrice(ord.total)}</span>
+                      </div>
+                      <p className="text-xs text-gray-500">Customer: {ord.customer.fullName} ({ord.customer.phone}) - {ord.customer.address}, {ord.customer.city}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {adminTab === 'settings' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl">
+                  {/* Change Password Form */}
+                  <form onSubmit={handleUpdatePassword} className={`p-6 rounded-lg border space-y-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
+                    <h3 className="text-base font-serif font-bold border-b pb-2">Change Admin Password</h3>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">New Password</label>
+                      <input 
+                        type="password"
+                        required
+                        value={newPasswordInput}
+                        onChange={(e) => setNewPasswordInput(e.target.value)}
+                        placeholder="Enter new secure password"
+                        className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
+                      />
+                    </div>
+                    <button type="submit" className="bg-[#D4AF37] text-black font-bold px-6 py-2.5 rounded text-xs uppercase tracking-wider">
+                      Update Password in Firebase
+                    </button>
+                  </form>
+
+                  {/* Add New Admin Form */}
+                  <form onSubmit={handleAddNewAdmin} className={`p-6 rounded-lg border space-y-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
+                    <h3 className="text-base font-serif font-bold border-b pb-2">Grant Admin Access to New Email</h3>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">New Admin Email</label>
+                      <input 
+                        type="email"
+                        required
+                        value={newAdminEmail}
+                        onChange={(e) => setNewAdminEmail(e.target.value)}
+                        placeholder="newadmin@gmail.com"
+                        className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">Temporary Password</label>
+                      <input 
+                        type="password"
+                        required
+                        value={newAdminPassword}
+                        onChange={(e) => setNewAdminPassword(e.target.value)}
+                        placeholder="Temporary password"
+                        className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
+                      />
+                    </div>
+                    <button type="submit" className="bg-[#D4AF37] text-black font-bold px-6 py-2.5 rounded text-xs uppercase tracking-wider">
+                      Create New Admin Account
+                    </button>
+                  </form>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* FOOTER */}
       <footer className={`border-t pt-12 sm:pt-16 pb-12 mt-auto ${isDarkMode ? 'bg-[#121212] border-gray-800 text-gray-300' : 'bg-white border-gray-200 text-gray-700'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 sm:gap-10 text-xs">
@@ -892,7 +1177,7 @@ export default function App() {
                 <span className={`text-[8px] sm:text-[9px] tracking-[0.3em] font-sans -mt-1 ${isDarkMode ? 'text-[#D4AF37]' : 'text-black font-semibold'}`}>কাইভ্রো &bull; WEAR YOUR STORY</span>
               </div>
             </div>
-            <p className="leading-relaxed">
+            <p className="description">
               Kyvro offers stylish, comfortable, and affordable clothing made for everyday wear. Discover premium fabrics, modern designs, and perfect fits.
             </p>
             <p className={`font-semibold ${isDarkMode ? 'text-[#D4AF37]' : 'text-black'}`}>Domain: www.kyvro.store</p>
