@@ -1,7 +1,7 @@
 import React from 'react';
 import { Lock } from 'lucide-react';
 
-export default function AdminPortal({ adminPin, adminTab, deleteProduct, editingProductId, exportOrdersCSV, formatPrice, handleAdminLogin, handleAdminLogout, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, isDarkMode, loggedInUserEmail, newProductForm, orders, products, setAdminPin, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct }) {
+export default function AdminPortal({ adminTab, deleteProduct, editingProductId, exportOrdersCSV, formatPrice, handleAdminLogout, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, isDarkMode, loggedInUserEmail, newProductForm, orders, products, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct }) {
   return (
     <>
         <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
@@ -10,30 +10,7 @@ export default function AdminPortal({ adminPin, adminTab, deleteProduct, editing
               <div className="text-center space-y-2">
                 <Lock size={40} className="mx-auto text-[#D4AF37]" />
                 <h2 className="text-2xl font-serif font-bold">KYVRO ADMIN PORTAL</h2>
-                <p className="text-xs text-gray-500">Sign in using your Security PIN or Google account.</p>
-              </div>
-
-              {/* PIN Login Form */}
-              <form onSubmit={handleAdminLogin} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Admin Security PIN</label>
-                  <input 
-                    type="password" 
-                    value={adminPin}
-                    onChange={(e) => setAdminPin(e.target.value)}
-                    placeholder="Enter Admin PIN"
-                    className={`w-full border p-3 text-xs rounded focus:outline-none focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
-                  />
-                </div>
-                <button type="submit" className="w-full bg-[#D4AF37] text-black font-bold py-3.5 rounded text-xs uppercase tracking-widest hover:opacity-90 transition">
-                  Access via PIN
-                </button>
-              </form>
-
-              <div className="relative flex py-2 items-center">
-                <div className="flex-grow border-t border-gray-300 dark:border-gray-700"></div>
-                <span className="flex-shrink mx-4 text-gray-400 text-xs uppercase">Or</span>
-                <div className="flex-grow border-t border-gray-300 dark:border-gray-700"></div>
+                <p className="text-xs text-gray-500">Sign in with your authorized Google account.</p>
               </div>
 
               {/* Google Sign-In Button */}

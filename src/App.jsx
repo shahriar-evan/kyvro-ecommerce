@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { auth, googleProvider } from './firebase';
+import { isAdminEmail } from './adminEmails';
 import { INITIAL_PRODUCTS } from './data/products';
 import { CURRENCIES } from './data/currencies';
 import heroBannerImg from './assets/hero-banner.png';
@@ -63,15 +64,19 @@ export default function App() {
 
   // Admin & Firebase Auth States
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-  const [adminPin, setAdminPin] = useState('');
   const [loggedInUserEmail, setLoggedInUserEmail] = useState('');
   const [adminTab, setAdminTab] = useState('products');
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
+      if (user && isAdminEmail(user.email)) {
         setIsAdminLoggedIn(true);
         setLoggedInUserEmail(user.email);
+      } else if (user) {
+        // Allowed list e nai, tai session bondho kore dao
+        signOut(auth).catch(() => {});
+        setIsAdminLoggedIn(false);
+        setLoggedInUserEmail('');
       }
     });
     return () => unsubscribe();
@@ -163,22 +168,15 @@ export default function App() {
     setCurrentView('order-success');
   };
 
-  // PIN Login Handler
-  const handleAdminLogin = (e) => {
-    e.preventDefault();
-    if (adminPin === 'admin123' || adminPin === 'kyvro2026') {
-      setIsAdminLoggedIn(true);
-      setLoggedInUserEmail('Owner PIN Login');
-      setAdminPin('');
-    } else {
-      alert('Invalid Admin PIN.');
-    }
-  };
-
-  // Google Sign-In Handler
+  // Google Sign-In Handler (shudhu allowed email gulo login korte parbe)
   const handleGoogleSignIn = async () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
+      if (!isAdminEmail(result.user.email)) {
+        await signOut(auth);
+        alert('Access denied: ' + result.user.email + ' is not authorized for the Admin Portal.');
+        return;
+      }
       setIsAdminLoggedIn(true);
       setLoggedInUserEmail(result.user.email);
     } catch (error) {
@@ -321,8 +319,8 @@ export default function App() {
       {/* SHOP CATALOG VIEW */}
       {currentView === 'shop' && <ShopView addToCart={addToCart} filteredProducts={filteredProducts} formatPrice={formatPrice} isDarkMode={isDarkMode} products={products} searchQuery={searchQuery} selectedCategory={selectedCategory} setCurrentView={setCurrentView} setSearchQuery={setSearchQuery} setSelectedCategory={setSelectedCategory} setSelectedProduct={setSelectedProduct} setSortBy={setSortBy} sortBy={sortBy} />}
 
-      {/* ADMIN PORTAL VIEW (PIN & GOOGLE SIGN-IN BOTH) */}
-      {currentView === 'admin' && <AdminPortal adminPin={adminPin} adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} exportOrdersCSV={exportOrdersCSV} formatPrice={formatPrice} handleAdminLogin={handleAdminLogin} handleAdminLogout={handleAdminLogout} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} setAdminPin={setAdminPin} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} />}
+      {/* ADMIN PORTAL VIEW (GOOGLE SIGN-IN, WHITELISTED EMAILS ONLY) */}
+      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} exportOrdersCSV={exportOrdersCSV} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} />}
 
       {/* FOOTER */}
       <Footer isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={setSelectedCategory} />
