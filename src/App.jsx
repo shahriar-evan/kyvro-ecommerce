@@ -6,6 +6,7 @@ import { getAdminStatus, watchAdminAccess } from './adminAuth';
 import { INITIAL_PRODUCTS } from './data/products';
 import { CURRENCIES } from './data/currencies';
 import heroBannerImg from './assets/hero-banner.png';
+import styleImg from './assets/style.png';
 import shirtImg from './assets/shirts.png';
 import punjabiImg from './assets/punjabi.png';
 import sneakersImg from './assets/Snekers.png';
@@ -53,7 +54,7 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  const banners = [heroBannerImg, shirtImg, punjabiImg, sneakersImg];
+  const banners = [styleImg, shirtImg, punjabiImg, sneakersImg];
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
 
   useEffect(() => {
