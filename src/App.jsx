@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth, googleProvider } from './firebase';
-import { isAdminEmail } from './adminEmails';
+import { isOwnerEmail } from './adminEmails';
+import { isAuthorizedAdmin } from './adminAuth';
 import { INITIAL_PRODUCTS } from './data/products';
 import { CURRENCIES } from './data/currencies';
 import heroBannerImg from './assets/hero-banner.png';
@@ -68,12 +69,13 @@ export default function App() {
   const [adminTab, setAdminTab] = useState('products');
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user && isAdminEmail(user.email)) {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) return;
+      if (await isAuthorizedAdmin(user.email)) {
         setIsAdminLoggedIn(true);
         setLoggedInUserEmail(user.email);
-      } else if (user) {
-        // Allowed list e nai, tai session bondho kore dao
+      } else {
+        // Admin list e nai, tai session bondho kore dao
         signOut(auth).catch(() => {});
         setIsAdminLoggedIn(false);
         setLoggedInUserEmail('');
@@ -168,11 +170,11 @@ export default function App() {
     setCurrentView('order-success');
   };
 
-  // Google Sign-In Handler (shudhu allowed email gulo login korte parbe)
+  // Google Sign-In Handler (shudhu owner / allowed admin email gulo login korte parbe)
   const handleGoogleSignIn = async () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      if (!isAdminEmail(result.user.email)) {
+      if (!(await isAuthorizedAdmin(result.user.email))) {
         await signOut(auth);
         alert('Access denied: ' + result.user.email + ' is not authorized for the Admin Portal.');
         return;
@@ -181,6 +183,23 @@ export default function App() {
       setLoggedInUserEmail(result.user.email);
     } catch (error) {
       alert('Google Sign-In Error: ' + error.message);
+    }
+  };
+
+  // Email + Password Sign-In Handler
+  const handleEmailSignIn = async (email, password) => {
+    try {
+      const result = await signInWithEmailAndPassword(auth, email.trim(), password);
+      if (!(await isAuthorizedAdmin(result.user.email))) {
+        await signOut(auth);
+        alert('Access denied: ' + result.user.email + ' is not authorized for the Admin Portal.');
+        return;
+      }
+      setIsAdminLoggedIn(true);
+      setLoggedInUserEmail(result.user.email);
+    } catch (error) {
+      const wrong = ['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found', 'auth/invalid-email'];
+      alert(wrong.includes(error.code) ? 'Email ba password thik na.' : 'Sign-In Error: ' + error.message);
     }
   };
 
@@ -320,7 +339,7 @@ export default function App() {
       {currentView === 'shop' && <ShopView addToCart={addToCart} filteredProducts={filteredProducts} formatPrice={formatPrice} isDarkMode={isDarkMode} products={products} searchQuery={searchQuery} selectedCategory={selectedCategory} setCurrentView={setCurrentView} setSearchQuery={setSearchQuery} setSelectedCategory={setSelectedCategory} setSelectedProduct={setSelectedProduct} setSortBy={setSortBy} sortBy={sortBy} />}
 
       {/* ADMIN PORTAL VIEW (GOOGLE SIGN-IN, WHITELISTED EMAILS ONLY) */}
-      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} exportOrdersCSV={exportOrdersCSV} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} />}
+      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} exportOrdersCSV={exportOrdersCSV} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} isOwner={isOwnerEmail(loggedInUserEmail)} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} />}
 
       {/* FOOTER */}
       <Footer isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={setSelectedCategory} />
