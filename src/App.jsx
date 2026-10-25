@@ -5,6 +5,7 @@ import { isOwnerEmail } from './adminEmails';
 import { getAdminStatus, watchAdminAccess } from './adminAuth';
 import { INITIAL_PRODUCTS } from './data/products';
 import { CURRENCIES } from './data/currencies';
+import { defaultCategoryFor, matchesCollectionPage, hasSizeStock, stockForSize, orderedSizes } from './data/catalog';
 import heroBannerImg from './assets/hero-banner.png';
 import men_womenImg from './assets/men_women.png';
 import women_bannerImg from './assets/women_banner.png';
@@ -21,6 +22,12 @@ import HomeView from './components/HomeView';
 import ShopView from './components/ShopView';
 import AdminPortal from './components/AdminPortal';
 import Footer from './components/Footer';
+import ProductDetail from './components/ProductDetail';
+
+const EMPTY_PRODUCT_FORM = {
+  name: '', gender: 'Men', category: 'Shirt', price: '', originalPrice: '', image: '', description: '',
+  colors: 'Matte Black, Charcoal', sizeStock: {}, stock: '10', isNew: true, isFeatured: false, isBestSeller: false
+};
 
 export default function App() {
   const [products, setProducts] = useState(() => {
@@ -47,8 +54,15 @@ export default function App() {
 
   const [currentView, setCurrentView] = useState('home');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedSubCategory, setSelectedSubCategory] = useState(null); // null = default view of the collection
   const [selectedProduct, setSelectedProduct] = useState(null);
   
+  // Choosing a collection always starts at its default view
+  const selectCategory = (category) => {
+    setSelectedCategory(category);
+    setSelectedSubCategory(null);
+  };
+
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('featured');
   const [priceFilter, setPriceFilter] = useState(15000);
@@ -118,9 +132,7 @@ export default function App() {
     return () => unsubscribe();
   }, [isAdminLoggedIn, loggedInUserEmail]);
 
-  const [newProductForm, setNewProductForm] = useState({
-    name: '', gender: 'Men', category: 'Shirt', price: '', originalPrice: '', image: '', description: '', colors: 'Matte Black, Charcoal', sizes: ['M', 'L'], stock: '10', isNew: true, isFeatured: false, isBestSeller: false
-  });
+  const [newProductForm, setNewProductForm] = useState(EMPTY_PRODUCT_FORM);
   const [editingProductId, setEditingProductId] = useState(null);
 
   const [checkoutForm, setCheckoutForm] = useState({
@@ -130,7 +142,12 @@ export default function App() {
   const [orderCompleteData, setOrderCompleteData] = useState(null);
 
   useEffect(() => {
-    localStorage.setItem('kyvro_products', JSON.stringify(products));
+    try {
+      localStorage.setItem('kyvro_products', JSON.stringify(products));
+    } catch (err) {
+      console.error('Could not save products:', err);
+      alert('Browser storage is full, so the latest product changes could not be saved. Use smaller photos or image links instead of uploaded photos.');
+    }
   }, [products]);
 
   useEffect(() => {
@@ -152,19 +169,46 @@ export default function App() {
   };
 
   const addToCart = (product, selectedColor, selectedSize, quantity = 1) => {
-    const cartItemId = `${product.id}-${selectedColor || 'default'}-${selectedSize || 'default'}`;
+    const live = products.find(p => p.id === product.id) || product;
+    const size = selectedSize || (live.sizes && live.sizes[0]);
+    const color = selectedColor || (live.colors && live.colors[0]);
+    const cartItemId = `${product.id}-${color || 'default'}-${size || 'default'}`;
+
+    // Never allow more than what is in stock (for that size)
+    const available = stockForSize(live, size);
+    const inCart = cart.filter(i => i.id === product.id && i.selectedSize === size).reduce((sum, i) => sum + i.quantity, 0);
+    const canAdd = Math.max(0, available - inCart);
+    const sizeText = hasSizeStock(live) && size ? ` in size ${size}` : '';
+    if (canAdd <= 0) {
+      alert(`Sorry, no more units are available${sizeText}.`);
+      return;
+    }
+    const qty = Math.min(quantity, canAdd);
+    if (qty < quantity) alert(`Only ${available} unit(s) available${sizeText}. We added ${qty} to your cart.`);
+
     setCart(prev => {
       const existing = prev.find(item => item.cartItemId === cartItemId);
       if (existing) {
-        return prev.map(item => item.cartItemId === cartItemId ? { ...item, quantity: item.quantity + quantity } : item);
-      } else {
-        return [...prev, { ...product, cartItemId, selectedColor: selectedColor || product.colors[0], selectedSize: selectedSize || product.sizes[0], quantity }];
+        return prev.map(item => item.cartItemId === cartItemId ? { ...item, quantity: item.quantity + qty } : item);
       }
+      return [...prev, { ...live, cartItemId, selectedColor: color, selectedSize: size, quantity: qty }];
     });
     setIsCartOpen(true);
   };
 
   const updateCartQty = (cartItemId, delta) => {
+    if (delta > 0) {
+      const target = cart.find(i => i.cartItemId === cartItemId);
+      if (target) {
+        const live = products.find(p => p.id === target.id) || target;
+        const available = stockForSize(live, target.selectedSize);
+        const sameSizeInCart = cart.filter(i => i.id === target.id && i.selectedSize === target.selectedSize).reduce((sum, i) => sum + i.quantity, 0);
+        if (sameSizeInCart + delta > available) {
+          alert(`Only ${available} unit(s) available${hasSizeStock(live) ? ` in size ${target.selectedSize}` : ''}.`);
+          return;
+        }
+      }
+    }
     setCart(prev => prev.map(item => {
       if (item.cartItemId === cartItemId) {
         const newQty = item.quantity + delta;
@@ -252,14 +296,38 @@ export default function App() {
   };
 
   // Gender/Collection change handler (was missing in the original code and crashed the admin form)
+  // Changing the collection resets the sub-category and sizes (they differ per collection)
   const handleGenderChange = (gender) => {
-    const defaultCategory = { Men: 'Shirt', Women: 'Sharee', Shoes: 'Shoes', Wallets: 'Wallets', Watches: 'Watches' };
-    setNewProductForm(prev => ({ ...prev, gender, category: defaultCategory[gender] || prev.category }));
+    setNewProductForm(prev => ({ ...prev, gender, category: defaultCategoryFor(gender), sizeStock: {} }));
   };
+
 
   const handleSaveProduct = (e) => {
     e.preventDefault();
     const existingProduct = editingProductId ? products.find(p => p.id === editingProductId) : null;
+
+    if (!newProductForm.image) {
+      alert('Please add a product image: paste an image link or upload a photo.');
+      return;
+    }
+
+    // Sizes with their own quantity, e.g. { M: 20, L: 15, XL: 10 }
+    const formSizes = newProductForm.sizeStock || {};
+    const sizeStock = {};
+    for (const size of orderedSizes(Object.keys(formSizes), newProductForm.gender)) {
+      const n = parseInt(formSizes[size], 10);
+      if (Number.isNaN(n) || n < 0) {
+        alert(`Please enter how many are available for size ${size} (0 or more).`);
+        return;
+      }
+      sizeStock[size] = n;
+    }
+    const sizeNames = Object.keys(sizeStock);
+    const hasSizes = sizeNames.length > 0;
+    const stock = hasSizes
+      ? sizeNames.reduce((sum, s) => sum + sizeStock[s], 0)
+      : Math.max(0, parseInt(newProductForm.stock, 10) || 0);
+
     const productData = {
       id: editingProductId || Date.now(),
       name: newProductForm.name,
@@ -267,12 +335,13 @@ export default function App() {
       gender: newProductForm.gender,
       price: parseFloat(newProductForm.price) || 0,
       originalPrice: parseFloat(newProductForm.originalPrice) || 0,
-      image: newProductForm.image || shirtImg,
-      images: [newProductForm.image || shirtImg],
+      image: newProductForm.image,
+      images: [newProductForm.image],
       description: newProductForm.description,
-      colors: newProductForm.colors.split(',').map(s => s.trim()),
-      sizes: newProductForm.sizes.length > 0 ? newProductForm.sizes : ["Standard"],
-      stock: parseInt(newProductForm.stock) || 10,
+      colors: newProductForm.colors.split(',').map(s => s.trim()).filter(Boolean),
+      sizes: hasSizes ? sizeNames : ["Standard"],
+      ...(hasSizes ? { sizeStock } : {}),
+      stock,
       isNew: newProductForm.isNew,
       isFeatured: newProductForm.isFeatured,
       isBestSeller: newProductForm.isBestSeller,
@@ -288,13 +357,23 @@ export default function App() {
       setProducts([productData, ...products]);
     }
 
-    setNewProductForm({
-      name: '', gender: 'Men', category: 'Shirt', price: '', originalPrice: '', image: '', description: '', colors: 'Matte Black, Charcoal', sizes: ['M', 'L'], stock: '10', isNew: true, isFeatured: false, isBestSeller: false
-    });
+    setNewProductForm(EMPTY_PRODUCT_FORM);
     alert('Product saved successfully!');
   };
 
   const startEditProduct = (prod) => {
+    // Older products without per-size stock: share the stock evenly so the admin can adjust it
+    let sizeStock = {};
+    if (hasSizeStock(prod)) {
+      Object.entries(prod.sizeStock).forEach(([size, qty]) => { sizeStock[size] = String(qty); });
+    } else {
+      const real = (Array.isArray(prod.sizes) ? prod.sizes : []).filter(sz => !['Standard', 'One Size'].includes(sz));
+      if (real.length > 0) {
+        const total = parseInt(prod.stock, 10) || 0;
+        const each = Math.floor(total / real.length);
+        real.forEach((sz, i) => { sizeStock[sz] = String(i === 0 ? total - each * (real.length - 1) : each); });
+      }
+    }
     setEditingProductId(prod.id);
     setNewProductForm({
       name: prod.name,
@@ -304,8 +383,8 @@ export default function App() {
       originalPrice: prod.originalPrice || '',
       image: prod.image,
       description: prod.description,
-      colors: prod.colors.join(', '),
-      sizes: Array.isArray(prod.sizes) ? prod.sizes : [prod.sizes || 'Standard'],
+      colors: (prod.colors || []).join(', '),
+      sizeStock,
       stock: prod.stock,
       isNew: prod.isNew,
       isFeatured: prod.isFeatured,
@@ -348,10 +427,9 @@ export default function App() {
 
   const filteredProducts = products.filter(p => {
     let matchesCategory = true;
-    if (selectedCategory === 'Men') {
-      matchesCategory = p.gender === 'Men' || ['Shirt', 'Punjabi', 'Polo', 'T-shirt', 'Joggers & Sweats', 'Jersey'].includes(p.category);
-    } else if (selectedCategory === 'Women') {
-      matchesCategory = p.gender === 'Women' || ['Sharee', 'Bags', 'Western Wear', 'Muslim Wear'].includes(p.category);
+    if (selectedCategory === 'Men' || selectedCategory === 'Women') {
+      // Men: Shirt & Punjabi by default, Women: Sharee by default, or the chosen sub-category
+      matchesCategory = matchesCollectionPage(p, selectedCategory, selectedSubCategory);
     } else if (selectedCategory === 'Shoes') {
       matchesCategory = p.category === 'Shoes' || p.gender === 'Shoes';
     } else if (selectedCategory === 'Wallets') {
@@ -361,7 +439,6 @@ export default function App() {
     } else if (selectedCategory !== 'All') {
       matchesCategory = p.category.toLowerCase() === selectedCategory.toLowerCase();
     }
-
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesPrice = p.price <= priceFilter;
     return matchesCategory && matchesSearch && matchesPrice;
@@ -380,25 +457,27 @@ export default function App() {
       <AnnouncementBar announcementText={announcementText} isDarkMode={isDarkMode} />
 
       {/* 2. HEADER */}
-      <Header cart={cart} curr={curr} currencyKey={currencyKey} currentView={currentView} isDarkMode={isDarkMode} setCurrencyKey={setCurrencyKey} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} setIsDarkMode={setIsDarkMode} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={setSelectedCategory} />
+      <Header cart={cart} curr={curr} currencyKey={currencyKey} currentView={currentView} isDarkMode={isDarkMode} setCurrencyKey={setCurrencyKey} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} setIsDarkMode={setIsDarkMode} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} />
 
       {/* MOBILE MENU DRAWER */}
-      {isMobileMenuOpen && <MobileMenu isDarkMode={isDarkMode} setCurrentView={setCurrentView} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={setSelectedCategory} />}
+      {isMobileMenuOpen && <MobileMenu isDarkMode={isDarkMode} setCurrentView={setCurrentView} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} />}
 
       {/* CART SLIDE-OVER DRAWER */}
       {isCartOpen && <CartDrawer cart={cart} finalShipping={finalShipping} formatPrice={formatPrice} freeShippingThreshold={freeShippingThreshold} grandTotal={grandTotal} isDarkMode={isDarkMode} removeFromCart={removeFromCart} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} shippingFee={shippingFee} subtotal={subtotal} updateCartQty={updateCartQty} />}
 
       {/* HOME VIEW */}
-      {currentView === 'home' && <HomeView addToCart={addToCart} banners={banners} calculateDiscountPercent={calculateDiscountPercent} currentBannerIndex={currentBannerIndex} formatPrice={formatPrice} isDarkMode={isDarkMode} products={products} setCurrentBannerIndex={setCurrentBannerIndex} setCurrentView={setCurrentView} setSelectedCategory={setSelectedCategory} setSelectedProduct={setSelectedProduct} />}
+      {currentView === 'home' && <HomeView addToCart={addToCart} banners={banners} calculateDiscountPercent={calculateDiscountPercent} currentBannerIndex={currentBannerIndex} formatPrice={formatPrice} isDarkMode={isDarkMode} products={products} setCurrentBannerIndex={setCurrentBannerIndex} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} />}
 
       {/* SHOP CATALOG VIEW */}
-      {currentView === 'shop' && <ShopView addToCart={addToCart} filteredProducts={filteredProducts} formatPrice={formatPrice} isDarkMode={isDarkMode} products={products} searchQuery={searchQuery} selectedCategory={selectedCategory} setCurrentView={setCurrentView} setSearchQuery={setSearchQuery} setSelectedCategory={setSelectedCategory} setSelectedProduct={setSelectedProduct} setSortBy={setSortBy} sortBy={sortBy} />}
+      {currentView === 'shop' && <ShopView selectedSubCategory={selectedSubCategory} setSelectedSubCategory={setSelectedSubCategory} addToCart={addToCart} filteredProducts={filteredProducts} formatPrice={formatPrice} isDarkMode={isDarkMode} products={products} searchQuery={searchQuery} selectedCategory={selectedCategory} setCurrentView={setCurrentView} setSearchQuery={setSearchQuery} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} setSortBy={setSortBy} sortBy={sortBy} />}
+
+      {currentView === 'product-detail' && selectedProduct && <ProductDetail product={selectedProduct} products={products} addToCart={addToCart} calculateDiscountPercent={calculateDiscountPercent} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
 
       {/* ADMIN PORTAL VIEW (GOOGLE SIGN-IN, WHITELISTED EMAILS ONLY) */}
       {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} exportOrdersCSV={exportOrdersCSV} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} canDeleteProduct={canDeleteProduct} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} />}
 
       {/* FOOTER */}
-      <Footer isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={setSelectedCategory} />
+      <Footer isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} />
 
     </div>
   );

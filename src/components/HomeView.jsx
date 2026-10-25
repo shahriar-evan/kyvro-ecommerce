@@ -1,4 +1,5 @@
 import React from 'react';
+import { hasSizeStock, totalStock } from '../data/catalog';
 import { User, Shield, Truck, RefreshCw, ChevronRight, MessageCircle } from 'lucide-react';
 import heroBannerImg from '../assets/hero-banner.png';
 import shirtImg from '../assets/shirts.png';
@@ -148,10 +149,13 @@ export default function HomeView({ addToCart, banners, calculateDiscountPercent,
                               Details
                             </button>
                             <button 
-                              onClick={() => addToCart(product, product.colors[0], product.sizes[0], 1)}
-                              className="bg-[#D4AF37] text-black text-xs font-bold py-2.5 rounded hover:opacity-90 transition text-center"
+                              disabled={totalStock(product) <= 0}
+                              onClick={() => hasSizeStock(product)
+                                ? (setSelectedProduct(product), setCurrentView('product-detail'))
+                                : addToCart(product, product.colors[0], product.sizes[0], 1)}
+                              className="bg-[#D4AF37] text-black text-xs font-bold py-2.5 rounded hover:opacity-90 transition text-center disabled:opacity-40 disabled:cursor-not-allowed"
                             >
-                              Add to Cart
+                              {totalStock(product) <= 0 ? 'Sold Out' : hasSizeStock(product) ? 'Select Size' : 'Add to Cart'}
                             </button>
                           </div>
                           <a 

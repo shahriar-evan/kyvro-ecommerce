@@ -1,0 +1,118 @@
+import React, { useState } from 'react';
+import { hasSizeStock, totalStock, stockForSize, orderedSizes } from '../data/catalog';
+
+export default function ProductDetail({ product, products, addToCart, calculateDiscountPercent, formatPrice, isDarkMode, setCurrentView }) {
+  // Always use the latest version of the product (admin may have changed stock)
+  const live = (products || []).find((p) => p.id === product.id) || product;
+  const sized = hasSizeStock(live);
+  const sizes = sized ? orderedSizes(Object.keys(live.sizeStock), live.gender) : [];
+  const colors = Array.isArray(live.colors) && live.colors.length ? live.colors : [];
+
+  const [size, setSize] = useState('');
+  const [color, setColor] = useState(colors[0] || '');
+  const [qty, setQty] = useState(1);
+
+  const total = totalStock(live);
+  const available = sized ? (size ? stockForSize(live, size) : 0) : total;
+  const soldOut = total <= 0;
+  const discount = calculateDiscountPercent(live.price, live.originalPrice);
+  const needsSize = sized && !size;
+
+  const pickSize = (s) => {
+    setSize(s);
+    setQty(1);
+  };
+
+  const handleAdd = () => {
+    if (soldOut || needsSize) return;
+    addToCart(live, color || undefined, sized ? size : (live.sizes && live.sizes[0]), qty);
+  };
+
+  const cardBtn = (active, disabled) =>
+    `min-w-[3rem] px-3 py-2 text-xs rounded border transition ${
+      disabled
+        ? 'opacity-40 line-through cursor-not-allowed border-gray-300 dark:border-gray-700'
+        : active
+          ? 'bg-[#D4AF37] border-[#D4AF37] text-black font-bold'
+          : (isDarkMode ? 'border-gray-700 hover:border-[#D4AF37]' : 'border-gray-300 hover:border-[#D4AF37]')
+    }`;
+
+  return (
+    <div className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 w-full">
+      <button onClick={() => setCurrentView('shop')} className="text-xs text-gray-500 hover:text-[#D4AF37] mb-6">&larr; Back to shop</button>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
+        <div className={`relative rounded-lg overflow-hidden border ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-gray-100 border-gray-200'}`}>
+          <img src={live.image} alt={live.name} className="w-full h-full max-h-[560px] object-cover" />
+          {soldOut && <span className="absolute top-3 left-3 bg-red-600 text-white text-[11px] font-bold px-3 py-1 rounded">SOLD OUT</span>}
+          {!soldOut && discount > 0 && <span className="absolute top-3 left-3 bg-[#D4AF37] text-black text-[11px] font-bold px-3 py-1 rounded">-{discount}%</span>}
+        </div>
+
+        <div className="space-y-5">
+          <div>
+            <span className="text-[11px] text-[#D4AF37] uppercase tracking-wider">{live.gender === live.category ? live.category : `${live.gender} / ${live.category}`}</span>
+            <h1 className="text-2xl sm:text-3xl font-serif font-bold mt-1">{live.name}</h1>
+          </div>
+
+          <div className="flex items-end gap-3">
+            <span className="text-2xl font-bold text-[#D4AF37]">{formatPrice(live.price)}</span>
+            {live.originalPrice > live.price && <span className="text-sm text-gray-500 line-through">{formatPrice(live.originalPrice)}</span>}
+          </div>
+
+          <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{live.description}</p>
+
+          {colors.length > 1 && (
+            <div>
+              <p className="text-xs font-semibold mb-2">Color: <span className="font-normal text-gray-500">{color}</span></p>
+              <div className="flex flex-wrap gap-2">
+                {colors.map((c) => (
+                  <button key={c} onClick={() => setColor(c)} className={cardBtn(color === c, false)}>{c}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {sized && (
+            <div>
+              <p className="text-xs font-semibold mb-2">
+                Size: <span className="font-normal text-gray-500">{size || 'select a size'}</span>
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {sizes.map((s) => {
+                  const left = stockForSize(live, s);
+                  return (
+                    <button key={s} disabled={left <= 0} onClick={() => pickSize(s)} className={cardBtn(size === s, left <= 0)} title={left <= 0 ? 'Out of stock' : `${left} available`}>
+                      <span className="block">{s}</span>
+                      {left > 0 && left <= 5 && <span className="block text-[9px] opacity-80">{left} left</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              {size && <p className="text-xs text-gray-500 mt-2">{available} available in size {size}</p>}
+            </div>
+          )}
+
+          {!sized && !soldOut && <p className="text-xs text-gray-500">{total <= 5 ? `Only ${total} left in stock` : 'In stock'}</p>}
+
+          {!soldOut && (
+            <div className="flex items-center gap-3">
+              <div className={`flex items-center border rounded ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>
+                <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="px-3 py-2 text-sm">−</button>
+                <span className="px-4 text-sm font-semibold">{qty}</span>
+                <button onClick={() => setQty((q) => Math.min(Math.max(available, 1), q + 1))} disabled={needsSize || qty >= available} className="px-3 py-2 text-sm disabled:opacity-40">+</button>
+              </div>
+              <button
+                onClick={handleAdd}
+                disabled={needsSize}
+                className="flex-1 bg-[#D4AF37] text-black font-bold py-3 rounded text-xs uppercase tracking-widest hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {needsSize ? 'Select a size' : 'Add to Cart'}
+              </button>
+            </div>
+          )}
+          {soldOut && <p className="text-sm font-bold text-red-500">This product is currently sold out.</p>}
+        </div>
+      </div>
+    </div>
+  );
+}

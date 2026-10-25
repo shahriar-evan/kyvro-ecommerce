@@ -1,10 +1,15 @@
 import React from 'react';
 import AdminLogin from './AdminLogin';
 import AdminManager from './AdminManager';
+import ImageField from './ImageField';
+import SizeStockEditor from './SizeStockEditor';
+import { SUB_CATEGORIES, hasSubCategories, hasSizeStock, totalStock, orderedSizes } from '../data/catalog';
 
 export default function AdminPortal({ adminTab, deleteProduct, editingProductId, exportOrdersCSV, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminRole, canDeleteProduct, isDarkMode, loggedInUserEmail, newProductForm, orders, products, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct }) {
   const isOwner = adminRole === 'owner';
   const canManageTeam = adminRole === 'owner' || adminRole === 'manager';
+  const sizesUsed = Object.keys((newProductForm && newProductForm.sizeStock) || {}).length > 0;
+  const sizesTotal = Object.values((newProductForm && newProductForm.sizeStock) || {}).reduce((sum, n) => sum + (parseInt(n, 10) || 0), 0);
   const roleLabel = adminRole ? adminRole.charAt(0).toUpperCase() + adminRole.slice(1) : '';
 
   return (
@@ -80,9 +85,16 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                               {p.addedBy && <p className="text-[10px] text-gray-500 font-normal mt-0.5">Added by {p.addedBy}</p>}
                             </div>
                           </td>
-                          <td className="p-4 text-gray-500">{p.gender} / {p.category}</td>
+                          <td className="p-4 text-gray-500">{p.gender === p.category ? p.category : `${p.gender} / ${p.category}`}</td>
                           <td className="p-4 text-[#D4AF37] font-bold">{formatPrice(p.price)}</td>
-                          <td className="p-4 text-gray-500">{p.stock} units</td>
+                          <td className="p-4 text-gray-500">
+                            {totalStock(p)} units
+                            {hasSizeStock(p) && (
+                              <p className="text-[10px] mt-0.5">
+                                {orderedSizes(Object.keys(p.sizeStock), p.gender).map(sz => `${sz}: ${p.sizeStock[sz]}`).join(' · ')}
+                              </p>
+                            )}
+                          </td>
                           <td className="p-4 text-right space-x-2">
                             <button onClick={() => startEditProduct(p)} className="text-gray-500 hover:text-black dark:hover:text-white px-2 py-1 bg-gray-200 dark:bg-gray-800 rounded">Edit</button>
                             {canDeleteProduct(p) && <button onClick={() => deleteProduct(p.id)} className="text-red-400 hover:text-red-300 px-2 py-1 bg-red-950/40 rounded">Delete</button>}
@@ -125,6 +137,25 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                         <option value="Watches">Watches</option>
                       </select>
                     </div>
+
+                    {hasSubCategories(newProductForm.gender) && (
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-semibold text-gray-500 mb-1">Sub Category *</label>
+                        <select
+                          value={newProductForm.category}
+                          onChange={e => setNewProductForm({...newProductForm, category: e.target.value})}
+                          className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
+                        >
+                          {SUB_CATEGORIES[newProductForm.gender].map(item => item.group ? (
+                            <optgroup key={item.group} label={item.group}>
+                              {item.items.map(i => <option key={i} value={i}>{i}</option>)}
+                            </optgroup>
+                          ) : (
+                            <option key={item.name} value={item.name}>{item.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 mb-1">Selling Price (BDT) *</label>
                       <input 
@@ -136,23 +167,31 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-500 mb-1">Stock Quantity *</label>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">{sizesUsed ? 'Total Stock (auto, from sizes)' : 'Stock Quantity *'}</label>
                       <input 
                         type="number" 
-                        required 
-                        value={newProductForm.stock}
+                        min="0"
+                        required={!sizesUsed}
+                        disabled={sizesUsed}
+                        value={sizesUsed ? sizesTotal : newProductForm.stock}
                         onChange={e => setNewProductForm({...newProductForm, stock: e.target.value})}
                         className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
                       />
                     </div>
+
                     <div className="sm:col-span-2">
-                      <label className="block text-xs font-semibold text-gray-500 mb-1">Product Image URL / Upload *</label>
-                      <input 
-                        type="url" 
+                      <SizeStockEditor
+                        gender={newProductForm.gender}
+                        value={newProductForm.sizeStock || {}}
+                        onChange={(sizeStock) => setNewProductForm({...newProductForm, sizeStock})}
+                        isDarkMode={isDarkMode}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <ImageField
                         value={newProductForm.image}
-                        onChange={e => setNewProductForm({...newProductForm, image: e.target.value})}
-                        className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
-                        placeholder="https://images.unsplash.com/..."
+                        onChange={(image) => setNewProductForm(prev => ({...prev, image}))}
+                        isDarkMode={isDarkMode}
                       />
                     </div>
                     <div className="sm:col-span-2">

@@ -1,6 +1,7 @@
 import React from 'react';
+import { SUB_CATEGORIES, COLLECTION_LABELS, DEFAULT_SUB_LABEL, hasSizeStock, totalStock } from '../data/catalog';
 
-export default function ShopView({ addToCart, filteredProducts, formatPrice, isDarkMode, products, searchQuery, selectedCategory, setCurrentView, setSearchQuery, setSelectedCategory, setSelectedProduct, setSortBy, sortBy }) {
+export default function ShopView({ addToCart, filteredProducts, formatPrice, isDarkMode, products, searchQuery, selectedCategory, selectedSubCategory, setSelectedSubCategory, setCurrentView, setSearchQuery, setSelectedCategory, setSelectedProduct, setSortBy, sortBy }) {
   return (
     <>
         <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 w-full">
@@ -9,7 +10,10 @@ export default function ShopView({ addToCart, filteredProducts, formatPrice, isD
               <h1 className="text-2xl sm:text-3xl font-serif font-bold">
                 {selectedCategory === 'All' ? 'Complete Collection' : `${selectedCategory} Collection`}
               </h1>
-              <p className="text-xs text-gray-500 mt-1">Showing {filteredProducts.length} luxury products</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {(selectedCategory === 'Men' || selectedCategory === 'Women') && <span className="text-[#D4AF37] font-semibold">{selectedSubCategory || DEFAULT_SUB_LABEL[selectedCategory]} &middot; </span>}
+                Showing {filteredProducts.length} luxury products
+              </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-3 sm:gap-4 w-full md:w-auto">
@@ -37,13 +41,51 @@ export default function ShopView({ addToCart, filteredProducts, formatPrice, isD
             <div className="space-y-6">
               <div className={`p-6 rounded-lg border ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
                 <h3 className="text-sm font-serif font-bold mb-4 uppercase tracking-wider">Categories</h3>
-                <div className="flex flex-col space-y-2 text-xs">
-                  <button onClick={() => setSelectedCategory('All')} className={`text-left py-2 px-3 rounded transition ${selectedCategory === 'All' ? 'bg-[#D4AF37] text-black font-bold' : 'hover:bg-gray-200 dark:hover:bg-[#222]'}`}>All Products</button>
-                  <button onClick={() => setSelectedCategory('Men')} className={`text-left py-1.5 px-4 rounded transition ml-2 ${selectedCategory === 'Men' ? 'bg-[#D4AF37] text-black font-bold' : 'hover:bg-gray-200 dark:hover:bg-[#222]'}`}>&bull; Men's Collection</button>
-                  <button onClick={() => setSelectedCategory('Women')} className={`text-left py-1.5 px-4 rounded transition ml-2 ${selectedCategory === 'Women' ? 'bg-[#D4AF37] text-black font-bold' : 'hover:bg-gray-200 dark:hover:bg-[#222]'}`}>&bull; Women's Collection</button>
-                  <button onClick={() => setSelectedCategory('Shoes')} className={`text-left py-1.5 px-4 rounded transition ml-2 ${selectedCategory === 'Shoes' ? 'bg-[#D4AF37] text-black font-bold' : 'hover:bg-gray-200 dark:hover:bg-[#222]'}`}>&bull; Shoes</button>
-                  <button onClick={() => setSelectedCategory('Wallets')} className={`text-left py-1.5 px-4 rounded transition ml-2 ${selectedCategory === 'Wallets' ? 'bg-[#D4AF37] text-black font-bold' : 'hover:bg-gray-200 dark:hover:bg-[#222]'}`}>&bull; Wallets</button>
-                  <button onClick={() => setSelectedCategory('Watches')} className={`text-left py-1.5 px-4 rounded transition ml-2 ${selectedCategory === 'Watches' ? 'bg-[#D4AF37] text-black font-bold' : 'hover:bg-gray-200 dark:hover:bg-[#222]'}`}>&bull; Watches</button>
+                <div className="flex flex-col space-y-1 text-xs">
+                  {(() => {
+                    const same = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
+                    const row = (active, extra = '') => `text-left py-1.5 px-3 rounded transition w-full ${extra} ${active ? 'bg-[#D4AF37] text-black font-bold' : 'hover:bg-gray-200 dark:hover:bg-[#222]'}`;
+                    const subBtn = (name, indent = '') => (
+                      <button key={name} onClick={() => setSelectedSubCategory(name)} className={row(same(selectedSubCategory, name), indent)}>
+                        {name}
+                      </button>
+                    );
+                    return (
+                      <>
+                        <button onClick={() => setSelectedCategory('All')} className={row(selectedCategory === 'All')}>All Products</button>
+
+                        {['Men', 'Women'].map((col) => (
+                          <div key={col}>
+                            <button onClick={() => setSelectedCategory(col)} className={row(selectedCategory === col && !selectedSubCategory, 'ml-2')}>
+                              &bull; {COLLECTION_LABELS[col]}
+                            </button>
+                            {selectedCategory === col && (
+                              <div className={`ml-6 mt-1 mb-1 pl-2 border-l space-y-1 ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>
+                                {SUB_CATEGORIES[col].map((item) =>
+                                  item.group ? (
+                                    <div key={item.group}>
+                                      <button onClick={() => setSelectedSubCategory(item.group)} className={row(same(selectedSubCategory, item.group))}>
+                                        {item.group}
+                                      </button>
+                                      <div className="ml-3 mt-1 space-y-1">
+                                        {item.items.map((i) => subBtn(i))}
+                                      </div>
+                                    </div>
+                                  ) : subBtn(item.name)
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+
+                        {['Shoes', 'Wallets', 'Watches'].map((col) => (
+                          <button key={col} onClick={() => setSelectedCategory(col)} className={row(selectedCategory === col, 'ml-2')}>
+                            &bull; {COLLECTION_LABELS[col]}
+                          </button>
+                        ))}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -54,6 +96,7 @@ export default function ShopView({ addToCart, filteredProducts, formatPrice, isD
                   <div key={product.id} className={`group rounded-lg overflow-hidden border flex flex-col ${isDarkMode ? 'bg-[#181818] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
                     <div className="relative h-64 overflow-hidden bg-gray-900 cursor-pointer" onClick={() => { setSelectedProduct(product); setCurrentView('product-detail'); }}>
                       <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                      {totalStock(product) <= 0 && <span className="absolute top-2 left-2 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded">SOLD OUT</span>}
                     </div>
                     <div className="p-4 flex-1 flex flex-col justify-between">
                       <div>
@@ -75,10 +118,13 @@ export default function ShopView({ addToCart, filteredProducts, formatPrice, isD
                             Details
                           </button>
                           <button 
-                            onClick={() => addToCart(product, product.colors[0], product.sizes[0], 1)}
-                            className="bg-[#D4AF37] text-black text-[11px] font-bold py-2 rounded hover:opacity-90 transition text-center"
+                            disabled={totalStock(product) <= 0}
+                            onClick={() => hasSizeStock(product)
+                              ? (setSelectedProduct(product), setCurrentView('product-detail'))
+                              : addToCart(product, product.colors[0], product.sizes[0], 1)}
+                            className="bg-[#D4AF37] text-black text-[11px] font-bold py-2 rounded hover:opacity-90 transition text-center disabled:opacity-40 disabled:cursor-not-allowed"
                           >
-                            Add to Cart
+                            {totalStock(product) <= 0 ? 'Sold Out' : hasSizeStock(product) ? 'Select Size' : 'Add to Cart'}
                           </button>
                         </div>
                       </div>
