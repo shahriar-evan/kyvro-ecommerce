@@ -85,14 +85,15 @@ export default function App() {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [loggedInUserEmail, setLoggedInUserEmail] = useState('');
   const [adminRole, setAdminRole] = useState(null); // 'owner' | 'manager' | 'admin' | null
+  const [adminName, setAdminName] = useState('');
   const [adminTab, setAdminTab] = useState('products');
 
   // Checks whether an email has access (role + access ON/OFF)
   const checkAccess = async (email) => {
-    const { role, active } = await getAdminStatus(email);
+    const { role, active, name } = await getAdminStatus(email);
     if (!role) return { ok: false, message: 'Access denied: ' + email + ' is not authorized for the Admin Portal.' };
     if (!active) return { ok: false, message: 'Your access is currently turned OFF. Please contact the Owner.' };
-    return { ok: true, role };
+    return { ok: true, role, name };
   };
 
   useEffect(() => {
@@ -101,12 +102,14 @@ export default function App() {
       const access = await checkAccess(user.email);
       if (access.ok) {
         setAdminRole(access.role);
+        setAdminName(access.name || user.displayName || '');
         setIsAdminLoggedIn(true);
         setLoggedInUserEmail(user.email);
       } else {
         // Not on the team list or access is OFF, so end the session
         signOut(auth).catch(() => {});
         setAdminRole(null);
+        setAdminName('');
         setIsAdminLoggedIn(false);
         setLoggedInUserEmail('');
       }
@@ -117,16 +120,18 @@ export default function App() {
   // While logged in, access OFF / removal / role changes by the Owner apply immediately
   useEffect(() => {
     if (!isAdminLoggedIn || !loggedInUserEmail || isOwnerEmail(loggedInUserEmail)) return;
-    const unsubscribe = watchAdminAccess(loggedInUserEmail, ({ role, active }) => {
+    const unsubscribe = watchAdminAccess(loggedInUserEmail, ({ role, active, name }) => {
       if (!role || !active) {
         signOut(auth).catch(() => {});
         setIsAdminLoggedIn(false);
         setLoggedInUserEmail('');
         setAdminRole(null);
+        setAdminName('');
         setCurrentView('home');
         alert(!role ? 'Your admin access has been removed.' : 'Your admin access has been turned OFF.');
       } else {
         setAdminRole(role);
+        if (name) setAdminName(name);
       }
     });
     return () => unsubscribe();
@@ -259,6 +264,7 @@ export default function App() {
         return;
       }
       setAdminRole(access.role);
+      setAdminName(access.name || result.user.displayName || '');
       setIsAdminLoggedIn(true);
       setLoggedInUserEmail(result.user.email);
     } catch (error) {
@@ -277,6 +283,7 @@ export default function App() {
         return;
       }
       setAdminRole(access.role);
+      setAdminName(access.name || result.user.displayName || '');
       setIsAdminLoggedIn(true);
       setLoggedInUserEmail(result.user.email);
     } catch (error) {
@@ -292,6 +299,7 @@ export default function App() {
     setIsAdminLoggedIn(false);
     setLoggedInUserEmail('');
     setAdminRole(null);
+    setAdminName('');
     setCurrentView('home');
   };
 
@@ -347,6 +355,7 @@ export default function App() {
       isBestSeller: newProductForm.isBestSeller,
       // Who added this product (stays the same when edited)
       addedBy: existingProduct ? existingProduct.addedBy : loggedInUserEmail,
+      addedByName: existingProduct ? existingProduct.addedByName : (adminName || loggedInUserEmail),
       addedByRole: existingProduct ? existingProduct.addedByRole : adminRole
     };
 
@@ -474,7 +483,7 @@ export default function App() {
       {currentView === 'product-detail' && selectedProduct && <ProductDetail product={selectedProduct} products={products} addToCart={addToCart} calculateDiscountPercent={calculateDiscountPercent} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
 
       {/* ADMIN PORTAL VIEW (GOOGLE SIGN-IN, WHITELISTED EMAILS ONLY) */}
-      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} exportOrdersCSV={exportOrdersCSV} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} canDeleteProduct={canDeleteProduct} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} />}
+      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} exportOrdersCSV={exportOrdersCSV} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} />}
 
       {/* FOOTER */}
       <Footer isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} />

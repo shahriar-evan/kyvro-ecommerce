@@ -5,7 +5,7 @@ import ImageField from './ImageField';
 import SizeStockEditor from './SizeStockEditor';
 import { SUB_CATEGORIES, hasSubCategories, hasSizeStock, totalStock, orderedSizes } from '../data/catalog';
 
-export default function AdminPortal({ adminTab, deleteProduct, editingProductId, exportOrdersCSV, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminRole, canDeleteProduct, isDarkMode, loggedInUserEmail, newProductForm, orders, products, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct }) {
+export default function AdminPortal({ adminTab, deleteProduct, editingProductId, exportOrdersCSV, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, isDarkMode, loggedInUserEmail, newProductForm, orders, products, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct }) {
   const isOwner = adminRole === 'owner';
   const canManageTeam = adminRole === 'owner' || adminRole === 'manager';
   const sizesUsed = Object.keys((newProductForm && newProductForm.sizeStock) || {}).length > 0;
@@ -22,7 +22,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
               <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 rounded-lg border gap-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
                 <div>
                   <h1 className="text-2xl font-serif font-bold">Kyvro Management Dashboard</h1>
-                  <p className="text-xs text-gray-500">Logged in as: <strong className="text-[#D4AF37]">{loggedInUserEmail}</strong> ({roleLabel}) | Domain: www.kyvro.store</p>
+                  <p className="text-xs text-gray-500">Logged in as: <strong className="text-[#D4AF37]">{adminName || loggedInUserEmail}</strong>{adminName && <span> ({loggedInUserEmail})</span>} &middot; {roleLabel} | Domain: www.kyvro.store</p>
                 </div>
                 <button 
                   onClick={handleAdminLogout}
@@ -61,7 +61,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                 )}
               </div>
 
-              {adminTab === 'admins' && canManageTeam && <AdminManager isDarkMode={isDarkMode} currentEmail={loggedInUserEmail} adminRole={adminRole} />}
+              {adminTab === 'admins' && canManageTeam && <AdminManager isDarkMode={isDarkMode} currentEmail={loggedInUserEmail} currentName={adminName} adminRole={adminRole} />}
 
               {adminTab === 'products' && (
                 <div className={`rounded-lg border overflow-x-auto ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
@@ -82,7 +82,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                             <img src={p.image} alt={p.name} className="w-10 h-10 object-cover rounded" />
                             <div>
                               <span className="font-semibold">{p.name}</span>
-                              {p.addedBy && <p className="text-[10px] text-gray-500 font-normal mt-0.5">Added by {p.addedBy}</p>}
+                              {(p.addedByName || p.addedBy) && <p className="text-[10px] text-gray-500 font-normal mt-0.5">Added by {p.addedByName || p.addedBy}</p>}
                             </div>
                           </td>
                           <td className="p-4 text-gray-500">{p.gender === p.category ? p.category : `${p.gender} / ${p.category}`}</td>

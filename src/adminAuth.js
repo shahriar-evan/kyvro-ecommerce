@@ -1,8 +1,8 @@
 import { initializeApp, getApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from "firebase/auth";
-import { getFirestore, doc, getDoc, onSnapshot, setDoc, updateDoc, deleteDoc, collection, getDocs, serverTimestamp } from "firebase/firestore";
+import { getFirestore, doc, getDoc, onSnapshot, setDoc, updateDoc, deleteDoc, deleteField, collection, getDocs, serverTimestamp } from "firebase/firestore";
 import { auth } from "./firebase";
-import { isOwnerEmail } from "./adminEmails";
+import { isOwnerEmail, ownerName } from "./adminEmails";
 
 const db = getFirestore(getApp());
 const norm = (e) => (e || "").trim().toLowerCase();
@@ -15,19 +15,20 @@ export const ROLE_LABELS = { owner: "Owner", manager: "Manager", admin: "Admin" 
 
 // Returns role = 'owner' | 'manager' | 'admin' | null (not on the list) and active = access ON/OFF
 export async function getAdminStatus(email) {
-  if (!email) return { role: null, active: false };
-  if (isOwnerEmail(email)) return { role: "owner", active: true };
+  if (!email) return { role: null, active: false, name: "" };
+  if (isOwnerEmail(email)) return { role: "owner", active: true, name: ownerName(email) };
   try {
     const snap = await getDoc(doc(db, "admins", norm(email)));
-    if (!snap.exists()) return { role: null, active: false };
+    if (!snap.exists()) return { role: null, active: false, name: "" };
     const data = snap.data();
     return {
       role: ROLES.includes(data.role) ? data.role : "admin", // older entries without a role = admin
       active: data.active !== false,
+      name: data.name || "",
     };
   } catch (err) {
     console.error("Admin status check failed:", err);
-    return { role: null, active: false };
+    return { role: null, active: false, name: "" };
   }
 }
 
@@ -42,9 +43,9 @@ export function watchAdminAccess(email, callback) {
   return onSnapshot(
     doc(db, "admins", norm(email)),
     (snap) => {
-      if (!snap.exists()) return callback({ role: null, active: false });
+      if (!snap.exists()) return callback({ role: null, active: false, name: "" });
       const data = snap.data();
-      callback({ role: ROLES.includes(data.role) ? data.role : "admin", active: data.active !== false });
+      callback({ role: ROLES.includes(data.role) ? data.role : "admin", active: data.active !== false, name: data.name || "" });
     },
     () => {} // ignore network/permission errors
   );
@@ -58,9 +59,22 @@ export async function listAdmins() {
   });
 }
 
+// Owner-only details (phone, note and the password that was set when the person was added)
+// live in a separate collection so managers can never read them.
+export async function listPrivateDetails() {
+  try {
+    const snap = await getDocs(collection(db, "adminPrivate"));
+    const map = {};
+    snap.docs.forEach((d) => { map[d.id] = d.data(); });
+    return map;
+  } catch (err) {
+    return {}; // not an owner: no access
+  }
+}
+
 // Creates a Firebase email+password account and adds the person to the team list with a role.
 // A secondary app is used so the person adding them stays logged in.
-export async function createAdminAccount(email, password, role = "admin") {
+export async function createAdminAccount(email, password, role = "admin", profile = {}) {
   const e = norm(email);
   if (!ROLES.includes(role)) throw new Error("Invalid role");
   let accountCreated = true;
@@ -77,12 +91,30 @@ export async function createAdminAccount(email, password, role = "admin") {
   }
   await setDoc(doc(db, "admins", e), {
     email: e,
+    name: (profile.name || "").trim(),
     role,
     active: true,
     addedBy: auth.currentUser?.email || "",
+    addedByName: profile.addedByName || "",
     createdAt: serverTimestamp(),
   });
+  // Owner-only extras. The password is only saved when we really created the account
+  // (if the account already existed, the password typed here is not its real password).
+  try {
+    const priv = { phone: (profile.phone || "").trim(), note: (profile.note || "").trim() };
+    if (accountCreated) priv.password = password;
+    await setDoc(doc(db, "adminPrivate", e), priv);
+  } catch (err) {
+    console.warn("Could not save private details:", err);
+  }
   return { accountCreated };
+}
+
+// Owner edits name (public to the team) and phone / note (owner-only)
+export async function updateAdminProfile(email, { name, phone, note }) {
+  const e = norm(email);
+  await updateDoc(doc(db, "admins", e), { name: (name || "").trim() });
+  await setDoc(doc(db, "adminPrivate", e), { phone: (phone || "").trim(), note: (note || "").trim() }, { merge: true });
 }
 
 export async function setAdminRole(email, role) {
@@ -95,7 +127,14 @@ export async function setAdminActive(email, active) {
 }
 
 export async function removeAdmin(email) {
-  await deleteDoc(doc(db, "admins", norm(email)));
+  const e = norm(email);
+  await deleteDoc(doc(db, "admins", e));
+  try { await deleteDoc(doc(db, "adminPrivate", e)); } catch (err) { /* nothing stored */ }
 }
 
-export const sendAdminPasswordReset = (email) => sendPasswordResetEmail(auth, norm(email));
+// After a reset email the stored password is no longer correct, so it is cleared.
+export async function sendAdminPasswordReset(email) {
+  const e = norm(email);
+  await sendPasswordResetEmail(auth, e);
+  try { await updateDoc(doc(db, "adminPrivate", e), { password: deleteField() }); } catch (err) { /* nothing stored */ }
+}
