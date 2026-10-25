@@ -1,6 +1,6 @@
-// OWNER email: ei email gulo shobsomoy admin, ar shudhu ei gulo Admin Portal theke
-// onno admin add/remove korte pare. Eta code e rakha hoyeche jate tumi kokhono lock out na hou.
-// Onno admin der list Admin Portal -> "Manage Admins" tab theke control hoy (Firestore e save hoy).
+// OWNER emails: these emails are always Owners and can never be removed, turned off or demoted.
+// This is kept in code so you can never be locked out.
+// Other team members are managed from Admin Portal -> "Manage Admins" (saved in Firestore).
 export const OWNER_EMAILS = [
   "shahriarevan545@gmail.com",
 ];

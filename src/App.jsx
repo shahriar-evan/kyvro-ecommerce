@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth, googleProvider } from './firebase';
 import { isOwnerEmail } from './adminEmails';
-import { isAuthorizedAdmin } from './adminAuth';
+import { getAdminStatus, watchAdminAccess } from './adminAuth';
 import { INITIAL_PRODUCTS } from './data/products';
 import { CURRENCIES } from './data/currencies';
 import heroBannerImg from './assets/hero-banner.png';
@@ -66,23 +66,53 @@ export default function App() {
   // Admin & Firebase Auth States
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [loggedInUserEmail, setLoggedInUserEmail] = useState('');
+  const [adminRole, setAdminRole] = useState(null); // 'owner' | 'manager' | 'admin' | null
   const [adminTab, setAdminTab] = useState('products');
+
+  // Checks whether an email has access (role + access ON/OFF)
+  const checkAccess = async (email) => {
+    const { role, active } = await getAdminStatus(email);
+    if (!role) return { ok: false, message: 'Access denied: ' + email + ' is not authorized for the Admin Portal.' };
+    if (!active) return { ok: false, message: 'Your access is currently turned OFF. Please contact the Owner.' };
+    return { ok: true, role };
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) return;
-      if (await isAuthorizedAdmin(user.email)) {
+      const access = await checkAccess(user.email);
+      if (access.ok) {
+        setAdminRole(access.role);
         setIsAdminLoggedIn(true);
         setLoggedInUserEmail(user.email);
       } else {
-        // Admin list e nai, tai session bondho kore dao
+        // Not on the team list or access is OFF, so end the session
         signOut(auth).catch(() => {});
+        setAdminRole(null);
         setIsAdminLoggedIn(false);
         setLoggedInUserEmail('');
       }
     });
     return () => unsubscribe();
   }, []);
+
+  // While logged in, access OFF / removal / role changes by the Owner apply immediately
+  useEffect(() => {
+    if (!isAdminLoggedIn || !loggedInUserEmail || isOwnerEmail(loggedInUserEmail)) return;
+    const unsubscribe = watchAdminAccess(loggedInUserEmail, ({ role, active }) => {
+      if (!role || !active) {
+        signOut(auth).catch(() => {});
+        setIsAdminLoggedIn(false);
+        setLoggedInUserEmail('');
+        setAdminRole(null);
+        setCurrentView('home');
+        alert(!role ? 'Your admin access has been removed.' : 'Your admin access has been turned OFF.');
+      } else {
+        setAdminRole(role);
+      }
+    });
+    return () => unsubscribe();
+  }, [isAdminLoggedIn, loggedInUserEmail]);
 
   const [newProductForm, setNewProductForm] = useState({
     name: '', gender: 'Men', category: 'Shirt', price: '', originalPrice: '', image: '', description: '', colors: 'Matte Black, Charcoal', sizes: ['M', 'L'], stock: '10', isNew: true, isFeatured: false, isBestSeller: false
@@ -170,15 +200,17 @@ export default function App() {
     setCurrentView('order-success');
   };
 
-  // Google Sign-In Handler (shudhu owner / allowed admin email gulo login korte parbe)
+  // Google Sign-In Handler (only owners and team members with access ON can log in)
   const handleGoogleSignIn = async () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      if (!(await isAuthorizedAdmin(result.user.email))) {
+      const access = await checkAccess(result.user.email);
+      if (!access.ok) {
         await signOut(auth);
-        alert('Access denied: ' + result.user.email + ' is not authorized for the Admin Portal.');
+        alert(access.message);
         return;
       }
+      setAdminRole(access.role);
       setIsAdminLoggedIn(true);
       setLoggedInUserEmail(result.user.email);
     } catch (error) {
@@ -190,16 +222,18 @@ export default function App() {
   const handleEmailSignIn = async (email, password) => {
     try {
       const result = await signInWithEmailAndPassword(auth, email.trim(), password);
-      if (!(await isAuthorizedAdmin(result.user.email))) {
+      const access = await checkAccess(result.user.email);
+      if (!access.ok) {
         await signOut(auth);
-        alert('Access denied: ' + result.user.email + ' is not authorized for the Admin Portal.');
+        alert(access.message);
         return;
       }
+      setAdminRole(access.role);
       setIsAdminLoggedIn(true);
       setLoggedInUserEmail(result.user.email);
     } catch (error) {
       const wrong = ['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found', 'auth/invalid-email'];
-      alert(wrong.includes(error.code) ? 'Email ba password thik na.' : 'Sign-In Error: ' + error.message);
+      alert(wrong.includes(error.code) ? 'Incorrect email or password.' : 'Sign-In Error: ' + error.message);
     }
   };
 
@@ -209,10 +243,11 @@ export default function App() {
     } catch (err) {}
     setIsAdminLoggedIn(false);
     setLoggedInUserEmail('');
+    setAdminRole(null);
     setCurrentView('home');
   };
 
-  // Gender/Collection change handler (original code e define kora chilo na -> admin form crash korto)
+  // Gender/Collection change handler (was missing in the original code and crashed the admin form)
   const handleGenderChange = (gender) => {
     const defaultCategory = { Men: 'Shirt', Women: 'Sharee', Shoes: 'Shoes', Wallets: 'Wallets', Watches: 'Watches' };
     setNewProductForm(prev => ({ ...prev, gender, category: defaultCategory[gender] || prev.category }));
@@ -220,6 +255,7 @@ export default function App() {
 
   const handleSaveProduct = (e) => {
     e.preventDefault();
+    const existingProduct = editingProductId ? products.find(p => p.id === editingProductId) : null;
     const productData = {
       id: editingProductId || Date.now(),
       name: newProductForm.name,
@@ -235,7 +271,10 @@ export default function App() {
       stock: parseInt(newProductForm.stock) || 10,
       isNew: newProductForm.isNew,
       isFeatured: newProductForm.isFeatured,
-      isBestSeller: newProductForm.isBestSeller
+      isBestSeller: newProductForm.isBestSeller,
+      // Who added this product (stays the same when edited)
+      addedBy: existingProduct ? existingProduct.addedBy : loggedInUserEmail,
+      addedByRole: existingProduct ? existingProduct.addedByRole : adminRole
     };
 
     if (editingProductId) {
@@ -271,7 +310,20 @@ export default function App() {
     setAdminTab('add-product');
   };
 
+  // Owner can delete everything, Manager only products they added, Admin none
+  const canDeleteProduct = (p) => {
+    if (adminRole === 'owner') return true;
+    if (adminRole === 'manager') {
+      return !!p.addedBy && p.addedBy.toLowerCase() === (loggedInUserEmail || '').toLowerCase();
+    }
+    return false;
+  };
   const deleteProduct = (id) => {
+    const target = products.find(p => p.id === id);
+    if (!target || !canDeleteProduct(target)) {
+      alert('You do not have permission to delete this product.');
+      return;
+    }
     if (confirm('Are you sure you want to delete this product?')) {
       setProducts(products.filter(p => p.id !== id));
     }
@@ -339,7 +391,7 @@ export default function App() {
       {currentView === 'shop' && <ShopView addToCart={addToCart} filteredProducts={filteredProducts} formatPrice={formatPrice} isDarkMode={isDarkMode} products={products} searchQuery={searchQuery} selectedCategory={selectedCategory} setCurrentView={setCurrentView} setSearchQuery={setSearchQuery} setSelectedCategory={setSelectedCategory} setSelectedProduct={setSelectedProduct} setSortBy={setSortBy} sortBy={sortBy} />}
 
       {/* ADMIN PORTAL VIEW (GOOGLE SIGN-IN, WHITELISTED EMAILS ONLY) */}
-      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} exportOrdersCSV={exportOrdersCSV} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} isOwner={isOwnerEmail(loggedInUserEmail)} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} />}
+      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} exportOrdersCSV={exportOrdersCSV} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} canDeleteProduct={canDeleteProduct} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} />}
 
       {/* FOOTER */}
       <Footer isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={setSelectedCategory} />

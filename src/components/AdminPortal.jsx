@@ -2,7 +2,11 @@ import React from 'react';
 import AdminLogin from './AdminLogin';
 import AdminManager from './AdminManager';
 
-export default function AdminPortal({ adminTab, deleteProduct, editingProductId, exportOrdersCSV, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, isDarkMode, isOwner, loggedInUserEmail, newProductForm, orders, products, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct }) {
+export default function AdminPortal({ adminTab, deleteProduct, editingProductId, exportOrdersCSV, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminRole, canDeleteProduct, isDarkMode, loggedInUserEmail, newProductForm, orders, products, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct }) {
+  const isOwner = adminRole === 'owner';
+  const canManageTeam = adminRole === 'owner' || adminRole === 'manager';
+  const roleLabel = adminRole ? adminRole.charAt(0).toUpperCase() + adminRole.slice(1) : '';
+
   return (
     <>
         <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
@@ -13,7 +17,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
               <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 rounded-lg border gap-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
                 <div>
                   <h1 className="text-2xl font-serif font-bold">Kyvro Management Dashboard</h1>
-                  <p className="text-xs text-gray-500">Logged in as: <strong className="text-[#D4AF37]">{loggedInUserEmail}</strong> | Domain: www.kyvro.store</p>
+                  <p className="text-xs text-gray-500">Logged in as: <strong className="text-[#D4AF37]">{loggedInUserEmail}</strong> ({roleLabel}) | Domain: www.kyvro.store</p>
                 </div>
                 <button 
                   onClick={handleAdminLogout}
@@ -42,17 +46,17 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                 >
                   Orders ({orders.length})
                 </button>
-                {isOwner && (
+                {canManageTeam && (
                   <button 
                     onClick={() => setAdminTab('admins')} 
                     className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'admins' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
                   >
-                    Manage Admins
+                    {isOwner ? 'Manage Admins' : 'Add Admin'}
                   </button>
                 )}
               </div>
 
-              {adminTab === 'admins' && isOwner && <AdminManager isDarkMode={isDarkMode} />}
+              {adminTab === 'admins' && canManageTeam && <AdminManager isDarkMode={isDarkMode} currentEmail={loggedInUserEmail} adminRole={adminRole} />}
 
               {adminTab === 'products' && (
                 <div className={`rounded-lg border overflow-x-auto ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
@@ -71,14 +75,17 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                         <tr key={p.id} className="hover:bg-gray-100 dark:hover:bg-[#1a1a1a]">
                           <td className="p-4 flex items-center gap-3">
                             <img src={p.image} alt={p.name} className="w-10 h-10 object-cover rounded" />
-                            <span className="font-semibold">{p.name}</span>
+                            <div>
+                              <span className="font-semibold">{p.name}</span>
+                              {p.addedBy && <p className="text-[10px] text-gray-500 font-normal mt-0.5">Added by {p.addedBy}</p>}
+                            </div>
                           </td>
                           <td className="p-4 text-gray-500">{p.gender} / {p.category}</td>
                           <td className="p-4 text-[#D4AF37] font-bold">{formatPrice(p.price)}</td>
                           <td className="p-4 text-gray-500">{p.stock} units</td>
                           <td className="p-4 text-right space-x-2">
                             <button onClick={() => startEditProduct(p)} className="text-gray-500 hover:text-black dark:hover:text-white px-2 py-1 bg-gray-200 dark:bg-gray-800 rounded">Edit</button>
-                            <button onClick={() => deleteProduct(p.id)} className="text-red-400 hover:text-red-300 px-2 py-1 bg-red-950/40 rounded">Delete</button>
+                            {canDeleteProduct(p) && <button onClick={() => deleteProduct(p.id)} className="text-red-400 hover:text-red-300 px-2 py-1 bg-red-950/40 rounded">Delete</button>}
                           </td>
                         </tr>
                       ))}
