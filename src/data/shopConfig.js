@@ -4,6 +4,9 @@
 // here, change it in the rules too, otherwise new orders will be rejected.
 // ---------------------------------------------------------------------------
 
+// WhatsApp number for "Order on WhatsApp" (country code + number, no + or spaces). Change it here once.
+export const WHATSAPP_NUMBER = '60123456789';
+
 export const DELIVERY_AREAS = ['Inside Dhaka', 'Outside Dhaka'];
 export const DELIVERY_AREA_BN = { 'Inside Dhaka': 'ঢাকার ভিতরে', 'Outside Dhaka': 'ঢাকার বাইরে' };
 

@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { MessageCircle } from 'lucide-react';
+import { WHATSAPP_NUMBER } from '../data/shopConfig';
 import { hasSizeStock, totalStock, stockForSize, orderedSizes } from '../data/catalog';
 
 export default function ProductDetail({ product, products, addToCart, calculateDiscountPercent, formatPrice, isDarkMode, setCurrentView }) {
@@ -32,6 +34,18 @@ export default function ProductDetail({ product, products, addToCart, calculateD
     if (soldOut || needsSize) return;
     addToCart(live, color || undefined, sized ? size : (live.sizes && live.sizes[0]), qty, true);
   };
+
+  // WhatsApp message carries the size / color / quantity the customer picked
+  const waLines = [
+    'Hello Kyvro, I want to order:',
+    `* Name: ${live.name}`,
+    ...(color ? [`* Color: ${color}`] : []),
+    ...(sized && size ? [`* Size: ${size}`] : []),
+    `* Quantity: ${qty}`,
+    `* Price: ${formatPrice(live.price)}`,
+  ];
+  const waLink = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(waLines.join('\n'))}`;
+  const waNeedsSize = needsSize;
 
   const cardBtn = (active, disabled) =>
     `min-w-[3rem] px-3 py-2 text-xs rounded border transition ${
@@ -121,6 +135,17 @@ export default function ProductDetail({ product, products, addToCart, calculateD
                 Buy Now
               </button>
             </div>
+          )}
+          {!soldOut && (
+            <a
+              href={waNeedsSize ? undefined : waLink}
+              onClick={(e) => { if (waNeedsSize) { e.preventDefault(); alert('Please select a size first.'); } }}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full bg-[#25D366] text-white font-bold py-3 rounded text-xs uppercase tracking-widest hover:opacity-90 transition flex items-center justify-center gap-2 shadow"
+            >
+              <MessageCircle size={16} /> Order on WhatsApp
+            </a>
           )}
           {soldOut && <p className="text-sm font-bold text-red-500">This product is currently sold out.</p>}
         </div>

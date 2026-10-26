@@ -1,5 +1,6 @@
 import React from 'react';
 import { hasSizeStock, totalStock } from '../data/catalog';
+import { WHATSAPP_NUMBER } from '../data/shopConfig';
 import { User, Shield, Truck, RefreshCw, ChevronRight, MessageCircle } from 'lucide-react';
 import heroBannerImg from '../assets/hero-banner.png';
 import shirtImg from '../assets/shirts.png';
@@ -158,8 +159,17 @@ export default function HomeView({ addToCart, banners, calculateDiscountPercent,
                               {totalStock(product) <= 0 ? 'Sold Out' : hasSizeStock(product) ? 'Select Size' : 'Add to Cart'}
                             </button>
                           </div>
+                          <button
+                            disabled={totalStock(product) <= 0}
+                            onClick={() => hasSizeStock(product)
+                              ? (setSelectedProduct(product), setCurrentView('product-detail'))
+                              : addToCart(product, product.colors[0], product.sizes[0], 1, true)}
+                            className={`w-full border-2 border-[#D4AF37] ${isDarkMode ? 'text-[#D4AF37]' : 'text-black'} text-[11px] font-bold py-2 rounded hover:bg-[#D4AF37]/10 transition text-center uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed`}
+                          >
+                            Buy Now
+                          </button>
                           <a 
-                            href={`https://wa.me/60123456789?text=Hello%20Kyvro,%20I%20want%20to%20order:%0A*%20Name:%20${encodeURIComponent(product.name)}%0A*%20Price:%20${encodeURIComponent(formatPrice(product.price))}`}
+                            href={`https://wa.me/${WHATSAPP_NUMBER}?text=Hello%20Kyvro,%20I%20want%20to%20order:%0A*%20Name:%20${encodeURIComponent(product.name)}%0A*%20Price:%20${encodeURIComponent(formatPrice(product.price))}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="w-full bg-[#25D366] text-white font-bold py-2 rounded text-[11px] uppercase tracking-wider hover:opacity-90 transition flex items-center justify-center gap-1.5 shadow"
