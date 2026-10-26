@@ -129,6 +129,17 @@ export async function updateOrderStatus(orderId, status, staff) {
   });
 }
 
+// A customer can cancel their OWN order, but only while it is still Pending and within 10 minutes of ordering.
+// Firestore rules enforce this too (so it cannot be bypassed). A Pending order has not touched the stock yet.
+export const CANCEL_WINDOW_MINUTES = 10;
+export async function cancelMyOrder(orderId, customer) {
+  await updateDoc(doc(db, "orders", orderId), {
+    status: "Cancelled",
+    updatedAt: serverTimestamp(),
+    history: arrayUnion({ status: "Cancelled", by: customer.email || "", byName: "Customer (cancelled own order)", at: new Date().toISOString() }),
+  });
+}
+
 export async function markOrderPaid(orderId, staff) {
   await updateDoc(doc(db, "orders", orderId), {
     paymentStatus: "Paid",

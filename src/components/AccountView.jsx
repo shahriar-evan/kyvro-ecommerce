@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Heart, User, Package, Wallet, Settings, LogOut } from 'lucide-react';
-import { formatDateTime } from '../utils/dates';
+import { formatDateTime, toDate } from '../utils/dates';
+import { CANCEL_WINDOW_MINUTES } from '../orders';
 import { imageFileToDataURL } from '../utils/imageUpload';
 
 const STATUS_STYLE = {
@@ -19,13 +20,37 @@ const TABS = [
 ];
 
 export default function AccountView({
-  customerUser, displayName, photoURL, activeTab, setActiveTab, onSignIn, onSignOut, onSaveProfile,
+  customerUser, displayName, photoURL, activeTab, setActiveTab, onSignIn, onSignOut, onSaveProfile, onCancelOrder,
   myOrders, savedProducts, toggleSaved, formatPrice, isDarkMode, setCurrentView, setSelectedProduct,
 }) {
   const [name, setName] = useState(displayName || '');
   const [photo, setPhoto] = useState(photoURL || '');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [now, setNow] = useState(Date.now());
+  const [cancelling, setCancelling] = useState('');
+  const [cancelMsg, setCancelMsg] = useState('');
+
+  // keeps the "minutes left to cancel" fresh
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(t);
+  }, []);
+
+  // minutes left to cancel (0 when the time is over, the order moved on, or it was just placed and has no time yet)
+  const minutesLeft = (o) => {
+    if (o.status !== 'Pending') return 0;
+    const d = toDate(o.createdAt);
+    if (!d) return CANCEL_WINDOW_MINUTES;
+    return Math.max(0, Math.ceil((d.getTime() + CANCEL_WINDOW_MINUTES * 60000 - now) / 60000));
+  };
+  const cancelOrder = async (o) => {
+    if (!confirm(`Cancel order ${o.orderNumber}?`)) return;
+    setCancelMsg(''); setCancelling(o.id);
+    try { await onCancelOrder(o.id); }
+    catch (e) { setCancelMsg('Sorry, this order can no longer be cancelled here (the 10 minutes are over or the team already confirmed it). Please contact us on WhatsApp or kyvrofashion@gmail.com.'); }
+    setCancelling('');
+  };
 
   // Profile arrives a moment after sign-in
   useEffect(() => { setName(displayName || ''); setPhoto(photoURL || ''); }, [displayName, photoURL]);
@@ -107,6 +132,7 @@ export default function AccountView({
               <button onClick={() => setCurrentView('shop')} className="mt-4 bg-[#D4AF37] text-black font-bold px-6 py-2.5 rounded text-xs uppercase tracking-widest">Start shopping</button>
             </div>
           )}
+          {cancelMsg && <p className="text-xs p-3 rounded border border-red-500/40 text-red-500 bg-red-500/10">{cancelMsg}</p>}
           {myOrders.map((o) => (
             <div key={o.id} className={card}>
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -125,6 +151,14 @@ export default function AccountView({
                 <span className="text-gray-500">{o.paymentMethod} &middot; {o.deliveryArea}{o.discount > 0 ? ` · Discount ${formatPrice(o.discount)}` : ''}</span>
                 <span className="font-bold text-sm text-[#D4AF37]">{formatPrice(o.total)}</span>
               </div>
+              {minutesLeft(o) > 0 && (
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <button disabled={cancelling === o.id} onClick={() => cancelOrder(o)} className="px-4 py-2 rounded text-xs font-bold border border-red-500 text-red-500 hover:bg-red-500 hover:text-white transition disabled:opacity-50">
+                    {cancelling === o.id ? 'Cancelling...' : 'Cancel order'}
+                  </button>
+                  <span className="text-[11px] text-gray-500">You can cancel for {minutesLeft(o)} more minute(s), until the team confirms it.</span>
+                </div>
+              )}
             </div>
           ))}
         </div>

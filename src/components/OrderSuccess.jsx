@@ -1,5 +1,5 @@
 import React from 'react';
-import { DELIVERY_AREA_BN } from '../data/shopConfig';
+import { DELIVERY_AREA_BN, WHATSAPP_NUMBER } from '../data/shopConfig';
 import { formatDateTime } from '../utils/dates';
 
 export default function OrderSuccess({ order, formatPrice, isDarkMode, setCurrentView }) {
@@ -20,7 +20,17 @@ export default function OrderSuccess({ order, formatPrice, isDarkMode, setCurren
         <div className="w-14 h-14 rounded-full bg-green-500/15 text-green-600 text-3xl flex items-center justify-center mx-auto">✓</div>
         <h1 className="text-3xl font-serif font-bold">Thank you for your order!</h1>
         <p className="text-sm text-gray-500">আপনার অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে। আমরা শীঘ্রই আপনার সাথে যোগাযোগ করব।</p>
-        <p className="text-sm">Your order number is <strong className="text-[#D4AF37] text-lg">{order.orderNumber}</strong></p>
+        <p className="text-base sm:text-lg font-bold text-black dark:text-white leading-relaxed pt-1">
+          কোনো সমস্যা হলে, অথবা অনলাইনে অর্ডার করতে না পারলে আমাদের WhatsApp বা Email-এ মেসেজ করুন।
+          <br />
+          <span className="text-sm sm:text-base font-semibold">
+            If you have any problem or cannot order online, message us on{' '}
+            <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noreferrer" className="underline">WhatsApp</a>
+            {' '}or email{' '}
+            <a href="mailto:kyvrofashion@gmail.com" className="underline">kyvrofashion@gmail.com</a>.
+          </span>
+        </p>
+        <p className="text-sm pt-1">Your order number is <strong className="text-[#D4AF37] text-lg">{order.orderNumber}</strong></p>
         <p className="text-xs text-gray-500">Placed on {formatDateTime(order.date)}</p>
       </div>
 
@@ -56,6 +66,10 @@ export default function OrderSuccess({ order, formatPrice, isDarkMode, setCurren
             : 'Our team will call you to confirm your order. You pay in cash when it is delivered. (ডেলিভারির সময় ক্যাশে পেমেন্ট করবেন।)'}
         </p>
       </div>
+
+      <p className="text-xs text-gray-500 text-center">
+        Changed your mind? You can cancel this order within {10} minutes from My Orders, as long as the team has not confirmed it. (অর্ডার করার ১০ মিনিটের মধ্যে, কনফার্ম হওয়ার আগে My Orders থেকে ক্যানসেল করতে পারবেন।)
+      </p>
 
       <div className="text-center">
         <button onClick={() => setCurrentView('shop')} className="bg-[#D4AF37] text-black text-xs font-bold px-8 py-3.5 tracking-widest uppercase rounded hover:opacity-90 transition">

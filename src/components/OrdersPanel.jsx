@@ -28,6 +28,8 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
   const [error, setError] = useState('');
   const [blocked, setBlocked] = useState({ phones: {}, emails: {} });
   const [showBlocked, setShowBlocked] = useState(false);
+  const [openIds, setOpenIds] = useState({}); // which orders are expanded (all start collapsed)
+  const toggleOpen = (id) => setOpenIds((m) => ({ ...m, [id]: !m[id] }));
 
   useEffect(() => {
     const stop = watchBlocked(setBlocked);
@@ -158,21 +160,35 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
 
       {visible.map((o) => {
         const busy = busyId === o.id;
+        const isOpen = !!openIds[o.id];
         const history = Array.isArray(o.history) ? [...o.history].sort((a, b) => (toDate(a.at) || 0) - (toDate(b.at) || 0)) : [];
         return (
-          <div key={o.id} className={cardClass}>
-            {/* header */}
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-3">
-              <div>
-                <p className="text-sm font-bold text-[#D4AF37]">{o.orderNumber}</p>
-                <p className="text-xs text-gray-500">Ordered on {formatDateTime(o.createdAt)}</p>
+          <div key={o.id} className={`${cardClass} !space-y-0 !p-0 overflow-hidden`}>
+            {/* short row: click to open / close the details */}
+            <button type="button" onClick={() => toggleOpen(o.id)} aria-expanded={isOpen}
+              className={`w-full text-left flex items-center gap-3 p-3 sm:p-4 transition ${isDarkMode ? 'hover:bg-[#1d1d1d]' : 'hover:bg-gray-50'}`}>
+              <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-0.5">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-[#D4AF37]">{o.orderNumber}</p>
+                  <p className="text-[11px] text-gray-500">{formatDateTime(o.createdAt)}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate">{o.customer?.name}</p>
+                  <p className="text-[11px] text-gray-500 truncate">{o.customer?.phone}</p>
+                </div>
+                <p className="text-[11px] text-gray-500 truncate sm:self-center">
+                  {(o.items || []).reduce((n, i) => n + (parseInt(i.quantity, 10) || 0), 0)} item(s): {(o.items || []).map((i) => i.name).join(', ')}
+                </p>
               </div>
-              <div className="text-right">
-                <span className={`inline-block px-3 py-1 rounded text-[11px] font-bold uppercase tracking-wider ${STATUS_STYLE[o.status] || ''}`}>{o.status}</span>
+              <div className="text-right shrink-0">
+                <span className={`inline-block px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${STATUS_STYLE[o.status] || ''}`}>{o.status}</span>
                 <p className="text-sm font-bold mt-1">{formatPrice(o.total)}</p>
               </div>
-            </div>
+              <span className="text-[#D4AF37] text-lg leading-none shrink-0" aria-hidden="true">{isOpen ? '▲' : '▼'}</span>
+            </button>
 
+            {isOpen && (
+            <div className="p-4 sm:p-5 space-y-4 border-t">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* customer */}
               <div className={innerClass}>
@@ -248,12 +264,14 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
                 <button disabled={busy} onClick={() => run(o.id, () => markOrderPaid(o.id, staff))} className={`${btn} bg-[#D4AF37] text-black hover:opacity-90`}>Mark payment received</button>
               )}
               {o.status !== 'Cancelled' && o.status !== 'Delivered' && (
-                <button disabled={busy} onClick={() => setStatus(o, 'Cancelled', `Cancel order ${o.orderNumber}?`)} className={`${btn} bg-red-950/40 text-red-400 hover:text-red-300`}>Cancel order</button>
+                <button disabled={busy} onClick={() => setStatus(o, 'Cancelled', `Cancel order ${o.orderNumber}?`)} className={`${btn} bg-red-600 text-white hover:bg-red-700`}>Cancel order</button>
               )}
               {o.status === 'Cancelled' && (
-                <button disabled={busy} onClick={() => setStatus(o, 'Pending', `Reopen order ${o.orderNumber} as Pending?`)} className={`${btn} bg-gray-200 dark:bg-gray-800 text-gray-600`}>Reopen as pending</button>
+                <button disabled={busy} onClick={() => setStatus(o, 'Pending', `Reopen order ${o.orderNumber} as Pending?`)} className={`${btn} bg-gray-700 text-white hover:bg-gray-800`}>Reopen as pending</button>
               )}
             </div>
+            </div>
+            )}
           </div>
         );
       })}

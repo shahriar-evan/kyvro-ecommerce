@@ -3,7 +3,7 @@ import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, signOu
 import { auth, googleProvider } from './firebase';
 import { isOwnerEmail } from './adminEmails';
 import { getAdminStatus, watchAdminAccess } from './adminAuth';
-import { placeOrder, watchOrders } from './orders';
+import { placeOrder, watchOrders, cancelMyOrder } from './orders';
 import { watchProfile, saveProfile, watchMyOrders } from './customerData';
 import { watchProducts, saveProduct, removeProduct, approveProduct, migrateProducts } from './productsStore';
 import { watchStoreSettings } from './storeSettings';
@@ -450,6 +450,8 @@ export default function App() {
     }
   };
 
+  const handleCancelMyOrder = (orderId) => cancelMyOrder(orderId, { email: customerUser ? customerUser.email : '' });
+
   const handleCustomerSignOut = async () => {
     try { await signOut(auth); } catch (err) {}
     setIsAdminLoggedIn(false);
@@ -701,7 +703,7 @@ export default function App() {
 
       {currentView === 'product-detail' && selectedProduct && <ProductDetail product={selectedProduct} products={shopProducts} addToCart={addToCart} calculateDiscountPercent={calculateDiscountPercent} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} savedIds={savedIds} toggleSaved={toggleSaved} />}
 
-      {currentView === 'account' && <AccountView customerUser={customerUser} displayName={displayName} photoURL={photoURL} activeTab={accountTab} setActiveTab={setAccountTab} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} onSaveProfile={handleSaveProfile} myOrders={myOrders} savedProducts={savedProducts} toggleSaved={toggleSaved} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedProduct={setSelectedProduct} />}
+      {currentView === 'account' && <AccountView customerUser={customerUser} displayName={displayName} photoURL={photoURL} activeTab={accountTab} setActiveTab={setAccountTab} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} onSaveProfile={handleSaveProfile} onCancelOrder={handleCancelMyOrder} myOrders={myOrders} savedProducts={savedProducts} toggleSaved={toggleSaved} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedProduct={setSelectedProduct} />}
 
       {/* CHECKOUT (guest checkout, no login needed) */}
       {currentView === 'checkout' && <CheckoutView cart={cart} checkoutForm={checkoutForm} setCheckoutForm={setCheckoutForm} checkoutError={checkoutError} deliveryCharge={deliveryCharge} grandTotal={grandTotal} formatPrice={formatPrice} handleCheckoutSubmit={handleCheckoutSubmit} isDarkMode={isDarkMode} placingOrder={placingOrder} removeFromCart={removeFromCart} setCurrentView={setCurrentView} subtotal={subtotal} discount={discount} discountLabel={discountLabel} reward={reward} customerUser={customerUser} authReady={authReady} onSignIn={handleCustomerSignIn} />}
