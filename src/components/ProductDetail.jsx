@@ -38,6 +38,10 @@ export default function ProductDetail({ product, products, addToCart, calculateD
     setColor(c);
     setQty(1);
   };
+  // the green line follows the choice: size M + blue -> only the pieces of M blue
+  const labelCount = byColor
+    ? (sized ? (size ? stockFor(live, size, color) : (color ? stockForColor(live, color) : total)) : stockFor(live, '', color))
+    : (sized && size ? stockForSize(live, size) : total);
   const colorOut = byColor && !needsSize && available <= 0;
 
   const handleAdd = () => {
@@ -115,7 +119,7 @@ export default function ProductDetail({ product, products, addToCart, calculateD
             </div>
           )}
 
-          <StockLabel count={total} className="!text-base" />
+          <StockLabel count={labelCount} className="!text-base" />
 
           {sized && (
             <div>
