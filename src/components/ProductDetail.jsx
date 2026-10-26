@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MessageCircle, Heart } from 'lucide-react';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
+import StockLabel from './StockLabel';
 import { hasSizeStock, totalStock, stockForSize, orderedSizes } from '../data/catalog';
 
 export default function ProductDetail({ product, products, addToCart, calculateDiscountPercent, formatPrice, isDarkMode, setCurrentView, savedIds = [], toggleSaved = () => {} }) {
@@ -99,6 +100,8 @@ export default function ProductDetail({ product, products, addToCart, calculateD
             </div>
           )}
 
+          <StockLabel count={total} className="!text-base" />
+
           {sized && (
             <div>
               <p className="text-xs font-semibold mb-2">
@@ -119,7 +122,7 @@ export default function ProductDetail({ product, products, addToCart, calculateD
             </div>
           )}
 
-          {!sized && !soldOut && <p className="text-xs text-gray-500">{total <= 5 ? `Only ${total} left in stock` : 'In stock'}</p>}
+          {!sized && !soldOut && total <= 5 && <p className="text-xs font-semibold text-orange-600">Hurry! Only {total} left.</p>}
 
           {!soldOut && (
             <div className="flex flex-wrap items-center gap-3">

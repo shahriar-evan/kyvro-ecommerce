@@ -1,6 +1,7 @@
 import React from 'react';
 import { MessageCircle, Heart } from 'lucide-react';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
+import StockLabel from './StockLabel';
 import { SUB_CATEGORIES, COLLECTION_LABELS, DEFAULT_SUB_LABEL, hasSizeStock, totalStock } from '../data/catalog';
 
 export default function ShopView({ addToCart, filteredProducts, formatPrice, isDarkMode, products, searchQuery, selectedCategory, selectedSubCategory, setSelectedSubCategory, setCurrentView, setSearchQuery, setSelectedCategory, setSelectedProduct, setSortBy, sortBy, savedIds = [], toggleSaved = () => {} }) {
@@ -117,6 +118,7 @@ export default function ShopView({ addToCart, filteredProducts, formatPrice, isD
                         <div className="flex items-center gap-2 mt-2">
                           <span className="text-sm font-bold">{formatPrice(product.price)}</span>
                         </div>
+                        <StockLabel count={totalStock(product)} className="mt-1.5" />
                       </div>
 
                       <div className="mt-4 space-y-2">

@@ -68,7 +68,7 @@ export default function OrderSuccess({ order, formatPrice, isDarkMode, setCurren
       </div>
 
       <p className="text-xs text-gray-500 text-center">
-        Changed your mind? You can cancel this order within {10} minutes from My Orders, as long as the team has not confirmed it. (অর্ডার করার ১০ মিনিটের মধ্যে, কনফার্ম হওয়ার আগে My Orders থেকে ক্যানসেল করতে পারবেন।)
+        Changed your mind? You can cancel this order within 30 minutes from My Orders, as long as the team has not confirmed it. (অর্ডার করার ৩০ মিনিটের মধ্যে, কনফার্ম হওয়ার আগে My Orders থেকে ক্যানসেল করতে পারবেন।)
       </p>
 
       <div className="text-center">

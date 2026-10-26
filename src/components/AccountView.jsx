@@ -33,22 +33,26 @@ export default function AccountView({
 
   // keeps the "minutes left to cancel" fresh
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 15000);
+    const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
 
   // minutes left to cancel (0 when the time is over, the order moved on, or it was just placed and has no time yet)
-  const minutesLeft = (o) => {
+  const msLeft = (o) => {
     if (o.status !== 'Pending') return 0;
     const d = toDate(o.createdAt);
-    if (!d) return CANCEL_WINDOW_MINUTES;
-    return Math.max(0, Math.ceil((d.getTime() + CANCEL_WINDOW_MINUTES * 60000 - now) / 60000));
+    if (!d) return CANCEL_WINDOW_MINUTES * 60000;
+    return Math.max(0, d.getTime() + CANCEL_WINDOW_MINUTES * 60000 - now);
+  };
+  const clock = (ms) => {
+    const s = Math.ceil(ms / 1000);
+    return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   };
   const cancelOrder = async (o) => {
     if (!confirm(`Cancel order ${o.orderNumber}?`)) return;
     setCancelMsg(''); setCancelling(o.id);
     try { await onCancelOrder(o.id); }
-    catch (e) { setCancelMsg('Sorry, this order can no longer be cancelled here (the 10 minutes are over or the team already confirmed it). Please contact us on WhatsApp or kyvrofashion@gmail.com.'); }
+    catch (e) { setCancelMsg('Sorry, this order can no longer be cancelled here (the 30 minutes are over or the team already confirmed it). Please contact us on WhatsApp or kyvrofashion@gmail.com.'); }
     setCancelling('');
   };
 
@@ -151,12 +155,16 @@ export default function AccountView({
                 <span className="text-gray-500">{o.paymentMethod} &middot; {o.deliveryArea}{o.discount > 0 ? ` · Discount ${formatPrice(o.discount)}` : ''}</span>
                 <span className="font-bold text-sm text-[#D4AF37]">{formatPrice(o.total)}</span>
               </div>
-              {minutesLeft(o) > 0 && (
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <button disabled={cancelling === o.id} onClick={() => cancelOrder(o)} className="px-4 py-2 rounded text-xs font-bold border border-red-500 text-red-500 hover:bg-red-500 hover:text-white transition disabled:opacity-50">
+              {msLeft(o) > 0 && (
+                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <button disabled={cancelling === o.id} onClick={() => cancelOrder(o)} className="px-5 py-2.5 rounded text-sm font-bold border-2 border-red-500 text-red-500 hover:bg-red-500 hover:text-white transition disabled:opacity-50">
                     {cancelling === o.id ? 'Cancelling...' : 'Cancel order'}
                   </button>
-                  <span className="text-[11px] text-gray-500">You can cancel for {minutesLeft(o)} more minute(s), until the team confirms it.</span>
+                  <div className="text-sm">
+                    <span className="font-semibold">Time left to cancel: </span>
+                    <span className="font-mono font-bold text-base text-red-500 tabular-nums">{clock(msLeft(o))}</span>
+                    <p className="text-xs text-gray-500">You can cancel until this timer ends or the team confirms your order.</p>
+                  </div>
                 </div>
               )}
             </div>

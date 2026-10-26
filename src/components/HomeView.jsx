@@ -1,5 +1,6 @@
 import React from 'react';
 import { hasSizeStock, totalStock } from '../data/catalog';
+import StockLabel from './StockLabel';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
 import { User, Shield, Truck, RefreshCw, ChevronRight, MessageCircle, Heart } from 'lucide-react';
 import heroBannerImg from '../assets/hero-banner.png';
@@ -148,6 +149,7 @@ export default function HomeView({ addToCart, banners, calculateDiscountPercent,
                               <span className="text-xs text-gray-500 line-through">{formatPrice(product.originalPrice)}</span>
                             )}
                           </div>
+                          <StockLabel count={totalStock(product)} className="mt-1.5" />
                         </div>
 
                         <div className="mt-5 space-y-2">
