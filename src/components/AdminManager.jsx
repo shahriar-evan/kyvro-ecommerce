@@ -121,7 +121,7 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
   const innerCardClass = `p-5 rounded-lg border ${isDarkMode ? 'bg-[#121212] border-gray-800' : 'bg-gray-50 border-gray-200'}`;
   const selectClass = `border p-2 text-xs rounded focus:outline-none focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`;
   const mutedClass = isDarkMode ? 'text-gray-400' : 'text-gray-600';
-  const chipBtn = 'px-2 py-1 rounded text-[11px] bg-gray-200 dark:bg-gray-800 text-gray-600 hover:text-black dark:hover:text-white';
+  const chipBtn = 'px-3 py-1.5 rounded text-xs font-semibold border bg-white text-gray-900 border-gray-400 hover:bg-gray-100 dark:bg-gray-700 dark:text-white dark:border-gray-500 dark:hover:bg-gray-600 transition';
 
   const lockedOwners = OWNER_EMAILS.map((o) => o.toLowerCase());
   const extraAdmins = admins.filter((a) => !lockedOwners.includes(a.email));
@@ -442,7 +442,7 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
                       )}
                       <button onClick={() => startEdit(a)} className={chipBtn}>Edit</button>
                       <button onClick={() => handleReset(a)} className={chipBtn}>Reset password</button>
-                      {!isMe && <button onClick={() => handleRemove(a)} className="text-red-400 hover:text-red-300 px-2 py-1 bg-red-950/40 rounded text-[11px]">Remove</button>}
+                      {!isMe && <button onClick={() => handleRemove(a)} className="px-3 py-1.5 rounded text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition">Remove</button>}
                     </div>
                   ) : (
                     <span className="text-[#D4AF37] font-bold uppercase tracking-wider">{ROLE_LABELS[a.role]}</span>

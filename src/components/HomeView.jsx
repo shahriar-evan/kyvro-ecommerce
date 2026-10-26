@@ -29,13 +29,14 @@ export default function HomeView({ addToCart, banners, calculateDiscountPercent,
 
           {/* AUTOMATIC BANNERS SLIDER */}
           <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16 pb-4">
-            <div className="relative h-[280px] sm:h-[400px] md:h-[500px] rounded-2xl overflow-hidden shadow-2xl border border-gray-800 bg-transparent">
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-800">
               {banners.map((img, idx) => (
                 <div 
                   key={idx}
-                  className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${idx === currentBannerIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+                  className={`transition-opacity duration-1000 ease-in-out ${idx === currentBannerIndex ? 'relative opacity-100 z-10' : 'absolute top-0 left-0 w-full opacity-0 z-0 pointer-events-none'}`}
                 >
-                  <img src={img} alt={`Kyvro Banner ${idx + 1}`} className="w-full h-full object-cover" />
+                  {/* the box takes the photo's own shape: nothing is cropped and there is no empty space */}
+                  <img src={img} alt={`Kyvro Banner ${idx + 1}`} className="block w-full h-auto" />
                   <div className="absolute inset-x-0 bottom-6 z-20 flex justify-center">
                     <button 
                       onClick={() => setCurrentView('shop')}
