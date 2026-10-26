@@ -45,6 +45,7 @@ export default function OrderSuccess({ order, formatPrice, isDarkMode, setCurren
 
         <div className="text-sm space-y-1 border-t pt-3">
           <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span>{formatPrice(order.subtotal)}</span></div>
+          {order.discount > 0 && <div className="flex justify-between text-green-600"><span>Discount{order.discountLabel ? ` (${order.discountLabel})` : ''}</span><span>- {formatPrice(order.discount)}</span></div>}
           <div className="flex justify-between"><span className="text-gray-500">Delivery charge</span><span>{order.shipping === 0 ? 'FREE' : formatPrice(order.shipping)}</span></div>
           <div className="flex justify-between text-lg font-bold pt-1"><span>Total</span><span className="text-[#D4AF37]">{formatPrice(order.total)}</span></div>
         </div>

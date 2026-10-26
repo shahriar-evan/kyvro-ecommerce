@@ -4,7 +4,8 @@ import { auth, googleProvider } from './firebase';
 import { isOwnerEmail } from './adminEmails';
 import { getAdminStatus, watchAdminAccess } from './adminAuth';
 import { placeOrder, watchOrders } from './orders';
-import { DELIVERY_AREAS, deliveryFee, paymentStatusFor } from './data/shopConfig';
+import { watchStoreSettings } from './storeSettings';
+import { DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
 import { INITIAL_PRODUCTS } from './data/products';
 import { CURRENCIES } from './data/currencies';
 import { defaultCategoryFor, matchesCollectionPage, hasSizeStock, stockForSize, orderedSizes } from './data/catalog';
@@ -51,7 +52,9 @@ export default function App() {
 
   const [orders, setOrders] = useState([]); // live from Firestore (team members only)
 
-  const [announcementText, setAnnouncementText] = useState("Discover Your Signature Style | Complimentary Worldwide Shipping on Orders Over 3500 BDT");
+  // Banner text + discount rules: edited by the Owner in the admin panel (Firestore settings/store)
+  const [storeSettings, setStoreSettings] = useState(DEFAULT_STORE_SETTINGS);
+  const announcementText = storeSettings.announcementText;
   const [currencyKey, setCurrencyKey] = useState("BDT");
   const curr = CURRENCIES[currencyKey];
 
@@ -169,6 +172,16 @@ export default function App() {
     return () => unsubscribe();
   }, [isAdminLoggedIn]);
 
+  // Live store settings (banner + discount rules) for every visitor
+  useEffect(() => {
+    try {
+      const unsubscribe = watchStoreSettings(setStoreSettings);
+      return () => unsubscribe();
+    } catch (err) {
+      console.error('Could not load store settings:', err);
+    }
+  }, []);
+
   // Every page change starts at the top
   useEffect(() => { window.scrollTo(0, 0); }, [currentView]);
 
@@ -182,7 +195,7 @@ export default function App() {
     return Math.round(((originalPrice - price) / originalPrice) * 100);
   };
 
-  const addToCart = (product, selectedColor, selectedSize, quantity = 1) => {
+  const addToCart = (product, selectedColor, selectedSize, quantity = 1, goCheckout = false) => {
     const live = products.find(p => p.id === product.id) || product;
     const size = selectedSize || (live.sizes && live.sizes[0]);
     const color = selectedColor || (live.colors && live.colors[0]);
@@ -207,7 +220,14 @@ export default function App() {
       }
       return [...prev, { ...live, cartItemId, selectedColor: color, selectedSize: size, quantity: qty }];
     });
-    setIsCartOpen(true);
+    if (goCheckout) {
+      // Buy Now: skip the cart drawer and go straight to checkout
+      setIsCartOpen(false);
+      setCheckoutError('');
+      setCurrentView('checkout');
+    } else {
+      setIsCartOpen(true);
+    }
   };
 
   const updateCartQty = (cartItemId, delta) => {
@@ -239,7 +259,12 @@ export default function App() {
   const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   // Online Payment = free delivery, Cash on Delivery = 100 / 150 by area (see data/shopConfig.js)
   const deliveryCharge = deliveryFee(checkoutForm.deliveryArea, checkoutForm.paymentMethod);
-  const grandTotal = subtotal + deliveryCharge;
+  // Automatic discount (rules are set by the Owner), taken off the product total, not the delivery charge
+  const discountInfo = bestDiscount(subtotal, storeSettings);
+  const discount = discountInfo.amount;
+  const discountLabel = discountInfo.rule ? describeRule(discountInfo.rule) : '';
+  const reward = nextReward(subtotal, storeSettings);
+  const grandTotal = subtotal - discount + deliveryCharge;
 
   const handleCheckoutSubmit = async (e) => {
     e.preventDefault();
@@ -280,6 +305,8 @@ export default function App() {
         image: typeof item.image === 'string' && /^https?:\/\//.test(item.image) && item.image.length < 400 ? item.image : ''
       })),
       subtotal,
+      discount,
+      discountLabel,
       deliveryArea: checkoutForm.deliveryArea,
       shipping: deliveryCharge,
       total: grandTotal,
@@ -508,7 +535,7 @@ export default function App() {
       {isMobileMenuOpen && <MobileMenu isDarkMode={isDarkMode} setCurrentView={setCurrentView} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} />}
 
       {/* CART SLIDE-OVER DRAWER */}
-      {isCartOpen && <CartDrawer cart={cart} formatPrice={formatPrice} isDarkMode={isDarkMode} removeFromCart={removeFromCart} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} subtotal={subtotal} updateCartQty={updateCartQty} />}
+      {isCartOpen && <CartDrawer cart={cart} formatPrice={formatPrice} isDarkMode={isDarkMode} removeFromCart={removeFromCart} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} subtotal={subtotal} discount={discount} discountLabel={discountLabel} reward={reward} updateCartQty={updateCartQty} />}
 
       {/* HOME VIEW */}
       {currentView === 'home' && <HomeView addToCart={addToCart} banners={banners} calculateDiscountPercent={calculateDiscountPercent} currentBannerIndex={currentBannerIndex} formatPrice={formatPrice} isDarkMode={isDarkMode} products={products} setCurrentBannerIndex={setCurrentBannerIndex} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} />}
@@ -519,13 +546,13 @@ export default function App() {
       {currentView === 'product-detail' && selectedProduct && <ProductDetail product={selectedProduct} products={products} addToCart={addToCart} calculateDiscountPercent={calculateDiscountPercent} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
 
       {/* CHECKOUT (guest checkout, no login needed) */}
-      {currentView === 'checkout' && <CheckoutView cart={cart} checkoutForm={checkoutForm} setCheckoutForm={setCheckoutForm} checkoutError={checkoutError} deliveryCharge={deliveryCharge} grandTotal={grandTotal} formatPrice={formatPrice} handleCheckoutSubmit={handleCheckoutSubmit} isDarkMode={isDarkMode} placingOrder={placingOrder} removeFromCart={removeFromCart} setCurrentView={setCurrentView} subtotal={subtotal} />}
+      {currentView === 'checkout' && <CheckoutView cart={cart} checkoutForm={checkoutForm} setCheckoutForm={setCheckoutForm} checkoutError={checkoutError} deliveryCharge={deliveryCharge} grandTotal={grandTotal} formatPrice={formatPrice} handleCheckoutSubmit={handleCheckoutSubmit} isDarkMode={isDarkMode} placingOrder={placingOrder} removeFromCart={removeFromCart} setCurrentView={setCurrentView} subtotal={subtotal} discount={discount} discountLabel={discountLabel} reward={reward} />}
 
       {/* ORDER CONFIRMATION */}
       {currentView === 'order-success' && <OrderSuccess order={orderCompleteData} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
 
       {/* ADMIN PORTAL VIEW (GOOGLE SIGN-IN, WHITELISTED EMAILS ONLY) */}
-      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} />}
+      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} storeSettings={storeSettings} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} />}
 
       {/* FOOTER */}
       <Footer isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} />

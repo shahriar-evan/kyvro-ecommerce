@@ -28,6 +28,11 @@ export default function ProductDetail({ product, products, addToCart, calculateD
     addToCart(live, color || undefined, sized ? size : (live.sizes && live.sizes[0]), qty);
   };
 
+  const handleBuyNow = () => {
+    if (soldOut || needsSize) return;
+    addToCart(live, color || undefined, sized ? size : (live.sizes && live.sizes[0]), qty, true);
+  };
+
   const cardBtn = (active, disabled) =>
     `min-w-[3rem] px-3 py-2 text-xs rounded border transition ${
       disabled
@@ -95,7 +100,7 @@ export default function ProductDetail({ product, products, addToCart, calculateD
           {!sized && !soldOut && <p className="text-xs text-gray-500">{total <= 5 ? `Only ${total} left in stock` : 'In stock'}</p>}
 
           {!soldOut && (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <div className={`flex items-center border rounded ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                 <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="px-3 py-2 text-sm">−</button>
                 <span className="px-4 text-sm font-semibold">{qty}</span>
@@ -107,6 +112,13 @@ export default function ProductDetail({ product, products, addToCart, calculateD
                 className="flex-1 bg-[#D4AF37] text-black font-bold py-3 rounded text-xs uppercase tracking-widest hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {needsSize ? 'Select a size' : 'Add to Cart'}
+              </button>
+              <button
+                onClick={handleBuyNow}
+                disabled={needsSize}
+                className={`flex-1 font-bold py-3 rounded text-xs uppercase tracking-widest border-2 border-[#D4AF37] transition disabled:opacity-50 disabled:cursor-not-allowed ${isDarkMode ? 'text-[#D4AF37] hover:bg-[#D4AF37]/10' : 'text-black hover:bg-[#D4AF37]/10'}`}
+              >
+                Buy Now
               </button>
             </div>
           )}

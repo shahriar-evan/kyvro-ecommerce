@@ -3,7 +3,7 @@ import { DELIVERY_AREAS, DELIVERY_AREA_BN, DELIVERY_CHARGES, PAYMENT_METHODS, PA
 
 export default function CheckoutView({
   cart, checkoutForm, setCheckoutForm, checkoutError, deliveryCharge, grandTotal, formatPrice,
-  handleCheckoutSubmit, isDarkMode, placingOrder, removeFromCart, setCurrentView, subtotal,
+  handleCheckoutSubmit, isDarkMode, placingOrder, removeFromCart, setCurrentView, subtotal, discount = 0, discountLabel = '',
 }) {
   const set = (field, value) => setCheckoutForm({ ...checkoutForm, [field]: value });
   const online = checkoutForm.paymentMethod === 'Online Payment';
@@ -88,6 +88,11 @@ export default function CheckoutView({
             <div className="flex justify-between font-semibold">
               <span>Subtotal</span><span>{formatPrice(subtotal)}</span>
             </div>
+            {discount > 0 && (
+              <div className="flex justify-between font-semibold text-green-600">
+                <span>Discount ({discountLabel})</span><span>- {formatPrice(discount)}</span>
+              </div>
+            )}
 
             <div>
               <label className="block font-semibold mb-1.5">Shipping (ডেলিভারি এলাকা) *</label>

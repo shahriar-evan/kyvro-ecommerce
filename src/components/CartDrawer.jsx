@@ -2,7 +2,7 @@ import React from 'react';
 import { ShoppingBag, X, ChevronRight, Trash2 } from 'lucide-react';
 import { DELIVERY_CHARGES } from '../data/shopConfig';
 
-export default function CartDrawer({ cart, formatPrice, isDarkMode, removeFromCart, setCurrentView, setIsCartOpen, subtotal, updateCartQty }) {
+export default function CartDrawer({ cart, formatPrice, isDarkMode, removeFromCart, setCurrentView, setIsCartOpen, subtotal, discount = 0, discountLabel = '', reward = null, updateCartQty }) {
   return (
     <>
         <div className="fixed inset-0 z-50 bg-black/70 flex justify-end">
@@ -59,10 +59,27 @@ export default function CartDrawer({ cart, formatPrice, isDarkMode, removeFromCa
             {cart.length > 0 && (
               <div className="border-t pt-4 space-y-3">
                 <div className="space-y-1.5 text-sm">
-                  <div className="flex justify-between text-base font-bold">
+                  <div className={`flex justify-between ${discount > 0 ? 'text-sm' : 'text-base font-bold'}`}>
                     <span>Subtotal</span>
-                    <span className="text-[#D4AF37]">{formatPrice(subtotal)}</span>
+                    <span className={discount > 0 ? '' : 'text-[#D4AF37]'}>{formatPrice(subtotal)}</span>
                   </div>
+                  {discount > 0 && (
+                    <>
+                      <div className="flex justify-between text-sm text-green-600 font-semibold">
+                        <span>Discount ({discountLabel})</span>
+                        <span>- {formatPrice(discount)}</span>
+                      </div>
+                      <div className="flex justify-between text-base font-bold">
+                        <span>After discount</span>
+                        <span className="text-[#D4AF37]">{formatPrice(subtotal - discount)}</span>
+                      </div>
+                    </>
+                  )}
+                  {reward && (
+                    <p className="text-[11px] font-semibold text-[#D4AF37]">
+                      Add {formatPrice(reward.missing)} more to get {reward.rule.type === 'percent' ? `${reward.rule.value}%` : formatPrice(reward.rule.value)} OFF!
+                    </p>
+                  )}
                   <p className="text-[11px] text-gray-500">
                     Delivery charge is added at checkout. Cash on Delivery: Inside Dhaka {formatPrice(DELIVERY_CHARGES['Inside Dhaka'])}, Outside Dhaka {formatPrice(DELIVERY_CHARGES['Outside Dhaka'])}. Online Payment: free delivery.
                   </p>

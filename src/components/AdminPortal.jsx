@@ -4,9 +4,10 @@ import AdminManager from './AdminManager';
 import ImageField from './ImageField';
 import SizeStockEditor from './SizeStockEditor';
 import OrdersPanel from './OrdersPanel';
+import StoreSettings from './StoreSettings';
 import { SUB_CATEGORIES, hasSubCategories, hasSizeStock, totalStock, orderedSizes } from '../data/catalog';
 
-export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, isDarkMode, loggedInUserEmail, newProductForm, orders, products, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct }) {
+export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, isDarkMode, loggedInUserEmail, newProductForm, orders, products, storeSettings, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct }) {
   const isOwner = adminRole === 'owner';
   const canManageTeam = adminRole === 'owner' || adminRole === 'manager';
   const sizesUsed = Object.keys((newProductForm && newProductForm.sizeStock) || {}).length > 0;
@@ -55,6 +56,14 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                     <span className="ml-2 bg-red-600 text-white rounded-full px-2 py-0.5 text-[10px]">{orders.filter(o => o.status === 'Pending').length} new</span>
                   )}
                 </button>
+                {isOwner && (
+                  <button
+                    onClick={() => setAdminTab('settings')}
+                    className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'settings' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
+                  >
+                    Banner &amp; Discount
+                  </button>
+                )}
                 {canManageTeam && (
                   <button 
                     onClick={() => setAdminTab('admins')} 
@@ -64,6 +73,8 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                   </button>
                 )}
               </div>
+
+              {adminTab === 'settings' && isOwner && <StoreSettings settings={storeSettings} isDarkMode={isDarkMode} formatPrice={formatPrice} staff={{ email: loggedInUserEmail, name: adminName }} />}
 
               {adminTab === 'admins' && canManageTeam && <AdminManager isDarkMode={isDarkMode} currentEmail={loggedInUserEmail} currentName={adminName} adminRole={adminRole} />}
 

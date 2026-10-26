@@ -48,10 +48,10 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
   };
 
   const exportCSV = () => {
-    const rows = ['Order Number,Date,Customer,Phone,Address,Delivery Area,Items,Subtotal (BDT),Delivery (BDT),Total (BDT),Payment Method,Payment Status,Status'];
+    const rows = ['Order Number,Date,Customer,Phone,Address,Delivery Area,Items,Subtotal (BDT),Discount (BDT),Delivery (BDT),Total (BDT),Payment Method,Payment Status,Status'];
     orders.forEach((o) => {
       const items = (o.items || []).map((i) => `${i.name}${i.size && i.size !== 'Standard' ? ` (${i.size})` : ''} x${i.quantity}`).join('; ');
-      rows.push([o.orderNumber, formatDateTime(o.createdAt), o.customer?.name, o.customer?.phone, o.customer?.address, o.deliveryArea, items, o.subtotal, o.shipping, o.total, o.paymentMethod, o.paymentStatus, o.status].map(csv).join(','));
+      rows.push([o.orderNumber, formatDateTime(o.createdAt), o.customer?.name, o.customer?.phone, o.customer?.address, o.deliveryArea, items, o.subtotal, o.discount || 0, o.shipping, o.total, o.paymentMethod, o.paymentStatus, o.status].map(csv).join(','));
     });
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
     const a = document.createElement('a');
@@ -133,6 +133,7 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
                 <p>Method: <strong>{o.paymentMethod}</strong></p>
                 <p>Status: <strong className={PAYMENT_STYLE[o.paymentStatus] || ''}>{o.paymentStatus}</strong></p>
                 <p>Subtotal: {formatPrice(o.subtotal)}</p>
+                {o.discount > 0 && <p className="text-green-600">Discount{o.discountLabel ? ` (${o.discountLabel})` : ''}: - {formatPrice(o.discount)}</p>}
                 <p>Delivery: {o.shipping === 0 ? 'FREE' : formatPrice(o.shipping)}</p>
                 <p className="text-sm font-bold">Total: {formatPrice(o.total)}</p>
               </div>
