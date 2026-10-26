@@ -3,7 +3,7 @@ import { DELIVERY_AREAS, DELIVERY_AREA_BN, DELIVERY_CHARGES, PAYMENT_METHODS, PA
 
 export default function CheckoutView({
   cart, checkoutForm, setCheckoutForm, checkoutError, deliveryCharge, grandTotal, formatPrice,
-  handleCheckoutSubmit, isDarkMode, placingOrder, removeFromCart, setCurrentView, subtotal, discount = 0, discountLabel = '',
+  handleCheckoutSubmit, isDarkMode, placingOrder, removeFromCart, setCurrentView, subtotal, discount = 0, discountLabel = '', customerUser = null, authReady = true, onSignIn,
 }) {
   const set = (field, value) => setCheckoutForm({ ...checkoutForm, [field]: value });
   const online = checkoutForm.paymentMethod === 'Online Payment';
@@ -21,6 +21,31 @@ export default function CheckoutView({
         <button onClick={() => setCurrentView('shop')} className="bg-[#D4AF37] text-black text-xs font-bold px-6 py-3 tracking-widest uppercase rounded hover:opacity-90 transition">
           Start Shopping
         </button>
+      </div>
+    );
+  }
+
+  // Your cart works without an account, but placing the order needs a Google sign-in (the cart stays as it is)
+  if (!customerUser) {
+    return (
+      <div className="flex-1 max-w-3xl mx-auto px-4 sm:px-6 py-10 sm:py-16 w-full">
+        <button onClick={() => setCurrentView('shop')} className="text-xs text-gray-500 hover:text-[#D4AF37] mb-4">&larr; Continue shopping</button>
+        <div className={`${panel} text-center space-y-4`}>
+          <h1 className="text-2xl font-serif font-bold">Sign in to place your order</h1>
+          <p className="text-sm text-gray-500">অর্ডার করতে আপনার Google অ্যাকাউন্ট দিয়ে সাইন ইন করুন। আপনার কার্টের সব প্রোডাক্ট যেমন আছে তেমনই থাকবে।</p>
+          <div className="space-y-2 text-left max-w-md mx-auto">
+            {cart.map((item) => (
+              <div key={item.cartItemId} className={`flex items-center gap-3 p-2 rounded border ${isDarkMode ? 'bg-[#121212] border-gray-800' : 'bg-white border-gray-200'}`}>
+                <img src={item.image} alt={item.name} className="w-12 h-12 object-cover rounded" />
+                <span className="flex-1 min-w-0 text-sm font-semibold truncate">{item.name} &times; {item.quantity}</span>
+                <span className="text-sm font-bold">{formatPrice(item.price * item.quantity)}</span>
+              </div>
+            ))}
+          </div>
+          <button onClick={onSignIn} disabled={!authReady} className="inline-flex items-center justify-center gap-2 bg-[#D4AF37] text-black text-xs font-bold px-8 py-3.5 tracking-widest uppercase rounded hover:opacity-90 transition disabled:opacity-60">
+            {authReady ? 'Continue with Google' : 'Please wait...'}
+          </button>
+        </div>
       </div>
     );
   }

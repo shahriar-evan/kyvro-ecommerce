@@ -7,7 +7,7 @@ import { placeOrder, watchOrders } from './orders';
 import { watchProfile, saveProfile, watchMyOrders } from './customerData';
 import { watchProducts, saveProduct, removeProduct, approveProduct, migrateProducts } from './productsStore';
 import { watchStoreSettings } from './storeSettings';
-import { DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
+import { cleanPhone, DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
 import { INITIAL_PRODUCTS } from './data/products';
 import { CURRENCIES } from './data/currencies';
 import { defaultCategoryFor, matchesCollectionPage, hasSizeStock, stockForSize, orderedSizes } from './data/catalog';
@@ -65,6 +65,7 @@ export default function App() {
 
   // Customer account (Google sign-in). Team members who sign in this way are also recognised as team below.
   const [customerUser, setCustomerUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false); // true once Firebase has told us whether someone is signed in
   const [profile, setProfile] = useState({});
   const [myOrders, setMyOrders] = useState([]);
   const [accountTab, setAccountTab] = useState('orders');
@@ -125,6 +126,7 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setAuthReady(true);
       if (!user) {
         setCustomerUser(null);
         setProfile({});
@@ -334,12 +336,13 @@ export default function App() {
     e.preventDefault();
     if (placingOrder || cart.length === 0) return;
     setCheckoutError('');
+    if (!customerUser) { setCheckoutError('Please sign in with Google to place your order.'); return; }
 
     const name = checkoutForm.fullName.trim();
-    const phone = checkoutForm.phone.trim();
+    const phone = cleanPhone(checkoutForm.phone.trim());
     const address = checkoutForm.address.trim();
     if (name.length < 2) return setCheckoutError('Please enter your name. (আপনার নাম লিখুন)');
-    if (!/^[0-9+\-\s()]{7,20}$/.test(phone) || phone.replace(/\D/g, '').length < 7) return setCheckoutError('Please enter a valid phone number. (সঠিক ফোন নম্বর দিন)');
+    if (!/^[+]?[0-9]{7,15}$/.test(phone)) return setCheckoutError('Please enter a valid phone number. (সঠিক ফোন নম্বর দিন)');
     if (address.length < 10) return setCheckoutError('Please enter your full address with district. (সম্পূর্ণ ঠিকানা লিখুন, জেলা উপজেলা সহ)');
     if (!DELIVERY_AREAS.includes(checkoutForm.deliveryArea)) return setCheckoutError('Please select your delivery area: Inside Dhaka or Outside Dhaka.');
     if (!checkoutForm.agree) return setCheckoutError('Please accept the Terms & Conditions, Privacy Policy and Return & Refund Policy to continue.');
@@ -377,7 +380,8 @@ export default function App() {
       paymentMethod: checkoutForm.paymentMethod,
       paymentStatus: paymentStatusFor(checkoutForm.paymentMethod),
       status: 'Pending',
-      ...(customerUser ? { uid: customerUser.uid } : {})
+      ...(customerUser ? { uid: customerUser.uid } : {}),
+      ...(customerUser && customerUser.email ? { email: customerUser.email.toLowerCase() } : {})
     };
 
     setPlacingOrder(true);
@@ -389,7 +393,9 @@ export default function App() {
       setCurrentView('order-success');
     } catch (err) {
       console.error('Order failed:', err);
-      setCheckoutError('Sorry, we could not place your order. Please check your internet connection and try again, or contact us.');
+      setCheckoutError(err && err.code === 'permission-denied'
+        ? 'Sorry, we could not accept this order. Please contact us on WhatsApp or at kyvrofashion@gmail.com.'
+        : 'Sorry, we could not place your order. Please check your internet connection and try again, or contact us.');
     }
     setPlacingOrder(false);
   };
@@ -698,7 +704,7 @@ export default function App() {
       {currentView === 'account' && <AccountView customerUser={customerUser} displayName={displayName} photoURL={photoURL} activeTab={accountTab} setActiveTab={setAccountTab} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} onSaveProfile={handleSaveProfile} myOrders={myOrders} savedProducts={savedProducts} toggleSaved={toggleSaved} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedProduct={setSelectedProduct} />}
 
       {/* CHECKOUT (guest checkout, no login needed) */}
-      {currentView === 'checkout' && <CheckoutView cart={cart} checkoutForm={checkoutForm} setCheckoutForm={setCheckoutForm} checkoutError={checkoutError} deliveryCharge={deliveryCharge} grandTotal={grandTotal} formatPrice={formatPrice} handleCheckoutSubmit={handleCheckoutSubmit} isDarkMode={isDarkMode} placingOrder={placingOrder} removeFromCart={removeFromCart} setCurrentView={setCurrentView} subtotal={subtotal} discount={discount} discountLabel={discountLabel} reward={reward} />}
+      {currentView === 'checkout' && <CheckoutView cart={cart} checkoutForm={checkoutForm} setCheckoutForm={setCheckoutForm} checkoutError={checkoutError} deliveryCharge={deliveryCharge} grandTotal={grandTotal} formatPrice={formatPrice} handleCheckoutSubmit={handleCheckoutSubmit} isDarkMode={isDarkMode} placingOrder={placingOrder} removeFromCart={removeFromCart} setCurrentView={setCurrentView} subtotal={subtotal} discount={discount} discountLabel={discountLabel} reward={reward} customerUser={customerUser} authReady={authReady} onSignIn={handleCustomerSignIn} />}
 
       {/* ORDER CONFIRMATION */}
       {currentView === 'order-success' && <OrderSuccess order={orderCompleteData} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}

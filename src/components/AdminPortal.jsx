@@ -238,7 +238,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                 </form>
               )}
 
-              {adminTab === 'orders' && <OrdersPanel orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} />}
+              {adminTab === 'orders' && <OrdersPanel orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} canUnblock={adminRole === 'owner' || adminRole === 'manager'} />}
             </div>
           )}
         </div>

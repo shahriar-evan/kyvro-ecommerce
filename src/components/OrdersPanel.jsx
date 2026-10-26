@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ORDER_STATUSES, DELIVERY_AREA_BN } from '../data/shopConfig';
 import { updateOrderStatus, markOrderPaid } from '../orders';
 import { formatDateTime, toDate } from '../utils/dates';
+import { phoneKey, emailKey } from '../data/shopConfig';
+import { watchBlocked, blockPhone, blockEmail, unblockPhone, unblockEmail } from '../blocklist';
 
 const STATUS_STYLE = {
   Pending: 'bg-yellow-500/15 text-yellow-600',
@@ -19,11 +21,18 @@ const PAYMENT_STYLE = {
 
 const csv = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
-export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName, loggedInUserEmail }) {
+export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName, loggedInUserEmail, canUnblock }) {
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState('');
+  const [blocked, setBlocked] = useState({ phones: {}, emails: {} });
+  const [showBlocked, setShowBlocked] = useState(false);
+
+  useEffect(() => {
+    const stop = watchBlocked(setBlocked);
+    return () => stop();
+  }, []);
 
   const staff = { email: loggedInUserEmail, name: adminName || loggedInUserEmail };
   const countOf = (s) => orders.filter((o) => o.status === s).length;
@@ -51,6 +60,20 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
       }
     });
   };
+
+  const doBlockPhone = (o) => {
+    if (!confirm(`Block the phone number ${o.customer?.phone}? New orders from this number will be refused.`)) return;
+    run(o.id, () => blockPhone(o.customer.phone, o.orderNumber, staff));
+  };
+  const doBlockEmail = (o) => {
+    if (!confirm(`Block the account ${o.email}? New orders from this account will be refused.`)) return;
+    run(o.id, () => blockEmail(o.email, o.orderNumber, staff));
+  };
+  const doUnblock = (kind, key) => {
+    if (!confirm('Unblock this customer?')) return;
+    run(key, () => (kind === 'phone' ? unblockPhone(key) : unblockEmail(key)));
+  };
+  const blockedCount = Object.keys(blocked.phones).length + Object.keys(blocked.emails).length;
 
   const exportCSV = () => {
     const rows = ['Order Number,Date,Customer,Phone,Address,Delivery Area,Items,Subtotal (BDT),Discount (BDT),Delivery (BDT),Total (BDT),Payment Method,Payment Status,Status'];
@@ -98,6 +121,35 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
         {error && <p className="text-xs p-3 rounded border border-red-500/40 text-red-500 bg-red-500/10">{error}</p>}
       </div>
 
+      {/* blocked customers */}
+      <div className={`${cardClass} !space-y-3`}>
+        <button onClick={() => setShowBlocked(!showBlocked)} className="w-full flex items-center justify-between text-xs font-bold uppercase tracking-wider">
+          <span>Blocked customers ({blockedCount})</span>
+          <span className="text-[#D4AF37]">{showBlocked ? 'Hide' : 'Show'}</span>
+        </button>
+        {showBlocked && (
+          blockedCount === 0
+            ? <p className="text-xs text-gray-500">Nobody is blocked. To block someone, open one of their orders below and use the Block buttons.</p>
+            : (
+              <div className="space-y-2">
+                {Object.entries(blocked.phones).map(([key, b]) => (
+                  <div key={'p' + key} className="flex flex-wrap items-center justify-between gap-2 text-xs border rounded p-2.5">
+                    <span><strong>Phone</strong> {b.phone || key} <span className="text-gray-500">· blocked by {b.blockedByName || b.blockedBy} {b.at ? `· ${formatDateTime(b.at)}` : ''} {b.orderNumber ? `· ${b.orderNumber}` : ''}</span></span>
+                    {canUnblock && <button onClick={() => doUnblock('phone', key)} className="px-3 py-1.5 rounded text-[11px] font-semibold border hover:border-[#D4AF37]">Unblock</button>}
+                  </div>
+                ))}
+                {Object.entries(blocked.emails).map(([key, b]) => (
+                  <div key={'e' + key} className="flex flex-wrap items-center justify-between gap-2 text-xs border rounded p-2.5">
+                    <span><strong>Account</strong> {b.email || key} <span className="text-gray-500">· blocked by {b.blockedByName || b.blockedBy} {b.at ? `· ${formatDateTime(b.at)}` : ''} {b.orderNumber ? `· ${b.orderNumber}` : ''}</span></span>
+                    {canUnblock && <button onClick={() => doUnblock('email', key)} className="px-3 py-1.5 rounded text-[11px] font-semibold border hover:border-[#D4AF37]">Unblock</button>}
+                  </div>
+                ))}
+                {!canUnblock && <p className="text-[11px] text-gray-500">Only the Owner or a Manager can unblock.</p>}
+              </div>
+            )
+        )}
+      </div>
+
       {visible.length === 0 && (
         <p className="text-sm text-gray-500 text-center py-10">
           {orders.length === 0 ? 'No orders yet. New orders from customers will appear here automatically.' : 'No orders match this filter.'}
@@ -130,6 +182,15 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
                 <p>Address: {o.customer?.address}</p>
                 <p>Area: {o.deliveryArea} {DELIVERY_AREA_BN[o.deliveryArea] ? `(${DELIVERY_AREA_BN[o.deliveryArea]})` : ''}</p>
                 {o.customer?.notes && <p>Comment: <em>{o.customer.notes}</em></p>}
+                {o.email && <p>Account: <strong>{o.email}</strong></p>}
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {blocked.phones[phoneKey(o.customer?.phone)]
+                    ? <span className="px-3 py-1.5 rounded text-[11px] font-bold bg-red-600/15 text-red-500">Phone blocked</span>
+                    : <button disabled={busy} onClick={() => doBlockPhone(o)} className="px-3 py-1.5 rounded text-[11px] font-semibold border border-red-500/50 text-red-500 hover:bg-red-500/10 disabled:opacity-50">Block this phone</button>}
+                  {o.email && (blocked.emails[emailKey(o.email)]
+                    ? <span className="px-3 py-1.5 rounded text-[11px] font-bold bg-red-600/15 text-red-500">Account blocked</span>
+                    : <button disabled={busy} onClick={() => doBlockEmail(o)} className="px-3 py-1.5 rounded text-[11px] font-semibold border border-red-500/50 text-red-500 hover:bg-red-500/10 disabled:opacity-50">Block this account</button>)}
+                </div>
               </div>
 
               {/* money */}

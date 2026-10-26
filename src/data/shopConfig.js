@@ -107,3 +107,11 @@ export function discountLimits(settings) {
     maxFixed: Math.max(0, ...s.discountRules.filter((r) => r.type === 'fixed').map((r) => r.value)),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Blocking spam customers. A phone number is turned into a "key" so that +8801712345678, 8801712345678
+// and 01712345678 are the same number. The SAME steps are done in firestore.rules (function phoneKey).
+// ---------------------------------------------------------------------------
+export const cleanPhone = (p) => String(p || '').replace(/[\s()-]/g, '');
+export const phoneKey = (p) => cleanPhone(p).replace(/^[+]/, '').replace(/^880/, '0').replace(/^1/, '01');
+export const emailKey = (e) => String(e || '').trim().toLowerCase();
