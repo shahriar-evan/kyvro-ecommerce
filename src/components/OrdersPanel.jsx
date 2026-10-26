@@ -44,7 +44,12 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
 
   const setStatus = (o, status, confirmText) => {
     if (confirmText && !confirm(confirmText)) return;
-    run(o.id, () => updateOrderStatus(o.id, status, staff));
+    run(o.id, async () => {
+      const { skipped } = await updateOrderStatus(o.id, status, staff);
+      if (skipped && skipped.length) {
+        alert('The order was updated, but the stock of these items was NOT changed (they are not in Firestore yet, or the size no longer exists):\n' + skipped.join('\n') + '\nUpdate their stock by hand.');
+      }
+    });
   };
 
   const exportCSV = () => {
@@ -161,6 +166,7 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
             {/* history */}
             <div className="text-[11px] text-gray-500 space-y-0.5">
               <p>• Order placed · {formatDateTime(o.createdAt)}</p>
+              {o.stockDeducted && <p className="text-green-600">• Stock deducted for this order</p>}
               {history.map((h, i) => (
                 <p key={i}>• {h.status === 'Processing' ? 'Confirmed, processing started' : h.status} · by {h.byName || h.by} · {formatDateTime(h.at)}</p>
               ))}

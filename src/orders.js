@@ -1,6 +1,6 @@
 import { getApp } from "firebase/app";
 import {
-  getFirestore, doc, setDoc, updateDoc, collection, query, orderBy, onSnapshot, serverTimestamp, arrayUnion,
+  getFirestore, doc, setDoc, updateDoc, runTransaction, collection, query, orderBy, onSnapshot, serverTimestamp, arrayUnion,
 } from "firebase/firestore";
 import "./firebase"; // makes sure the default Firebase app exists
 
@@ -48,18 +48,85 @@ const historyEntry = (label, staff) => ({
   at: new Date().toISOString(),
 });
 
-// Moves an order to a new status and records who did it and when
+// Moves an order to a new status and records who did it and when.
+// Stock is handled here too:
+//   * Pending -> Processing (confirm): the ordered quantities are taken off each product's stock (per size)
+//   * Cancel after it was confirmed: the stock is put back
+// Everything happens in one transaction, so two people confirming at once cannot double-count.
+// Returns { skipped: [...] } with products whose stock could not be changed (e.g. not in Firestore).
 export async function updateOrderStatus(orderId, status, staff) {
-  const patch = {
-    status,
-    updatedAt: serverTimestamp(),
-    history: arrayUnion(historyEntry(status, staff)),
-  };
-  if (status === "Processing") {
-    patch.confirmedBy = staff.email || "";
-    patch.confirmedByName = staff.name || staff.email || "";
-  }
-  await updateDoc(doc(db, "orders", orderId), patch);
+  const orderRef = doc(db, "orders", orderId);
+  return runTransaction(db, async (tx) => {
+    const snap = await tx.get(orderRef);
+    if (!snap.exists()) throw new Error("Order not found.");
+    const order = snap.data();
+    const wasDeducted = order.stockDeducted === true;
+    const deduct = status === "Processing" && !wasDeducted;
+    const restore = status === "Cancelled" && wasDeducted;
+    const skipped = [];
+    const productWrites = [];
+
+    if (deduct || restore) {
+      const dir = deduct ? -1 : 1;
+      const items = Array.isArray(order.items) ? order.items : [];
+      const ids = [...new Set(items.map((it) => String(it.id)))];
+      // all reads first (a Firestore transaction rule)
+      const docs = {};
+      for (const id of ids) docs[id] = await tx.get(doc(db, "products", id));
+
+      const shortages = [];
+      for (const id of ids) {
+        const pSnap = docs[id];
+        const lines = items.filter((it) => String(it.id) === id);
+        if (!pSnap.exists()) { skipped.push(lines[0].name); continue; }
+        const p = pSnap.data();
+        const sized = p.sizeStock && Object.keys(p.sizeStock).length > 0;
+        const sizeStock = sized ? { ...p.sizeStock } : null;
+        let stock = parseInt(p.stock, 10) || 0;
+        let touched = false;
+        for (const it of lines) {
+          const qty = parseInt(it.quantity, 10) || 0;
+          if (sized) {
+            if (sizeStock[it.size] === undefined) { skipped.push(`${it.name} (${it.size})`); continue; }
+            const next = (parseInt(sizeStock[it.size], 10) || 0) + dir * qty;
+            if (next < 0) shortages.push(`${it.name} (size ${it.size}): only ${parseInt(sizeStock[it.size], 10) || 0} left, order needs ${qty}`);
+            sizeStock[it.size] = Math.max(0, next);
+            touched = true;
+          } else {
+            const next = stock + dir * qty;
+            if (next < 0) shortages.push(`${it.name}: only ${stock} left, order needs ${qty}`);
+            stock = Math.max(0, next);
+            touched = true;
+          }
+        }
+        if (touched) {
+          const patch = sized
+            ? { sizeStock, stock: Object.values(sizeStock).reduce((a, n) => a + (parseInt(n, 10) || 0), 0) }
+            : { stock };
+          productWrites.push([doc(db, "products", id), patch]);
+        }
+      }
+      if (shortages.length) {
+        throw new Error("Not enough stock to confirm this order:\n" + shortages.join("\n") + "\nUpdate the stock first, or cancel the order.");
+      }
+    }
+
+    for (const [ref, patch] of productWrites) tx.update(ref, patch);
+
+    const patch = {
+      status,
+      updatedAt: serverTimestamp(),
+      history: arrayUnion(historyEntry(status, staff)),
+    };
+    if (status === "Processing") {
+      patch.confirmedBy = staff.email || "";
+      patch.confirmedByName = staff.name || staff.email || "";
+    }
+    if (deduct) patch.stockDeducted = true;
+    if (restore) patch.stockDeducted = false;
+    tx.update(orderRef, patch);
+    return { skipped };
+  });
 }
 
 export async function markOrderPaid(orderId, staff) {
