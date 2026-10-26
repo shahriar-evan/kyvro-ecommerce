@@ -241,6 +241,11 @@ export default function App() {
     }
   }, []);
 
+  // Tailwind "dark:" styles follow the Light/Dark button of the site
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDarkMode);
+  }, [isDarkMode]);
+
   // Every page change starts at the top
   useEffect(() => { window.scrollTo(0, 0); }, [currentView]);
 

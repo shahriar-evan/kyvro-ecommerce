@@ -1,10 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ShoppingBag, Search, User, Menu, Sun, Moon } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 import { CURRENCIES } from '../data/currencies';
 
 export default function Header({ cart, curr, currencyKey, currentView, isDarkMode, setCurrencyKey, setCurrentView, setIsCartOpen, setIsDarkMode, setIsMobileMenuOpen, setSelectedCategory, customerUser, displayName, photoURL, goAccount, onSignIn, onSignOut }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  // Close the account menu when the person taps/clicks anywhere else, presses Esc, or opens another page
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onOutside = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setMenuOpen(false); };
+    document.addEventListener('pointerdown', onOutside);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('pointerdown', onOutside); document.removeEventListener('keydown', onKey); };
+  }, [menuOpen]);
+  useEffect(() => { setMenuOpen(false); }, [currentView]);
   const go = (fn) => { setMenuOpen(false); fn(); };
   const itemCls = `block w-full text-left px-5 py-3 text-xs font-bold uppercase tracking-wider hover:text-[#D4AF37] transition ${isDarkMode ? 'text-gray-200' : 'text-black'}`;
   return (
@@ -26,7 +38,7 @@ export default function Header({ cart, curr, currencyKey, currentView, isDarkMod
               <img src={logoImg} alt="Kyvro Logo" className="h-8 sm:h-10 w-auto object-contain" />
               <div className="flex flex-col items-start">
                 <span className={`text-lg sm:text-2xl font-serif font-bold tracking-widest ${isDarkMode ? 'text-white' : 'text-black'}`}>KYVRO</span>
-                <span className={`text-[8px] sm:text-[9px] tracking-[0.2em] sm:tracking-[0.3em] font-sans -mt-1 ${isDarkMode ? 'text-[#D4AF37]' : 'text-black font-semibold'}`}>কাইভ্রো &bull; WEAR YOUR STORY</span>
+                <span className={`hidden sm:block text-[9px] tracking-[0.3em] font-sans -mt-1 ${isDarkMode ? 'text-[#D4AF37]' : 'text-black font-semibold'}`}>কাইভ্রো &bull; WEAR YOUR STORY</span>
               </div>
             </div>
           </div>
@@ -72,7 +84,7 @@ export default function Header({ cart, curr, currencyKey, currentView, isDarkMod
               <Search size={18} />
             </button>
 
-            <div className="relative">
+            <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
                 className={`transition relative p-1 flex items-center ${isDarkMode ? 'text-gray-300 hover:text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]'}`}
@@ -84,8 +96,7 @@ export default function Header({ cart, curr, currencyKey, currentView, isDarkMod
               </button>
               {menuOpen && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-                  <div className={`absolute right-0 top-full mt-3 w-64 z-50 rounded shadow-2xl border py-2 ${isDarkMode ? 'bg-[#181818] border-gray-800' : 'bg-white border-gray-200'}`}>
+                  <div className={`absolute right-0 top-full mt-3 w-64 max-w-[calc(100vw-2rem)] z-50 rounded shadow-2xl border py-2 ${isDarkMode ? 'bg-[#181818] border-gray-800' : 'bg-white border-gray-200'}`}>
                     {customerUser ? (
                       <div className="px-5 py-3 border-b border-gray-200/20">
                         <p className="text-sm font-bold truncate">{displayName || 'Welcome'}</p>
