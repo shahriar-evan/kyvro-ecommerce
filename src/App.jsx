@@ -34,7 +34,7 @@ import AccountView from './components/AccountView';
 
 const EMPTY_CHECKOUT = {
   fullName: '', phone: '', address: '', notes: '',
-  deliveryArea: '', paymentMethod: 'Cash on Delivery', agree: false
+  district: '', upazila: '', area: '', deliveryArea: '', paymentMethod: 'Cash on Delivery', agree: false
 };
 
 const EMPTY_PRODUCT_FORM = {
@@ -340,11 +340,15 @@ export default function App() {
 
     const name = checkoutForm.fullName.trim();
     const phone = cleanPhone(checkoutForm.phone.trim());
-    const address = checkoutForm.address.trim();
+    const street = checkoutForm.address.trim();
     if (name.length < 2) return setCheckoutError('Please enter your name. (আপনার নাম লিখুন)');
     if (!/^[+]?[0-9]{7,15}$/.test(phone)) return setCheckoutError('Please enter a valid phone number. (সঠিক ফোন নম্বর দিন)');
-    if (address.length < 10) return setCheckoutError('Please enter your full address with district. (সম্পূর্ণ ঠিকানা লিখুন, জেলা উপজেলা সহ)');
-    if (!DELIVERY_AREAS.includes(checkoutForm.deliveryArea)) return setCheckoutError('Please select your delivery area: Inside Dhaka or Outside Dhaka.');
+    if (!checkoutForm.district) return setCheckoutError('Please select your city / district. (জেলা নির্বাচন করুন)');
+    if (!checkoutForm.upazila) return setCheckoutError('Please select your zone / thana. (থানা বা উপজেলা নির্বাচন করুন)');
+    if (street.length < 5) return setCheckoutError('Please enter your house / road / village. (বাড়ি, রাস্তা বা গ্রামের নাম লিখুন)');
+    if (!DELIVERY_AREAS.includes(checkoutForm.deliveryArea)) return setCheckoutError('Please select your city / district again.');
+    // one clear address line for the order: street, area, thana/upazila, district
+    const address = [street, checkoutForm.area, checkoutForm.upazila, checkoutForm.district].filter(Boolean).join(', ');
     if (!checkoutForm.agree) return setCheckoutError('Please accept the Terms & Conditions, Privacy Policy and Return & Refund Policy to continue.');
 
     // Make sure everything in the cart is still in stock

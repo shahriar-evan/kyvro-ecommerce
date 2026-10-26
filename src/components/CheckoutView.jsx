@@ -1,11 +1,29 @@
-import React from 'react';
-import { DELIVERY_AREAS, DELIVERY_AREA_BN, DELIVERY_CHARGES, PAYMENT_METHODS, PAYMENT_METHOD_BN, toBanglaDigits } from '../data/shopConfig';
+import React, { useState, useEffect } from 'react';
+import { deliveryAreaFor, DELIVERY_AREAS, DELIVERY_AREA_BN, DELIVERY_CHARGES, PAYMENT_METHODS, PAYMENT_METHOD_BN, toBanglaDigits } from '../data/shopConfig';
 
 export default function CheckoutView({
   cart, checkoutForm, setCheckoutForm, checkoutError, deliveryCharge, grandTotal, formatPrice,
   handleCheckoutSubmit, isDarkMode, placingOrder, removeFromCart, setCurrentView, subtotal, discount = 0, discountLabel = '', customerUser = null, authReady = true, onSignIn,
 }) {
   const set = (field, value) => setCheckoutForm({ ...checkoutForm, [field]: value });
+
+  // Bangladesh districts -> thanas / upazilas -> areas (unions). Loaded when the checkout opens, not with the first page.
+  const [places, setPlaces] = useState([]);
+  useEffect(() => {
+    let alive = true;
+    import('../data/bdLocations.json').then((m) => { if (alive) setPlaces(m.default || m); });
+    return () => { alive = false; };
+  }, []);
+  const districtObj = places.find((d) => d.n === checkoutForm.district);
+  const upazilaObj = districtObj && districtObj.u.find((u) => u.n === checkoutForm.upazila);
+  // picking a place also works out Inside / Outside Dhaka (so the delivery charge cannot be picked by hand)
+  const setPlace = (patch) => {
+    const next = { ...checkoutForm, ...patch };
+    const d = places.find((x) => x.n === next.district);
+    const z = d && d.u.find((x) => x.n === next.upazila);
+    next.deliveryArea = deliveryAreaFor(next.district, next.upazila, !!(z && z.m));
+    setCheckoutForm(next);
+  };
   const online = checkoutForm.paymentMethod === 'Online Payment';
   const areaChosen = !!checkoutForm.deliveryArea;
 
@@ -73,9 +91,37 @@ export default function CheckoutView({
             <input type="tel" required maxLength={20} value={checkoutForm.phone} onChange={(e) => set('phone', e.target.value.replace(/[^0-9+\-\s()]/g, ''))} placeholder="Phone Number" className={input} />
           </div>
 
+          <div className={`rounded border p-4 space-y-3 ${isDarkMode ? 'border-gray-700' : 'border-gray-300 bg-white'}`}>
+            <p className="text-sm font-bold">Delivery City &amp; Zone (ডেলিভারি এলাকা)</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-semibold mb-1">City (জেলা) *</label>
+                <select required value={checkoutForm.district} onChange={(e) => setPlace({ district: e.target.value, upazila: '', area: '' })} className={input}>
+                  <option value="">{places.length ? 'Select City' : 'Loading...'}</option>
+                  {places.map((d) => <option key={d.n} value={d.n}>{d.n}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1">Zone (থানা / উপজেলা) *</label>
+                <select required disabled={!districtObj} value={checkoutForm.upazila} onChange={(e) => setPlace({ upazila: e.target.value, area: '' })} className={`${input} disabled:opacity-60`}>
+                  <option value="">{districtObj ? 'Select Zone' : 'Select city first'}</option>
+                  {districtObj && districtObj.u.map((u) => <option key={u.n} value={u.n}>{u.n}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1">Area (এলাকা / ইউনিয়ন)</label>
+                <select disabled={!upazilaObj || upazilaObj.a.length === 0} value={checkoutForm.area} onChange={(e) => set('area', e.target.value)} className={`${input} disabled:opacity-60`}>
+                  <option value="">{!upazilaObj ? 'Select zone first' : upazilaObj.a.length ? 'Select Area (optional)' : 'Write your area below'}</option>
+                  {upazilaObj && upazilaObj.a.map((a, i) => <option key={a[0] + i} value={a[0]}>{a[0]}{a[1] ? ` (PO: ${a[1]}${a[2] ? ', ' + a[2] : ''})` : ''}</option>)}
+                </select>
+              </div>
+            </div>
+            <p className="text-[11px] text-gray-500">Selecting city &amp; zone helps ensure accurate courier delivery. Your exact village / road goes in the box below.</p>
+          </div>
+
           <div>
-            <label className={label}>Enter Your Full Address (আপনার ঠিকানা) *</label>
-            <textarea required rows={3} maxLength={400} value={checkoutForm.address} onChange={(e) => set('address', e.target.value)} placeholder="(আপনার ঠিকানা) House number, Road number, Thana, District" className={input} />
+            <label className={label}>House / Road / Village (বাড়ি, রাস্তা, গ্রামের নাম) *</label>
+            <textarea required rows={3} maxLength={250} value={checkoutForm.address} onChange={(e) => set('address', e.target.value)} placeholder="House number, Road number, Village, nearby landmark" className={input} />
           </div>
 
           <div>
@@ -119,22 +165,15 @@ export default function CheckoutView({
               </div>
             )}
 
-            <div>
-              <label className="block font-semibold mb-1.5">Shipping (ডেলিভারি এলাকা) *</label>
-              <select required value={checkoutForm.deliveryArea} onChange={(e) => set('deliveryArea', e.target.value)} className={input}>
-                <option value="">-- Select Area --</option>
-                {DELIVERY_AREAS.map((area) => (
-                  <option key={area} value={area}>
-                    {area} ({DELIVERY_AREA_BN[area]}) &ndash; {online ? 'Free' : formatPrice(DELIVERY_CHARGES[area])}
-                  </option>
-                ))}
-              </select>
+            <div className="flex justify-between">
+              <span>Delivery area</span>
+              <span className="font-semibold">{areaChosen ? `${checkoutForm.deliveryArea} (${DELIVERY_AREA_BN[checkoutForm.deliveryArea]})` : 'Select your city & zone'}</span>
             </div>
 
             <div className="flex justify-between">
               <span>Delivery charge</span>
               <span className="font-semibold">
-                {!areaChosen ? 'Select area' : deliveryCharge === 0 ? 'FREE' : formatPrice(deliveryCharge)}
+                {!areaChosen ? 'Select city & zone' : deliveryCharge === 0 ? 'FREE' : formatPrice(deliveryCharge)}
               </span>
             </div>
 

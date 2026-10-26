@@ -28,6 +28,7 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
   const [error, setError] = useState('');
   const [blocked, setBlocked] = useState({ phones: {}, emails: {} });
   const [showBlocked, setShowBlocked] = useState(false);
+  const [copiedId, setCopiedId] = useState('');
   const [openIds, setOpenIds] = useState({}); // which orders are expanded (all start collapsed)
   const toggleOpen = (id) => setOpenIds((m) => ({ ...m, [id]: !m[id] }));
 
@@ -76,6 +77,43 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
     run(key, () => (kind === 'phone' ? unblockPhone(key) : unblockEmail(key)));
   };
   const blockedCount = Object.keys(blocked.phones).length + Object.keys(blocked.emails).length;
+
+  // One block of text with everything a supplier / courier needs, ready to paste into WhatsApp
+  const orderText = (o) => {
+    const money = (n) => `${Number(n || 0).toLocaleString('en-US')} BDT`;
+    const lines = [
+      `ORDER ${o.orderNumber}`,
+      `Date: ${formatDateTime(o.createdAt)}`,
+      '',
+      `Name: ${o.customer?.name || ''}`,
+      `Phone: ${o.customer?.phone || ''}`,
+      `Address: ${o.customer?.address || ''}`,
+      `Delivery area: ${o.deliveryArea || ''}`,
+    ];
+    if (o.customer?.notes) lines.push(`Customer comment: ${o.customer.notes}`);
+    lines.push('', 'PRODUCTS:');
+    (o.items || []).forEach((it, i) => {
+      const bits = [it.size && it.size !== 'Standard' ? `Size ${it.size}` : '', it.color ? `Color ${it.color}` : ''].filter(Boolean).join(', ');
+      lines.push(`${i + 1}. ${it.name}${bits ? ` (${bits})` : ''} x ${it.quantity} = ${money(it.price * it.quantity)}`);
+    });
+    lines.push('', `Subtotal: ${money(o.subtotal)}`);
+    if (o.discount > 0) lines.push(`Discount${o.discountLabel ? ` (${o.discountLabel})` : ''}: -${money(o.discount)}`);
+    lines.push(`Delivery: ${o.shipping === 0 ? 'FREE' : money(o.shipping)}`, `TOTAL: ${money(o.total)}`, '');
+    const toCollect = o.paymentStatus === 'Paid' ? 0 : o.total;
+    lines.push(`Payment: ${o.paymentMethod} (${o.paymentStatus})`, `Collect from customer: ${money(toCollect)}`);
+    return lines.join('\n');
+  };
+  const copyOrder = async (o) => {
+    const text = orderText(o);
+    try { await navigator.clipboard.writeText(text); }
+    catch (e) {
+      const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch (e2) {}
+      document.body.removeChild(ta);
+    }
+    setCopiedId(o.id);
+    setTimeout(() => setCopiedId((c) => (c === o.id ? '' : c)), 2000);
+  };
 
   const exportCSV = () => {
     const rows = ['Order Number,Date,Customer,Phone,Address,Delivery Area,Items,Subtotal (BDT),Discount (BDT),Delivery (BDT),Total (BDT),Payment Method,Payment Status,Status'];
@@ -251,6 +289,9 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
 
             {/* actions */}
             <div className="flex flex-wrap gap-2 border-t pt-3">
+              <button type="button" onClick={() => copyOrder(o)} className={`${btn} ${copiedId === o.id ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                {copiedId === o.id ? 'Copied ✓' : 'Copy order details'}
+              </button>
               {o.status === 'Pending' && (
                 <button disabled={busy} onClick={() => setStatus(o, 'Processing')} className={`${btn} bg-green-600 text-white hover:opacity-90`}>Confirm &amp; start processing</button>
               )}

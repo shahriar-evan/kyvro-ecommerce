@@ -5,10 +5,17 @@
 // ---------------------------------------------------------------------------
 
 // WhatsApp number for "Order on WhatsApp" (country code + number, no + or spaces). Change it here once.
-export const WHATSAPP_NUMBER = '60123456789';
+export const WHATSAPP_NUMBER = '8801770849168';
 
 export const DELIVERY_AREAS = ['Inside Dhaka', 'Outside Dhaka'];
 export const DELIVERY_AREA_BN = { 'Inside Dhaka': 'ঢাকার ভিতরে', 'Outside Dhaka': 'ঢাকার বাইরে' };
+
+// Delivery area is worked out from the customer's district + thana/upazila:
+// "Inside Dhaka" = every Dhaka city thana (Mirpur, Dhanmondi, Gulshan...) plus the places listed below.
+// Everywhere else = "Outside Dhaka". Edit the list to change it.
+export const INSIDE_DHAKA_EXTRA = ['Savar', 'Keraniganj'];
+export const deliveryAreaFor = (district, zone, isCityThana) =>
+  !district ? '' : (district === 'Dhaka' && (isCityThana || INSIDE_DHAKA_EXTRA.includes(zone)) ? 'Inside Dhaka' : 'Outside Dhaka');
 
 // Delivery charge, charged only for Cash on Delivery
 export const DELIVERY_CHARGES = { 'Inside Dhaka': 100, 'Outside Dhaka': 150 };
