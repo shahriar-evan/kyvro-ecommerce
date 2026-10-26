@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, Heart } from 'lucide-react';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
 import { hasSizeStock, totalStock, stockForSize, orderedSizes } from '../data/catalog';
 
-export default function ProductDetail({ product, products, addToCart, calculateDiscountPercent, formatPrice, isDarkMode, setCurrentView }) {
+export default function ProductDetail({ product, products, addToCart, calculateDiscountPercent, formatPrice, isDarkMode, setCurrentView, savedIds = [], toggleSaved = () => {} }) {
   // Always use the latest version of the product (admin may have changed stock)
   const live = (products || []).find((p) => p.id === product.id) || product;
   const sized = hasSizeStock(live);
@@ -63,6 +63,14 @@ export default function ProductDetail({ product, products, addToCart, calculateD
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
         <div className={`relative rounded-lg overflow-hidden border ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-gray-100 border-gray-200'}`}>
           <img src={live.image} alt={live.name} className="w-full h-full max-h-[560px] object-cover" />
+          <button
+            type="button"
+            onClick={() => toggleSaved(live.id)}
+            title={savedIds.includes(live.id) ? 'Remove from saved items' : 'Save this item'}
+            className="absolute top-3 right-3 z-10 w-10 h-10 rounded-full bg-white/90 text-black shadow flex items-center justify-center hover:scale-110 transition"
+          >
+            <Heart size={18} className={savedIds.includes(live.id) ? 'fill-red-500 text-red-500' : ''} />
+          </button>
           {soldOut && <span className="absolute top-3 left-3 bg-red-600 text-white text-[11px] font-bold px-3 py-1 rounded">SOLD OUT</span>}
           {!soldOut && discount > 0 && <span className="absolute top-3 left-3 bg-[#D4AF37] text-black text-[11px] font-bold px-3 py-1 rounded">-{discount}%</span>}
         </div>

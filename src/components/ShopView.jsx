@@ -1,9 +1,9 @@
 import React from 'react';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, Heart } from 'lucide-react';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
 import { SUB_CATEGORIES, COLLECTION_LABELS, DEFAULT_SUB_LABEL, hasSizeStock, totalStock } from '../data/catalog';
 
-export default function ShopView({ addToCart, filteredProducts, formatPrice, isDarkMode, products, searchQuery, selectedCategory, selectedSubCategory, setSelectedSubCategory, setCurrentView, setSearchQuery, setSelectedCategory, setSelectedProduct, setSortBy, sortBy }) {
+export default function ShopView({ addToCart, filteredProducts, formatPrice, isDarkMode, products, searchQuery, selectedCategory, selectedSubCategory, setSelectedSubCategory, setCurrentView, setSearchQuery, setSelectedCategory, setSelectedProduct, setSortBy, sortBy, savedIds = [], toggleSaved = () => {} }) {
   return (
     <>
         <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 w-full">
@@ -98,6 +98,14 @@ export default function ShopView({ addToCart, filteredProducts, formatPrice, isD
                   <div key={product.id} className={`group rounded-lg overflow-hidden border flex flex-col ${isDarkMode ? 'bg-[#181818] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
                     <div className="relative h-64 overflow-hidden bg-gray-900 cursor-pointer" onClick={() => { setSelectedProduct(product); setCurrentView('product-detail'); }}>
                       <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); toggleSaved(product.id); }}
+                        title={savedIds.includes(product.id) ? 'Remove from saved items' : 'Save this item'}
+                        className="absolute bottom-3 right-3 z-10 w-9 h-9 rounded-full bg-white/90 text-black shadow flex items-center justify-center hover:scale-110 transition"
+                      >
+                        <Heart size={16} className={savedIds.includes(product.id) ? 'fill-red-500 text-red-500' : ''} />
+                      </button>
                       {totalStock(product) <= 0 && <span className="absolute top-2 left-2 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded">SOLD OUT</span>}
                     </div>
                     <div className="p-4 flex-1 flex flex-col justify-between">

@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ShoppingBag, Search, User, Menu, Sun, Moon } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 import { CURRENCIES } from '../data/currencies';
 
-export default function Header({ cart, curr, currencyKey, currentView, isDarkMode, setCurrencyKey, setCurrentView, setIsCartOpen, setIsDarkMode, setIsMobileMenuOpen, setSelectedCategory }) {
+export default function Header({ cart, curr, currencyKey, currentView, isDarkMode, setCurrencyKey, setCurrentView, setIsCartOpen, setIsDarkMode, setIsMobileMenuOpen, setSelectedCategory, customerUser, displayName, photoURL, goAccount, onSignIn, onSignOut }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const go = (fn) => { setMenuOpen(false); fn(); };
+  const itemCls = `block w-full text-left px-5 py-3 text-xs font-bold uppercase tracking-wider hover:text-[#D4AF37] transition ${isDarkMode ? 'text-gray-200' : 'text-black'}`;
   return (
     <>
       <header className={`sticky top-0 z-40 backdrop-blur border-b ${isDarkMode ? 'bg-[#121212]/95 border-gray-800' : 'bg-white/95 border-gray-200'}`}>
@@ -69,13 +72,38 @@ export default function Header({ cart, curr, currencyKey, currentView, isDarkMod
               <Search size={18} />
             </button>
 
-            <button 
-              onClick={() => setCurrentView('admin')}
-              className={`transition relative p-1 ${isDarkMode ? 'text-gray-300 hover:text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]'}`}
-              title="Admin Panel"
-            >
-              <User size={18} />
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setMenuOpen(!menuOpen)}
+                className={`transition relative p-1 flex items-center ${isDarkMode ? 'text-gray-300 hover:text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]'}`}
+                title={customerUser ? 'My Account' : 'Sign in'}
+              >
+                {photoURL
+                  ? <img src={photoURL} alt="" className="w-7 h-7 rounded-full object-cover border border-[#D4AF37]" />
+                  : <User size={18} />}
+              </button>
+              {menuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+                  <div className={`absolute right-0 top-full mt-3 w-64 z-50 rounded shadow-2xl border py-2 ${isDarkMode ? 'bg-[#181818] border-gray-800' : 'bg-white border-gray-200'}`}>
+                    {customerUser ? (
+                      <div className="px-5 py-3 border-b border-gray-200/20">
+                        <p className="text-sm font-bold truncate">{displayName || 'Welcome'}</p>
+                        <p className="text-[11px] text-gray-500 truncate">{customerUser.email}</p>
+                      </div>
+                    ) : (
+                      <button onClick={() => go(onSignIn)} className={itemCls}>Sign In</button>
+                    )}
+                    <button onClick={() => go(() => goAccount('orders'))} className={itemCls}>My Orders</button>
+                    <button onClick={() => go(() => goAccount('settings'))} className={itemCls}>My Account Settings</button>
+                    <button onClick={() => go(() => goAccount('wallet'))} className={itemCls}>My Wallet</button>
+                    <button onClick={() => go(() => goAccount('saved'))} className={itemCls}>My Saved Items</button>
+                    {customerUser && <button onClick={() => go(onSignOut)} className={itemCls}>Sign Out</button>}
+                    <button onClick={() => go(() => setCurrentView('admin'))} className={`${itemCls} border-t border-gray-200/20 mt-1`}>Admin Panel</button>
+                  </div>
+                </>
+              )}
+            </div>
 
             <button 
               onClick={() => setIsCartOpen(true)}

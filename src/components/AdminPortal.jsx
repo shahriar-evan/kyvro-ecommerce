@@ -7,7 +7,7 @@ import OrdersPanel from './OrdersPanel';
 import StoreSettings from './StoreSettings';
 import { SUB_CATEGORIES, hasSubCategories, hasSizeStock, totalStock, orderedSizes } from '../data/catalog';
 
-export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, isDarkMode, loggedInUserEmail, newProductForm, orders, products, storeSettings, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct }) {
+export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct }) {
   const isOwner = adminRole === 'owner';
   const canManageTeam = adminRole === 'owner' || adminRole === 'manager';
   const sizesUsed = Object.keys((newProductForm && newProductForm.sizeStock) || {}).length > 0;
@@ -39,7 +39,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                   onClick={() => setAdminTab('products')} 
                   className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'products' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
                 >
-                  Products ({products.length})
+                  Products ({products.length}){pendingCount > 0 && <span className="ml-2 bg-red-600 text-white rounded-full px-2 py-0.5 text-[10px]">{pendingCount} pending</span>}
                 </button>
                 <button 
                   onClick={() => { setEditingProductId(null); setAdminTab('add-product'); }} 
@@ -78,6 +78,15 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
 
               {adminTab === 'admins' && canManageTeam && <AdminManager isDarkMode={isDarkMode} currentEmail={loggedInUserEmail} currentName={adminName} adminRole={adminRole} />}
 
+              {adminTab === 'products' && isOwner && !isCloud && (
+                <div className="mb-4 rounded-lg border border-[#D4AF37] bg-[#D4AF37]/10 p-4 text-xs flex flex-wrap items-center justify-between gap-3">
+                  <p className="max-w-2xl">Your products are only saved in this browser, so customers cannot see them. Move them to Firestore once so every customer on every device sees the same shop.</p>
+                  <button onClick={handleMigrateProducts} disabled={migrating} className="bg-[#D4AF37] text-black font-bold px-5 py-2.5 rounded uppercase tracking-wider disabled:opacity-50">
+                    {migrating ? 'Moving...' : 'Move products to Firestore'}
+                  </button>
+                </div>
+              )}
+
               {adminTab === 'products' && (
                 <div className={`rounded-lg border overflow-x-auto ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
                   <table className="w-full text-left text-xs">
@@ -97,6 +106,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                             <img src={p.image} alt={p.name} className="w-10 h-10 object-cover rounded" />
                             <div>
                               <span className="font-semibold">{p.name}</span>
+                              {p.status === 'pending' && <span className="ml-2 bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 text-[10px] font-bold px-2 py-0.5 rounded">PENDING APPROVAL</span>}
                               {(p.addedByName || p.addedBy) && <p className="text-[10px] text-gray-500 font-normal mt-0.5">Added by {p.addedByName || p.addedBy}</p>}
                             </div>
                           </td>
@@ -111,8 +121,9 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                             )}
                           </td>
                           <td className="p-4 text-right space-x-2">
-                            <button onClick={() => startEditProduct(p)} className="text-gray-500 hover:text-black dark:hover:text-white px-2 py-1 bg-gray-200 dark:bg-gray-800 rounded">Edit</button>
-                            {canDeleteProduct(p) && <button onClick={() => deleteProduct(p.id)} className="text-red-400 hover:text-red-300 px-2 py-1 bg-red-950/40 rounded">Delete</button>}
+                            {canApproveProduct(p) && <button onClick={() => handleApproveProduct(p)} className="px-3 py-1.5 rounded text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition">Approve</button>}
+                            <button onClick={() => startEditProduct(p)} className="px-3 py-1.5 rounded text-xs font-semibold border bg-white text-gray-900 border-gray-400 hover:bg-gray-100 dark:bg-gray-700 dark:text-white dark:border-gray-500 dark:hover:bg-gray-600 transition">Edit</button>
+                            {canDeleteProduct(p) && <button onClick={() => deleteProduct(p.id)} className="px-3 py-1.5 rounded text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition">{p.status === 'pending' ? 'Reject' : 'Delete'}</button>}
                           </td>
                         </tr>
                       ))}

@@ -4,6 +4,8 @@ import { auth, googleProvider } from './firebase';
 import { isOwnerEmail } from './adminEmails';
 import { getAdminStatus, watchAdminAccess } from './adminAuth';
 import { placeOrder, watchOrders } from './orders';
+import { watchProfile, saveProfile, watchMyOrders } from './customerData';
+import { watchProducts, saveProduct, removeProduct, approveProduct, migrateProducts } from './productsStore';
 import { watchStoreSettings } from './storeSettings';
 import { DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
 import { INITIAL_PRODUCTS } from './data/products';
@@ -28,6 +30,7 @@ import Footer from './components/Footer';
 import CheckoutView from './components/CheckoutView';
 import OrderSuccess from './components/OrderSuccess';
 import ProductDetail from './components/ProductDetail';
+import AccountView from './components/AccountView';
 
 const EMPTY_CHECKOUT = {
   fullName: '', phone: '', address: '', notes: '',
@@ -40,10 +43,18 @@ const EMPTY_PRODUCT_FORM = {
 };
 
 export default function App() {
-  const [products, setProducts] = useState(() => {
+  // Products: Firestore ("cloud") once the Owner has moved them there, until then this browser's saved list
+  const [localProducts, setLocalProducts] = useState(() => {
     const saved = localStorage.getItem('kyvro_products');
     return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
   });
+  const [cloudProducts, setCloudProducts] = useState(null); // null = not in Firestore yet
+  const isCloud = cloudProducts !== null;
+  const products = isCloud ? cloudProducts : localProducts;
+  // Customers only see approved products (an Admin's new product waits for Owner / Manager approval)
+  const isApproved = (p) => (p.status || 'approved') === 'approved';
+  const shopProducts = products.filter(isApproved);
+  const pendingCount = products.filter(p => !isApproved(p)).length;
 
   const [cart, setCart] = useState(() => {
     const saved = localStorage.getItem('kyvro_cart');
@@ -51,6 +62,15 @@ export default function App() {
   });
 
   const [orders, setOrders] = useState([]); // live from Firestore (team members only)
+
+  // Customer account (Google sign-in). Team members who sign in this way are also recognised as team below.
+  const [customerUser, setCustomerUser] = useState(null);
+  const [profile, setProfile] = useState({});
+  const [myOrders, setMyOrders] = useState([]);
+  const [accountTab, setAccountTab] = useState('orders');
+  const displayName = profile.name || (customerUser && customerUser.displayName) || '';
+  const photoURL = profile.photoURL !== undefined && profile.photoURL !== '' ? profile.photoURL : ((customerUser && customerUser.photoURL) || '');
+  const savedIds = Array.isArray(profile.saved) ? profile.saved : [];
 
   // Banner text + discount rules: edited by the Owner in the admin panel (Firestore settings/store)
   const [storeSettings, setStoreSettings] = useState(DEFAULT_STORE_SETTINGS);
@@ -105,7 +125,14 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) return;
+      if (!user) {
+        setCustomerUser(null);
+        setProfile({});
+        setMyOrders([]);
+        return;
+      }
+      // Everyone who signs in is a customer; team members are recognised on top of that
+      setCustomerUser({ uid: user.uid, email: user.email || '', displayName: user.displayName || '', photoURL: user.photoURL || '' });
       const access = await checkAccess(user.email);
       if (access.ok) {
         setAdminRole(access.role);
@@ -113,8 +140,6 @@ export default function App() {
         setIsAdminLoggedIn(true);
         setLoggedInUserEmail(user.email);
       } else {
-        // Not on the team list or access is OFF, so end the session
-        signOut(auth).catch(() => {});
         setAdminRole(null);
         setAdminName('');
         setIsAdminLoggedIn(false);
@@ -129,7 +154,6 @@ export default function App() {
     if (!isAdminLoggedIn || !loggedInUserEmail || isOwnerEmail(loggedInUserEmail)) return;
     const unsubscribe = watchAdminAccess(loggedInUserEmail, ({ role, active, name }) => {
       if (!role || !active) {
-        signOut(auth).catch(() => {});
         setIsAdminLoggedIn(false);
         setLoggedInUserEmail('');
         setAdminRole(null);
@@ -153,13 +177,14 @@ export default function App() {
   const [orderCompleteData, setOrderCompleteData] = useState(null);
 
   useEffect(() => {
+    if (isCloud) return;
     try {
-      localStorage.setItem('kyvro_products', JSON.stringify(products));
+      localStorage.setItem('kyvro_products', JSON.stringify(localProducts));
     } catch (err) {
       console.error('Could not save products:', err);
       alert('Browser storage is full, so the latest product changes could not be saved. Use smaller photos or image links instead of uploaded photos.');
     }
-  }, [products]);
+  }, [localProducts, isCloud]);
 
   useEffect(() => {
     localStorage.setItem('kyvro_cart', JSON.stringify(cart));
@@ -170,6 +195,40 @@ export default function App() {
     if (!isAdminLoggedIn) { setOrders([]); return; }
     const unsubscribe = watchOrders(setOrders, (err) => console.error('Could not load orders:', err));
     return () => unsubscribe();
+  }, [isAdminLoggedIn]);
+
+  // The signed-in customer's profile (name, photo, saved items) and own orders
+  const customerUid = customerUser ? customerUser.uid : null;
+  useEffect(() => {
+    if (!customerUid) return;
+    const stopProfile = watchProfile(customerUid, setProfile);
+    const stopOrders = watchMyOrders(customerUid, setMyOrders, (err) => console.error('Could not load your orders:', err));
+    return () => { stopProfile(); stopOrders(); };
+  }, [customerUid]);
+
+  // Make checkout easier: pre-fill the name of a signed-in customer
+  useEffect(() => {
+    if (displayName) setCheckoutForm(f => (f.fullName ? f : { ...f, fullName: displayName }));
+  }, [displayName]);
+
+  // Live products from Firestore (everyone sees the same shop)
+  useEffect(() => {
+    try {
+      const unsubscribe = watchProducts((list, isEmpty) => {
+        let moved = false;
+        try { moved = localStorage.getItem('kyvro_cloud') === '1'; } catch (e) {}
+        if (!isEmpty) {
+          try { localStorage.setItem('kyvro_cloud', '1'); } catch (e) {}
+          setCloudProducts(list);
+        } else {
+          // Nothing in Firestore yet: keep the old list. If it was emptied on purpose, stay empty.
+          setCloudProducts(moved ? [] : null);
+        }
+      }, (err) => console.error('Could not load products:', err), { all: isAdminLoggedIn });
+      return () => unsubscribe();
+    } catch (err) {
+      console.error('Could not load products:', err);
+    }
   }, [isAdminLoggedIn]);
 
   // Live store settings (banner + discount rules) for every visitor
@@ -312,7 +371,8 @@ export default function App() {
       total: grandTotal,
       paymentMethod: checkoutForm.paymentMethod,
       paymentStatus: paymentStatusFor(checkoutForm.paymentMethod),
-      status: 'Pending'
+      status: 'Pending',
+      ...(customerUser ? { uid: customerUser.uid } : {})
     };
 
     setPlacingOrder(true);
@@ -335,7 +395,7 @@ export default function App() {
       const result = await signInWithPopup(auth, googleProvider);
       const access = await checkAccess(result.user.email);
       if (!access.ok) {
-        await signOut(auth);
+        // Signed in as a normal customer, but not a team member
         alert(access.message);
         return;
       }
@@ -368,6 +428,65 @@ export default function App() {
     }
   };
 
+  // Customer sign-in / sign-out (header user menu)
+  const handleCustomerSignIn = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
+        alert('Sign-In Error: ' + error.message);
+      }
+    }
+  };
+
+  const handleCustomerSignOut = async () => {
+    try { await signOut(auth); } catch (err) {}
+    setIsAdminLoggedIn(false);
+    setLoggedInUserEmail('');
+    setAdminRole(null);
+    setAdminName('');
+    setCurrentView('home');
+  };
+
+  const goAccount = (tab) => { setAccountTab(tab); setCurrentView('account'); };
+
+  const handleSaveProfile = (patch) => saveProfile(customerUser.uid, patch);
+
+  // Heart button: saved items are kept in the customer's profile (sign in first)
+  const toggleSaved = async (productId) => {
+    if (!customerUser) {
+      alert('Please sign in to save items.');
+      await handleCustomerSignIn();
+      return;
+    }
+    const next = savedIds.includes(productId) ? savedIds.filter(id => id !== productId) : [...savedIds, productId];
+    try {
+      await saveProfile(customerUser.uid, { saved: next });
+    } catch (err) {
+      alert('Could not save this item. Please try again.');
+    }
+  };
+
+  const savedProducts = savedIds.map(id => shopProducts.find(p => p.id === id)).filter(Boolean);
+
+  // Owner: move the products from this browser into Firestore (one time)
+  const [migrating, setMigrating] = useState(false);
+  const handleMigrateProducts = async () => {
+    if (migrating || isCloud) return;
+    if (!confirm('Move all products to Firestore? After this, every customer on every device will see the same products.')) return;
+    setMigrating(true);
+    try {
+      const byId = {};
+      INITIAL_PRODUCTS.forEach(p => { byId[p.id] = p; });
+      const { count, missingPhotos } = await migrateProducts(localProducts, byId);
+      alert(`Done. ${count} product(s) moved to Firestore.` + (missingPhotos ? `\n${missingPhotos} product(s) have no usable photo. Please edit them and add a photo again.` : ''));
+    } catch (err) {
+      console.error(err);
+      alert('Could not move the products: ' + (err.code === 'permission-denied' ? 'please publish the new Firestore rules first.' : err.message));
+    }
+    setMigrating(false);
+  };
+
   const handleAdminLogout = async () => {
     try {
       await signOut(auth);
@@ -386,7 +505,7 @@ export default function App() {
   };
 
 
-  const handleSaveProduct = (e) => {
+  const handleSaveProduct = async (e) => {
     e.preventDefault();
     const existingProduct = editingProductId ? products.find(p => p.id === editingProductId) : null;
 
@@ -432,18 +551,30 @@ export default function App() {
       // Who added this product (stays the same when edited)
       addedBy: existingProduct ? existingProduct.addedBy : loggedInUserEmail,
       addedByName: existingProduct ? existingProduct.addedByName : (adminName || loggedInUserEmail),
-      addedByRole: existingProduct ? existingProduct.addedByRole : adminRole
+      addedByRole: existingProduct ? existingProduct.addedByRole : adminRole,
+      // New products from an Admin wait for approval; Owner and Manager products go live at once.
+      // Editing keeps the current status.
+      status: existingProduct ? (existingProduct.status || 'approved') : (isCloud && adminRole === 'admin' ? 'pending' : 'approved')
     };
 
-    if (editingProductId) {
-      setProducts(products.map(p => p.id === editingProductId ? productData : p));
-      setEditingProductId(null);
-    } else {
-      setProducts([productData, ...products]);
+    try {
+      if (isCloud) {
+        await saveProduct(productData);
+      } else if (editingProductId) {
+        setLocalProducts(localProducts.map(p => p.id === editingProductId ? productData : p));
+      } else {
+        setLocalProducts([productData, ...localProducts]);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Could not save the product: ' + (err.code === 'permission-denied' ? 'you do not have permission (check the Firestore rules).' : err.message));
+      return;
     }
+    if (editingProductId) setEditingProductId(null);
+    const wentPending = productData.status === 'pending';
 
     setNewProductForm(EMPTY_PRODUCT_FORM);
-    alert('Product saved successfully!');
+    alert(wentPending ? 'Product saved. It is waiting for approval by the Owner or a Manager, then customers will see it.' : 'Product saved successfully!');
   };
 
   const startEditProduct = (prod) => {
@@ -482,22 +613,36 @@ export default function App() {
   const canDeleteProduct = (p) => {
     if (adminRole === 'owner') return true;
     if (adminRole === 'manager') {
-      return !!p.addedBy && p.addedBy.toLowerCase() === (loggedInUserEmail || '').toLowerCase();
+      // Own products, or a pending product from an Admin (rejecting it)
+      return (!!p.addedBy && p.addedBy.toLowerCase() === (loggedInUserEmail || '').toLowerCase()) || !isApproved(p);
     }
     return false;
   };
-  const deleteProduct = (id) => {
+  const canApproveProduct = (p) => isCloud && !isApproved(p) && (adminRole === 'owner' || adminRole === 'manager');
+  const handleApproveProduct = async (p) => {
+    try {
+      await approveProduct(p, { email: loggedInUserEmail, name: adminName });
+    } catch (err) {
+      alert('Could not approve: ' + (err.code === 'permission-denied' ? 'you do not have permission (check the Firestore rules).' : err.message));
+    }
+  };
+  const deleteProduct = async (id) => {
     const target = products.find(p => p.id === id);
     if (!target || !canDeleteProduct(target)) {
       alert('You do not have permission to delete this product.');
       return;
     }
     if (confirm('Are you sure you want to delete this product?')) {
-      setProducts(products.filter(p => p.id !== id));
+      try {
+        if (isCloud) await removeProduct(id);
+        else setLocalProducts(localProducts.filter(p => p.id !== id));
+      } catch (err) {
+        alert('Could not delete the product: ' + (err.code === 'permission-denied' ? 'you do not have permission.' : err.message));
+      }
     }
   };
 
-  const filteredProducts = products.filter(p => {
+  const filteredProducts = shopProducts.filter(p => {
     let matchesCategory = true;
     if (selectedCategory === 'Men' || selectedCategory === 'Women') {
       // Men: Shirt & Punjabi by default, Women: Sharee by default, or the chosen sub-category
@@ -529,7 +674,7 @@ export default function App() {
       <AnnouncementBar announcementText={announcementText} isDarkMode={isDarkMode} />
 
       {/* 2. HEADER */}
-      <Header cart={cart} curr={curr} currencyKey={currencyKey} currentView={currentView} isDarkMode={isDarkMode} setCurrencyKey={setCurrencyKey} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} setIsDarkMode={setIsDarkMode} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} />
+      <Header cart={cart} curr={curr} currencyKey={currencyKey} currentView={currentView} isDarkMode={isDarkMode} setCurrencyKey={setCurrencyKey} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} setIsDarkMode={setIsDarkMode} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} customerUser={customerUser} displayName={displayName} photoURL={photoURL} goAccount={goAccount} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} />
 
       {/* MOBILE MENU DRAWER */}
       {isMobileMenuOpen && <MobileMenu isDarkMode={isDarkMode} setCurrentView={setCurrentView} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} />}
@@ -538,12 +683,14 @@ export default function App() {
       {isCartOpen && <CartDrawer cart={cart} formatPrice={formatPrice} isDarkMode={isDarkMode} removeFromCart={removeFromCart} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} subtotal={subtotal} discount={discount} discountLabel={discountLabel} reward={reward} updateCartQty={updateCartQty} />}
 
       {/* HOME VIEW */}
-      {currentView === 'home' && <HomeView addToCart={addToCart} banners={banners} calculateDiscountPercent={calculateDiscountPercent} currentBannerIndex={currentBannerIndex} formatPrice={formatPrice} isDarkMode={isDarkMode} products={products} setCurrentBannerIndex={setCurrentBannerIndex} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} />}
+      {currentView === 'home' && <HomeView addToCart={addToCart} banners={banners} calculateDiscountPercent={calculateDiscountPercent} currentBannerIndex={currentBannerIndex} formatPrice={formatPrice} isDarkMode={isDarkMode} products={shopProducts} setCurrentBannerIndex={setCurrentBannerIndex} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} savedIds={savedIds} toggleSaved={toggleSaved} />}
 
       {/* SHOP CATALOG VIEW */}
-      {currentView === 'shop' && <ShopView selectedSubCategory={selectedSubCategory} setSelectedSubCategory={setSelectedSubCategory} addToCart={addToCart} filteredProducts={filteredProducts} formatPrice={formatPrice} isDarkMode={isDarkMode} products={products} searchQuery={searchQuery} selectedCategory={selectedCategory} setCurrentView={setCurrentView} setSearchQuery={setSearchQuery} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} setSortBy={setSortBy} sortBy={sortBy} />}
+      {currentView === 'shop' && <ShopView selectedSubCategory={selectedSubCategory} setSelectedSubCategory={setSelectedSubCategory} addToCart={addToCart} filteredProducts={filteredProducts} formatPrice={formatPrice} isDarkMode={isDarkMode} products={shopProducts} searchQuery={searchQuery} selectedCategory={selectedCategory} setCurrentView={setCurrentView} setSearchQuery={setSearchQuery} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} setSortBy={setSortBy} sortBy={sortBy} savedIds={savedIds} toggleSaved={toggleSaved} />}
 
-      {currentView === 'product-detail' && selectedProduct && <ProductDetail product={selectedProduct} products={products} addToCart={addToCart} calculateDiscountPercent={calculateDiscountPercent} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
+      {currentView === 'product-detail' && selectedProduct && <ProductDetail product={selectedProduct} products={shopProducts} addToCart={addToCart} calculateDiscountPercent={calculateDiscountPercent} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} savedIds={savedIds} toggleSaved={toggleSaved} />}
+
+      {currentView === 'account' && <AccountView customerUser={customerUser} displayName={displayName} photoURL={photoURL} activeTab={accountTab} setActiveTab={setAccountTab} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} onSaveProfile={handleSaveProfile} myOrders={myOrders} savedProducts={savedProducts} toggleSaved={toggleSaved} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedProduct={setSelectedProduct} />}
 
       {/* CHECKOUT (guest checkout, no login needed) */}
       {currentView === 'checkout' && <CheckoutView cart={cart} checkoutForm={checkoutForm} setCheckoutForm={setCheckoutForm} checkoutError={checkoutError} deliveryCharge={deliveryCharge} grandTotal={grandTotal} formatPrice={formatPrice} handleCheckoutSubmit={handleCheckoutSubmit} isDarkMode={isDarkMode} placingOrder={placingOrder} removeFromCart={removeFromCart} setCurrentView={setCurrentView} subtotal={subtotal} discount={discount} discountLabel={discountLabel} reward={reward} />}
@@ -552,7 +699,7 @@ export default function App() {
       {currentView === 'order-success' && <OrderSuccess order={orderCompleteData} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
 
       {/* ADMIN PORTAL VIEW (GOOGLE SIGN-IN, WHITELISTED EMAILS ONLY) */}
-      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} storeSettings={storeSettings} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} />}
+      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} canApproveProduct={canApproveProduct} handleApproveProduct={handleApproveProduct} pendingCount={pendingCount} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} storeSettings={storeSettings} isCloud={isCloud} migrating={migrating} handleMigrateProducts={handleMigrateProducts} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} />}
 
       {/* FOOTER */}
       <Footer isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} />
