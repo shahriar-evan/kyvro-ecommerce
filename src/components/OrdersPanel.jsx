@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ORDER_STATUSES, DELIVERY_AREA_BN } from '../data/shopConfig';
-import { updateOrderStatus, markOrderPaid } from '../orders';
+import { updateOrderStatus, markOrderPaid, deleteOrders } from '../orders';
 import { formatDateTime, toDate } from '../utils/dates';
 import { phoneKey, emailKey } from '../data/shopConfig';
 import { watchBlocked, blockPhone, blockEmail, unblockPhone, unblockEmail } from '../blocklist';
@@ -21,11 +21,13 @@ const PAYMENT_STYLE = {
 
 const csv = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
-export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName, loggedInUserEmail, canUnblock }) {
+export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName, loggedInUserEmail, canUnblock, isOwner }) {
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate_, setToDate] = useState('');
   const [blocked, setBlocked] = useState({ phones: {}, emails: {} });
   const [showBlocked, setShowBlocked] = useState(false);
   const [copiedId, setCopiedId] = useState('');
@@ -41,7 +43,18 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
   const countOf = (s) => orders.filter((o) => o.status === s).length;
 
   const q = search.trim().toLowerCase();
+  // History = finished orders (Delivered / Cancelled), optionally limited to a date range
+  const FINISHED = ['Delivered', 'Cancelled'];
+  const rangeStart = fromDate ? new Date(`${fromDate}T00:00:00`) : null;
+  const rangeEnd = toDate_ ? new Date(`${toDate_}T23:59:59.999`) : null;
+  const inRange = (o) => {
+    const d = toDate(o.createdAt);
+    if (!d) return false;
+    return (!rangeStart || d >= rangeStart) && (!rangeEnd || d <= rangeEnd);
+  };
+  const historyList = orders.filter((o) => FINISHED.includes(o.status) && inRange(o));
   const visible = orders.filter((o) => {
+    if (filter === 'History') return FINISHED.includes(o.status) && inRange(o) && (!q || [o.orderNumber, o.customer?.name, o.customer?.phone].some((v) => String(v || '').toLowerCase().includes(q)));
     if (filter !== 'All' && o.status !== filter) return false;
     if (!q) return true;
     return [o.orderNumber, o.customer?.name, o.customer?.phone].some((v) => String(v || '').toLowerCase().includes(q));
@@ -115,9 +128,22 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
     setTimeout(() => setCopiedId((c) => (c === o.id ? '' : c)), 2000);
   };
 
+  const clearHistory = async () => {
+    if (!isOwner) return;
+    if (!rangeStart || !rangeEnd) { setError('Choose both dates (From and To) to clear history.'); return; }
+    if (rangeStart > rangeEnd) { setError('The From date must be before the To date.'); return; }
+    if (historyList.length === 0) { setError('There are no finished orders in this date range.'); return; }
+    if (!confirm(`Permanently delete ${historyList.length} finished order(s) (Delivered / Cancelled) from ${fromDate} to ${toDate_}?\n\nThis cannot be undone. Tip: press "Export Orders to CSV" first to keep a copy.\nThe customers will also stop seeing these orders in their account.`)) return;
+    setError('');
+    setBusyId('history');
+    try { await deleteOrders(historyList.map((o) => o.id)); alert('History cleared.'); }
+    catch (err) { setError(err.code === 'permission-denied' ? 'Permission denied. Publish the latest Firestore rules (only the Owner can clear history).' : (err.message || 'Could not clear history.')); }
+    setBusyId(null);
+  };
+
   const exportCSV = () => {
     const rows = ['Order Number,Date,Customer,Phone,Address,Delivery Area,Items,Subtotal (BDT),Discount (BDT),Delivery (BDT),Total (BDT),Payment Method,Payment Status,Status'];
-    orders.forEach((o) => {
+    (filter === 'History' ? historyList : orders).forEach((o) => {
       const items = (o.items || []).map((i) => `${i.name}${i.size && i.size !== 'Standard' ? ` (${i.size})` : ''} x${i.quantity}`).join('; ');
       rows.push([o.orderNumber, formatDateTime(o.createdAt), o.customer?.name, o.customer?.phone, o.customer?.address, o.deliveryArea, items, o.subtotal, o.discount || 0, o.shipping, o.total, o.paymentMethod, o.paymentStatus, o.status].map(csv).join(','));
     });
@@ -141,13 +167,13 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
           <button onClick={exportCSV} className="bg-[#D4AF37] text-black text-xs font-bold px-4 py-2 rounded uppercase tracking-wider">Export Orders to CSV</button>
         </div>
         <div className="flex flex-wrap gap-2">
-          {['All', ...ORDER_STATUSES].map((s) => (
+          {['All', ...ORDER_STATUSES, 'History'].map((s) => (
             <button
               key={s}
               onClick={() => setFilter(s)}
               className={`px-3 py-1.5 rounded text-[11px] font-bold uppercase tracking-wider transition ${filter === s ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#222] text-gray-700 dark:text-gray-300'}`}
             >
-              {s} ({s === 'All' ? orders.length : countOf(s)})
+              {s} ({s === 'All' ? orders.length : s === 'History' ? orders.filter((o) => FINISHED.includes(o.status)).length : countOf(s)})
             </button>
           ))}
         </div>
@@ -158,6 +184,24 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
           placeholder="Search by order number, name or phone..."
           className={`w-full border p-2.5 text-xs rounded focus:outline-none focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
         />
+        {filter === 'History' && (
+          <div className={`${innerClass} !space-y-3`}>
+            <p className="text-gray-500">History shows finished orders (Delivered and Cancelled). Pick a date range to see only those, {isOwner ? 'and clear them to keep the panel clean.' : 'for your records.'}</p>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="text-[11px] font-semibold text-gray-500">From
+                <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className={`block mt-1 border p-2 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`} />
+              </label>
+              <label className="text-[11px] font-semibold text-gray-500">To
+                <input type="date" value={toDate_} onChange={(e) => setToDate(e.target.value)} className={`block mt-1 border p-2 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`} />
+              </label>
+              {(fromDate || toDate_) && <button type="button" onClick={() => { setFromDate(''); setToDate(''); }} className="text-xs underline text-gray-500 pb-2">Reset dates</button>}
+              <span className="text-xs text-gray-500 pb-2">{historyList.length} order(s) in this range</span>
+              {isOwner
+                ? <button type="button" disabled={busyId === 'history'} onClick={clearHistory} className="ml-auto bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold uppercase tracking-wider px-4 py-2 rounded disabled:opacity-50">{busyId === 'history' ? 'Clearing...' : 'Clear history'}</button>
+                : <span className="ml-auto text-[11px] text-gray-500 pb-2">Only the Owner can clear history.</span>}
+            </div>
+          </div>
+        )}
         {error && <p className="text-xs p-3 rounded border border-red-500/40 text-red-500 bg-red-500/10">{error}</p>}
       </div>
 

@@ -3,11 +3,12 @@ import AdminLogin from './AdminLogin';
 import AdminManager from './AdminManager';
 import ImageField from './ImageField';
 import SizeStockEditor from './SizeStockEditor';
+import ColorPhotos from './ColorPhotos';
 import OrdersPanel from './OrdersPanel';
 import StoreSettings from './StoreSettings';
 import { SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
 
-export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct }) {
+export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct, clearProductForm }) {
   const isOwner = adminRole === 'owner';
   const canManageTeam = adminRole === 'owner' || adminRole === 'manager';
   const formColors = ((newProductForm && newProductForm.colors) || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -18,6 +19,10 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
   const sizesTotal = perColorOn
     ? Object.entries(newProductForm.colorStock || {}).reduce((sum, [k, n]) => (formSizeNames.length ? formSizeNames : ['']).includes(k.split('|')[0]) ? sum + (parseInt(n, 10) || 0) : sum, 0)
     : Object.values((newProductForm && newProductForm.sizeStock) || {}).reduce((sum, n) => sum + (parseInt(n, 10) || 0), 0);
+  // colors that can have their own photo: the typed stock colors, or the Colors field
+  const photoColors = perColorOn
+    ? [...new Set(Object.keys((newProductForm && newProductForm.colorStock) || {}).filter((k) => (formSizeNames.length ? formSizeNames : ['']).includes(k.split('|')[0])).map((k) => k.split('|').slice(1).join('|').trim()).filter(Boolean))]
+    : formColors;
   const roleLabel = adminRole ? adminRole.charAt(0).toUpperCase() + adminRole.slice(1) : '';
 
   return (
@@ -145,9 +150,19 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
 
               {adminTab === 'add-product' && (
                 <form onSubmit={handleSaveProduct} className={`p-8 rounded-lg border space-y-6 max-w-3xl ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
-                  <h3 className="text-lg font-serif font-bold border-b pb-3">
-                    {editingProductId ? 'Edit Product Details' : 'Add New Luxury Product'}
-                  </h3>
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+                    <h3 className="text-lg font-serif font-bold">
+                      {editingProductId ? 'Edit Product Details' : 'Add New Luxury Product'}
+                    </h3>
+                    <div className="flex gap-2">
+                      {editingProductId && (
+                        <button type="button" onClick={() => { const saved = products.find((p) => p.id === editingProductId); if (saved && confirm('Undo all your changes and go back to the saved product?')) startEditProduct(saved); }}
+                          className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded border border-gray-400 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#222]">Reset changes</button>
+                      )}
+                      <button type="button" onClick={() => { if (confirm(editingProductId ? 'Clear the whole form? You will leave edit mode (the saved product stays unchanged).' : 'Clear the whole form?')) clearProductForm(); }}
+                        className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded border border-red-400 text-red-500 hover:bg-red-500/10">Clear form</button>
+                    </div>
+                  </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -227,6 +242,9 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                         onColorChange={(colorStock) => setNewProductForm({...newProductForm, colorStock})}
                         isDarkMode={isDarkMode}
                       />
+                      <div className="mt-3">
+                        <ColorPhotos colors={photoColors} value={newProductForm.colorImages || {}} onChange={(colorImages) => setNewProductForm({...newProductForm, colorImages})} isDarkMode={isDarkMode} />
+                      </div>
                     </div>
                     <div className="sm:col-span-2">
                       <ImageField
@@ -253,7 +271,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                 </form>
               )}
 
-              {adminTab === 'orders' && <OrdersPanel orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} canUnblock={adminRole === 'owner' || adminRole === 'manager'} />}
+              {adminTab === 'orders' && <OrdersPanel orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} canUnblock={adminRole === 'owner' || adminRole === 'manager'} isOwner={adminRole === 'owner'} />}
             </div>
           )}
         </div>

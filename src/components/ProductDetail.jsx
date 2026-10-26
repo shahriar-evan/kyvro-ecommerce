@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MessageCircle, Heart } from 'lucide-react';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
 import StockLabel from './StockLabel';
-import { hasSizeStock, hasColorStock, totalStock, stockForSize, stockFor, stockForColor, productColors, orderedSizes } from '../data/catalog';
+import { hasSizeStock, hasColorStock, totalStock, stockForSize, stockFor, stockForColor, productColors, imageFor, orderedSizes } from '../data/catalog';
 
 export default function ProductDetail({ product, products, addToCart, calculateDiscountPercent, formatPrice, isDarkMode, setCurrentView, savedIds = [], toggleSaved = () => {} }) {
   // Always use the latest version of the product (admin may have changed stock)
@@ -81,7 +81,7 @@ export default function ProductDetail({ product, products, addToCart, calculateD
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
         <div className={`relative rounded-lg overflow-hidden border ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-gray-100 border-gray-200'}`}>
-          <img src={live.image} alt={live.name} className="w-full h-full max-h-[560px] object-cover" />
+          <img src={imageFor(live, color)} alt={live.name} className="w-full h-full max-h-[560px] object-cover" />
           <button
             type="button"
             onClick={() => toggleSaved(live.id)}

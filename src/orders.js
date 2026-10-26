@@ -1,6 +1,6 @@
 import { getApp } from "firebase/app";
 import {
-  getFirestore, doc, setDoc, updateDoc, runTransaction, collection, query, orderBy, onSnapshot, serverTimestamp, arrayUnion,
+  getFirestore, doc, setDoc, updateDoc, runTransaction, writeBatch, collection, query, orderBy, onSnapshot, serverTimestamp, arrayUnion,
 } from "firebase/firestore";
 import "./firebase"; // makes sure the default Firebase app exists
 
@@ -166,4 +166,14 @@ export async function markOrderPaid(orderId, staff) {
     updatedAt: serverTimestamp(),
     history: arrayUnion(historyEntry("Payment received", staff)),
   });
+}
+
+// Owner only (the Firestore rules check it too): permanently deletes finished orders (Delivered / Cancelled)
+export async function deleteOrders(ids) {
+  for (let i = 0; i < ids.length; i += 400) {
+    const batch = writeBatch(db);
+    ids.slice(i, i + 400).forEach((id) => batch.delete(doc(db, "orders", id)));
+    await batch.commit();
+  }
+  return ids.length;
 }

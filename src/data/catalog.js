@@ -105,6 +105,9 @@ export const stockForColor = (p, color) => {
   return Object.entries(p.colorStock).reduce((sum, [k, n]) => (k.split('|')[1] === color ? sum + (parseInt(n, 10) || 0) : sum), 0);
 };
 
+// photo of the chosen color (falls back to the main image)
+export const imageFor = (p, color) => (color && p?.colorImages && p.colorImages[color]) || p?.image;
+
 export const productColors = (p) => (Array.isArray(p?.colors) ? p.colors.filter(Boolean) : []);
 
 // Does the customer have to choose something (size or color) before this can go in the cart?

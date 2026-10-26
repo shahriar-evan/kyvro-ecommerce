@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
-import { hasSizeStock, hasColorStock, orderedSizes, productColors, stockFor, stockForColor, stockForSize, totalStock } from '../data/catalog';
+import { hasSizeStock, hasColorStock, orderedSizes, productColors, imageFor, stockFor, stockForColor, stockForSize, totalStock } from '../data/catalog';
 
 // Small window that opens from the product cards: choose size, color and quantity, then add to cart / buy now.
 export default function QuickAdd({ product, goCheckout, onConfirm, onClose, formatPrice, isDarkMode }) {
@@ -45,7 +45,7 @@ export default function QuickAdd({ product, goCheckout, onConfirm, onClose, form
         <button onClick={onClose} className="absolute top-3 right-3 p-1 text-gray-500 hover:text-[#D4AF37]" aria-label="Close"><X size={20} /></button>
 
         <div className="flex gap-3 pr-6">
-          <img src={product.image} alt={product.name} className="w-20 h-20 object-cover rounded" />
+          <img src={imageFor(product, color)} alt={product.name} className="w-20 h-20 object-cover rounded" />
           <div className="min-w-0">
             <h3 className="font-serif font-bold leading-snug">{product.name}</h3>
             <p className="text-[#D4AF37] font-bold mt-1">{formatPrice(product.price)}</p>

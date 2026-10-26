@@ -10,7 +10,7 @@ import { watchStoreSettings } from './storeSettings';
 import { cleanPhone, DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
 import { INITIAL_PRODUCTS } from './data/products';
 import { CURRENCIES } from './data/currencies';
-import { defaultCategoryFor, matchesCollectionPage, hasSizeStock, stockForSize, orderedSizes, hasColorStock, stockFor, variantKey, needsChoice } from './data/catalog';
+import { defaultCategoryFor, matchesCollectionPage, hasSizeStock, stockForSize, orderedSizes, hasColorStock, stockFor, variantKey, needsChoice, imageFor } from './data/catalog';
 import QuickAdd from './components/QuickAdd';
 import heroBannerImg from './assets/hero-banner.png';
 import men_womenImg from './assets/men_women.png';
@@ -40,7 +40,7 @@ const EMPTY_CHECKOUT = {
 
 const EMPTY_PRODUCT_FORM = {
   name: '', gender: 'Men', category: 'Shirt', price: '', originalPrice: '', image: '', description: '',
-  colors: 'Matte Black, Charcoal', sizeStock: {}, colorStock: {}, trackColors: false, stock: '10', isNew: true, isFeatured: false, isBestSeller: false
+  colors: 'Matte Black, Charcoal', sizeStock: {}, colorStock: {}, colorImages: {}, trackColors: false, stock: '10', isNew: true, isFeatured: false, isBestSeller: false
 };
 
 export default function App() {
@@ -286,7 +286,8 @@ export default function App() {
       if (existing) {
         return prev.map(item => item.cartItemId === cartItemId ? { ...item, quantity: item.quantity + qty } : item);
       }
-      return [...prev, { ...live, cartItemId, selectedColor: color, selectedSize: size, quantity: qty }];
+      const { colorImages, ...rest } = live; // color photos stay out of the cart (keeps it small)
+      return [...prev, { ...rest, image: imageFor(live, color), cartItemId, selectedColor: color, selectedSize: size, quantity: qty }];
     });
     if (goCheckout) {
       // Buy Now: skip the cart drawer and go straight to checkout
@@ -616,6 +617,11 @@ export default function App() {
       sizes: hasSizes ? sizeNames : ["Standard"],
       ...(hasSizes ? { sizeStock } : {}),
       ...(perColor ? { colorStock } : {}),
+      ...(() => {
+        const ci = {};
+        for (const c of colorList) { const u = (newProductForm.colorImages || {})[c]; if (u) ci[c] = u; }
+        return Object.keys(ci).length ? { colorImages: ci } : {};
+      })(),
       stock,
       isNew: newProductForm.isNew,
       isFeatured: newProductForm.isFeatured,
@@ -676,6 +682,7 @@ export default function App() {
       colors: (prod.colors || []).join(', '),
       sizeStock,
       colorStock,
+      colorImages: { ...(prod.colorImages || {}) },
       trackColors: hasColorStock(prod),
       stock: prod.stock,
       isNew: prod.isNew,
@@ -776,7 +783,7 @@ export default function App() {
       {currentView === 'order-success' && <OrderSuccess order={orderCompleteData} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
 
       {/* ADMIN PORTAL VIEW (GOOGLE SIGN-IN, WHITELISTED EMAILS ONLY) */}
-      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} canApproveProduct={canApproveProduct} handleApproveProduct={handleApproveProduct} pendingCount={pendingCount} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} storeSettings={storeSettings} isCloud={isCloud} migrating={migrating} handleMigrateProducts={handleMigrateProducts} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} />}
+      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} canApproveProduct={canApproveProduct} handleApproveProduct={handleApproveProduct} pendingCount={pendingCount} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} storeSettings={storeSettings} isCloud={isCloud} migrating={migrating} handleMigrateProducts={handleMigrateProducts} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} clearProductForm={() => { setEditingProductId(null); setNewProductForm(EMPTY_PRODUCT_FORM); }} />}
 
       {/* FOOTER */}
       <Footer isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} />
