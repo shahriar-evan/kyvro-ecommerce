@@ -3,6 +3,8 @@ import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, signOu
 import { auth, googleProvider } from './firebase';
 import { isOwnerEmail } from './adminEmails';
 import { getAdminStatus, watchAdminAccess } from './adminAuth';
+import { placeOrder, watchOrders } from './orders';
+import { DELIVERY_AREAS, deliveryFee, paymentStatusFor } from './data/shopConfig';
 import { INITIAL_PRODUCTS } from './data/products';
 import { CURRENCIES } from './data/currencies';
 import { defaultCategoryFor, matchesCollectionPage, hasSizeStock, stockForSize, orderedSizes } from './data/catalog';
@@ -22,7 +24,14 @@ import HomeView from './components/HomeView';
 import ShopView from './components/ShopView';
 import AdminPortal from './components/AdminPortal';
 import Footer from './components/Footer';
+import CheckoutView from './components/CheckoutView';
+import OrderSuccess from './components/OrderSuccess';
 import ProductDetail from './components/ProductDetail';
+
+const EMPTY_CHECKOUT = {
+  fullName: '', phone: '', address: '', notes: '',
+  deliveryArea: '', paymentMethod: 'Cash on Delivery', agree: false
+};
 
 const EMPTY_PRODUCT_FORM = {
   name: '', gender: 'Men', category: 'Shirt', price: '', originalPrice: '', image: '', description: '',
@@ -40,17 +49,12 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [orders, setOrders] = useState(() => {
-    const saved = localStorage.getItem('kyvro_orders');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [orders, setOrders] = useState([]); // live from Firestore (team members only)
 
   const [announcementText, setAnnouncementText] = useState("Discover Your Signature Style | Complimentary Worldwide Shipping on Orders Over 3500 BDT");
   const [currencyKey, setCurrencyKey] = useState("BDT");
   const curr = CURRENCIES[currencyKey];
 
-  const [shippingFee, setShippingFee] = useState(150.00);
-  const [freeShippingThreshold, setFreeShippingThreshold] = useState(3500.00);
 
   const [currentView, setCurrentView] = useState('home');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -140,10 +144,9 @@ export default function App() {
   const [newProductForm, setNewProductForm] = useState(EMPTY_PRODUCT_FORM);
   const [editingProductId, setEditingProductId] = useState(null);
 
-  const [checkoutForm, setCheckoutForm] = useState({
-    fullName: '', phone: '', email: '', city: '', zone: '', area: '', address: '', postalCode: '', notes: '', 
-    paymentType: 'Partial Payment', advancePaid: 'No', paymentMethod: 'Account Wallet'
-  });
+  const [checkoutForm, setCheckoutForm] = useState(EMPTY_CHECKOUT);
+  const [checkoutError, setCheckoutError] = useState('');
+  const [placingOrder, setPlacingOrder] = useState(false);
   const [orderCompleteData, setOrderCompleteData] = useState(null);
 
   useEffect(() => {
@@ -159,9 +162,15 @@ export default function App() {
     localStorage.setItem('kyvro_cart', JSON.stringify(cart));
   }, [cart]);
 
+  // Team members see new customer orders live
   useEffect(() => {
-    localStorage.setItem('kyvro_orders', JSON.stringify(orders));
-  }, [orders]);
+    if (!isAdminLoggedIn) { setOrders([]); return; }
+    const unsubscribe = watchOrders(setOrders, (err) => console.error('Could not load orders:', err));
+    return () => unsubscribe();
+  }, [isAdminLoggedIn]);
+
+  // Every page change starts at the top
+  useEffect(() => { window.scrollTo(0, 0); }, [currentView]);
 
   const formatPrice = (amountInBDT) => {
     const converted = amountInBDT * curr.rate;
@@ -228,29 +237,69 @@ export default function App() {
   };
 
   const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-  const finalShipping = subtotal >= freeShippingThreshold || subtotal === 0 ? 0 : shippingFee;
-  const grandTotal = subtotal + finalShipping;
+  // Online Payment = free delivery, Cash on Delivery = 100 / 150 by area (see data/shopConfig.js)
+  const deliveryCharge = deliveryFee(checkoutForm.deliveryArea, checkoutForm.paymentMethod);
+  const grandTotal = subtotal + deliveryCharge;
 
-  const handleCheckoutSubmit = (e) => {
+  const handleCheckoutSubmit = async (e) => {
     e.preventDefault();
-    if (cart.length === 0) return;
+    if (placingOrder || cart.length === 0) return;
+    setCheckoutError('');
 
-    const newOrder = {
-      orderNumber: 'KYV-' + Math.floor(100000 + Math.random() * 900000),
-      date: new Date().toISOString(),
-      customer: checkoutForm,
-      items: cart,
+    const name = checkoutForm.fullName.trim();
+    const phone = checkoutForm.phone.trim();
+    const address = checkoutForm.address.trim();
+    if (name.length < 2) return setCheckoutError('Please enter your name. (আপনার নাম লিখুন)');
+    if (!/^[0-9+\-\s()]{7,20}$/.test(phone) || phone.replace(/\D/g, '').length < 7) return setCheckoutError('Please enter a valid phone number. (সঠিক ফোন নম্বর দিন)');
+    if (address.length < 10) return setCheckoutError('Please enter your full address with district. (সম্পূর্ণ ঠিকানা লিখুন, জেলা উপজেলা সহ)');
+    if (!DELIVERY_AREAS.includes(checkoutForm.deliveryArea)) return setCheckoutError('Please select your delivery area: Inside Dhaka or Outside Dhaka.');
+    if (!checkoutForm.agree) return setCheckoutError('Please accept the Terms & Conditions, Privacy Policy and Return & Refund Policy to continue.');
+
+    // Make sure everything in the cart is still in stock
+    for (const item of cart) {
+      const live = products.find(p => p.id === item.id) || item;
+      const inCart = cart.filter(i => i.id === item.id && i.selectedSize === item.selectedSize).reduce((n, i) => n + i.quantity, 0);
+      const left = stockForSize(live, item.selectedSize);
+      if (inCart > left) {
+        return setCheckoutError(left <= 0
+          ? `Sorry, "${item.name}" is sold out. Please remove it from your cart.`
+          : `Sorry, only ${left} unit(s) of "${item.name}"${hasSizeStock(live) ? ` in size ${item.selectedSize}` : ''} are left. Please reduce the quantity.`);
+      }
+    }
+
+    const order = {
+      customer: { name, phone, address, notes: checkoutForm.notes.trim() },
+      items: cart.map(item => ({
+        id: item.id,
+        name: item.name,
+        category: item.category || '',
+        price: item.price,
+        quantity: item.quantity,
+        size: item.selectedSize || '',
+        color: item.selectedColor || '',
+        image: typeof item.image === 'string' && /^https?:\/\//.test(item.image) && item.image.length < 400 ? item.image : ''
+      })),
       subtotal,
-      shipping: finalShipping,
+      deliveryArea: checkoutForm.deliveryArea,
+      shipping: deliveryCharge,
       total: grandTotal,
-      status: 'Pending',
-      paymentStatus: checkoutForm.paymentType === 'Full Payment' ? 'Paid' : 'Partial Payment'
+      paymentMethod: checkoutForm.paymentMethod,
+      paymentStatus: paymentStatusFor(checkoutForm.paymentMethod),
+      status: 'Pending'
     };
 
-    setOrders([newOrder, ...orders]);
-    setOrderCompleteData(newOrder);
-    setCart([]);
-    setCurrentView('order-success');
+    setPlacingOrder(true);
+    try {
+      const { orderNumber } = await placeOrder(order);
+      setOrderCompleteData({ ...order, orderNumber, date: new Date().toISOString() });
+      setCart([]);
+      setCheckoutForm(EMPTY_CHECKOUT);
+      setCurrentView('order-success');
+    } catch (err) {
+      console.error('Order failed:', err);
+      setCheckoutError('Sorry, we could not place your order. Please check your internet connection and try again, or contact us.');
+    }
+    setPlacingOrder(false);
   };
 
   // Google Sign-In Handler (only owners and team members with access ON can log in)
@@ -421,19 +470,6 @@ export default function App() {
     }
   };
 
-  const exportOrdersCSV = () => {
-    let csv = 'Order Number,Date,Customer Name,Phone,Email,Total,Status,Payment\n';
-    orders.forEach(o => {
-      csv += `"${o.orderNumber}","${new Date(o.date).toLocaleDateString()}","${o.customer.fullName}","${o.customer.phone}","${o.customer.email}","${curr.symbol} ${o.total.toFixed(2)}","${o.status}","${o.paymentStatus}"\n`;
-    });
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `kyvro-orders-${Date.now()}.csv`;
-    a.click();
-  };
-
   const filteredProducts = products.filter(p => {
     let matchesCategory = true;
     if (selectedCategory === 'Men' || selectedCategory === 'Women') {
@@ -472,7 +508,7 @@ export default function App() {
       {isMobileMenuOpen && <MobileMenu isDarkMode={isDarkMode} setCurrentView={setCurrentView} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} />}
 
       {/* CART SLIDE-OVER DRAWER */}
-      {isCartOpen && <CartDrawer cart={cart} finalShipping={finalShipping} formatPrice={formatPrice} freeShippingThreshold={freeShippingThreshold} grandTotal={grandTotal} isDarkMode={isDarkMode} removeFromCart={removeFromCart} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} shippingFee={shippingFee} subtotal={subtotal} updateCartQty={updateCartQty} />}
+      {isCartOpen && <CartDrawer cart={cart} formatPrice={formatPrice} isDarkMode={isDarkMode} removeFromCart={removeFromCart} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} subtotal={subtotal} updateCartQty={updateCartQty} />}
 
       {/* HOME VIEW */}
       {currentView === 'home' && <HomeView addToCart={addToCart} banners={banners} calculateDiscountPercent={calculateDiscountPercent} currentBannerIndex={currentBannerIndex} formatPrice={formatPrice} isDarkMode={isDarkMode} products={products} setCurrentBannerIndex={setCurrentBannerIndex} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} />}
@@ -482,8 +518,14 @@ export default function App() {
 
       {currentView === 'product-detail' && selectedProduct && <ProductDetail product={selectedProduct} products={products} addToCart={addToCart} calculateDiscountPercent={calculateDiscountPercent} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
 
+      {/* CHECKOUT (guest checkout, no login needed) */}
+      {currentView === 'checkout' && <CheckoutView cart={cart} checkoutForm={checkoutForm} setCheckoutForm={setCheckoutForm} checkoutError={checkoutError} deliveryCharge={deliveryCharge} grandTotal={grandTotal} formatPrice={formatPrice} handleCheckoutSubmit={handleCheckoutSubmit} isDarkMode={isDarkMode} placingOrder={placingOrder} removeFromCart={removeFromCart} setCurrentView={setCurrentView} subtotal={subtotal} />}
+
+      {/* ORDER CONFIRMATION */}
+      {currentView === 'order-success' && <OrderSuccess order={orderCompleteData} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
+
       {/* ADMIN PORTAL VIEW (GOOGLE SIGN-IN, WHITELISTED EMAILS ONLY) */}
-      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} exportOrdersCSV={exportOrdersCSV} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} />}
+      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} />}
 
       {/* FOOTER */}
       <Footer isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} />

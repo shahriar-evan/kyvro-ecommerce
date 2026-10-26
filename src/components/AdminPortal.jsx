@@ -3,9 +3,10 @@ import AdminLogin from './AdminLogin';
 import AdminManager from './AdminManager';
 import ImageField from './ImageField';
 import SizeStockEditor from './SizeStockEditor';
+import OrdersPanel from './OrdersPanel';
 import { SUB_CATEGORIES, hasSubCategories, hasSizeStock, totalStock, orderedSizes } from '../data/catalog';
 
-export default function AdminPortal({ adminTab, deleteProduct, editingProductId, exportOrdersCSV, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, isDarkMode, loggedInUserEmail, newProductForm, orders, products, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct }) {
+export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, isDarkMode, loggedInUserEmail, newProductForm, orders, products, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct }) {
   const isOwner = adminRole === 'owner';
   const canManageTeam = adminRole === 'owner' || adminRole === 'manager';
   const sizesUsed = Object.keys((newProductForm && newProductForm.sizeStock) || {}).length > 0;
@@ -50,6 +51,9 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                   className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'orders' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
                 >
                   Orders ({orders.length})
+                  {orders.filter(o => o.status === 'Pending').length > 0 && (
+                    <span className="ml-2 bg-red-600 text-white rounded-full px-2 py-0.5 text-[10px]">{orders.filter(o => o.status === 'Pending').length} new</span>
+                  )}
                 </button>
                 {canManageTeam && (
                   <button 
@@ -212,25 +216,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                 </form>
               )}
 
-              {adminTab === 'orders' && (
-                <div className="space-y-6">
-                  <div className={`flex justify-between items-center p-4 rounded border ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
-                    <p className="text-xs text-gray-500">Total Orders: <strong className="font-bold">{orders.length}</strong></p>
-                    <button onClick={exportOrdersCSV} className="bg-[#D4AF37] text-black text-xs font-bold px-4 py-2 rounded uppercase tracking-wider">
-                      Export Orders to CSV
-                    </button>
-                  </div>
-                  {orders.map((ord, idx) => (
-                    <div key={idx} className={`p-6 rounded-lg border space-y-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
-                      <div className="flex justify-between border-b pb-3">
-                        <span className="text-sm font-bold text-[#D4AF37]">{ord.orderNumber}</span>
-                        <span className="text-sm font-bold">{formatPrice(ord.total)}</span>
-                      </div>
-                      <p className="text-xs text-gray-500">Customer: {ord.customer.fullName} ({ord.customer.phone}) - {ord.customer.address}, {ord.customer.city}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {adminTab === 'orders' && <OrdersPanel orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} />}
             </div>
           )}
         </div>

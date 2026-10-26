@@ -31,6 +31,9 @@ const PERMISSIONS = [
   ['Edit any product', true, true, true],
   ['Delete products they added themselves', true, true, false],
   ['Delete products added by someone else', true, false, false],
+  ['View customer orders and customer details', true, true, true],
+  ['Confirm orders and move them to Processing, Shipped, Delivered', true, true, true],
+  ['Cancel an order or mark an online payment as received', true, true, true],
   ['View the team list (names and emails)', true, true, false],
   ['Add a new Admin', true, true, false],
   ['Add a new Manager or Owner', true, false, false],
@@ -49,6 +52,7 @@ const ROLE_CARDS = [
     summary: 'Full control of the admin panel.',
     can: [
       'Add, edit and delete every product',
+      'See customer orders, confirm them and move them through Processing, Shipped and Delivered',
       'Add team members with any role (Owner, Manager or Admin)',
       'Edit names, phone numbers and notes, and change anyone\'s role',
       'Turn anyone\'s access ON or OFF',
@@ -65,6 +69,7 @@ const ROLE_CARDS = [
     summary: 'Runs the product catalog and can bring in new Admins.',
     can: [
       'Add new products and edit any product',
+      'See customer orders, confirm them and move them through Processing, Shipped and Delivered',
       'Delete only the products they added themselves',
       'Add new team members, but only with the Admin role',
       'View the team list (names and emails, read-only)',
@@ -83,6 +88,7 @@ const ROLE_CARDS = [
     can: [
       'Add new products',
       'Edit any product',
+      'See customer orders, confirm them and move them through Processing, Shipped and Delivered',
     ],
     cannot: [
       'Delete any product (the Delete button is hidden)',

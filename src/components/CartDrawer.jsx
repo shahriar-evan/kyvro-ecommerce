@@ -1,7 +1,8 @@
 import React from 'react';
 import { ShoppingBag, X, ChevronRight, Trash2 } from 'lucide-react';
+import { DELIVERY_CHARGES } from '../data/shopConfig';
 
-export default function CartDrawer({ cart, finalShipping, formatPrice, freeShippingThreshold, grandTotal, isDarkMode, removeFromCart, setCurrentView, setIsCartOpen, shippingFee, subtotal, updateCartQty }) {
+export default function CartDrawer({ cart, formatPrice, isDarkMode, removeFromCart, setCurrentView, setIsCartOpen, subtotal, updateCartQty }) {
   return (
     <>
         <div className="fixed inset-0 z-50 bg-black/70 flex justify-end">
@@ -58,23 +59,13 @@ export default function CartDrawer({ cart, finalShipping, formatPrice, freeShipp
             {cart.length > 0 && (
               <div className="border-t pt-4 space-y-3">
                 <div className="space-y-1.5 text-sm">
-                  <div className="flex justify-between text-gray-500">
+                  <div className="flex justify-between text-base font-bold">
                     <span>Subtotal</span>
-                    <span>{formatPrice(subtotal)}</span>
+                    <span className="text-[#D4AF37]">{formatPrice(subtotal)}</span>
                   </div>
-                  <div className="flex justify-between text-gray-500">
-                    <span>Shipping</span>
-                    <span>{finalShipping === 0 ? 'FREE' : formatPrice(shippingFee)}</span>
-                  </div>
-                  {subtotal < freeShippingThreshold && (
-                    <p className="text-[11px] text-[#D4AF37]">
-                      Add {formatPrice(freeShippingThreshold - subtotal)} more for Free Shipping!
-                    </p>
-                  )}
-                  <div className="flex justify-between text-base font-bold pt-2 border-t">
-                    <span>Total</span>
-                    <span className="text-[#D4AF37]">{formatPrice(grandTotal)}</span>
-                  </div>
+                  <p className="text-[11px] text-gray-500">
+                    Delivery charge is added at checkout. Cash on Delivery: Inside Dhaka {formatPrice(DELIVERY_CHARGES['Inside Dhaka'])}, Outside Dhaka {formatPrice(DELIVERY_CHARGES['Outside Dhaka'])}. Online Payment: free delivery.
+                  </p>
                 </div>
 
                 <button 
