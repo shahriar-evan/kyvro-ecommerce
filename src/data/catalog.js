@@ -86,6 +86,30 @@ export const totalStock = (p) =>
 export const stockForSize = (p, size) =>
   hasSizeStock(p) ? parseInt(p.sizeStock[size], 10) || 0 : parseInt(p?.stock, 10) || 0;
 
+// ---- Stock per size AND color (e.g. M + White = 5, M + Red = 7) -------------
+// colorStock = { 'M|White': 5, 'M|Red': 7, 'L|White': 3 }. Products without sizes use an empty size: '|Red'.
+// sizeStock and stock are still kept as the totals, so the rest of the shop keeps working.
+export const hasColorStock = (p) => !!p && !!p.colorStock && Object.keys(p.colorStock).length > 0;
+export const variantKey = (size, color) => `${size || ''}|${color || ''}`;
+
+// How many are available for this exact size + color (falls back to the per-size / total stock)
+export const stockFor = (p, size, color) => {
+  if (!p) return 0;
+  if (hasColorStock(p)) return parseInt(p.colorStock[variantKey(hasSizeStock(p) ? size : '', color)], 10) || 0;
+  return stockForSize(p, size);
+};
+
+// Total of one color across all sizes (used when no size is picked yet)
+export const stockForColor = (p, color) => {
+  if (!hasColorStock(p)) return totalStock(p);
+  return Object.entries(p.colorStock).reduce((sum, [k, n]) => (k.split('|')[1] === color ? sum + (parseInt(n, 10) || 0) : sum), 0);
+};
+
+export const productColors = (p) => (Array.isArray(p?.colors) ? p.colors.filter(Boolean) : []);
+
+// Does the customer have to choose something (size or color) before this can go in the cart?
+export const needsChoice = (p) => hasSizeStock(p) || productColors(p).length > 1;
+
 // Sizes in a sensible order (S, M, L ... then anything custom)
 export const orderedSizes = (sizes, gender) => {
   const order = [...SIZE_PRESETS.clothing, ...SIZE_PRESETS.womenExtra, ...SIZE_PRESETS.shoes];

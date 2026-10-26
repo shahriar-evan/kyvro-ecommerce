@@ -5,13 +5,19 @@ import ImageField from './ImageField';
 import SizeStockEditor from './SizeStockEditor';
 import OrdersPanel from './OrdersPanel';
 import StoreSettings from './StoreSettings';
-import { SUB_CATEGORIES, hasSubCategories, hasSizeStock, totalStock, orderedSizes } from '../data/catalog';
+import { SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
 
 export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct }) {
   const isOwner = adminRole === 'owner';
   const canManageTeam = adminRole === 'owner' || adminRole === 'manager';
-  const sizesUsed = Object.keys((newProductForm && newProductForm.sizeStock) || {}).length > 0;
-  const sizesTotal = Object.values((newProductForm && newProductForm.sizeStock) || {}).reduce((sum, n) => sum + (parseInt(n, 10) || 0), 0);
+  const formColors = ((newProductForm && newProductForm.colors) || '').split(',').map(s => s.trim()).filter(Boolean);
+  const perColorOn = !!(newProductForm && newProductForm.trackColors);
+  const formSizeNames = Object.keys((newProductForm && newProductForm.sizeStock) || {});
+  // stock total of the form: from sizes, or from size x color boxes, or the plain Stock Quantity box
+  const sizesUsed = formSizeNames.length > 0 || perColorOn;
+  const sizesTotal = perColorOn
+    ? Object.entries(newProductForm.colorStock || {}).reduce((sum, [k, n]) => (formSizeNames.length ? formSizeNames : ['']).includes(k.split('|')[0]) ? sum + (parseInt(n, 10) || 0) : sum, 0)
+    : Object.values((newProductForm && newProductForm.sizeStock) || {}).reduce((sum, n) => sum + (parseInt(n, 10) || 0), 0);
   const roleLabel = adminRole ? adminRole.charAt(0).toUpperCase() + adminRole.slice(1) : '';
 
   return (
@@ -119,6 +125,11 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                                 {orderedSizes(Object.keys(p.sizeStock), p.gender).map(sz => `${sz}: ${p.sizeStock[sz]}`).join(' · ')}
                               </p>
                             )}
+                            {hasColorStock(p) && (
+                              <p className="text-[10px] mt-0.5 leading-relaxed">
+                                {Object.entries(p.colorStock).map(([k, n]) => { const [sz, col] = k.split('|'); return `${sz ? sz + ' ' : ''}${col}: ${n}`; }).join(' · ')}
+                              </p>
+                            )}
                           </td>
                           <td className="p-4 text-right space-x-2">
                             {canApproveProduct(p) && <button onClick={() => handleApproveProduct(p)} className="px-3 py-1.5 rounded text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition">Approve</button>}
@@ -193,7 +204,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-500 mb-1">{sizesUsed ? 'Total Stock (auto, from sizes)' : 'Stock Quantity *'}</label>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">{sizesUsed ? 'Total Stock (auto)' : 'Stock Quantity *'}</label>
                       <input 
                         type="number" 
                         min="0"
@@ -210,6 +221,10 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                         gender={newProductForm.gender}
                         value={newProductForm.sizeStock || {}}
                         onChange={(sizeStock) => setNewProductForm({...newProductForm, sizeStock})}
+                        perColor={!!newProductForm.trackColors}
+                        onPerColorChange={(trackColors) => setNewProductForm({...newProductForm, trackColors})}
+                        colorValue={newProductForm.colorStock || {}}
+                        onColorChange={(colorStock) => setNewProductForm({...newProductForm, colorStock})}
                         isDarkMode={isDarkMode}
                       />
                     </div>

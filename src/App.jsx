@@ -10,7 +10,8 @@ import { watchStoreSettings } from './storeSettings';
 import { cleanPhone, DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
 import { INITIAL_PRODUCTS } from './data/products';
 import { CURRENCIES } from './data/currencies';
-import { defaultCategoryFor, matchesCollectionPage, hasSizeStock, stockForSize, orderedSizes } from './data/catalog';
+import { defaultCategoryFor, matchesCollectionPage, hasSizeStock, stockForSize, orderedSizes, hasColorStock, stockFor, variantKey, needsChoice } from './data/catalog';
+import QuickAdd from './components/QuickAdd';
 import heroBannerImg from './assets/hero-banner.png';
 import men_womenImg from './assets/men_women.png';
 import women_bannerImg from './assets/women_banner.png';
@@ -39,7 +40,7 @@ const EMPTY_CHECKOUT = {
 
 const EMPTY_PRODUCT_FORM = {
   name: '', gender: 'Men', category: 'Shirt', price: '', originalPrice: '', image: '', description: '',
-  colors: 'Matte Black, Charcoal', sizeStock: {}, stock: '10', isNew: true, isFeatured: false, isBestSeller: false
+  colors: 'Matte Black, Charcoal', sizeStock: {}, colorStock: {}, trackColors: false, stock: '10', isNew: true, isFeatured: false, isBestSeller: false
 };
 
 export default function App() {
@@ -267,11 +268,12 @@ export default function App() {
     const color = selectedColor || (live.colors && live.colors[0]);
     const cartItemId = `${product.id}-${color || 'default'}-${size || 'default'}`;
 
-    // Never allow more than what is in stock (for that size)
-    const available = stockForSize(live, size);
-    const inCart = cart.filter(i => i.id === product.id && i.selectedSize === size).reduce((sum, i) => sum + i.quantity, 0);
+    // Never allow more than what is in stock (for that size, and that color when colors have their own stock)
+    const byColor = hasColorStock(live);
+    const available = stockFor(live, size, color);
+    const inCart = cart.filter(i => i.id === product.id && i.selectedSize === size && (!byColor || i.selectedColor === color)).reduce((sum, i) => sum + i.quantity, 0);
     const canAdd = Math.max(0, available - inCart);
-    const sizeText = hasSizeStock(live) && size ? ` in size ${size}` : '';
+    const sizeText = `${hasSizeStock(live) && size ? ` in size ${size}` : ''}${byColor && color ? `, ${color}` : ''}`;
     if (canAdd <= 0) {
       alert(`Sorry, no more units are available${sizeText}.`);
       return;
@@ -301,10 +303,11 @@ export default function App() {
       const target = cart.find(i => i.cartItemId === cartItemId);
       if (target) {
         const live = products.find(p => p.id === target.id) || target;
-        const available = stockForSize(live, target.selectedSize);
-        const sameSizeInCart = cart.filter(i => i.id === target.id && i.selectedSize === target.selectedSize).reduce((sum, i) => sum + i.quantity, 0);
+        const byColor = hasColorStock(live);
+        const available = stockFor(live, target.selectedSize, target.selectedColor);
+        const sameSizeInCart = cart.filter(i => i.id === target.id && i.selectedSize === target.selectedSize && (!byColor || i.selectedColor === target.selectedColor)).reduce((sum, i) => sum + i.quantity, 0);
         if (sameSizeInCart + delta > available) {
-          alert(`Only ${available} unit(s) available${hasSizeStock(live) ? ` in size ${target.selectedSize}` : ''}.`);
+          alert(`Only ${available} unit(s) available${hasSizeStock(live) ? ` in size ${target.selectedSize}` : ''}${byColor && target.selectedColor ? `, ${target.selectedColor}` : ''}.`);
           return;
         }
       }
@@ -316,6 +319,18 @@ export default function App() {
       }
       return item;
     }).filter(Boolean));
+  };
+
+  // Add to Cart / Buy Now on the product cards: ask for size / color first when the product has them
+  const [quickAdd, setQuickAdd] = useState(null); // { product, goCheckout }
+  const requestAdd = (product, goCheckout = false) => {
+    const live = products.find(p => p.id === product.id) || product;
+    if (needsChoice(live)) setQuickAdd({ product: live, goCheckout });
+    else addToCart(live, undefined, undefined, 1, goCheckout);
+  };
+  const confirmQuickAdd = (product, color, size, qty, goCheckout) => {
+    setQuickAdd(null);
+    addToCart(product, color, size, qty, goCheckout);
   };
 
   const removeFromCart = (cartItemId) => {
@@ -354,12 +369,14 @@ export default function App() {
     // Make sure everything in the cart is still in stock
     for (const item of cart) {
       const live = products.find(p => p.id === item.id) || item;
-      const inCart = cart.filter(i => i.id === item.id && i.selectedSize === item.selectedSize).reduce((n, i) => n + i.quantity, 0);
-      const left = stockForSize(live, item.selectedSize);
+      const byColor = hasColorStock(live);
+      const inCart = cart.filter(i => i.id === item.id && i.selectedSize === item.selectedSize && (!byColor || i.selectedColor === item.selectedColor)).reduce((n, i) => n + i.quantity, 0);
+      const left = stockFor(live, item.selectedSize, item.selectedColor);
       if (inCart > left) {
+        const which = `${hasSizeStock(live) ? ` in size ${item.selectedSize}` : ''}${byColor && item.selectedColor ? `, ${item.selectedColor}` : ''}`;
         return setCheckoutError(left <= 0
-          ? `Sorry, "${item.name}" is sold out. Please remove it from your cart.`
-          : `Sorry, only ${left} unit(s) of "${item.name}"${hasSizeStock(live) ? ` in size ${item.selectedSize}` : ''} are left. Please reduce the quantity.`);
+          ? `Sorry, "${item.name}"${which} is sold out. Please remove it from your cart.`
+          : `Sorry, only ${left} unit(s) of "${item.name}"${which} are left. Please reduce the quantity.`);
       }
     }
 
@@ -518,7 +535,7 @@ export default function App() {
   // Gender/Collection change handler (was missing in the original code and crashed the admin form)
   // Changing the collection resets the sub-category and sizes (they differ per collection)
   const handleGenderChange = (gender) => {
-    setNewProductForm(prev => ({ ...prev, gender, category: defaultCategoryFor(gender), sizeStock: {} }));
+    setNewProductForm(prev => ({ ...prev, gender, category: defaultCategoryFor(gender), sizeStock: {}, colorStock: {} }));
   };
 
 
@@ -533,8 +550,13 @@ export default function App() {
 
     // Sizes with their own quantity, e.g. { M: 20, L: 15, XL: 10 }
     const formSizes = newProductForm.sizeStock || {};
+    let colorList = newProductForm.colors.split(',').map(s => s.trim()).filter(Boolean);
+    // Stock per size AND color (e.g. M + White = 5): sizeStock and stock become the totals.
+    // The admin types the color names himself, right beside each size.
+    const perColor = !!newProductForm.trackColors;
     const sizeStock = {};
     for (const size of orderedSizes(Object.keys(formSizes), newProductForm.gender)) {
+      if (perColor) { sizeStock[size] = 0; continue; } // worked out from the colors below
       const n = parseInt(formSizes[size], 10);
       if (Number.isNaN(n) || n < 0) {
         alert(`Please enter how many are available for size ${size} (0 or more).`);
@@ -544,9 +566,41 @@ export default function App() {
     }
     const sizeNames = Object.keys(sizeStock);
     const hasSizes = sizeNames.length > 0;
-    const stock = hasSizes
-      ? sizeNames.reduce((sum, s) => sum + sizeStock[s], 0)
-      : Math.max(0, parseInt(newProductForm.stock, 10) || 0);
+    let colorStock = {};
+    let stock;
+    if (perColor) {
+      const formColor = newProductForm.colorStock || {};
+      const rows = hasSizes ? sizeNames : [''];
+      const names = [];
+      for (const size of rows) {
+        let sizeTotal = 0;
+        for (const key of Object.keys(formColor)) {
+          const [ks, ...rest] = key.split('|');
+          const color = rest.join('|').trim();
+          if (ks !== size || !color) continue;
+          const raw = formColor[key];
+          const n = raw === undefined || raw === '' ? 0 : parseInt(raw, 10);
+          if (Number.isNaN(n) || n < 0) {
+            alert(`Please enter a valid number for ${size ? `size ${size}, ` : ''}${color} (0 or more).`);
+            return;
+          }
+          colorStock[variantKey(size, color)] = n;
+          sizeTotal += n;
+          if (!names.includes(color)) names.push(color);
+        }
+        if (hasSizes) sizeStock[size] = sizeTotal;
+      }
+      if (!names.length) {
+        alert('Add at least one color with its quantity, or untick "Track stock for each color separately".');
+        return;
+      }
+      colorList = names;
+      stock = Object.values(colorStock).reduce((sum, n) => sum + n, 0);
+    } else {
+      stock = hasSizes
+        ? sizeNames.reduce((sum, s) => sum + sizeStock[s], 0)
+        : Math.max(0, parseInt(newProductForm.stock, 10) || 0);
+    }
 
     const productData = {
       id: editingProductId || Date.now(),
@@ -558,9 +612,10 @@ export default function App() {
       image: newProductForm.image,
       images: [newProductForm.image],
       description: newProductForm.description,
-      colors: newProductForm.colors.split(',').map(s => s.trim()).filter(Boolean),
+      colors: colorList,
       sizes: hasSizes ? sizeNames : ["Standard"],
       ...(hasSizes ? { sizeStock } : {}),
+      ...(perColor ? { colorStock } : {}),
       stock,
       isNew: newProductForm.isNew,
       isFeatured: newProductForm.isFeatured,
@@ -607,6 +662,8 @@ export default function App() {
         real.forEach((sz, i) => { sizeStock[sz] = String(i === 0 ? total - each * (real.length - 1) : each); });
       }
     }
+    const colorStock = {};
+    if (hasColorStock(prod)) Object.entries(prod.colorStock).forEach(([k, n]) => { colorStock[k] = String(n); });
     setEditingProductId(prod.id);
     setNewProductForm({
       name: prod.name,
@@ -618,6 +675,8 @@ export default function App() {
       description: prod.description,
       colors: (prod.colors || []).join(', '),
       sizeStock,
+      colorStock,
+      trackColors: hasColorStock(prod),
       stock: prod.stock,
       isNew: prod.isNew,
       isFeatured: prod.isFeatured,
@@ -697,13 +756,14 @@ export default function App() {
       {isMobileMenuOpen && <MobileMenu isDarkMode={isDarkMode} setCurrentView={setCurrentView} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} />}
 
       {/* CART SLIDE-OVER DRAWER */}
+      {quickAdd && <QuickAdd product={quickAdd.product} goCheckout={quickAdd.goCheckout} onConfirm={confirmQuickAdd} onClose={() => setQuickAdd(null)} formatPrice={formatPrice} isDarkMode={isDarkMode} />}
       {isCartOpen && <CartDrawer cart={cart} formatPrice={formatPrice} isDarkMode={isDarkMode} removeFromCart={removeFromCart} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} subtotal={subtotal} discount={discount} discountLabel={discountLabel} reward={reward} updateCartQty={updateCartQty} />}
 
       {/* HOME VIEW */}
-      {currentView === 'home' && <HomeView addToCart={addToCart} banners={banners} calculateDiscountPercent={calculateDiscountPercent} currentBannerIndex={currentBannerIndex} formatPrice={formatPrice} isDarkMode={isDarkMode} products={shopProducts} setCurrentBannerIndex={setCurrentBannerIndex} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} savedIds={savedIds} toggleSaved={toggleSaved} />}
+      {currentView === 'home' && <HomeView requestAdd={requestAdd} addToCart={addToCart} banners={banners} calculateDiscountPercent={calculateDiscountPercent} currentBannerIndex={currentBannerIndex} formatPrice={formatPrice} isDarkMode={isDarkMode} products={shopProducts} setCurrentBannerIndex={setCurrentBannerIndex} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} savedIds={savedIds} toggleSaved={toggleSaved} />}
 
       {/* SHOP CATALOG VIEW */}
-      {currentView === 'shop' && <ShopView selectedSubCategory={selectedSubCategory} setSelectedSubCategory={setSelectedSubCategory} addToCart={addToCart} filteredProducts={filteredProducts} formatPrice={formatPrice} isDarkMode={isDarkMode} products={shopProducts} searchQuery={searchQuery} selectedCategory={selectedCategory} setCurrentView={setCurrentView} setSearchQuery={setSearchQuery} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} setSortBy={setSortBy} sortBy={sortBy} savedIds={savedIds} toggleSaved={toggleSaved} />}
+      {currentView === 'shop' && <ShopView selectedSubCategory={selectedSubCategory} setSelectedSubCategory={setSelectedSubCategory} requestAdd={requestAdd} addToCart={addToCart} filteredProducts={filteredProducts} formatPrice={formatPrice} isDarkMode={isDarkMode} products={shopProducts} searchQuery={searchQuery} selectedCategory={selectedCategory} setCurrentView={setCurrentView} setSearchQuery={setSearchQuery} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} setSortBy={setSortBy} sortBy={sortBy} savedIds={savedIds} toggleSaved={toggleSaved} />}
 
       {currentView === 'product-detail' && selectedProduct && <ProductDetail product={selectedProduct} products={shopProducts} addToCart={addToCart} calculateDiscountPercent={calculateDiscountPercent} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} savedIds={savedIds} toggleSaved={toggleSaved} />}
 

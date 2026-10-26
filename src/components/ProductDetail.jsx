@@ -2,21 +2,28 @@ import React, { useState } from 'react';
 import { MessageCircle, Heart } from 'lucide-react';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
 import StockLabel from './StockLabel';
-import { hasSizeStock, totalStock, stockForSize, orderedSizes } from '../data/catalog';
+import { hasSizeStock, hasColorStock, totalStock, stockForSize, stockFor, stockForColor, productColors, orderedSizes } from '../data/catalog';
 
 export default function ProductDetail({ product, products, addToCart, calculateDiscountPercent, formatPrice, isDarkMode, setCurrentView, savedIds = [], toggleSaved = () => {} }) {
   // Always use the latest version of the product (admin may have changed stock)
   const live = (products || []).find((p) => p.id === product.id) || product;
   const sized = hasSizeStock(live);
   const sizes = sized ? orderedSizes(Object.keys(live.sizeStock), live.gender) : [];
-  const colors = Array.isArray(live.colors) && live.colors.length ? live.colors : [];
+  const colors = productColors(live);
+  const byColor = hasColorStock(live);
+
+  // how many of a color are left (for the chosen size, or in total while no size is chosen yet)
+  const colorLeftFor = (s, c) => (sized ? (s ? stockFor(live, s, c) : stockForColor(live, c)) : stockFor(live, '', c));
+  const firstColorFor = (s) => colors.find((c) => colorLeftFor(s, c) > 0) || colors[0] || '';
 
   const [size, setSize] = useState('');
-  const [color, setColor] = useState(colors[0] || '');
+  const [color, setColor] = useState(byColor ? firstColorFor('') : (colors[0] || ''));
   const [qty, setQty] = useState(1);
 
   const total = totalStock(live);
-  const available = sized ? (size ? stockForSize(live, size) : 0) : total;
+  const available = byColor
+    ? (sized && !size ? 0 : stockFor(live, size, color))
+    : (sized ? (size ? stockForSize(live, size) : 0) : total);
   const soldOut = total <= 0;
   const discount = calculateDiscountPercent(live.price, live.originalPrice);
   const needsSize = sized && !size;
@@ -24,15 +31,22 @@ export default function ProductDetail({ product, products, addToCart, calculateD
   const pickSize = (s) => {
     setSize(s);
     setQty(1);
+    // if the chosen color is finished in this size, move to a color that is still available
+    if (byColor && colorLeftFor(s, color) <= 0) setColor(firstColorFor(s));
   };
+  const pickColor = (c) => {
+    setColor(c);
+    setQty(1);
+  };
+  const colorOut = byColor && !needsSize && available <= 0;
 
   const handleAdd = () => {
-    if (soldOut || needsSize) return;
+    if (soldOut || needsSize || colorOut) return;
     addToCart(live, color || undefined, sized ? size : (live.sizes && live.sizes[0]), qty);
   };
 
   const handleBuyNow = () => {
-    if (soldOut || needsSize) return;
+    if (soldOut || needsSize || colorOut) return;
     addToCart(live, color || undefined, sized ? size : (live.sizes && live.sizes[0]), qty, true);
   };
 
@@ -93,9 +107,10 @@ export default function ProductDetail({ product, products, addToCart, calculateD
             <div>
               <p className="text-xs font-semibold mb-2">Color: <span className="font-normal text-gray-500">{color}</span></p>
               <div className="flex flex-wrap gap-2">
-                {colors.map((c) => (
-                  <button key={c} onClick={() => setColor(c)} className={cardBtn(color === c, false)}>{c}</button>
-                ))}
+                {colors.map((c) => {
+                  const out = byColor && colorLeftFor(size, c) <= 0;
+                  return <button key={c} disabled={out} onClick={() => pickColor(c)} className={cardBtn(color === c, out)} title={out ? 'Out of stock' : undefined}>{c}</button>;
+                })}
               </div>
             </div>
           )}
@@ -118,10 +133,11 @@ export default function ProductDetail({ product, products, addToCart, calculateD
                   );
                 })}
               </div>
-              {size && <p className="text-xs text-gray-500 mt-2">{available} available in size {size}</p>}
+              {size && <p className="text-xs font-semibold text-gray-500 mt-2">{available} available in size {size}{byColor && color ? `, ${color}` : ''}</p>}
             </div>
           )}
 
+          {byColor && !sized && color && !soldOut && <p className="text-xs font-semibold text-gray-500">{available} available in {color}</p>}
           {!sized && !soldOut && total <= 5 && <p className="text-xs font-semibold text-orange-600">Hurry! Only {total} left.</p>}
 
           {!soldOut && (
@@ -133,14 +149,14 @@ export default function ProductDetail({ product, products, addToCart, calculateD
               </div>
               <button
                 onClick={handleAdd}
-                disabled={needsSize}
+                disabled={needsSize || colorOut}
                 className="flex-1 bg-[#D4AF37] text-black font-bold py-3 rounded text-xs uppercase tracking-widest hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {needsSize ? 'Select a size' : 'Add to Cart'}
+                {needsSize ? 'Select a size' : colorOut ? 'Out of stock' : 'Add to Cart'}
               </button>
               <button
                 onClick={handleBuyNow}
-                disabled={needsSize}
+                disabled={needsSize || colorOut}
                 className={`flex-1 font-bold py-3 rounded text-xs uppercase tracking-widest border-2 border-[#D4AF37] transition disabled:opacity-50 disabled:cursor-not-allowed ${isDarkMode ? 'text-[#D4AF37] hover:bg-[#D4AF37]/10' : 'text-black hover:bg-[#D4AF37]/10'}`}
               >
                 Buy Now

@@ -7,7 +7,7 @@ import heroBannerImg from '../assets/hero-banner.png';
 import shirtImg from '../assets/shirts.png';
 import sneakersImg from '../assets/Snekers.png';
 
-export default function HomeView({ addToCart, banners, calculateDiscountPercent, currentBannerIndex, formatPrice, isDarkMode, products, setCurrentBannerIndex, setCurrentView, setSelectedCategory, setSelectedProduct, savedIds = [], toggleSaved = () => {} }) {
+export default function HomeView({ requestAdd, addToCart, banners, calculateDiscountPercent, currentBannerIndex, formatPrice, isDarkMode, products, setCurrentBannerIndex, setCurrentView, setSelectedCategory, setSelectedProduct, savedIds = [], toggleSaved = () => {} }) {
   return (
     <>
         <div className="flex-1">
@@ -162,19 +162,15 @@ export default function HomeView({ addToCart, banners, calculateDiscountPercent,
                             </button>
                             <button 
                               disabled={totalStock(product) <= 0}
-                              onClick={() => hasSizeStock(product)
-                                ? (setSelectedProduct(product), setCurrentView('product-detail'))
-                                : addToCart(product, product.colors[0], product.sizes[0], 1)}
+                              onClick={() => requestAdd(product, false)}
                               className="bg-[#D4AF37] text-black text-xs font-bold py-2.5 rounded hover:opacity-90 transition text-center disabled:opacity-40 disabled:cursor-not-allowed"
                             >
-                              {totalStock(product) <= 0 ? 'Sold Out' : hasSizeStock(product) ? 'Select Size' : 'Add to Cart'}
+                              {totalStock(product) <= 0 ? 'Sold Out' : 'Add to Cart'}
                             </button>
                           </div>
                           <button
                             disabled={totalStock(product) <= 0}
-                            onClick={() => hasSizeStock(product)
-                              ? (setSelectedProduct(product), setCurrentView('product-detail'))
-                              : addToCart(product, product.colors[0], product.sizes[0], 1, true)}
+                            onClick={() => requestAdd(product, true)}
                             className={`w-full border-2 border-[#D4AF37] ${isDarkMode ? 'text-[#D4AF37]' : 'text-black'} text-[11px] font-bold py-2 rounded hover:bg-[#D4AF37]/10 transition text-center uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed`}
                           >
                             Buy Now

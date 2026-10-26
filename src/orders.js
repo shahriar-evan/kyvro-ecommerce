@@ -81,12 +81,23 @@ export async function updateOrderStatus(orderId, status, staff) {
         if (!pSnap.exists()) { skipped.push(lines[0].name); continue; }
         const p = pSnap.data();
         const sized = p.sizeStock && Object.keys(p.sizeStock).length > 0;
+        const colored = p.colorStock && Object.keys(p.colorStock).length > 0;
         const sizeStock = sized ? { ...p.sizeStock } : null;
+        const colorStock = colored ? { ...p.colorStock } : null;
         let stock = parseInt(p.stock, 10) || 0;
         let touched = false;
         for (const it of lines) {
           const qty = parseInt(it.quantity, 10) || 0;
-          if (sized) {
+          if (colored) {
+            // stock is kept per size AND color: 'M|White'
+            const key = `${sized ? it.size || '' : ''}|${it.color || ''}`;
+            if (colorStock[key] === undefined) { skipped.push(`${it.name} (${[it.size, it.color].filter(Boolean).join(', ')})`); continue; }
+            const cur = parseInt(colorStock[key], 10) || 0;
+            const next = cur + dir * qty;
+            if (next < 0) shortages.push(`${it.name} (${[sized ? `size ${it.size}` : '', it.color].filter(Boolean).join(', ')}): only ${cur} left, order needs ${qty}`);
+            colorStock[key] = Math.max(0, next);
+            touched = true;
+          } else if (sized) {
             if (sizeStock[it.size] === undefined) { skipped.push(`${it.name} (${it.size})`); continue; }
             const next = (parseInt(sizeStock[it.size], 10) || 0) + dir * qty;
             if (next < 0) shortages.push(`${it.name} (size ${it.size}): only ${parseInt(sizeStock[it.size], 10) || 0} left, order needs ${qty}`);
@@ -100,9 +111,18 @@ export async function updateOrderStatus(orderId, status, staff) {
           }
         }
         if (touched) {
-          const patch = sized
-            ? { sizeStock, stock: Object.values(sizeStock).reduce((a, n) => a + (parseInt(n, 10) || 0), 0) }
-            : { stock };
+          let patch;
+          if (colored) {
+            // sizeStock and stock are the totals of the size x color numbers
+            const sums = {};
+            for (const [k, n] of Object.entries(colorStock)) { const sz = k.split('|')[0]; sums[sz] = (sums[sz] || 0) + (parseInt(n, 10) || 0); }
+            const total = Object.values(sums).reduce((a, n) => a + n, 0);
+            patch = sized ? { colorStock, sizeStock: Object.fromEntries(Object.keys(sizeStock).map((sz) => [sz, sums[sz] || 0])), stock: total } : { colorStock, stock: total };
+          } else {
+            patch = sized
+              ? { sizeStock, stock: Object.values(sizeStock).reduce((a, n) => a + (parseInt(n, 10) || 0), 0) }
+              : { stock };
+          }
           productWrites.push([doc(db, "products", id), patch]);
         }
       }

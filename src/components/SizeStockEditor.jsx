@@ -1,13 +1,32 @@
 import React, { useState } from 'react';
-import { sizePresetsFor, orderedSizes } from '../data/catalog';
+import { sizePresetsFor, orderedSizes, variantKey } from '../data/catalog';
 
 // Sizes with a separate quantity for each size, e.g. M: 20, XL: 10, L: 15
 // value = { M: '20', XL: '10' }  (quantities kept as strings while typing)
-export default function SizeStockEditor({ gender, value, onChange, isDarkMode }) {
+export default function SizeStockEditor({ gender, value, onChange, isDarkMode, perColor = false, onPerColorChange, colorValue = {}, onColorChange }) {
   const [custom, setCustom] = useState('');
   const presets = sizePresetsFor(gender);
   const sizes = orderedSizes(Object.keys(value || {}), gender);
   const total = sizes.reduce((sum, s) => sum + (parseInt(value[s], 10) || 0), 0);
+
+  const split = perColor;
+  // color entries of one size: [{ color, key }] in the order they were typed
+  const entriesOf = (size) => Object.keys(colorValue)
+    .filter((k) => k.split('|')[0] === size && k.split('|').slice(1).join('|').trim())
+    .map((k) => ({ key: k, color: k.split('|').slice(1).join('|') }));
+  const variantTotal = (size) => entriesOf(size).reduce((sum, e) => sum + (parseInt(colorValue[e.key], 10) || 0), 0);
+  const groups = sizes.length ? sizes : [''];
+  const grandTotal = split ? groups.reduce((sum, s) => sum + variantTotal(s), 0) : total;
+  const setEntry = (key, v) => onColorChange({ ...colorValue, [key]: v });
+  const removeEntry = (key) => { const next = { ...colorValue }; delete next[key]; onColorChange(next); };
+  const addEntry = (size, name, qty) => {
+    const color = String(name || '').trim();
+    if (!color) return false;
+    const exists = entriesOf(size).some((e) => e.color.toLowerCase() === color.toLowerCase());
+    if (exists) return false;
+    onColorChange({ ...colorValue, [variantKey(size, color)]: String(qty ?? '') });
+    return true;
+  };
 
   const inputClass = `w-24 border p-2 text-xs rounded focus:outline-none focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`;
 
@@ -74,32 +93,87 @@ export default function SizeStockEditor({ gender, value, onChange, isDarkMode })
         </button>
       </div>
 
+      <label className={`flex items-start gap-2 text-xs rounded border p-3 cursor-pointer ${isDarkMode ? 'border-gray-700' : 'border-gray-300 bg-gray-50'}`}>
+        <input type="checkbox" checked={perColor} onChange={(e) => onPerColorChange(e.target.checked)} className="mt-0.5 accent-[#D4AF37]" />
+        <span>
+          <strong>Track stock for each color separately</strong>
+          <span className="block text-[11px] text-gray-500">
+            Type the color name yourself beside each size, e.g. size M &rarr; White 5, Red 7, Blue 10. Customers only see the colors that are in stock.
+          </span>
+        </span>
+      </label>
+
+      {split && sizes.length === 0 && (
+        <div className={`rounded border divide-y ${isDarkMode ? 'border-gray-800 divide-gray-800' : 'border-gray-200 divide-gray-200'}`}>
+          <p className="px-3 py-2 text-xs font-bold">Stock per color</p>
+          <div className="px-3 py-3">
+            <ColorEntries size="" entries={entriesOf('')} colorValue={colorValue} setEntry={setEntry} removeEntry={removeEntry} addEntry={addEntry} inputClass={inputClass} isDarkMode={isDarkMode} />
+          </div>
+          <div className="px-3 py-2 text-xs font-bold flex justify-between">
+            <span>Total stock</span>
+            <span className="text-[#D4AF37]">{grandTotal} units in {entriesOf('').length} colors</span>
+          </div>
+        </div>
+      )}
+
       {sizes.length > 0 && (
         <div className={`rounded border divide-y ${isDarkMode ? 'border-gray-800 divide-gray-800' : 'border-gray-200 divide-gray-200'}`}>
           {sizes.map((s) => (
-            <div key={s} className="flex items-center justify-between gap-3 px-3 py-2">
+            <div key={s} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
               <span className="text-xs font-bold w-20">{s}</span>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={value[s]}
-                  onChange={(e) => onChange({ ...value, [s]: e.target.value })}
-                  placeholder="0"
-                  className={inputClass}
-                />
-                <span className="text-[11px] text-gray-500">available</span>
-              </div>
+              {split ? (
+                <div className="flex flex-col gap-2 flex-1">
+                  <ColorEntries size={s} entries={entriesOf(s)} colorValue={colorValue} setEntry={setEntry} removeEntry={removeEntry} addEntry={addEntry} inputClass={inputClass} isDarkMode={isDarkMode} />
+                  <span className="text-[11px] text-gray-500 ml-auto">= <strong className="text-[#D4AF37]">{variantTotal(s)}</strong> in {s}</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={value[s]}
+                    onChange={(e) => onChange({ ...value, [s]: e.target.value })}
+                    placeholder="0"
+                    className={inputClass}
+                  />
+                  <span className="text-[11px] text-gray-500">available</span>
+                </div>
+              )}
               <button type="button" onClick={() => removeSize(s)} className="text-red-400 hover:text-red-300 text-xs px-2" title="Remove this size">✕</button>
             </div>
           ))}
           <div className="px-3 py-2 text-xs font-bold flex justify-between">
             <span>Total stock</span>
-            <span className="text-[#D4AF37]">{total} units in {sizes.length} {sizes.length === 1 ? 'size' : 'sizes'}</span>
+            <span className="text-[#D4AF37]">{grandTotal} units in {sizes.length} {sizes.length === 1 ? 'size' : 'sizes'}</span>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// the color rows of one size: name + quantity, plus a small form to add another color
+function ColorEntries({ size, entries, colorValue, setEntry, removeEntry, addEntry, inputClass, isDarkMode }) {
+  const [name, setName] = useState('');
+  const [qty, setQty] = useState('');
+  const add = () => { if (addEntry(size, name, qty)) { setName(''); setQty(''); } };
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-x-4 gap-y-2">
+        {entries.map((e) => (
+          <div key={e.key} className="flex items-center gap-1.5 text-xs">
+            <span className="font-semibold">{e.color}</span>
+            <input type="number" min="0" step="1" value={colorValue[e.key] ?? ''} onChange={(ev) => setEntry(e.key, ev.target.value)} placeholder="0" className={`${inputClass} !w-20`} />
+            <button type="button" onClick={() => removeEntry(e.key)} className="text-red-400 hover:text-red-300 px-1" title="Remove this color">✕</button>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <input type="text" value={name} onChange={(ev) => setName(ev.target.value)} onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.preventDefault(); add(); } }} placeholder="Color name, e.g. White" className={`${inputClass} !w-40`} />
+        <input type="number" min="0" step="1" value={qty} onChange={(ev) => setQty(ev.target.value)} onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.preventDefault(); add(); } }} placeholder="Qty" className={`${inputClass} !w-20`} />
+        <button type="button" onClick={add} className={`px-3 py-2 text-xs font-bold rounded border whitespace-nowrap ${isDarkMode ? 'border-gray-700 text-gray-300 hover:bg-[#222]' : 'border-gray-300 text-gray-700 hover:bg-gray-100'}`}>+ Add color</button>
+      </div>
     </div>
   );
 }
