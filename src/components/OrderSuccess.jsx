@@ -67,6 +67,27 @@ export default function OrderSuccess({ order, formatPrice, isDarkMode, setCurren
         </p>
       </div>
 
+      <div className={`${panel} space-y-3 text-center`}>
+        <p className="text-base font-bold text-black dark:text-white leading-relaxed">
+          {online
+            ? 'অনলাইনে পেমেন্ট করতে না পারলে বা পেমেন্টে কোনো সমস্যা হলে সরাসরি আমাদের WhatsApp-এ মেসেজ করুন।'
+            : 'অর্ডার বা পেমেন্ট নিয়ে কোনো সমস্যা হলে সরাসরি আমাদের WhatsApp-এ মেসেজ করুন।'}
+        </p>
+        <p className="text-sm font-semibold text-black dark:text-white">
+          {online
+            ? 'Cannot pay online or having a payment problem? Message us on WhatsApp and we will help you right away.'
+            : 'Any problem with your order or payment? Message us on WhatsApp and we will help you right away.'}
+        </p>
+        <a
+          href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hello Kyvro, I need help with my order ${order.orderNumber}${online ? ' (online payment problem)' : ''}.`)}`}
+          target="_blank" rel="noreferrer"
+          className="inline-flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white text-xs font-bold px-8 py-3.5 tracking-widest uppercase rounded transition"
+        >
+          Message us on WhatsApp
+        </a>
+        <p className="text-xs text-gray-500">Or email <a href="mailto:kyvrofashion@gmail.com" className="underline">kyvrofashion@gmail.com</a> with your order number {order.orderNumber}.</p>
+      </div>
+
       <p className="text-xs text-gray-500 text-center">
         Changed your mind? You can cancel this order within 30 minutes from My Orders, as long as the team has not confirmed it. (অর্ডার করার ৩০ মিনিটের মধ্যে, কনফার্ম হওয়ার আগে My Orders থেকে ক্যানসেল করতে পারবেন।)
       </p>

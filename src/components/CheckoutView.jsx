@@ -3,7 +3,7 @@ import { deliveryAreaFor, DELIVERY_AREAS, DELIVERY_AREA_BN, DELIVERY_CHARGES, PA
 
 export default function CheckoutView({
   cart, checkoutForm, setCheckoutForm, checkoutError, deliveryCharge, grandTotal, formatPrice,
-  handleCheckoutSubmit, isDarkMode, placingOrder, removeFromCart, setCurrentView, subtotal, discount = 0, discountLabel = '', customerUser = null, authReady = true, onSignIn,
+  handleCheckoutSubmit, isDarkMode, placingOrder, removeFromCart, updateCartQty, setCurrentView, subtotal, discount = 0, discountLabel = '', customerUser = null, authReady = true, onSignIn,
 }) {
   const set = (field, value) => setCheckoutForm({ ...checkoutForm, [field]: value });
 
@@ -145,7 +145,14 @@ export default function CheckoutView({
                     {item.selectedColor && <>Color: {item.selectedColor}<br /></>}
                     {item.selectedSize && item.selectedSize !== 'Standard' && <>Size: {item.selectedSize}</>}
                   </p>
-                  <p className="text-xs mt-1">{formatPrice(item.price)} &times; {item.quantity}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className={`inline-flex items-center border rounded ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>
+                      <button type="button" disabled={item.quantity <= 1} onClick={() => updateCartQty(item.cartItemId, -1)} aria-label="Decrease quantity" className="w-8 h-8 text-lg leading-none font-bold hover:text-[#D4AF37] disabled:opacity-30 disabled:cursor-not-allowed">&minus;</button>
+                      <span className="w-8 text-center text-sm font-bold">{item.quantity}</span>
+                      <button type="button" onClick={() => updateCartQty(item.cartItemId, 1)} aria-label="Increase quantity" className="w-8 h-8 text-lg leading-none font-bold hover:text-[#D4AF37]">+</button>
+                    </div>
+                    <span className="text-xs text-gray-500">{formatPrice(item.price)} each</span>
+                  </div>
                 </div>
                 <div className="text-right flex flex-col justify-between items-end">
                   <button type="button" onClick={() => removeFromCart(item.cartItemId)} className="w-6 h-6 rounded-full bg-red-600 text-white text-xs leading-none" title="Remove">&times;</button>
