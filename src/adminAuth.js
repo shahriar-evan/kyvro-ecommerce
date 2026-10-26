@@ -9,7 +9,7 @@ const norm = (e) => (e || "").trim().toLowerCase();
 
 // owner   = everything (team add/remove/edit, access ON/OFF, all products)
 // manager = add/edit products, delete only own products, can add new Admins
-// admin   = add/edit products (cannot delete)
+// admin   = add/edit products, delete only own products
 export const ROLES = ["owner", "manager", "admin"];
 export const ROLE_LABELS = { owner: "Owner", manager: "Manager", admin: "Admin" };
 

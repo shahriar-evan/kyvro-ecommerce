@@ -1,5 +1,5 @@
 import { getApp } from "firebase/app";
-import { getFirestore, doc, collection, query, where, onSnapshot, setDoc, deleteDoc } from "firebase/firestore";
+import { getFirestore, doc, collection, query, where, onSnapshot, setDoc, updateDoc, deleteDoc, deleteField } from "firebase/firestore";
 import "./firebase"; // makes sure the default Firebase app exists
 import { imageFileToDataURL } from "./utils/imageUpload";
 
@@ -25,6 +25,23 @@ export const saveProduct = (product) => setDoc(doc(db, "products", String(produc
 // Owner or Manager approves a product that an Admin added, so customers can see it
 export const approveProduct = (product, staff) =>
   saveProduct({ ...product, status: "approved", approvedBy: staff.email || "", approvedByName: staff.name || staff.email || "", approvedAt: new Date().toISOString() });
+
+// A Manager / Admin asks the Owner to delete a live product. The product stays on the shop until the Owner agrees.
+export const requestProductDelete = (id, staff) =>
+  updateDoc(doc(db, "products", String(id)), {
+    deleteRequested: true,
+    deleteRequestedBy: staff.email || "",
+    deleteRequestedByName: staff.name || staff.email || "",
+    deleteRequestedAt: new Date().toISOString(),
+  });
+// Owner says no: the product simply stays
+export const rejectProductDelete = (id) =>
+  updateDoc(doc(db, "products", String(id)), {
+    deleteRequested: false,
+    deleteRequestedBy: deleteField(),
+    deleteRequestedByName: deleteField(),
+    deleteRequestedAt: deleteField(),
+  });
 
 export const removeProduct = (id) => deleteDoc(doc(db, "products", String(id)));
 

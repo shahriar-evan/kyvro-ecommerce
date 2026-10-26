@@ -29,19 +29,19 @@ const OWNER_WARNING = 'The Owner role lets this person do everything, including 
 const PERMISSIONS = [
   ['Add new products', true, true, true],
   ['Edit any product', true, true, true],
-  ['Delete products they added themselves', true, true, false],
-  ['Delete products added by someone else', true, false, false],
+  ['Delete products they added themselves (live ones need the Owner to confirm)', true, true, true],
+  ['Delete products added by someone else (including the Owner\'s)', true, false, false],
   ['View customer orders and customer details', true, true, true],
   ['Confirm orders and move them to Processing, Shipped, Delivered', true, true, true],
   ['Cancel an order or mark an online payment as received', true, true, true],
   ['View the team list (names and emails)', true, true, false],
   ['Add a new Admin', true, true, false],
   ['Add a new Manager or Owner', true, false, false],
-  ['Edit a member\'s name, phone and note', true, false, false],
-  ['See a member\'s phone, note and saved password', true, false, false],
+  ['Edit an admin\'s name, phone and note', true, false, false],
+  ['See an admin\'s phone, note and saved password', true, false, false],
   ['Change a team member\'s role', true, false, false],
   ['Turn a team member\'s access ON / OFF', true, false, false],
-  ['Reset a team member\'s password', true, false, false],
+  ['Reset an admin\'s password (sends a reset email)', true, true, false],
   ['Remove a team member', true, false, false],
 ];
 
@@ -56,7 +56,7 @@ const ROLE_CARDS = [
       'Add team members with any role (Owner, Manager or Admin)',
       'Edit names, phone numbers and notes, and change anyone\'s role',
       'Turn anyone\'s access ON or OFF',
-      'See each member\'s phone, note and the password set when they were added',
+      'See each admin\'s phone, note and the password set when they were added',
       'Reset passwords and remove team members',
     ],
     cannot: [
@@ -72,13 +72,14 @@ const ROLE_CARDS = [
       'See customer orders, confirm them and move them through Processing, Shipped and Delivered',
       'Delete only the products they added themselves',
       'Add new team members, but only with the Admin role',
+      'Send a password reset email to an Admin',
       'View the team list (names and emails, read-only)',
     ],
     cannot: [
       'Delete products added by an Admin, another Manager, an Owner, or the default store products',
       'Create Managers or Owners',
       'See phone numbers, notes or passwords',
-      'Change roles, turn access ON/OFF, reset passwords or remove anyone',
+      'Change roles, turn access ON/OFF, reset a Manager\'s or Owner\'s password or remove anyone',
     ],
   },
   {
@@ -88,10 +89,11 @@ const ROLE_CARDS = [
     can: [
       'Add new products',
       'Edit any product',
+      'Delete only the products they added themselves',
       'See customer orders, confirm them and move them through Processing, Shipped and Delivered',
     ],
     cannot: [
-      'Delete any product (the Delete button is hidden)',
+      'Delete products added by someone else (Delete is only shown on their own products)',
       'See or manage the team (no team tab)',
     ],
   },
@@ -311,8 +313,9 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
         <div className={`text-xs space-y-1.5 ${mutedClass}`}>
           <p className={`font-bold uppercase tracking-wider text-[11px] ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>Good to know</p>
           <ul className="list-disc pl-4 space-y-1">
-            <li>Each product shows who added it (&quot;Added by&quot;). Managers can only delete products that show their own name.</li>
+            <li>Each product shows who added it (&quot;Added by&quot;). Managers and Admins can only delete products that show their own name.</li>
             <li>The default products that came with the store have no &quot;Added by&quot; and can only be deleted by an Owner.</li>
+            <li>Reset password sends an email to the person, who then chooses a new password themselves, so nobody (not even the Owner) can see it. Managers can do this for Admins only.</li>
             <li>Turning a person&apos;s <strong>Access OFF</strong> blocks their login straight away and signs them out if they are logged in. Turning it back ON restores their role and password, nothing is lost.</li>
             <li><strong>Remove</strong> deletes the person from the team list permanently (their Firebase login account is not deleted, but it no longer works for the Admin Portal).</li>
             <li>The fixed Owner email is stored in the code, so it cannot be removed, demoted or turned OFF from this screen.</li>
@@ -445,7 +448,10 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
                       {!isMe && <button onClick={() => handleRemove(a)} className="px-3 py-1.5 rounded text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition">Remove</button>}
                     </div>
                   ) : (
-                    <span className="text-[#D4AF37] font-bold uppercase tracking-wider">{ROLE_LABELS[a.role]}</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[#D4AF37] font-bold uppercase tracking-wider">{ROLE_LABELS[a.role]}</span>
+                      {a.role === 'admin' && <button onClick={() => handleReset(a)} className={chipBtn}>Reset password</button>}
+                    </div>
                   )}
                 </div>
 

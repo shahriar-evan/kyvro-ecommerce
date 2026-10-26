@@ -5,7 +5,7 @@ import { isOwnerEmail } from './adminEmails';
 import { getAdminStatus, watchAdminAccess } from './adminAuth';
 import { placeOrder, watchOrders, cancelMyOrder } from './orders';
 import { watchProfile, saveProfile, watchMyOrders } from './customerData';
-import { watchProducts, saveProduct, removeProduct, approveProduct, migrateProducts } from './productsStore';
+import { watchProducts, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
 import { watchStoreSettings } from './storeSettings';
 import { cleanPhone, DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
 import { INITIAL_PRODUCTS } from './data/products';
@@ -632,7 +632,14 @@ export default function App() {
       addedByRole: existingProduct ? existingProduct.addedByRole : adminRole,
       // New products from an Admin wait for approval; Owner and Manager products go live at once.
       // Editing keeps the current status.
-      status: existingProduct ? (existingProduct.status || 'approved') : (isCloud && adminRole === 'admin' ? 'pending' : 'approved')
+      status: existingProduct ? (existingProduct.status || 'approved') : (isCloud && adminRole === 'admin' ? 'pending' : 'approved'),
+      // a waiting delete request must survive an edit
+      ...(existingProduct && existingProduct.deleteRequested ? {
+        deleteRequested: true,
+        deleteRequestedBy: existingProduct.deleteRequestedBy || '',
+        deleteRequestedByName: existingProduct.deleteRequestedByName || '',
+        deleteRequestedAt: existingProduct.deleteRequestedAt || ''
+      } : {})
     };
 
     try {
@@ -695,10 +702,10 @@ export default function App() {
   // Owner can delete everything, Manager only products they added, Admin none
   const canDeleteProduct = (p) => {
     if (adminRole === 'owner') return true;
-    if (adminRole === 'manager') {
-      // Own products, or a pending product from an Admin (rejecting it)
-      return (!!p.addedBy && p.addedBy.toLowerCase() === (loggedInUserEmail || '').toLowerCase()) || !isApproved(p);
-    }
+    const mine = !!p.addedBy && p.addedBy.toLowerCase() === (loggedInUserEmail || '').toLowerCase();
+    // Manager: own products, or a pending product from an Admin (rejecting it). Admin: own products only.
+    if (adminRole === 'manager') return mine || !isApproved(p);
+    if (adminRole === 'admin') return mine;
     return false;
   };
   const canApproveProduct = (p) => isCloud && !isApproved(p) && (adminRole === 'owner' || adminRole === 'manager');
@@ -715,6 +722,19 @@ export default function App() {
       alert('You do not have permission to delete this product.');
       return;
     }
+    // Manager / Admin: a live product is not deleted at once, the Owner has to confirm first
+    if (isCloud && adminRole !== 'owner' && isApproved(target)) {
+      if (target.deleteRequested) return;
+      if (confirm('This product is live on the shop. A delete request will be sent to the Owner, and it stays on the shop until the Owner confirms. Send the request?')) {
+        try {
+          await requestProductDelete(id, { email: loggedInUserEmail, name: adminName });
+          alert('Delete request sent to the Owner.');
+        } catch (err) {
+          alert('Could not send the request: ' + (err.code === 'permission-denied' ? 'you do not have permission (check the Firestore rules).' : err.message));
+        }
+      }
+      return;
+    }
     if (confirm('Are you sure you want to delete this product?')) {
       try {
         if (isCloud) await removeProduct(id);
@@ -722,6 +742,18 @@ export default function App() {
       } catch (err) {
         alert('Could not delete the product: ' + (err.code === 'permission-denied' ? 'you do not have permission.' : err.message));
       }
+    }
+  };
+
+  // Owner answers a delete request
+  const handleDeleteRequest = async (p, approve) => {
+    if (adminRole !== 'owner') return;
+    const who = p.deleteRequestedByName || p.deleteRequestedBy || 'a team member';
+    if (!confirm(approve ? `Delete "${p.name}" permanently? (requested by ${who})` : `Keep "${p.name}" and reject the request from ${who}?`)) return;
+    try {
+      if (approve) await removeProduct(p.id); else await rejectProductDelete(p.id);
+    } catch (err) {
+      alert('Could not do that: ' + (err.code === 'permission-denied' ? 'you do not have permission (check the Firestore rules).' : err.message));
     }
   };
 
@@ -783,7 +815,7 @@ export default function App() {
       {currentView === 'order-success' && <OrderSuccess order={orderCompleteData} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
 
       {/* ADMIN PORTAL VIEW (GOOGLE SIGN-IN, WHITELISTED EMAILS ONLY) */}
-      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} canApproveProduct={canApproveProduct} handleApproveProduct={handleApproveProduct} pendingCount={pendingCount} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} storeSettings={storeSettings} isCloud={isCloud} migrating={migrating} handleMigrateProducts={handleMigrateProducts} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} clearProductForm={() => { setEditingProductId(null); setNewProductForm(EMPTY_PRODUCT_FORM); }} />}
+      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} canApproveProduct={canApproveProduct} handleApproveProduct={handleApproveProduct} pendingCount={pendingCount} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} storeSettings={storeSettings} isCloud={isCloud} migrating={migrating} handleMigrateProducts={handleMigrateProducts} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} handleDeleteRequest={handleDeleteRequest} clearProductForm={() => { setEditingProductId(null); setNewProductForm(EMPTY_PRODUCT_FORM); }} />}
 
       {/* FOOTER */}
       <Footer isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} />

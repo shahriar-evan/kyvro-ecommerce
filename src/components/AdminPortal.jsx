@@ -8,7 +8,7 @@ import OrdersPanel from './OrdersPanel';
 import StoreSettings from './StoreSettings';
 import { SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
 
-export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct, clearProductForm }) {
+export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct, clearProductForm, handleDeleteRequest }) {
   const isOwner = adminRole === 'owner';
   const canManageTeam = adminRole === 'owner' || adminRole === 'manager';
   const formColors = ((newProductForm && newProductForm.colors) || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -98,6 +98,11 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                 </div>
               )}
 
+              {adminTab === 'products' && adminRole === 'owner' && products.some((p) => p.deleteRequested) && (
+                <div className="mb-4 p-4 rounded-lg border border-red-500/40 bg-red-500/10 text-xs text-red-600 dark:text-red-400 font-semibold">
+                  {products.filter((p) => p.deleteRequested).length} delete request(s) waiting for your decision. Use Delete or Keep on the highlighted rows below.
+                </div>
+              )}
               {adminTab === 'products' && (
                 <div className={`rounded-lg border overflow-x-auto ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
                   <table className="w-full text-left text-xs">
@@ -112,12 +117,13 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                     </thead>
                     <tbody className="divide-y">
                       {products.map(p => (
-                        <tr key={p.id} className="hover:bg-gray-100 dark:hover:bg-[#1a1a1a]">
+                        <tr key={p.id} className={`hover:bg-gray-100 dark:hover:bg-[#1a1a1a] ${p.deleteRequested ? 'bg-red-500/10' : ''}`}>
                           <td className="p-4 flex items-center gap-3">
                             <img src={p.image} alt={p.name} className="w-10 h-10 object-cover rounded" />
                             <div>
                               <span className="font-semibold">{p.name}</span>
                               {p.status === 'pending' && <span className="ml-2 bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 text-[10px] font-bold px-2 py-0.5 rounded">PENDING APPROVAL</span>}
+                              {p.deleteRequested && <span className="ml-2 bg-red-500/20 text-red-600 dark:text-red-400 text-[10px] font-bold px-2 py-0.5 rounded">DELETE REQUESTED{(p.deleteRequestedByName || p.deleteRequestedBy) ? ` BY ${String(p.deleteRequestedByName || p.deleteRequestedBy).toUpperCase()}` : ''}</span>}
                               {(p.addedByName || p.addedBy) && <p className="text-[10px] text-gray-500 font-normal mt-0.5">Added by {p.addedByName || p.addedBy}</p>}
                             </div>
                           </td>
@@ -139,7 +145,14 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                           <td className="p-4 text-right space-x-2">
                             {canApproveProduct(p) && <button onClick={() => handleApproveProduct(p)} className="px-3 py-1.5 rounded text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition">Approve</button>}
                             <button onClick={() => startEditProduct(p)} className="px-3 py-1.5 rounded text-xs font-semibold border bg-white text-gray-900 border-gray-400 hover:bg-gray-100 dark:bg-gray-700 dark:text-white dark:border-gray-500 dark:hover:bg-gray-600 transition">Edit</button>
-                            {canDeleteProduct(p) && <button onClick={() => deleteProduct(p.id)} className="px-3 py-1.5 rounded text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition">{p.status === 'pending' ? 'Reject' : 'Delete'}</button>}
+                            {p.deleteRequested && adminRole === 'owner' && (
+                              <>
+                                <button onClick={() => handleDeleteRequest(p, false)} className="px-3 py-1.5 rounded text-xs font-semibold border border-gray-400 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#222] transition">Keep product</button>
+                                <button onClick={() => handleDeleteRequest(p, true)} className="px-3 py-1.5 rounded text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition">Confirm delete</button>
+                              </>
+                            )}
+                            {p.deleteRequested && adminRole !== 'owner' && <span className="text-[10px] font-bold text-red-500">Waiting for Owner</span>}
+                            {!p.deleteRequested && canDeleteProduct(p) && <button onClick={() => deleteProduct(p.id)} className="px-3 py-1.5 rounded text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition">{p.status === 'pending' ? 'Reject' : (adminRole === 'owner' ? 'Delete' : 'Request delete')}</button>}
                           </td>
                         </tr>
                       ))}
