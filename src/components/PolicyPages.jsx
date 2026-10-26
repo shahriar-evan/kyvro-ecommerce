@@ -157,8 +157,8 @@ const PAGES = {
           'Once you receive and take the product, it cannot be returned or refunded, whether it is used or not.',
         ] },
         { h: '2. Online payment', li: [
-          'If you paid online and the product could not be delivered to you (you did not receive it), we will refund your money within 2 weeks.',
-          'If you paid the full amount online and you do not like the product when it arrives, you can check it in front of the delivery person and return it to the delivery person then. We will refund the amount you paid after deducting the delivery charge: BDT 100 for Inside Dhaka or BDT 150 for Outside Dhaka. The refund is made within 2 weeks.',
+          'If you paid online and the product could not be delivered to you (you did not receive it), we will refund your money within 2 weeks (14 days).',
+          'If you paid the full amount online and you do not like the product when it arrives, you can check it in front of the delivery person and return it to the delivery person then. We will refund the amount you paid after deducting the delivery charge: BDT 100 for Inside Dhaka or BDT 150 for Outside Dhaka. The refund is made within 2 weeks (14 days).',
           'Refunds are sent to the same bKash, Nagad or other account you paid from.',
         ] },
         { h: '3. When we cannot refund', li: [
@@ -180,8 +180,8 @@ const PAGES = {
           'পণ্য একবার হাতে নিয়ে গ্রহণ করে নিলে, ব্যবহার করুন বা না করুন, আর ফেরত বা রিফান্ড হবে না।',
         ] },
         { h: '২. অনলাইন পেমেন্ট', li: [
-          'অনলাইনে টাকা দেওয়ার পর পণ্য যদি আপনার কাছে পৌঁছাতে না পারে (আপনি না পান), তাহলে ২ সপ্তাহের মধ্যে আপনার টাকা ফেরত দেওয়া হবে।',
-          'অনলাইনে পুরো টাকা দেওয়ার পর পণ্য আসার সময় পছন্দ না হলে ডেলিভারি ম্যানের সামনে দেখে তখনই তাকে ফেরত দিতে পারবেন। তখন আপনার দেওয়া টাকা থেকে ডেলিভারি চার্জ কেটে বাকি টাকা ফেরত দেওয়া হবে: ঢাকার ভেতরে ১০০ টাকা বা ঢাকার বাইরে ১৫০ টাকা। ফেরত ২ সপ্তাহের মধ্যে দেওয়া হবে।',
+          'অনলাইনে টাকা দেওয়ার পর পণ্য যদি আপনার কাছে পৌঁছাতে না পারে (আপনি না পান), তাহলে ২ সপ্তাহের (১৪ দিনের) মধ্যে আপনার টাকা ফেরত দেওয়া হবে।',
+          'অনলাইনে পুরো টাকা দেওয়ার পর পণ্য আসার সময় পছন্দ না হলে ডেলিভারি ম্যানের সামনে দেখে তখনই তাকে ফেরত দিতে পারবেন। তখন আপনার দেওয়া টাকা থেকে ডেলিভারি চার্জ কেটে বাকি টাকা ফেরত দেওয়া হবে: ঢাকার ভেতরে ১০০ টাকা বা ঢাকার বাইরে ১৫০ টাকা। ফেরত ২ সপ্তাহের (১৪ দিনের) মধ্যে দেওয়া হবে।',
           'যে bKash, Nagad বা অন্য অ্যাকাউন্ট থেকে টাকা দিয়েছেন, রিফান্ড সেখানেই যাবে।',
         ] },
         { h: '৩. যখন রিফান্ড দেওয়া যাবে না', li: [
