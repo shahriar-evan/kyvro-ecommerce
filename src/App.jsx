@@ -13,6 +13,7 @@ import { CURRENCIES } from './data/currencies';
 import { defaultCategoryFor, matchesCollectionPage, hasSizeStock, stockForSize, orderedSizes, hasColorStock, stockFor, variantKey, needsChoice, imageFor } from './data/catalog';
 import QuickAdd from './components/QuickAdd';
 import heroBannerImg from './assets/hero-banner.png';
+import coverPhoto1Img from './assets/cover_photo1.png';
 import men_womenImg from './assets/men_women.png';
 import women_bannerImg from './assets/women_banner.png';
 import styleImg from './assets/style.png';
@@ -101,15 +102,29 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  const banners = [men_womenImg, women_bannerImg, styleImg, punjabi_shirtImg, shirtImg, punjabiImg, sneakersImg];
+  const banners = [coverPhoto1Img, men_womenImg, women_bannerImg, styleImg, punjabi_shirtImg, shirtImg, punjabiImg, sneakersImg];
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
 
+  // Every slide stays exactly 5 seconds. The timer restarts after each change (also after a click on a dot)
+  // and only runs while the home page is open, so the first photo is never cut short.
+  const BANNER_SECONDS = 5;
   useEffect(() => {
-    const timer = setInterval(() => {
+    if (currentView !== 'home') return undefined;
+    const timer = setTimeout(() => {
       setCurrentBannerIndex((prevIndex) => (prevIndex + 1) % banners.length);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [banners.length]);
+    }, BANNER_SECONDS * 1000);
+    return () => clearTimeout(timer);
+  }, [currentBannerIndex, currentView, banners.length]);
+
+  // Coming back to the home page always starts with the first (cover) photo
+  useEffect(() => {
+    if (currentView === 'home') setCurrentBannerIndex(0);
+  }, [currentView]);
+
+  // Load all banner photos in the background so a slide never appears late
+  useEffect(() => {
+    banners.forEach((src) => { const im = new Image(); im.src = src; });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Admin & Firebase Auth States
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);

@@ -23,7 +23,7 @@ export const SUB_CATEGORIES = {
   Women: [
     { name: 'Sharee' },
     { name: 'Bags' },
-    { name: 'Watches' },
+    { name: 'Beauty Products' },
     { group: 'Western Wear', items: ['Night Dress', 'Tops', 'T-Shirt'] },
     { group: 'Muslim Wear', items: ['Borkha', 'Hijab'] },
   ],
