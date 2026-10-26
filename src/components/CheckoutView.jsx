@@ -214,6 +214,13 @@ export default function CheckoutView({
 
             {checkoutError && <p className="text-xs p-3 rounded border border-red-500/40 text-red-500 bg-red-500/10">{checkoutError}</p>}
 
+            <p className="text-[11px] text-gray-500 text-center">
+              By placing your order you agree to our{' '}
+              <button type="button" onClick={() => setCurrentView('terms')} className="underline hover:text-[#D4AF37]">Terms</button>,{' '}
+              <button type="button" onClick={() => setCurrentView('privacy')} className="underline hover:text-[#D4AF37]">Privacy Policy</button> and{' '}
+              <button type="button" onClick={() => setCurrentView('refund')} className="underline hover:text-[#D4AF37]">Return &amp; Refund Policy</button>.
+              <span className="block mt-0.5">অর্ডার করার মাধ্যমে আপনি আমাদের শর্তাবলি, গোপনীয়তা নীতি ও রিটার্ন-রিফান্ড নীতি মেনে নিচ্ছেন।</span>
+            </p>
             <button type="submit" disabled={placingOrder} className="w-full bg-[#D4AF37] text-black font-bold py-4 rounded text-sm tracking-widest uppercase hover:opacity-90 transition disabled:opacity-50">
               {placingOrder ? 'Placing order...' : 'Place Order'}
             </button>
