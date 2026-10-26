@@ -1,36 +1,99 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { hasSizeStock, totalStock } from '../data/catalog';
 import StockLabel from './StockLabel';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
 import { User, Shield, Truck, RefreshCw, ChevronRight, MessageCircle, Heart } from 'lucide-react';
 import heroBannerImg from '../assets/hero-banner.png';
+import heroBanner1Img from '../assets/hero-banner1.png';
+import heroBanner2Img from '../assets/hero-banner2.png';
 import shirtImg from '../assets/shirts.png';
 import sneakersImg from '../assets/Snekers.png';
 
+// Photos of the big top (hero) section. Each one stays 5 seconds, then the next fades in.
+// To add a photo: put it in src/assets, import it above and add it to this list.
+const HERO_IMAGES = [heroBannerImg, heroBanner1Img, heroBanner2Img];
+const HERO_SECONDS = 5;
+
+// Swipe / drag sideways on a photo to change it (finger on a phone, mouse drag on a computer).
+// A normal click is not a swipe, so buttons on top of the photo keep working.
+function useSwipe(onNext, onPrev) {
+  const start = React.useRef(null);
+  return {
+    onPointerDown: (e) => { start.current = { x: e.clientX, y: e.clientY }; },
+    onPointerUp: (e) => {
+      const s0 = start.current;
+      start.current = null;
+      if (!s0) return;
+      const dx = e.clientX - s0.x;
+      const dy = e.clientY - s0.y;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) (dx < 0 ? onNext : onPrev)();
+    },
+    onPointerCancel: () => { start.current = null; },
+    onDragStart: (e) => e.preventDefault(),
+    style: { touchAction: 'pan-y' },
+  };
+}
+
 export default function HomeView({ requestAdd, addToCart, banners, calculateDiscountPercent, currentBannerIndex, formatPrice, isDarkMode, products, setCurrentBannerIndex, setCurrentView, setSelectedCategory, setSelectedProduct, savedIds = [], toggleSaved = () => {} }) {
+  const [heroIdx, setHeroIdx] = useState(0);
+  const heroSwipe = useSwipe(
+    () => setHeroIdx((i) => (i + 1) % HERO_IMAGES.length),
+    () => setHeroIdx((i) => (i - 1 + HERO_IMAGES.length) % HERO_IMAGES.length)
+  );
+  const bannerSwipe = useSwipe(
+    () => setCurrentBannerIndex((currentBannerIndex + 1) % banners.length),
+    () => setCurrentBannerIndex((currentBannerIndex - 1 + banners.length) % banners.length)
+  );
+  useEffect(() => {
+    if (HERO_IMAGES.length < 2) return undefined;
+    const t = setTimeout(() => setHeroIdx((i) => (i + 1) % HERO_IMAGES.length), HERO_SECONDS * 1000);
+    return () => clearTimeout(t);
+  }, [heroIdx]);
+  useEffect(() => { HERO_IMAGES.forEach((src) => { const im = new Image(); im.src = src; }); }, []);
+
   return (
     <>
         <div className="flex-1">
-          <section className="relative h-[70vh] sm:h-[80vh] flex flex-col justify-between items-center text-center bg-cover bg-center py-6 px-4" style={{ backgroundImage: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(${heroBannerImg})` }}>
-            <div className="w-full flex justify-center pt-2">
-              <span className={`text-[10px] sm:text-xs uppercase tracking-[0.3em] sm:tracking-[0.4em] font-semibold px-4 sm:px-6 py-2 rounded-full border shadow-xl ${isDarkMode ? 'bg-black/70 text-[#D4AF37] border-[#D4AF37]/50' : 'bg-white/90 text-black border-black/20'}`}>
+          <section {...heroSwipe} style={heroSwipe.style} className="relative w-full overflow-hidden select-none">
+            {/* Every slide sits in the same box (same height), and no photo is cropped. A photo that is wider than the
+                box is shown whole, and the free space above and below is filled with a blurred copy of the same photo. */}
+            <div className="relative w-full" style={{ aspectRatio: '1720 / 914' }}>
+              {HERO_IMAGES.map((src, i) => (
+                <div
+                  key={i}
+                  className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${i === heroIdx ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                >
+                  <img src={src} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110" />
+                  <img src={src} alt={`Kyvro hero ${i + 1}`} draggable={false} className="absolute inset-0 w-full h-full object-contain" />
+                </div>
+              ))}
+            </div>
+            <div className="absolute inset-x-0 top-2 sm:top-4 z-10 flex justify-center px-4">
+              <span className={`text-[8px] sm:text-xs uppercase tracking-[0.25em] sm:tracking-[0.4em] font-semibold px-3 sm:px-6 py-1 sm:py-2 rounded-full border shadow-xl ${isDarkMode ? 'bg-black/70 text-[#D4AF37] border-[#D4AF37]/50' : 'bg-white/90 text-black border-black/20'}`}>
                 KYVRO &bull; কাইভ্রো LUXURY COLLECTION
               </span>
             </div>
-            <div></div>
-            <div className="w-full flex justify-center pb-12 sm:pb-20">
-              <button 
+            <div className="absolute inset-x-0 bottom-3 sm:bottom-8 z-10 flex justify-center">
+              <button
                 onClick={() => setCurrentView('shop')}
-                className="bg-[#D4AF37] text-black font-bold px-6 sm:px-8 py-3.5 sm:py-4 rounded text-xs tracking-[0.2em] uppercase hover:bg-white transition shadow-2xl transform hover:scale-105"
+                className="bg-[#D4AF37] text-black font-bold px-4 sm:px-8 py-2 sm:py-3.5 rounded text-[10px] sm:text-xs tracking-[0.2em] uppercase hover:bg-white transition shadow-2xl transform hover:scale-105"
               >
                 Explore Collection
               </button>
             </div>
+            {HERO_IMAGES.length > 1 && (
+              <div className="absolute bottom-3 sm:bottom-5 right-4 sm:right-6 z-10 flex gap-2">
+                {HERO_IMAGES.map((_, i) => (
+                  <button key={i} type="button" aria-label={`Photo ${i + 1}`} onClick={() => setHeroIdx(i)}
+                    className={`h-2.5 rounded-full transition-all ${i === heroIdx ? 'bg-[#D4AF37] w-6' : 'bg-white/60 w-2.5'}`} />
+                ))}
+              </div>
+            )}
           </section>
 
           {/* AUTOMATIC BANNERS SLIDER */}
           <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16 pb-4">
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-800">
+            <div {...bannerSwipe} style={bannerSwipe.style} className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-800 select-none">
               {banners.map((img, idx) => (
                 <div 
                   key={idx}
