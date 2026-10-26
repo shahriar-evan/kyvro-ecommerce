@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { OWNER_EMAILS, ownerName } from '../adminEmails';
-import { listAdmins, listPrivateDetails, createAdminAccount, updateAdminProfile, setAdminRole, setAdminActive, removeAdmin, sendAdminPasswordReset, ROLES, ROLE_LABELS } from '../adminAuth';
+import { listAdmins, listPrivateDetails, createAdminAccount, updateAdminProfile, changeAdminEmail, setAdminRole, setAdminActive, removeAdmin, sendAdminPasswordReset, ROLES, ROLE_LABELS } from '../adminAuth';
 
 const randomPassword = () => {
   const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -115,6 +115,7 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
   const [showPw, setShowPw] = useState({});      // email -> true when the password is revealed
   const [editing, setEditing] = useState(null);  // email of the member being edited
   const [draft, setDraft] = useState({ name: '', phone: '', note: '' });
+  const [emailDraft, setEmailDraft] = useState({ email: '', password: '' });
 
   const me = (currentEmail || '').toLowerCase();
   const inputClass = `w-full border p-3 text-xs rounded focus:outline-none focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`;
@@ -177,6 +178,24 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
     const pv = privateInfo[a.email] || {};
     setEditing(a.email);
     setDraft({ name: a.name || '', phone: pv.phone || '', note: pv.note || '' });
+    setEmailDraft({ email: '', password: '' });
+  };
+
+  const saveEmail = async (a) => {
+    const to = emailDraft.email.trim();
+    if (!to) { setMessage({ type: 'err', text: 'Type the new email first.' }); return; }
+    if (!confirm(`Change the login email of ${a.name || a.email}?\n\nOld: ${a.email}\nNew: ${to}\n\nA new login account is created for the new email with the password you typed. The old email will stop working for the Admin Portal. Their role and details move to the new email.`)) return;
+    setMessage(null);
+    try {
+      const { accountCreated } = await changeAdminEmail(a.email, to, emailDraft.password);
+      setMessage({ type: 'ok', text: accountCreated
+        ? `Email changed to ${to.toLowerCase()}. Give them the new email and password so they can log in.`
+        : `Email changed to ${to.toLowerCase()}. That email already had a login account, so their existing password still works (it was not changed or saved).` });
+      setEditing(null);
+      await load();
+    } catch (err) {
+      setMessage({ type: 'err', text: err.message && !err.code ? err.message : friendlyError(err) });
+    }
   };
 
   const saveEdit = async () => {
@@ -492,6 +511,15 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
                         <label className="block text-[11px] text-gray-500 mb-1">Note / position</label>
                         <input type="text" maxLength={120} value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} className={smallInput} />
                       </div>
+                    </div>
+                    <div className={`rounded border p-3 space-y-2 ${isDarkMode ? 'border-gray-700' : 'border-gray-300 bg-white'}`}>
+                      <p className="text-[11px] font-bold uppercase tracking-wider">Change login email</p>
+                      <p className="text-[11px] text-gray-500">Current: {a.email}. A new login is created for the new email, so also set a new password for it. The role, name, phone and note move over. The old email stops working.</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <input type="email" value={emailDraft.email} onChange={(e) => setEmailDraft({ ...emailDraft, email: e.target.value })} placeholder="New email" className={smallInput} />
+                        <input type="text" value={emailDraft.password} onChange={(e) => setEmailDraft({ ...emailDraft, password: e.target.value })} placeholder="New password (min 6 characters)" className={smallInput} />
+                      </div>
+                      <button type="button" onClick={() => saveEmail(a)} className={chipBtn}>Change email</button>
                     </div>
                     <div className="flex gap-2">
                       <button onClick={saveEdit} className="bg-[#D4AF37] text-black font-bold px-4 py-2 rounded text-[11px] uppercase tracking-wider">Save</button>

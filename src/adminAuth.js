@@ -110,6 +110,44 @@ export async function createAdminAccount(email, password, role = "admin", profil
   return { accountCreated };
 }
 
+// Owner changes the LOGIN email of a team member. A login account cannot be renamed from the browser,
+// so a new account is created with the new email + a new password, the team entry (role, name, phone,
+// note, access) moves to the new email, and the old email is removed from the team.
+export async function changeAdminEmail(oldEmail, newEmail, newPassword) {
+  const from = norm(oldEmail);
+  const to = norm(newEmail);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) throw new Error("Please enter a valid email address.");
+  if (to === from) throw new Error("That is already the current email.");
+  if (isOwnerEmail(to)) throw new Error("That email belongs to the fixed Owner.");
+  const oldSnap = await getDoc(doc(db, "admins", from));
+  if (!oldSnap.exists()) throw new Error("This team member no longer exists.");
+  if ((await getDoc(doc(db, "admins", to))).exists()) throw new Error("That email is already on the team.");
+  if (!newPassword || newPassword.length < 6) throw new Error("The new password needs at least 6 characters.");
+
+  let accountCreated = true;
+  const secondary = initializeApp(getApp().options, "secondary-" + Date.now());
+  try {
+    const sAuth = getAuth(secondary);
+    await createUserWithEmailAndPassword(sAuth, to, newPassword);
+    await signOut(sAuth);
+  } catch (err) {
+    if (err.code === "auth/email-already-in-use") accountCreated = false;
+    else throw err;
+  } finally {
+    await deleteApp(secondary);
+  }
+  const old = oldSnap.data();
+  await setDoc(doc(db, "admins", to), { ...old, email: to });
+  let priv = {};
+  try { const p = await getDoc(doc(db, "adminPrivate", from)); if (p.exists()) priv = p.data(); } catch (err) { /* nothing stored */ }
+  delete priv.password;
+  if (accountCreated) priv.password = newPassword;
+  try { await setDoc(doc(db, "adminPrivate", to), priv); } catch (err) { console.warn("Could not save private details:", err); }
+  await deleteDoc(doc(db, "admins", from));
+  try { await deleteDoc(doc(db, "adminPrivate", from)); } catch (err) { /* nothing stored */ }
+  return { accountCreated };
+}
+
 // Owner edits name (public to the team) and phone / note (owner-only)
 export async function updateAdminProfile(email, { name, phone, note }) {
   const e = norm(email);
