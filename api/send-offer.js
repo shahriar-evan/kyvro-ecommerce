@@ -103,10 +103,20 @@ export default async function handler(req, res) {
         headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(chunk),
       });
-      if (r.ok) sent += chunk.length;
-      else {
-        failed += chunk.length;
-        try { const j = await r.json(); lastError = j.message || j.error || ''; } catch (e) { /* ignore */ }
+      if (r.ok) { sent += chunk.length; continue; }
+      try { const j = await r.json(); lastError = j.message || j.error || ''; } catch (e) { /* ignore */ }
+      // One bad address makes the whole batch fail, so retry this group one by one and skip only the bad ones
+      for (const mail of chunk) {
+        const one = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(mail),
+        });
+        if (one.ok) sent += 1;
+        else {
+          failed += 1;
+          try { const j = await one.json(); lastError = j.message || j.error || lastError; } catch (e) { /* ignore */ }
+        }
       }
     }
     if (sent === 0) return res.status(502).json({ error: `The email service refused the message. ${lastError}`.trim() });
