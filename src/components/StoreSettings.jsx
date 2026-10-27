@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { saveStoreSettings } from '../storeSettings';
-import { countSubscribers, sendOfferEmail } from '../subscribers';
+import { countSubscribers, countPushDevices, sendOfferEmail } from '../subscribers';
 import { normalizeSettings, bestDiscount, nextReward, describeRule, bannerFromRules } from '../data/shopConfig';
 
 // Owner-only editor: top banner text + automatic discount rules
@@ -16,7 +16,21 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
   const [mailBusy, setMailBusy] = useState(false);
   const [mailMsg, setMailMsg] = useState('');
   const [counts, setCounts] = useState(null);
-  const loadCounts = () => countSubscribers().then(setCounts).catch(() => setCounts(null));
+  const loadCounts = () => Promise.all([countSubscribers(), countPushDevices().catch(() => 0)])
+    .then(([c, devices]) => setCounts({ ...c, devices }))
+    .catch(() => setCounts(null));
+  const resultText = (r, testOnly) => {
+    const bits = [];
+    bits.push(testOnly ? (r.sent ? 'Test email sent to you.' : 'No test email sent.') : `Email: sent to ${r.sent} customer${r.sent === 1 ? '' : 's'}${r.failed ? ` (${r.failed} failed)` : ''}.`);
+    if (r.pushError && !r.pushSent) bits.push(`Notification: not sent (${r.pushError})`);
+    else bits.push(`Notification: sent to ${r.pushSent || 0} device${r.pushSent === 1 ? '' : 's'}${r.pushFailed ? ` (${r.pushFailed} failed)` : ''}.`);
+    return bits.join(' ');
+  };
+  const confirmText = () => {
+    const n = counts ? counts.active : 0;
+    const d = counts ? counts.devices : 0;
+    return `This sends an EMAIL to ${n} customer${n === 1 ? '' : 's'} and a pop-up NOTIFICATION to ${d} device${d === 1 ? '' : 's'}.`;
+  };
   useEffect(() => { loadCounts(); }, []);
 
   // Pick up changes saved from another device
@@ -46,14 +60,12 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
   const sendMail = async (testOnly) => {
     setMailMsg('');
     if (mailSubject.trim().length < 3 || mailBody.trim().length < 10) { setMailMsg('Error: write a subject and a message first.'); return; }
-    if (!testOnly) {
-      const n = counts ? counts.active : 0;
-      if (!window.confirm(`Send this email to ${n} subscribed customer${n === 1 ? '' : 's'} now? It cannot be undone.`)) return;
-    }
+    if (!testOnly && !window.confirm(`${confirmText()}\n\nSend now? It cannot be undone.`)) return;
     setMailBusy(true);
     try {
-      const r = await sendOfferEmail({ subject: mailSubject.trim(), message: mailBody.trim(), testOnly });
-      setMailMsg(testOnly ? 'Test email sent to your own address.' : `Sent to ${r.sent} customer${r.sent === 1 ? '' : 's'}${r.failed ? ` (${r.failed} failed)` : ''}.`);
+      const r = await sendOfferEmail({ subject: mailSubject.trim(), message: mailBody.trim(), testOnly, pushTitle: mailSubject.trim(), pushBody: mailBody.trim() });
+      setMailMsg(resultText(r, testOnly));
+      loadCounts();
     } catch (e) { setMailMsg('Error: ' + e.message); }
     setMailBusy(false);
   };
@@ -63,12 +75,12 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
     setMailMsg('');
     const t = (text || '').trim();
     if (t.length < 10) { setMailMsg('Error: the banner text is too short to send.'); return; }
-    const n = counts ? counts.active : 0;
-    if (!window.confirm(`Send this banner as an email to ${n} subscribed customer${n === 1 ? '' : 's'}?\n\n"${t}"\n\nIt cannot be undone.`)) return;
+    if (!window.confirm(`${confirmText()}\n\n"${t}"\n\nSend now? It cannot be undone.`)) return;
     setMailBusy(true);
     try {
-      const r = await sendOfferEmail({ subject: 'Kyvro: ' + t.slice(0, 90), message: `${t}\n\nVisit kyvro.store to see what is new.`, testOnly: false });
-      setMailMsg(`Sent to ${r.sent} customer${r.sent === 1 ? '' : 's'}${r.failed ? ` (${r.failed} failed)` : ''}.`);
+      const r = await sendOfferEmail({ subject: 'Kyvro: ' + t.slice(0, 90), message: `${t}\n\nVisit kyvro.store to see what is new.`, testOnly: false, pushTitle: 'Kyvro', pushBody: t });
+      setMailMsg(resultText(r, false));
+      loadCounts();
     } catch (e) { setMailMsg('Error: ' + e.message); }
     setMailBusy(false);
   };
@@ -99,7 +111,7 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
         <div className="flex flex-wrap items-center gap-3 mt-2">
           <button type="button" onClick={() => setText(bannerFromRules(draft))} className="text-xs underline text-[#D4AF37]">Write it from my discount rules</button>
           <span className="text-[11px] text-gray-500">{text.length}/200</span>
-          <button type="button" onClick={sendBannerMail} disabled={mailBusy} className="ml-auto border border-[#D4AF37] text-[#D4AF37] font-bold px-4 py-2 rounded text-xs uppercase tracking-widest hover:bg-[#D4AF37]/10 disabled:opacity-50">{mailBusy ? 'Sending...' : 'Send this banner as email'}</button>
+          <button type="button" onClick={sendBannerMail} disabled={mailBusy} className="ml-auto border border-[#D4AF37] text-[#D4AF37] font-bold px-4 py-2 rounded text-xs uppercase tracking-widest hover:bg-[#D4AF37]/10 disabled:opacity-50">{mailBusy ? 'Sending...' : 'Send this banner (email + notification)'}</button>
         </div>
         {mailMsg && <p className={`text-xs mt-2 ${mailMsg.startsWith('Error') ? 'text-red-500' : 'text-green-500'}`}>{mailMsg}</p>}
       </div>
@@ -166,10 +178,10 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
     </div>
     <div className="min-w-0">
         <div className={`${card} lg:sticky lg:top-4`}>
-          <h3 className="font-bold text-sm mb-1">Send offer email</h3>
+          <h3 className="font-bold text-sm mb-1">Send offer (email + notification)</h3>
           <p className="text-xs text-gray-500 mb-3">
-            Customers who signed in with Google are on the list unless they switched it off. Nothing is sent until you press the button.
-            {counts && <> Subscribed now: <strong className="text-[#D4AF37]">{counts.active}</strong> of {counts.total}.</>}
+            One press sends the email AND a pop-up notification to the phones / computers that allowed notifications. Nothing is sent until you press a button.
+            {counts && <> Email list: <strong className="text-[#D4AF37]">{counts.active}</strong> of {counts.total}. Notification devices: <strong className="text-[#D4AF37]">{counts.devices}</strong>.</>}
           </p>
           <div className="space-y-3">
             <input value={mailSubject} onChange={(e) => setMailSubject(e.target.value)} maxLength={150} placeholder="Email subject" className={input} />

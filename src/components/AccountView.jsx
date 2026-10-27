@@ -4,6 +4,7 @@ import { formatDateTime, toDate } from '../utils/dates';
 import { CANCEL_WINDOW_MINUTES } from '../orders';
 import { imageFileToDataURL } from '../utils/imageUpload';
 import { watchMySubscription, setMySubscription } from '../subscribers';
+import { pushSupported, pushPermission, enablePush, disablePush, myPushOn } from '../push';
 
 const STATUS_STYLE = {
   Pending: 'bg-yellow-500/15 text-yellow-600',
@@ -35,6 +36,22 @@ export default function AccountView({
     if (!customerUser || !customerUser.email) return undefined;
     return watchMySubscription(customerUser.email, setSub);
   }, [customerUser]);
+  const [push, setPush] = useState({ supported: false, on: false, blocked: false });
+  const [pushBusy, setPushBusy] = useState(false);
+  const loadPush = async () => {
+    const supported = await pushSupported();
+    setPush({ supported, on: supported ? await myPushOn() : false, blocked: supported && pushPermission() === 'denied' });
+  };
+  useEffect(() => { if (customerUser) loadPush(); }, [customerUser]);
+  const togglePush = async () => {
+    setPushBusy(true);
+    try {
+      if (push.on) await disablePush();
+      else await enablePush(customerUser);
+    } catch (e) { console.error(e); setMsg('Error: could not change the notification setting.'); }
+    await loadPush();
+    setPushBusy(false);
+  };
   const toggleOffers = async () => {
     setSubBusy(true);
     try { await setMySubscription(customerUser, !sub.on); } catch (e) { console.error(e); setMsg('Error: could not change the offer-email setting.'); }
@@ -245,6 +262,19 @@ export default function AccountView({
               <span className="sr-only">{sub.on ? 'On' : 'Off'}</span>
             </button>
           </div>
+          {push.supported && (
+            <div className="flex items-start justify-between gap-4 border-t border-gray-500/20 pt-4">
+              <div>
+                <p className="text-xs font-semibold">Notifications on this device</p>
+                <p className="text-xs text-gray-500 mt-1">{push.blocked ? 'Notifications are blocked in your browser settings. Allow them for kyvro.store there, then come back.' : 'A pop-up alert when Kyvro has a new offer.'}</p>
+              </div>
+              <button type="button" onClick={togglePush} disabled={pushBusy || push.blocked} aria-pressed={push.on}
+                className={`shrink-0 w-14 h-7 rounded-full relative transition-colors disabled:opacity-50 ${push.on ? 'bg-[#D4AF37]' : 'bg-gray-500/40'}`}>
+                <span className={`absolute top-0.5 w-6 h-6 rounded-full bg-white transition-all ${push.on ? 'left-7' : 'left-0.5'}`} />
+                <span className="sr-only">{push.on ? 'On' : 'Off'}</span>
+              </button>
+            </div>
+          )}
           <div className="flex items-center gap-4">
             <button onClick={save} disabled={busy} className="bg-[#D4AF37] text-black font-bold px-8 py-3 rounded text-xs uppercase tracking-widest hover:opacity-90 disabled:opacity-50">{busy ? 'Saving...' : 'Save changes'}</button>
             {msg && <span className={`text-xs ${msg.startsWith('Error') ? 'text-red-500' : 'text-green-500'}`}>{msg}</span>}

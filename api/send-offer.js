@@ -1,10 +1,15 @@
-// Vercel serverless function: sends the offer email to every subscribed customer (Owner only).
+// Vercel serverless function: sends the offer EMAIL and the phone/browser NOTIFICATION to every subscribed customer (Owner only).
 //
 // Environment variables (Vercel -> Project -> Settings -> Environment Variables):
-//   RESEND_API_KEY      API key from resend.com
-//   MAIL_FROM           e.g.  Kyvro <offers@kyvro.store>   (the domain must be verified in Resend)
-//   FIREBASE_PROJECT_ID optional, default kyvro-admin-auth
-//   SITE_URL            optional, default https://kyvro.store
+//   RESEND_API_KEY            API key from resend.com
+//   MAIL_FROM                 e.g.  Kyvro <offers@kyvro.store>   (the domain must be verified in Resend)
+//   FIREBASE_SERVICE_ACCOUNT  the whole JSON of a Firebase service account key (for the notifications)
+//   FIREBASE_PROJECT_ID       optional, default kyvro-admin-auth
+//   SITE_URL                  optional, default https://kyvro.store
+
+import crypto from 'node:crypto';
+
+export const config = { maxDuration: 30 };
 
 const PROJECT = process.env.FIREBASE_PROJECT_ID || 'kyvro-admin-auth';
 const SITE = (process.env.SITE_URL || 'https://kyvro.store').replace(/\/$/, '');
@@ -35,6 +40,98 @@ async function listSubscribers(idToken) {
     pageToken = j.nextPageToken || '';
   } while (pageToken);
   return out;
+}
+
+// ---------- Phone / browser notifications (Firebase Cloud Messaging) ----------
+async function listPushTokens(idToken) {
+  const out = [];
+  let pageToken = '';
+  do {
+    const url = `${FS}/pushTokens?pageSize=300${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${idToken}` } });
+    if (!r.ok) throw new Error('Could not read the notification list.');
+    const j = await r.json();
+    for (const d of j.documents || []) {
+      const f = d.fields || {};
+      const token = f.token && f.token.stringValue;
+      if (token) out.push({ token, email: ((f.email && f.email.stringValue) || '').toLowerCase() });
+    }
+    pageToken = j.nextPageToken || '';
+  } while (pageToken);
+  return out;
+}
+
+function readServiceAccount() {
+  let raw = process.env.FIREBASE_SERVICE_ACCOUNT || '';
+  if (!raw) return null;
+  raw = raw.trim();
+  if (raw[0] !== '{') raw = Buffer.from(raw, 'base64').toString('utf8');
+  const sa = JSON.parse(raw);
+  if (sa.private_key) sa.private_key = sa.private_key.replace(/\\n/g, '\n');
+  return sa;
+}
+
+async function fcmAccessToken(sa) {
+  const now = Math.floor(Date.now() / 1000);
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const unsigned = `${b64({ alg: 'RS256', typ: 'JWT' })}.${b64({
+    iss: sa.client_email,
+    scope: 'https://www.googleapis.com/auth/firebase.messaging',
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600,
+  })}`;
+  const sig = crypto.createSign('RSA-SHA256').update(unsigned).sign(sa.private_key).toString('base64url');
+  const r = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${unsigned}.${sig}` }),
+  });
+  const j = await r.json();
+  if (!r.ok || !j.access_token) throw new Error(j.error_description || j.error || 'Could not log in to Firebase.');
+  return j.access_token;
+}
+
+// Returns { pushSent, pushFailed, pushTotal } or { pushError }
+async function sendPush(idToken, { title, text, onlyEmail }) {
+  let sa;
+  try { sa = readServiceAccount(); } catch (e) { return { pushError: 'FIREBASE_SERVICE_ACCOUNT is not valid JSON.' }; }
+  if (!sa || !sa.client_email || !sa.private_key) return { pushError: 'Notifications are not set up yet (add FIREBASE_SERVICE_ACCOUNT in Vercel).' };
+  try {
+    let tokens = await listPushTokens(idToken);
+    if (onlyEmail) tokens = tokens.filter((t) => t.email === onlyEmail);
+    if (!tokens.length) return { pushSent: 0, pushFailed: 0, pushTotal: 0 };
+    const access = await fcmAccessToken(sa);
+    const project = sa.project_id || PROJECT;
+    let pushSent = 0;
+    let pushFailed = 0;
+    let lastError = '';
+    for (let i = 0; i < tokens.length; i += 20) {
+      await Promise.all(tokens.slice(i, i + 20).map(async (t) => {
+        const r = await fetch(`https://fcm.googleapis.com/v1/projects/${project}/messages:send`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: {
+            token: t.token,
+            data: { title, body: text, link: SITE, icon: `${SITE}/kyvro-icon.png` },
+            webpush: { headers: { Urgency: 'high', TTL: '86400' } },
+          } }),
+        });
+        if (r.ok) { pushSent += 1; return; }
+        pushFailed += 1;
+        let j = {};
+        try { j = await r.json(); } catch (e) { /* ignore */ }
+        lastError = (j.error && j.error.message) || lastError;
+        // The device is gone (app removed / permission withdrawn): remove it from the list
+        if (r.status === 404 || (j.error && j.error.status === 'NOT_FOUND')) {
+          await fetch(`${FS}/pushTokens/${encodeURIComponent(t.token)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${idToken}` } }).catch(() => {});
+        }
+      }));
+    }
+    return { pushSent, pushFailed, pushTotal: tokens.length, ...(pushSent === 0 && lastError ? { pushError: lastError } : {}) };
+  } catch (e) {
+    return { pushError: e.message || 'Notification sending failed.' };
+  }
 }
 
 const emailFromToken = (idToken) => {
@@ -91,7 +188,6 @@ export default async function handler(req, res) {
     } else {
       targets = all.filter((s) => s.email && s.token && !s.unsubscribed);
     }
-    if (!targets.length) return res.status(200).json({ sent: 0, failed: 0, total: 0 });
 
     let sent = 0;
     let failed = 0;
@@ -119,8 +215,22 @@ export default async function handler(req, res) {
         }
       }
     }
-    if (sent === 0) return res.status(502).json({ error: `The email service refused the message. ${lastError}`.trim() });
-    return res.status(200).json({ sent, failed, total: targets.length });
+    // Notification (phone / browser). Same click, same text.
+    let push = { pushSent: 0, pushFailed: 0, pushTotal: 0 };
+    if (body.push !== false) {
+      const pushTitle = String(body.pushTitle || subject).trim().slice(0, 80) || 'Kyvro';
+      const pushText = String(body.pushBody || message).trim().slice(0, 180);
+      push = await sendPush(idToken, {
+        title: body.testOnly ? `[TEST] ${pushTitle}` : pushTitle,
+        text: pushText,
+        onlyEmail: body.testOnly ? emailFromToken(idToken).toLowerCase() : '',
+      });
+    }
+
+    if (targets.length > 0 && sent === 0 && !(push.pushSent > 0)) {
+      return res.status(502).json({ error: `The email service refused the message. ${lastError}`.trim() });
+    }
+    return res.status(200).json({ sent, failed, total: targets.length, ...push });
   } catch (err) {
     return res.status(err.status || 500).json({ error: err.message || 'Something went wrong.' });
   }

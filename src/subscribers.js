@@ -62,7 +62,12 @@ export async function countSubscribers() {
 }
 
 // Asks the server (api/send-offer.js on Vercel) to send the email. The Owner's login proves who is asking.
-export async function sendOfferEmail({ subject, message, testOnly }) {
+export async function countPushDevices() {
+  const snap = await getDocs(collection(db, "pushTokens"));
+  return snap.size;
+}
+
+export async function sendOfferEmail({ subject, message, testOnly, pushTitle, pushBody }) {
   const user = auth.currentUser;
   if (!user) throw new Error("Please sign in again.");
   const idToken = await user.getIdToken();
@@ -71,7 +76,7 @@ export async function sendOfferEmail({ subject, message, testOnly }) {
     res = await fetch("/api/send-offer", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-      body: JSON.stringify({ subject, message, testOnly: !!testOnly }),
+      body: JSON.stringify({ subject, message, testOnly: !!testOnly, pushTitle, pushBody }),
     });
   } catch (e) {
     throw new Error("Could not reach the email service. This only works on the live site (Vercel), not on localhost.");
