@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { saveStoreSettings } from '../storeSettings';
+import { countSubscribers, sendOfferEmail } from '../subscribers';
 import { normalizeSettings, bestDiscount, nextReward, describeRule, bannerFromRules } from '../data/shopConfig';
 
 // Owner-only editor: top banner text + automatic discount rules
@@ -10,6 +11,13 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [testTotal, setTestTotal] = useState('4000');
+  const [mailSubject, setMailSubject] = useState('');
+  const [mailBody, setMailBody] = useState('');
+  const [mailBusy, setMailBusy] = useState(false);
+  const [mailMsg, setMailMsg] = useState('');
+  const [counts, setCounts] = useState(null);
+  const loadCounts = () => countSubscribers().then(setCounts).catch(() => setCounts(null));
+  useEffect(() => { loadCounts(); }, []);
 
   // Pick up changes saved from another device
   useEffect(() => {
@@ -30,6 +38,41 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
   const addRule = () => setRules((prev) => [...prev, { min: '', type: 'percent', value: '' }]);
   const removeRule = (i) => setRules((prev) => prev.filter((_, idx) => idx !== i));
 
+  const fillMail = () => {
+    setMailSubject('Kyvro offer: ' + (text || 'new discounts are live').slice(0, 80));
+    setMailBody(`${text || 'We have a new offer for you.'}\n\nVisit kyvro.store to see what is new.`);
+  };
+
+  const sendMail = async (testOnly) => {
+    setMailMsg('');
+    if (mailSubject.trim().length < 3 || mailBody.trim().length < 10) { setMailMsg('Error: write a subject and a message first.'); return; }
+    if (!testOnly) {
+      const n = counts ? counts.active : 0;
+      if (!window.confirm(`Send this email to ${n} subscribed customer${n === 1 ? '' : 's'} now? It cannot be undone.`)) return;
+    }
+    setMailBusy(true);
+    try {
+      const r = await sendOfferEmail({ subject: mailSubject.trim(), message: mailBody.trim(), testOnly });
+      setMailMsg(testOnly ? 'Test email sent to your own address.' : `Sent to ${r.sent} customer${r.sent === 1 ? '' : 's'}${r.failed ? ` (${r.failed} failed)` : ''}.`);
+    } catch (e) { setMailMsg('Error: ' + e.message); }
+    setMailBusy(false);
+  };
+
+  // One click: the banner text above goes out as an offer email to every subscribed customer
+  const sendBannerMail = async () => {
+    setMailMsg('');
+    const t = (text || '').trim();
+    if (t.length < 10) { setMailMsg('Error: the banner text is too short to send.'); return; }
+    const n = counts ? counts.active : 0;
+    if (!window.confirm(`Send this banner as an email to ${n} subscribed customer${n === 1 ? '' : 's'}?\n\n"${t}"\n\nIt cannot be undone.`)) return;
+    setMailBusy(true);
+    try {
+      const r = await sendOfferEmail({ subject: 'Kyvro: ' + t.slice(0, 90), message: `${t}\n\nVisit kyvro.store to see what is new.`, testOnly: false });
+      setMailMsg(`Sent to ${r.sent} customer${r.sent === 1 ? '' : 's'}${r.failed ? ` (${r.failed} failed)` : ''}.`);
+    } catch (e) { setMailMsg('Error: ' + e.message); }
+    setMailBusy(false);
+  };
+
   const save = async () => {
     setMsg('');
     const bad = rules.some((r) => !(Number(r.min) > 0) || !(Number(r.value) > 0));
@@ -47,7 +90,8 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
   };
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,48rem)_minmax(0,26rem)] gap-6 items-start">
+    <div className="space-y-6 min-w-0">
       <div className={card}>
         <h3 className="font-bold text-sm uppercase tracking-wider mb-1">Top Banner Text</h3>
         <p className="text-xs text-gray-500 mb-3">This text scrolls in the bar at the very top of the website.</p>
@@ -55,7 +99,9 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
         <div className="flex flex-wrap items-center gap-3 mt-2">
           <button type="button" onClick={() => setText(bannerFromRules(draft))} className="text-xs underline text-[#D4AF37]">Write it from my discount rules</button>
           <span className="text-[11px] text-gray-500">{text.length}/200</span>
+          <button type="button" onClick={sendBannerMail} disabled={mailBusy} className="ml-auto border border-[#D4AF37] text-[#D4AF37] font-bold px-4 py-2 rounded text-xs uppercase tracking-widest hover:bg-[#D4AF37]/10 disabled:opacity-50">{mailBusy ? 'Sending...' : 'Send this banner as email'}</button>
         </div>
+        {mailMsg && <p className={`text-xs mt-2 ${mailMsg.startsWith('Error') ? 'text-red-500' : 'text-green-500'}`}>{mailMsg}</p>}
       </div>
 
       <div className={card}>
@@ -117,6 +163,26 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
         </button>
         {msg && <p className={`text-xs ${msg.startsWith('Error') || msg.startsWith('Could not') ? 'text-red-500' : 'text-green-500'}`}>{msg}</p>}
       </div>
+    </div>
+    <div className="min-w-0">
+        <div className={`${card} lg:sticky lg:top-4`}>
+          <h3 className="font-bold text-sm mb-1">Send offer email</h3>
+          <p className="text-xs text-gray-500 mb-3">
+            Customers who signed in with Google are on the list unless they switched it off. Nothing is sent until you press the button.
+            {counts && <> Subscribed now: <strong className="text-[#D4AF37]">{counts.active}</strong> of {counts.total}.</>}
+          </p>
+          <div className="space-y-3">
+            <input value={mailSubject} onChange={(e) => setMailSubject(e.target.value)} maxLength={150} placeholder="Email subject" className={input} />
+            <textarea value={mailBody} onChange={(e) => setMailBody(e.target.value)} maxLength={4000} rows={6} placeholder="Message (e.g. Eid offer: 10% off above 3000 BDT...)" className={input} />
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="button" onClick={fillMail} className="text-xs underline text-[#D4AF37]">Fill from banner text</button>
+              <button type="button" onClick={() => sendMail(true)} disabled={mailBusy} className="border border-[#D4AF37] text-[#D4AF37] font-bold px-5 py-2.5 rounded text-xs uppercase tracking-widest disabled:opacity-50">Send test to me</button>
+              <button type="button" onClick={() => sendMail(false)} disabled={mailBusy} className="bg-[#D4AF37] text-black font-bold px-5 py-2.5 rounded text-xs uppercase tracking-widest hover:opacity-90 disabled:opacity-50">{mailBusy ? 'Sending...' : `Send to all${counts ? ` (${counts.active})` : ''}`}</button>
+            </div>
+            {mailMsg && <p className={`text-xs ${mailMsg.startsWith('Error') ? 'text-red-500' : 'text-green-500'}`}>{mailMsg}</p>}
+          </div>
+        </div>
+    </div>
     </div>
   );
 }

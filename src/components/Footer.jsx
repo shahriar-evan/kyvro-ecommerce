@@ -1,7 +1,7 @@
 import React from 'react';
 import logoImg from '../assets/logo.png';
 
-export default function Footer({ isDarkMode, setCurrentView, setSelectedCategory }) {
+export default function Footer({ isDarkMode, setCurrentView, setSelectedCategory, customerUser, onSignIn, goAccount }) {
   return (
     <>
       <footer className={`border-t pt-12 sm:pt-16 pb-12 mt-auto ${isDarkMode ? 'bg-[#121212] border-gray-800 text-gray-300' : 'bg-white border-gray-200 text-gray-700'}`}>
@@ -31,6 +31,7 @@ export default function Footer({ isDarkMode, setCurrentView, setSelectedCategory
               <li><button onClick={() => setCurrentView('privacy')} className="hover:text-[#D4AF37]">Privacy Policy</button></li>
               <li><button onClick={() => setCurrentView('terms')} className="hover:text-[#D4AF37]">Terms &amp; Conditions</button></li>
               <li><button onClick={() => setCurrentView('refund')} className="hover:text-[#D4AF37]">Return &amp; Refund Policy</button></li>
+              <li><button onClick={() => (customerUser ? (goAccount && goAccount('settings')) : (onSignIn && onSignIn()))} className="text-[#D4AF37] font-semibold hover:underline">{customerUser ? 'Manage offer emails' : 'Get offers by email (sign in with Google)'}</button></li>
             </ul>
           </div>
 

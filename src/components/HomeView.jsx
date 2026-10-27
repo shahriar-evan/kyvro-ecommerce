@@ -55,19 +55,16 @@ export default function HomeView({ requestAdd, addToCart, banners, calculateDisc
     <>
         <div className="flex-1">
           <section {...heroSwipe} style={heroSwipe.style} className="relative w-full overflow-hidden select-none">
-            {/* Every slide sits in the same box (same height), and no photo is cropped. A photo that is wider than the
-                box is shown whole, and the free space above and below is filled with a blurred copy of the same photo. */}
-            <div className="relative w-full" style={{ aspectRatio: '1720 / 914' }}>
-              {HERO_IMAGES.map((src, i) => (
-                <div
-                  key={i}
-                  className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${i === heroIdx ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-                >
-                  <img src={src} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110" />
-                  <img src={src} alt={`Kyvro hero ${i + 1}`} draggable={false} className="absolute inset-0 w-full h-full object-contain" />
-                </div>
-              ))}
-            </div>
+            {/* the box takes the shape of the photo: nothing is cropped and there is no blurred space */}
+            {HERO_IMAGES.map((src, i) => (
+              <img
+                key={i}
+                src={src}
+                alt={`Kyvro hero ${i + 1}`}
+                draggable={false}
+                className={`block w-full h-auto transition-opacity duration-1000 ease-in-out ${i === heroIdx ? 'relative opacity-100 z-0' : 'absolute top-0 left-0 opacity-0 pointer-events-none'}`}
+              />
+            ))}
             <div className="absolute inset-x-0 top-2 sm:top-4 z-10 flex justify-center px-4">
               <span className={`text-[8px] sm:text-xs uppercase tracking-[0.25em] sm:tracking-[0.4em] font-semibold px-3 sm:px-6 py-1 sm:py-2 rounded-full border shadow-xl ${isDarkMode ? 'bg-black/70 text-[#D4AF37] border-[#D4AF37]/50' : 'bg-white/90 text-black border-black/20'}`}>
                 KYVRO &bull; কাইভ্রো LUXURY COLLECTION

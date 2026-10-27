@@ -5,6 +5,7 @@ import { isOwnerEmail } from './adminEmails';
 import { getAdminStatus, watchAdminAccess } from './adminAuth';
 import { placeOrder, watchOrders, cancelMyOrder } from './orders';
 import { watchProfile, saveProfile, watchMyOrders } from './customerData';
+import { ensureSubscribed } from './subscribers';
 import { watchProducts, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
 import { watchStoreSettings } from './storeSettings';
 import { cleanPhone, DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
@@ -152,6 +153,8 @@ export default function App() {
       }
       // Everyone who signs in is a customer; team members are recognised on top of that
       setCustomerUser({ uid: user.uid, email: user.email || '', displayName: user.displayName || '', photoURL: user.photoURL || '' });
+      // offer emails: a signed-in customer joins the list once (they can switch it off in Account -> Settings)
+      if (user.email && user.emailVerified) ensureSubscribed(user).catch(() => {});
       const access = await checkAccess(user.email);
       if (access.ok) {
         setAdminRole(access.role);
@@ -835,7 +838,7 @@ export default function App() {
       {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} canApproveProduct={canApproveProduct} handleApproveProduct={handleApproveProduct} pendingCount={pendingCount} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} storeSettings={storeSettings} isCloud={isCloud} migrating={migrating} handleMigrateProducts={handleMigrateProducts} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} handleDeleteRequest={handleDeleteRequest} clearProductForm={() => { setEditingProductId(null); setNewProductForm(EMPTY_PRODUCT_FORM); }} />}
 
       {/* FOOTER */}
-      <Footer isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} />
+      <Footer isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} customerUser={customerUser} onSignIn={handleCustomerSignIn} goAccount={goAccount} />
 
     </div>
   );

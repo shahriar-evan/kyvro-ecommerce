@@ -3,6 +3,7 @@ import { Heart, User, Package, Wallet, Settings, LogOut } from 'lucide-react';
 import { formatDateTime, toDate } from '../utils/dates';
 import { CANCEL_WINDOW_MINUTES } from '../orders';
 import { imageFileToDataURL } from '../utils/imageUpload';
+import { watchMySubscription, setMySubscription } from '../subscribers';
 
 const STATUS_STYLE = {
   Pending: 'bg-yellow-500/15 text-yellow-600',
@@ -28,6 +29,17 @@ export default function AccountView({
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [now, setNow] = useState(Date.now());
+  const [sub, setSub] = useState({ exists: false, on: false });
+  const [subBusy, setSubBusy] = useState(false);
+  useEffect(() => {
+    if (!customerUser || !customerUser.email) return undefined;
+    return watchMySubscription(customerUser.email, setSub);
+  }, [customerUser]);
+  const toggleOffers = async () => {
+    setSubBusy(true);
+    try { await setMySubscription(customerUser, !sub.on); } catch (e) { console.error(e); setMsg('Error: could not change the offer-email setting.'); }
+    setSubBusy(false);
+  };
   const [cancelling, setCancelling] = useState('');
   const [cancelMsg, setCancelMsg] = useState('');
 
@@ -221,6 +233,17 @@ export default function AccountView({
           <div>
             <label className="block text-xs font-semibold mb-1.5">Password</label>
             <p className="text-xs text-gray-500">You sign in with Google, so there is no Kyvro password. To change your password, update your Google account password at myaccount.google.com.</p>
+          </div>
+          <div className="flex items-start justify-between gap-4 border-t border-gray-500/20 pt-4">
+            <div>
+              <p className="text-xs font-semibold">Offer emails</p>
+              <p className="text-xs text-gray-500 mt-1">Get discounts and new-arrival news at {customerUser.email}. Only when Kyvro has a real offer.</p>
+            </div>
+            <button type="button" onClick={toggleOffers} disabled={subBusy} aria-pressed={sub.on}
+              className={`shrink-0 w-14 h-7 rounded-full relative transition-colors disabled:opacity-50 ${sub.on ? 'bg-[#D4AF37]' : 'bg-gray-500/40'}`}>
+              <span className={`absolute top-0.5 w-6 h-6 rounded-full bg-white transition-all ${sub.on ? 'left-7' : 'left-0.5'}`} />
+              <span className="sr-only">{sub.on ? 'On' : 'Off'}</span>
+            </button>
           </div>
           <div className="flex items-center gap-4">
             <button onClick={save} disabled={busy} className="bg-[#D4AF37] text-black font-bold px-8 py-3 rounded text-xs uppercase tracking-widest hover:opacity-90 disabled:opacity-50">{busy ? 'Saving...' : 'Save changes'}</button>
