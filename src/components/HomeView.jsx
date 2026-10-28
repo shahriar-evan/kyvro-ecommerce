@@ -9,10 +9,10 @@ import heroBanner2Img from '../assets/hero-banner2.png';
 import shirtImg from '../assets/shirts.png';
 import sneakersImg from '../assets/Snekers.png';
 
-// Photos of the big top (hero) section. Each one stays 5 seconds, then the next fades in.
+// Photos of the big top (hero) section. Each one stays 10 seconds, then the next fades in.
 // To add a photo: put it in src/assets, import it above and add it to this list.
 const HERO_IMAGES = [heroBannerImg, heroBanner1Img, heroBanner2Img];
-const HERO_SECONDS = 5;
+const HERO_SECONDS = 10;
 
 // Swipe / drag sideways on a photo to change it (finger on a phone, mouse drag on a computer).
 // A normal click is not a swipe, so buttons on top of the photo keep working.
