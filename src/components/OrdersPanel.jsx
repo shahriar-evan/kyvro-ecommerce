@@ -47,6 +47,13 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
   }, []);
 
   // ---- Dropshipping: cost, profit and the text to paste into the supplier's site ----
+  // Supplier's own delivery fee per supplier order (same for every area for now)
+  const SUPPLIER_DELIVERY_BY_AREA = { 'Inside Dhaka': 70, 'Outside Dhaka': 130 };
+  const supplierDelivery = (o) => SUPPLIER_DELIVERY_BY_AREA[o.deliveryArea] || SUPPLIER_DELIVERY_BY_AREA['Outside Dhaka'];
+  // The supplier does NOT refund the delivery fee you pay upfront (change to true only if the first real order proves it does)
+  const DELIVERY_REFUNDED = false;
+  // Per order: tick if the customer already paid the delivery charge to you in advance (bKash / Nagad)
+  const [advance, setAdvance] = useState({});
   // Cost comes from the private "productCosts" (set in the product form). Items are grouped by supplier shop.
   const supplyInfo = (o) => {
     const groups = {};
@@ -67,7 +74,31 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
       cost += line;
     });
     const revenue = (Number(o.subtotal) || 0) - (Number(o.discount) || 0);
-    return { groups: Object.values(groups), missing, cost, revenue, profit: revenue - cost, hasSupplier: Object.keys(groups).length > 0 };
+    const list = Object.values(groups);
+    const sd = supplierDelivery(o);
+    const delivery = sd * list.length;
+    const total = Number(o.total) || 0;
+    const online = o.paymentMethod === 'Online Payment';
+    const sellTotal = list.reduce((a, g) => a + g.sell, 0) || 1;
+    const adv = !online && !!advance[o.id];
+    const shipping = Number(o.shipping) || 0;
+    // what to enter / pay on the supplier's confirm page, per supplier order
+    list.forEach((g) => {
+      const share = g.sell / sellTotal;
+      const customerPart = Math.round(total * share);
+      if (online) {
+        g.plan = { mode: 'full', sellingPrice: g.cost, payNow: g.cost + sd, collect: 0 };
+      } else if (adv) {
+        const sp = Math.max(0, Math.round((total - shipping) * share));
+        g.plan = { mode: 'advance', sellingPrice: sp, payNow: sd, collect: sp };
+      } else {
+        g.plan = { mode: 'door', sellingPrice: Math.max(0, customerPart - sd), payNow: sd, collect: customerPart };
+      }
+    });
+    // real profit = what the customer pays in total - supplier cost - supplier delivery (paid upfront)
+    // delivery taken at the door (no advance): the supplier's courier fee is charged again and not refunded
+    const extra = (!online && !adv && !DELIVERY_REFUNDED) ? delivery : 0;
+    return { groups: list, missing, cost, revenue, delivery, sd, total, online, adv, profit: total - cost - delivery - extra, hasSupplier: list.length > 0 };
   };
   const placedAt = (o, g) => (supply[o.id] && supply[o.id].placed && supply[o.id].placed[g.key]) || null;
 
@@ -418,11 +449,18 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="font-bold text-[11px] uppercase tracking-wider text-[#D4AF37]">Supplier order · private (customers cannot see this)</p>
                     <p className="font-semibold">
-                      Sold {formatPrice(sp.revenue)} − cost {formatPrice(sp.cost)} = <span className={sp.profit >= 0 ? 'text-green-600' : 'text-red-500'}>{sp.profit >= 0 ? 'profit' : 'LOSS'} {formatPrice(Math.abs(sp.profit))}</span>
+                      Customer pays {formatPrice(sp.total)} − cost {formatPrice(sp.cost)} − supplier delivery {formatPrice(sp.delivery)} = <span className={sp.profit >= 0 ? 'text-green-600' : 'text-red-500'}>{sp.profit >= 0 ? 'profit' : 'LOSS'} {formatPrice(Math.abs(sp.profit))}</span>
                     </p>
                   </div>
                   {sp.missing.length > 0 && <p className="text-amber-600">Supplier price is not set for: {sp.missing.join(', ')}. The profit above does not include these items.</p>}
-                  <p className="text-[11px] text-gray-500">Delivery charge you collected ({o.shipping === 0 ? 'FREE' : formatPrice(o.shipping)}) is not counted in the profit, because the supplier's own delivery fee can be different.</p>
+                  <p className="text-[11px] text-gray-500">Profit includes the delivery charge you collect ({o.shipping === 0 ? 'FREE' : formatPrice(o.shipping)}) and the supplier's delivery fee ({formatPrice(sp.sd)} per supplier order).</p>
+                  {!sp.online && !finished && (
+                    <label className="flex items-center gap-2 font-semibold cursor-pointer">
+                      <input type="checkbox" checked={!!advance[o.id]} onChange={(e) => setAdvance((a) => ({ ...a, [o.id]: e.target.checked }))} className="accent-[#D4AF37]" />
+                      Customer already paid the delivery charge to me in advance (bKash / Nagad)
+                    </label>
+                  )}
+                  {sp.online && o.paymentStatus !== 'Paid' && !finished && <p className="p-2 rounded bg-red-500/10 text-red-600 font-semibold">Online payment is not marked Paid yet. Do not pay the supplier until the customer's money has reached you.</p>}
                   {o.status === 'Pending' && !finished && (
                     <p className="p-2 rounded bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 font-semibold">Step 1: press "Confirm &amp; start processing" below. After that, order from the supplier shop.</p>
                   )}
@@ -445,6 +483,34 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
                             </li>
                           ))}
                         </ul>
+                        {!finished && g.plan && (
+                          <div className="rounded p-2 bg-blue-600/10 text-[11px] leading-relaxed">
+                            <p className="font-bold text-blue-600 mb-0.5">On {g.name}'s confirm page:</p>
+                            {g.plan.mode === 'full' ? (
+                              <ul className="list-disc pl-4 space-y-0.5">
+                                <li>Payment type: <strong>Full Payment</strong></li>
+                                <li>Selling price: <strong>{formatPrice(g.plan.sellingPrice)}</strong></li>
+                                <li>You pay now: <strong>{formatPrice(g.plan.payNow)}</strong> ({formatPrice(g.cost)} + {formatPrice(sp.sd)} delivery)</li>
+                                <li>Customer due on delivery should show <strong>{formatPrice(0)}</strong></li>
+                              </ul>
+                            ) : g.plan.mode === 'advance' ? (
+                              <ul className="list-disc pl-4 space-y-0.5">
+                                <li>Payment type: <strong>Partial Payment</strong>, advance delivery: <strong>Yes</strong></li>
+                                <li>Selling price: <strong>{formatPrice(g.plan.sellingPrice)}</strong></li>
+                                <li>You pay now: <strong>{formatPrice(g.plan.payNow)}</strong> (delivery, not refunded)</li>
+                                <li>Courier collects from customer: <strong>{formatPrice(g.plan.collect)}</strong> (no delivery charge)</li>
+                              </ul>
+                            ) : (
+                              <ul className="list-disc pl-4 space-y-0.5">
+                                <li>Payment type: <strong>Partial Payment</strong>, advance delivery: <strong>No</strong></li>
+                                <li>Selling price: <strong>{formatPrice(g.plan.sellingPrice)}</strong></li>
+                                <li>You pay now: <strong>{formatPrice(g.plan.payNow)}</strong> (delivery)</li>
+                                <li>Courier collects from customer: <strong>{formatPrice(g.plan.collect)}</strong> (including delivery)</li>
+                                <li className="text-amber-600">This way you lose the {formatPrice(sp.sd)} delivery fee. Taking the delivery charge from the customer in advance is better.</li>
+                              </ul>
+                            )}
+                          </div>
+                        )}
                         {placed && <p className="text-[11px] text-gray-500">Marked by {placed.byName || placed.by} · {formatDateTime(placed.at)}{placed.orderNo ? ` · ${g.name} order no: ${placed.orderNo}` : ''}</p>}
                         <div className="flex flex-wrap gap-2">
                           <button type="button" disabled={!canOrder} onClick={() => copyText(supplierText(o, g), `${o.id}|${g.key}`)}

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { deliveryAreaFor, DELIVERY_AREAS, DELIVERY_AREA_BN, DELIVERY_CHARGES, PAYMENT_METHODS, PAYMENT_METHOD_BN, toBanglaDigits } from '../data/shopConfig';
+import { deliveryAreaFor, DELIVERY_AREAS, DELIVERY_AREA_BN, PAYMENT_METHODS, PAYMENT_METHOD_BN, toBanglaDigits, deliveryNote, freeDeliveryApplies, freeDeliveryMissing, normalizeSettings } from '../data/shopConfig';
 
 export default function CheckoutView({
-  cart, checkoutForm, setCheckoutForm, checkoutError, deliveryCharge, grandTotal, formatPrice,
+  storeSettings, cart, checkoutForm, setCheckoutForm, checkoutError, deliveryCharge, grandTotal, formatPrice,
   handleCheckoutSubmit, isDarkMode, placingOrder, removeFromCart, updateCartQty, setCurrentView, subtotal, discount = 0, discountLabel = '', customerUser = null, authReady = true, onSignIn,
 }) {
   const set = (field, value) => setCheckoutForm({ ...checkoutForm, [field]: value });
@@ -202,8 +202,15 @@ export default function CheckoutView({
             </div>
 
             <div className={`text-xs leading-relaxed rounded border p-3 ${isDarkMode ? 'border-[#D4AF37]/40 bg-[#D4AF37]/10' : 'border-[#D4AF37]/50 bg-[#D4AF37]/10'}`}>
-              <p>অনলাইন পেমেন্ট করলে ডেলিভারি চার্জ লাগবে না।</p>
-              <p>ক্যাশ অন ডেলিভারিতে ঢাকার ভিতরে {toBanglaDigits(DELIVERY_CHARGES['Inside Dhaka'])} টাকা এবং ঢাকার বাইরে {toBanglaDigits(DELIVERY_CHARGES['Outside Dhaka'])} টাকা ডেলিভারি চার্জ প্রযোজ্য।</p>
+              <p>{deliveryNote(storeSettings).bn}</p>
+              {(() => {
+                const s = normalizeSettings(storeSettings);
+                const net = subtotal - discount;
+                const miss = freeDeliveryMissing(net, s);
+                if (miss > 0) return <p className="mt-1 font-semibold">আর {toBanglaDigits(miss)} টাকার পণ্য যোগ করলে ডেলিভারি ফ্রি পাবেন।</p>;
+                if (s.freeDeliveryEnabled && !freeDeliveryApplies(net, checkoutForm.paymentMethod, s)) return <p className="mt-1 font-semibold">আপনার অর্ডার ডেলিভারি ফ্রি-র যোগ্য। ফ্রি ডেলিভারি পেতে {s.freeDeliveryFor === 'online' ? 'অনলাইন পেমেন্ট' : 'ক্যাশ অন ডেলিভারি'} নির্বাচন করুন।</p>;
+                return null;
+              })()}
               {online && <p className="mt-1">অনলাইন পেমেন্ট নির্বাচন করলে অর্ডার করার পর আমাদের প্রতিনিধি আপনাকে ফোন করে পেমেন্টের নির্দেশনা জানাবেন।</p>}
             </div>
 

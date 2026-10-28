@@ -1,13 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { saveStoreSettings } from '../storeSettings';
 import { countSubscribers, countPushDevices, sendOfferEmail } from '../subscribers';
-import { normalizeSettings, bestDiscount, nextReward, describeRule, bannerFromRules } from '../data/shopConfig';
+import { normalizeSettings, bestDiscount, nextReward, describeRule, bannerFromRules, deliveryNote } from '../data/shopConfig';
 
 // Owner-only editor: top banner text + automatic discount rules
 export default function StoreSettings({ settings, isDarkMode, staff, formatPrice }) {
   const [text, setText] = useState(settings.announcementText);
   const [enabled, setEnabled] = useState(settings.discountEnabled);
   const [rules, setRules] = useState(settings.discountRules.map((r) => ({ ...r })));
+  const [dIn, setDIn] = useState(String(settings.deliveryInside));
+  const [dOut, setDOut] = useState(String(settings.deliveryOutside));
+  const [freeOn, setFreeOn] = useState(settings.freeDeliveryEnabled);
+  const [freeMin, setFreeMin] = useState(String(settings.freeDeliveryMin));
+  const [freeFor, setFreeFor] = useState(settings.freeDeliveryFor);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [testTotal, setTestTotal] = useState('4000');
@@ -38,12 +43,17 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
     setText(settings.announcementText);
     setEnabled(settings.discountEnabled);
     setRules(settings.discountRules.map((r) => ({ ...r })));
+    setDIn(String(settings.deliveryInside));
+    setDOut(String(settings.deliveryOutside));
+    setFreeOn(settings.freeDeliveryEnabled);
+    setFreeMin(String(settings.freeDeliveryMin));
+    setFreeFor(settings.freeDeliveryFor);
   }, [settings]);
 
   const card = `rounded-lg border p-5 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`;
   const input = `w-full border rounded px-3 py-2 text-sm outline-none focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#0f0f0f] border-gray-700' : 'bg-white border-gray-300'}`;
 
-  const draft = normalizeSettings({ announcementText: text, discountEnabled: enabled, discountRules: rules });
+  const draft = normalizeSettings({ announcementText: text, discountEnabled: enabled, discountRules: rules, deliveryInside: dIn === '' ? 0 : dIn, deliveryOutside: dOut === '' ? 0 : dOut, freeDeliveryEnabled: freeOn, freeDeliveryMin: freeMin === '' ? 0 : freeMin, freeDeliveryFor: freeFor });
   const t = Number(testTotal) || 0;
   const hit = bestDiscount(t, draft);
   const next = nextReward(t, draft);
@@ -89,6 +99,8 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
     setMsg('');
     const bad = rules.some((r) => !(Number(r.min) > 0) || !(Number(r.value) > 0));
     if (enabled && bad) { setMsg('Error: every discount rule needs a minimum total and a value above 0 (or delete the empty rule).'); return; }
+    if (dIn === '' || dOut === '' || !(Number(dIn) >= 0) || !(Number(dOut) >= 0)) { setMsg('Error: type both delivery charges (0 or more).'); return; }
+    if (freeOn && !(Number(freeMin) > 0)) { setMsg('Error: type the minimum order amount for free delivery (above 0), or switch free delivery OFF.'); return; }
     if (rules.some((r) => r.type === 'percent' && Number(r.value) > 100)) { setMsg('Error: a percent discount cannot be more than 100.'); return; }
     setSaving(true);
     try {
@@ -167,6 +179,42 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
           </p>
           {next && <p className="text-gray-500">Next reward: spend {formatPrice(next.missing)} more to get {describeRule(next.rule)}.</p>}
         </div>
+      </div>
+
+      <div className={card}>
+        <h3 className="font-bold text-sm uppercase tracking-wider mb-1">Delivery Charge</h3>
+        <p className="text-xs text-gray-500 mb-4">The charge is added at checkout, by the customer's delivery area. Free delivery is counted on the product total after the discount.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[11px] font-semibold mb-1">Inside Dhaka (BDT)</label>
+            <input type="number" min="0" value={dIn} onChange={(e) => setDIn(e.target.value)} className={input} placeholder="100" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold mb-1">Outside Dhaka (BDT)</label>
+            <input type="number" min="0" value={dOut} onChange={(e) => setDOut(e.target.value)} className={input} placeholder="150" />
+          </div>
+        </div>
+        <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer mt-4">
+          <input type="checkbox" checked={freeOn} onChange={(e) => setFreeOn(e.target.checked)} className="accent-[#D4AF37]" />
+          Free delivery for big orders: {freeOn ? 'ON' : 'OFF'}
+        </label>
+        {freeOn && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+            <div>
+              <label className="block text-[11px] font-semibold mb-1">Free delivery when the order is at least (BDT)</label>
+              <input type="number" min="1" value={freeMin} onChange={(e) => setFreeMin(e.target.value)} className={input} placeholder="2000" />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold mb-1">Free delivery applies to</label>
+              <select value={freeFor} onChange={(e) => setFreeFor(e.target.value)} className={input}>
+                <option value="online">Online Payment only</option>
+                <option value="cod">Cash on Delivery only</option>
+                <option value="both">Both payment methods</option>
+              </select>
+            </div>
+          </div>
+        )}
+        <p className="text-xs mt-3 text-gray-500">Customers will read: <strong className="text-[#D4AF37]">{deliveryNote(draft).en}</strong></p>
       </div>
 
       <div className="flex flex-wrap items-center gap-4">

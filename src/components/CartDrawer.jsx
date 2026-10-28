@@ -1,8 +1,8 @@
 import React from 'react';
 import { ShoppingBag, X, ChevronRight, Trash2 } from 'lucide-react';
-import { DELIVERY_CHARGES } from '../data/shopConfig';
+import { deliveryNote, freeDeliveryMissing, normalizeSettings } from '../data/shopConfig';
 
-export default function CartDrawer({ cart, formatPrice, isDarkMode, removeFromCart, setCurrentView, setIsCartOpen, subtotal, discount = 0, discountLabel = '', reward = null, updateCartQty }) {
+export default function CartDrawer({ storeSettings, cart, formatPrice, isDarkMode, removeFromCart, setCurrentView, setIsCartOpen, subtotal, discount = 0, discountLabel = '', reward = null, updateCartQty }) {
   return (
     <>
         <div className="fixed inset-0 z-50 bg-black/70 flex justify-end">
@@ -81,8 +81,15 @@ export default function CartDrawer({ cart, formatPrice, isDarkMode, removeFromCa
                     </p>
                   )}
                   <p className="text-[11px] text-gray-500">
-                    Delivery charge is added at checkout. Cash on Delivery: Inside Dhaka {formatPrice(DELIVERY_CHARGES['Inside Dhaka'])}, Outside Dhaka {formatPrice(DELIVERY_CHARGES['Outside Dhaka'])}. Online Payment: free delivery.
+                    {deliveryNote(storeSettings).en}
                   </p>
+                  {(() => {
+                    const s = normalizeSettings(storeSettings);
+                    const miss = freeDeliveryMissing(subtotal - discount, s);
+                    return miss > 0 && s.freeDeliveryFor !== 'cod' ? (
+                      <p className="text-[11px] font-semibold text-[#D4AF37]">Add {formatPrice(miss)} more for free delivery{s.freeDeliveryFor === 'online' ? ' (with Online Payment)' : ''}!</p>
+                    ) : null;
+                  })()}
                 </div>
 
                 <button 

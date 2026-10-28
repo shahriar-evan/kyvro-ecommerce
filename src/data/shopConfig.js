@@ -17,17 +17,48 @@ export const INSIDE_DHAKA_EXTRA = ['Savar', 'Keraniganj'];
 export const deliveryAreaFor = (district, zone, isCityThana) =>
   !district ? '' : (district === 'Dhaka' && (isCityThana || INSIDE_DHAKA_EXTRA.includes(zone)) ? 'Inside Dhaka' : 'Outside Dhaka');
 
-// Delivery charge, charged only for Cash on Delivery
-export const DELIVERY_CHARGES = { 'Inside Dhaka': 100, 'Outside Dhaka': 150 };
+// Delivery charge: 100 inside Dhaka, 150 outside Dhaka (default). The Owner can change them, and set a "free delivery"
+// minimum, in Admin > Store Settings. These defaults are used until the Owner saves something.
+// NOTE: firestore.rules checks the same rules (charge by area, free delivery) against settings/store.
+export const DEFAULT_DELIVERY = { deliveryInside: 100, deliveryOutside: 150, freeDeliveryEnabled: true, freeDeliveryMin: 2000, freeDeliveryFor: 'online' };
+export const FREE_DELIVERY_FOR = ['online', 'cod', 'both'];
 
 export const PAYMENT_METHODS = ['Cash on Delivery', 'Online Payment'];
 export const PAYMENT_METHOD_BN = { 'Cash on Delivery': 'ক্যাশ অন ডেলিভারি', 'Online Payment': 'অনলাইন পেমেন্ট' };
 
 export const ORDER_STATUSES = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
 
-// Online Payment = free delivery. Cash on Delivery = charge by area.
-export const deliveryFee = (area, method) =>
-  method === 'Online Payment' ? 0 : (DELIVERY_CHARGES[area] || 0);
+// Free delivery applies when the product total (after discount) reaches the minimum AND the payment method matches
+export const freeDeliveryApplies = (netTotal, method, settings) => {
+  const s = normalizeSettings(settings);
+  if (!s.freeDeliveryEnabled) return false;
+  if (!(netTotal >= s.freeDeliveryMin)) return false;
+  if (s.freeDeliveryFor === 'both') return true;
+  return s.freeDeliveryFor === 'online' ? method === 'Online Payment' : method === 'Cash on Delivery';
+};
+
+// Delivery charge for the order. 0 until the customer has chosen the delivery area (checkout shows "Select city & zone").
+export const deliveryFee = (area, method, netTotal, settings) => {
+  if (!area) return 0;
+  const s = normalizeSettings(settings);
+  return freeDeliveryApplies(netTotal, method, s) ? 0 : (area === 'Inside Dhaka' ? s.deliveryInside : s.deliveryOutside);
+};
+
+// Short sentence about delivery for the cart / checkout (English + Bangla)
+export const deliveryNote = (settings) => {
+  const s = normalizeSettings(settings);
+  const who = { online: ['with Online Payment', 'অনলাইন পেমেন্ট করলে'], cod: ['with Cash on Delivery', 'ক্যাশ অন ডেলিভারিতে'], both: ['on any payment method', 'যেকোনো পেমেন্টে'] }[s.freeDeliveryFor];
+  return {
+    en: `Delivery charge: ${s.deliveryInside} BDT inside Dhaka, ${s.deliveryOutside} BDT outside Dhaka.${s.freeDeliveryEnabled ? ` Free delivery ${who[0]} when your order is ${s.freeDeliveryMin} BDT or more.` : ''}`,
+    bn: `ডেলিভারি চার্জ: ঢাকার ভিতরে ${toBanglaDigits(s.deliveryInside)} টাকা, ঢাকার বাইরে ${toBanglaDigits(s.deliveryOutside)} টাকা।${s.freeDeliveryEnabled ? ` ${who[1]} ${toBanglaDigits(s.freeDeliveryMin)} টাকা বা তার বেশির অর্ডারে ডেলিভারি ফ্রি।` : ''}`,
+  };
+};
+
+// How much more the customer must add to get free delivery (0 if not applicable / already free / wrong payment method)
+export const freeDeliveryMissing = (netTotal, settings) => {
+  const s = normalizeSettings(settings);
+  return s.freeDeliveryEnabled && netTotal < s.freeDeliveryMin ? Math.ceil(s.freeDeliveryMin - netTotal) : 0;
+};
 
 export const paymentStatusFor = (method) =>
   method === 'Online Payment' ? 'Awaiting payment' : 'Cash on Delivery';
@@ -42,6 +73,7 @@ export const DEFAULT_STORE_SETTINGS = {
   announcementText: 'Discover Your Signature Style | Shop 3500 BDT or more and get 20% OFF automatically',
   discountEnabled: true,
   discountRules: [{ min: 3500, type: 'percent', value: 20 }],
+  ...DEFAULT_DELIVERY,
 };
 
 const num = (v) => {
@@ -69,6 +101,11 @@ export function normalizeSettings(raw) {
     announcementText: typeof raw.announcementText === 'string' ? raw.announcementText : base.announcementText,
     discountEnabled: raw.discountEnabled !== false,
     discountRules: rules,
+    deliveryInside: raw.deliveryInside === undefined ? DEFAULT_DELIVERY.deliveryInside : Math.min(100000, Math.max(0, Math.round(num(raw.deliveryInside)))),
+    deliveryOutside: raw.deliveryOutside === undefined ? DEFAULT_DELIVERY.deliveryOutside : Math.min(100000, Math.max(0, Math.round(num(raw.deliveryOutside)))),
+    freeDeliveryEnabled: raw.freeDeliveryEnabled === undefined ? DEFAULT_DELIVERY.freeDeliveryEnabled : raw.freeDeliveryEnabled === true,
+    freeDeliveryMin: raw.freeDeliveryMin === undefined ? DEFAULT_DELIVERY.freeDeliveryMin : Math.min(10000000, Math.max(0, Math.round(num(raw.freeDeliveryMin)))),
+    freeDeliveryFor: FREE_DELIVERY_FOR.includes(raw.freeDeliveryFor) ? raw.freeDeliveryFor : DEFAULT_DELIVERY.freeDeliveryFor,
   };
 }
 
