@@ -383,8 +383,13 @@ export default function App() {
     if (!checkoutForm.upazila) return setCheckoutError('Please select your zone / thana. (থানা বা উপজেলা নির্বাচন করুন)');
     if (street.length < 5) return setCheckoutError('Please enter your house / road / village. (বাড়ি, রাস্তা বা গ্রামের নাম লিখুন)');
     if (!DELIVERY_AREAS.includes(checkoutForm.deliveryArea)) return setCheckoutError('Please select your city / district again.');
-    // one clear address line for the order: street, area, thana/upazila, district
-    const address = [street, checkoutForm.area, checkoutForm.upazila, checkoutForm.district].filter(Boolean).join(', ');
+    // address saved on separate labelled lines: house/road, area, zone (thana/upazila), city (district)
+    const address = [
+      `House/Road: ${street}`,
+      checkoutForm.area ? `Area: ${checkoutForm.area}` : '',
+      `Zone: ${checkoutForm.upazila}`,
+      `City: ${checkoutForm.district}`
+    ].filter(Boolean).join('\n');
     if (!checkoutForm.agree) return setCheckoutError('Please accept the Terms & Conditions, Privacy Policy and Return & Refund Policy to continue.');
 
     // Make sure everything in the cart is still in stock

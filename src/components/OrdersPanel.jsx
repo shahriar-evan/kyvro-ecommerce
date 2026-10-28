@@ -100,7 +100,8 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
       '',
       `Name: ${o.customer?.name || ''}`,
       `Phone: ${o.customer?.phone || ''}`,
-      `Address: ${o.customer?.address || ''}`,
+      'Address:',
+      `${o.customer?.address || ''}`,
       `Delivery area: ${o.deliveryArea || ''}`,
     ];
     if (o.customer?.notes) lines.push(`Customer comment: ${o.customer.notes}`);
@@ -277,7 +278,7 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
                 <p className="font-bold text-[11px] uppercase tracking-wider text-gray-500 mb-1">Customer</p>
                 <p className="text-sm font-semibold">{o.customer?.name}</p>
                 <p>Phone: <a href={`tel:${o.customer?.phone}`} className="text-[#D4AF37] font-semibold">{o.customer?.phone}</a></p>
-                <p>Address: {o.customer?.address}</p>
+                <p className="whitespace-pre-line"><span className="text-gray-500">Address:</span>{'\n'}{o.customer?.address}</p>
                 <p>Area: {o.deliveryArea} {DELIVERY_AREA_BN[o.deliveryArea] ? `(${DELIVERY_AREA_BN[o.deliveryArea]})` : ''}</p>
                 {o.customer?.notes && <p>Comment: <em>{o.customer.notes}</em></p>}
                 {o.email && <p>Account: <strong>{o.email}</strong></p>}

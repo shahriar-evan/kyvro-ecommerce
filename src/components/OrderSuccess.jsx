@@ -39,7 +39,7 @@ export default function OrderSuccess({ order, formatPrice, isDarkMode, setCurren
         <div className="text-sm space-y-1">
           <p><span className="text-gray-500">Name:</span> {order.customer.name}</p>
           <p><span className="text-gray-500">Phone:</span> {order.customer.phone}</p>
-          <p><span className="text-gray-500">Address:</span> {order.customer.address}</p>
+          <p className="whitespace-pre-line"><span className="text-gray-500">Address:</span>{'\n'}{order.customer.address}</p>
           <p><span className="text-gray-500">Delivery area:</span> {order.deliveryArea} ({DELIVERY_AREA_BN[order.deliveryArea]})</p>
           <p><span className="text-gray-500">Payment:</span> {order.paymentMethod}</p>
         </div>
