@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { hasSizeStock, totalStock } from '../data/catalog';
 import StockLabel from './StockLabel';
+import WhatsAppButton from './WhatsAppButton';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
-import { User, Shield, Truck, RefreshCw, ChevronRight, ArrowRight, MessageCircle, Heart } from 'lucide-react';
+import { User, Shield, Truck, RefreshCw, ChevronRight, ArrowRight, Heart } from 'lucide-react';
 import heroBannerImg from '../assets/hero-banner.png';
 import heroBanner1Img from '../assets/hero-banner1.png';
 import heroBanner2Img from '../assets/hero-banner2.png';
@@ -241,14 +242,7 @@ export default function HomeView({ requestAdd, addToCart, banners, calculateDisc
                           >
                             Buy Now
                           </button>
-                          <a 
-                            href={`https://wa.me/${WHATSAPP_NUMBER}?text=Hello%20Kyvro,%20I%20want%20to%20order:%0A*%20Name:%20${encodeURIComponent(product.name)}%0A*%20Price:%20${encodeURIComponent(formatPrice(product.price))}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-full bg-[#25D366] text-white font-bold py-2 rounded text-[11px] uppercase tracking-wider hover:opacity-90 transition flex items-center justify-center gap-1.5 shadow"
-                          >
-                            <MessageCircle size={13} /> Order on WhatsApp
-                          </a>
+                          <WhatsAppButton compact href={`https://wa.me/${WHATSAPP_NUMBER}?text=Hello%20Kyvro,%20I%20want%20to%20order:%0A*%20Name:%20${encodeURIComponent(product.name)}%0A*%20Price:%20${encodeURIComponent(formatPrice(product.price))}`} />
                         </div>
                       </div>
                     </div>
