@@ -881,7 +881,7 @@ export default function App() {
 
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans relative transition-colors duration-300 overflow-x-hidden ${isDarkMode ? 'bg-[#0f0f0f] text-gray-100' : 'bg-white text-gray-900'}`}>
+    <div className={`min-h-screen flex flex-col font-sans relative transition-colors duration-300 overflow-x-clip ${isDarkMode ? 'bg-[#0f0f0f] text-gray-100' : 'bg-white text-gray-900'}`}>
 
       {/* 1. ANNOUNCEMENT BAR */}
       <AnnouncementBar announcementText={announcementText} isDarkMode={isDarkMode} />
