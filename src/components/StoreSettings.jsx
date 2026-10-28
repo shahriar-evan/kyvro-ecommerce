@@ -107,10 +107,10 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
       <div className={card}>
         <h3 className="font-bold text-sm uppercase tracking-wider mb-1">Top Banner Text</h3>
         <p className="text-xs text-gray-500 mb-3">This text scrolls in the bar at the very top of the website.</p>
-        <textarea rows={2} maxLength={200} value={text} onChange={(e) => setText(e.target.value)} className={input} />
+        <textarea rows={2} maxLength={500} value={text} onChange={(e) => setText(e.target.value)} className={input} />
         <div className="flex flex-wrap items-center gap-3 mt-2">
           <button type="button" onClick={() => setText(bannerFromRules(draft))} className="text-xs underline text-[#D4AF37]">Write it from my discount rules</button>
-          <span className="text-[11px] text-gray-500">{text.length}/200</span>
+          <span className="text-[11px] text-gray-500">{text.length}/500</span>
           <button type="button" onClick={sendBannerMail} disabled={mailBusy} className="ml-auto border border-[#D4AF37] text-[#D4AF37] font-bold px-4 py-2 rounded text-xs uppercase tracking-widest hover:bg-[#D4AF37]/10 disabled:opacity-50">{mailBusy ? 'Sending...' : 'Send this banner (email + notification)'}</button>
         </div>
         {mailMsg && <p className={`text-xs mt-2 ${mailMsg.startsWith('Error') ? 'text-red-500' : 'text-green-500'}`}>{mailMsg}</p>}

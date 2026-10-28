@@ -18,7 +18,7 @@ export function watchStoreSettings(onData) {
 export async function saveStoreSettings(settings, staff) {
   const clean = normalizeSettings(settings);
   await setDoc(doc(db, "settings", "store"), {
-    announcementText: clean.announcementText.trim().slice(0, 200),
+    announcementText: clean.announcementText.trim().slice(0, 500),
     discountEnabled: clean.discountEnabled,
     discountRules: clean.discountRules,
     ...discountLimits(clean),

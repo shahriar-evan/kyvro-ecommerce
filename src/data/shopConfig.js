@@ -97,12 +97,22 @@ export function nextReward(subtotal, settings) {
   return next ? { rule: next, missing: Math.ceil(next.min - subtotal) } : null;
 }
 
-// Banner sentence built from the rules, e.g. "Shop 3500 BDT or more and get 20% OFF automatically"
+// Banner sentence built from the rules (English + Bangla), e.g.
+// "Discover Your Signature Style | Spend 4000 BDT & get 20% OFF | Spend 5500 BDT or more & get 30% OFF | ..."
 export function bannerFromRules(settings) {
   const s = normalizeSettings(settings);
   if (!s.discountEnabled || s.discountRules.length === 0) return 'Discover Your Signature Style';
-  const parts = s.discountRules.map((r) => `${r.min} BDT = ${r.type === 'percent' ? `${r.value}%` : `৳${r.value}`} OFF`);
-  return `Discover Your Signature Style | Automatic discount: ${parts.join(', ')}`;
+  const rules = s.discountRules;
+  const last = rules.length - 1;
+  const en = rules.map((r, i) => {
+    const off = r.type === 'percent' ? `${r.value}% OFF` : `৳${r.value} OFF`;
+    return `Spend ${r.min} BDT${i === last ? ' or more' : ''} & get ${off}`;
+  });
+  const bn = rules.map((r, i) => {
+    const off = r.type === 'percent' ? `${toBanglaDigits(r.value)}% ছাড়` : `${toBanglaDigits(r.value)} টাকা ছাড়`;
+    return `${toBanglaDigits(r.min)} টাকা${i === last ? ' বা তার বেশি' : ''} কেনাকাটায় ${off}`;
+  });
+  return `Discover Your Signature Style | ${en.join(' | ')} | ${bn.join(' | ')}`;
 }
 
 // Highest values, stored next to the rules so Firestore rules can check an order's discount
