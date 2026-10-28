@@ -49,9 +49,11 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
   // ---- Dropshipping: cost, profit and the text to paste into the supplier's site ----
   // Supplier's own delivery fee per supplier order (same for every area for now)
   const SUPPLIER_DELIVERY_BY_AREA = { 'Inside Dhaka': 70, 'Outside Dhaka': 130 };
-  const supplierDelivery = (o) => SUPPLIER_DELIVERY_BY_AREA[o.deliveryArea] || SUPPLIER_DELIVERY_BY_AREA['Outside Dhaka'];
-  // The supplier does NOT refund the delivery fee you pay upfront (change to true only if the first real order proves it does)
-  const DELIVERY_REFUNDED = false;
+  // SelfShop: base fee for the first item + a small extra for every additional item (seen at 3 items: 70 + 30 extra)
+  const SUPPLIER_EXTRA_PER_ITEM = 15;
+  const supplierDelivery = (o, units) => (SUPPLIER_DELIVERY_BY_AREA[o.deliveryArea] || SUPPLIER_DELIVERY_BY_AREA['Outside Dhaka']) + SUPPLIER_EXTRA_PER_ITEM * Math.max(0, (units || 1) - 1);
+  // With Partial Payment + advance delivery "No", SelfShop's displayed profit already includes the delivery fee you pay now (profit = selling - cost + delivery), so it comes back to you
+  const DELIVERY_REFUNDED = true;
   // Per order: tick if the customer already paid the delivery charge to you in advance (bKash / Nagad)
   const [advance, setAdvance] = useState({});
   // Cost comes from the private "productCosts" (set in the product form). Items are grouped by supplier shop.
@@ -64,19 +66,20 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
       const qty = parseInt(it.quantity, 10) || 0;
       if (!c || c.supplierCost === undefined || c.supplierCost === null || c.supplierCost === '') { missing.push(it.name); return; }
       const name = String(c.supplierName || 'Supplier').trim() || 'Supplier';
-      const g = groups[supplierKey(name)] || (groups[supplierKey(name)] = { key: supplierKey(name), name, items: [], cost: 0, sell: 0 });
+      const g = groups[supplierKey(name)] || (groups[supplierKey(name)] = { key: supplierKey(name), name, items: [], cost: 0, sell: 0, units: 0 });
       const line = (Number(c.supplierCost) || 0) * qty;
       const cl = c.colorLinks || {};
       const colorKey = Object.keys(cl).find((k) => k.toLowerCase() === String(it.color || '').trim().toLowerCase());
       g.items.push({ ...it, link: (colorKey && cl[colorKey]) || c.supplierLink || '', unitCost: Number(c.supplierCost) || 0 });
       g.cost += line;
       g.sell += (Number(it.price) || 0) * qty;
+      g.units += qty;
       cost += line;
     });
     const revenue = (Number(o.subtotal) || 0) - (Number(o.discount) || 0);
     const list = Object.values(groups);
-    const sd = supplierDelivery(o);
-    const delivery = sd * list.length;
+    list.forEach((g) => { g.delivery = supplierDelivery(o, g.units); });
+    const delivery = list.reduce((a, g) => a + g.delivery, 0);
     const total = Number(o.total) || 0;
     const online = o.paymentMethod === 'Online Payment';
     const sellTotal = list.reduce((a, g) => a + g.sell, 0) || 1;
@@ -87,18 +90,18 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
       const share = g.sell / sellTotal;
       const customerPart = Math.round(total * share);
       if (online) {
-        g.plan = { mode: 'full', sellingPrice: g.cost, payNow: g.cost + sd, collect: 0 };
+        g.plan = { mode: 'full', sellingPrice: g.cost, payNow: g.cost + g.delivery, collect: 0 };
       } else if (adv) {
         const sp = Math.max(0, Math.round((total - shipping) * share));
-        g.plan = { mode: 'advance', sellingPrice: sp, payNow: sd, collect: sp };
+        g.plan = { mode: 'advance', sellingPrice: sp, payNow: g.delivery, collect: sp };
       } else {
-        g.plan = { mode: 'door', sellingPrice: Math.max(0, customerPart - sd), payNow: sd, collect: customerPart };
+        g.plan = { mode: 'door', sellingPrice: Math.max(0, customerPart - g.delivery), payNow: g.delivery, collect: customerPart };
       }
     });
     // real profit = what the customer pays in total - supplier cost - supplier delivery (paid upfront)
     // delivery taken at the door (no advance): the supplier's courier fee is charged again and not refunded
     const extra = (!online && !adv && !DELIVERY_REFUNDED) ? delivery : 0;
-    return { groups: list, missing, cost, revenue, delivery, sd, total, online, adv, profit: total - cost - delivery - extra, hasSupplier: list.length > 0 };
+    return { groups: list, missing, cost, revenue, delivery, total, online, adv, profit: total - cost - delivery - extra, hasSupplier: list.length > 0 };
   };
   const placedAt = (o, g) => (supply[o.id] && supply[o.id].placed && supply[o.id].placed[g.key]) || null;
 
@@ -453,7 +456,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
                     </p>
                   </div>
                   {sp.missing.length > 0 && <p className="text-amber-600">Supplier price is not set for: {sp.missing.join(', ')}. The profit above does not include these items.</p>}
-                  <p className="text-[11px] text-gray-500">Profit includes the delivery charge you collect ({o.shipping === 0 ? 'FREE' : formatPrice(o.shipping)}) and the supplier's delivery fee ({formatPrice(sp.sd)} per supplier order).</p>
+                  <p className="text-[11px] text-gray-500">Profit includes the delivery charge you collect ({o.shipping === 0 ? 'FREE' : formatPrice(o.shipping)}) and the supplier's delivery fee ({formatPrice(sp.delivery)}: base fee + {formatPrice(SUPPLIER_EXTRA_PER_ITEM)} for each extra item).</p>
                   {!sp.online && !finished && (
                     <label className="flex items-center gap-2 font-semibold cursor-pointer">
                       <input type="checkbox" checked={!!advance[o.id]} onChange={(e) => setAdvance((a) => ({ ...a, [o.id]: e.target.checked }))} className="accent-[#D4AF37]" />
@@ -490,7 +493,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
                               <ul className="list-disc pl-4 space-y-0.5">
                                 <li>Payment type: <strong>Full Payment</strong></li>
                                 <li>Selling price: <strong>{formatPrice(g.plan.sellingPrice)}</strong></li>
-                                <li>You pay now: <strong>{formatPrice(g.plan.payNow)}</strong> ({formatPrice(g.cost)} + {formatPrice(sp.sd)} delivery)</li>
+                                <li>You pay now: <strong>{formatPrice(g.plan.payNow)}</strong> ({formatPrice(g.cost)} + {formatPrice(g.delivery)} delivery)</li>
                                 <li>Customer due on delivery should show <strong>{formatPrice(0)}</strong></li>
                               </ul>
                             ) : g.plan.mode === 'advance' ? (
@@ -506,7 +509,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
                                 <li>Selling price: <strong>{formatPrice(g.plan.sellingPrice)}</strong></li>
                                 <li>You pay now: <strong>{formatPrice(g.plan.payNow)}</strong> (delivery)</li>
                                 <li>Courier collects from customer: <strong>{formatPrice(g.plan.collect)}</strong> (including delivery)</li>
-                                <li className="text-amber-600">This way you lose the {formatPrice(sp.sd)} delivery fee. Taking the delivery charge from the customer in advance is better.</li>
+                                <li className="text-gray-500">SelfShop's profit line already includes the {formatPrice(g.delivery)} delivery you pay now, so it comes back to you.</li>
                               </ul>
                             )}
                           </div>
