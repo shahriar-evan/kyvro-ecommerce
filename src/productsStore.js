@@ -43,7 +43,36 @@ export const rejectProductDelete = (id) =>
     deleteRequestedAt: deleteField(),
   });
 
-export const removeProduct = (id) => deleteDoc(doc(db, "products", String(id)));
+export const removeProduct = async (id) => {
+  await deleteDoc(doc(db, "products", String(id)));
+  // the private supplier details of this product go too (best effort)
+  try { await deleteDoc(doc(db, "productCosts", String(id))); } catch (err) { /* nothing to remove, or not allowed */ }
+};
+
+// ---- Supplier details (dropshipping): PRIVATE ----
+// Stored in their own collection "productCosts" (document id = product id), NOT inside the product, because products are
+// public. Firestore rules let only team members (Owner / Manager / Admin) read or write it, so customers can never see it.
+// Fields: supplierName (e.g. "SelfShop"), supplierCost (what the supplier charges you per piece), supplierLink (optional)
+export function watchProductCosts(onData, onError) {
+  return onSnapshot(
+    collection(db, "productCosts"),
+    (snap) => {
+      const map = {};
+      snap.docs.forEach((d) => { map[d.id] = d.data(); });
+      onData(map);
+    },
+    (err) => onError && onError(err)
+  );
+}
+export const saveProductCost = (id, cost, staff) =>
+  setDoc(doc(db, "productCosts", String(id)), clean({
+    supplierName: String(cost.supplierName || "").trim().slice(0, 80),
+    supplierCost: Number(cost.supplierCost) || 0,
+    supplierLink: String(cost.supplierLink || "").trim().slice(0, 500),
+    updatedAt: new Date().toISOString(),
+    updatedBy: (staff && staff.email) || "",
+  }));
+export const removeProductCost = (id) => deleteDoc(doc(db, "productCosts", String(id)));
 
 // Makes sure an image can be stored inside the product document (a small data URL or a normal web link)
 async function storableImage(src, fallback) {

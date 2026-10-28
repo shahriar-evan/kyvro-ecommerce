@@ -7,7 +7,7 @@ import { placeOrder, watchOrders, cancelMyOrder } from './orders';
 import { watchProfile, saveProfile, watchMyOrders } from './customerData';
 import { ensureSubscribed } from './subscribers';
 import PushPrompt from './components/PushPrompt';
-import { watchProducts, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
+import { watchProducts, watchProductCosts, saveProductCost, removeProductCost, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
 import { watchStoreSettings } from './storeSettings';
 import { cleanPhone, DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
 import { INITIAL_PRODUCTS } from './data/products';
@@ -45,7 +45,8 @@ const EMPTY_CHECKOUT = {
 
 const EMPTY_PRODUCT_FORM = {
   name: '', gender: 'Men', category: 'Shirt', price: '', originalPrice: '', image: '', description: '',
-  colors: '', sizeStock: {}, colorStock: {}, colorImages: {}, trackColors: false, stock: '10', isNew: true, isFeatured: false, isBestSeller: false
+  colors: '', sizeStock: {}, colorStock: {}, colorImages: {}, trackColors: false, stock: '10', isNew: true, isFeatured: false, isBestSeller: false,
+  supplierName: '', supplierCost: '', supplierLink: ''
 };
 
 export default function App() {
@@ -68,6 +69,7 @@ export default function App() {
   });
 
   const [orders, setOrders] = useState([]); // live from Firestore (team members only)
+  const [productCosts, setProductCosts] = useState({}); // private supplier details per product id (team members only)
 
   // Customer account (Google sign-in). Team members who sign in this way are also recognised as team below.
   const [customerUser, setCustomerUser] = useState(null);
@@ -226,6 +228,13 @@ export default function App() {
   useEffect(() => {
     if (!isAdminLoggedIn) { setOrders([]); return; }
     const unsubscribe = watchOrders(setOrders, (err) => console.error('Could not load orders:', err));
+    return () => unsubscribe();
+  }, [isAdminLoggedIn]);
+
+  // Private supplier details (cost, shop name) are loaded only for team members; customers never get them
+  useEffect(() => {
+    if (!isAdminLoggedIn) { setProductCosts({}); return; }
+    const unsubscribe = watchProductCosts(setProductCosts, (err) => console.error('Could not load supplier details:', err));
     return () => unsubscribe();
   }, [isAdminLoggedIn]);
 
@@ -640,6 +649,28 @@ export default function App() {
         : Math.max(0, parseInt(newProductForm.stock, 10) || 0);
     }
 
+    // Private supplier details (dropshipping). Cost is optional; if it is typed, the shop name is needed too.
+    const costRaw = String(newProductForm.supplierCost ?? '').trim();
+    const supplierName = String(newProductForm.supplierName || '').trim();
+    const supplierLink = String(newProductForm.supplierLink || '').trim();
+    const hasSupplier = costRaw !== '' || supplierName !== '' || supplierLink !== '';
+    const supplierCost = costRaw === '' ? 0 : parseFloat(costRaw);
+    if (hasSupplier) {
+      if (costRaw === '' || Number.isNaN(supplierCost) || supplierCost < 0) {
+        alert('Supplier details: please enter the original price (what the supplier charges you per piece), or clear the supplier fields.');
+        return;
+      }
+      if (!supplierName) {
+        alert('Supplier details: please write the name of the shop you buy this product from (for example SelfShop).');
+        return;
+      }
+      if (supplierLink && !/^https?:\/\//i.test(supplierLink)) {
+        alert('Supplier details: the product link must start with http:// or https://');
+        return;
+      }
+      if (supplierCost > (parseFloat(newProductForm.price) || 0) && !confirm(`Your selling price (${newProductForm.price}) is LOWER than the supplier price (${supplierCost}). You will lose money on every sale. Save anyway?`)) return;
+    }
+
     const productData = {
       id: editingProductId || Date.now(),
       name: newProductForm.name,
@@ -692,6 +723,14 @@ export default function App() {
       alert('Could not save the product: ' + (err.code === 'permission-denied' ? 'you do not have permission (check the Firestore rules).' : err.message));
       return;
     }
+    // Save (or clear) the private supplier details in their own admin-only collection
+    try {
+      if (hasSupplier) await saveProductCost(productData.id, { supplierName, supplierCost, supplierLink }, { email: loggedInUserEmail });
+      else if (editingProductId && productCosts[String(editingProductId)]) await removeProductCost(productData.id);
+    } catch (err) {
+      console.error(err);
+      alert('The product was saved, but the supplier details could NOT be saved: ' + (err.code === 'permission-denied' ? 'publish the latest Firestore rules (productCosts), then edit the product and save again.' : err.message));
+    }
     if (editingProductId) setEditingProductId(null);
     const wentPending = productData.status === 'pending';
 
@@ -714,6 +753,7 @@ export default function App() {
     }
     const colorStock = {};
     if (hasColorStock(prod)) Object.entries(prod.colorStock).forEach(([k, n]) => { colorStock[k] = String(n); });
+    const sup = productCosts[String(prod.id)] || {};
     setEditingProductId(prod.id);
     setNewProductForm({
       name: prod.name,
@@ -731,7 +771,10 @@ export default function App() {
       stock: prod.stock,
       isNew: prod.isNew,
       isFeatured: prod.isFeatured,
-      isBestSeller: prod.isBestSeller
+      isBestSeller: prod.isBestSeller,
+      supplierName: sup.supplierName || '',
+      supplierCost: sup.supplierCost === undefined ? '' : String(sup.supplierCost),
+      supplierLink: sup.supplierLink || ''
     });
     setAdminTab('add-product');
   };
@@ -853,7 +896,7 @@ export default function App() {
       {currentView === 'order-success' && <OrderSuccess order={orderCompleteData} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
 
       {/* ADMIN PORTAL VIEW (GOOGLE SIGN-IN, WHITELISTED EMAILS ONLY) */}
-      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} canApproveProduct={canApproveProduct} handleApproveProduct={handleApproveProduct} pendingCount={pendingCount} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} products={products} storeSettings={storeSettings} isCloud={isCloud} migrating={migrating} handleMigrateProducts={handleMigrateProducts} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} handleDeleteRequest={handleDeleteRequest} clearProductForm={() => { setEditingProductId(null); setNewProductForm(EMPTY_PRODUCT_FORM); }} />}
+      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} canApproveProduct={canApproveProduct} handleApproveProduct={handleApproveProduct} pendingCount={pendingCount} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} productCosts={productCosts} products={products} storeSettings={storeSettings} isCloud={isCloud} migrating={migrating} handleMigrateProducts={handleMigrateProducts} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} handleDeleteRequest={handleDeleteRequest} clearProductForm={() => { setEditingProductId(null); setNewProductForm(EMPTY_PRODUCT_FORM); }} />}
 
       {/* FOOTER */}
       <PushPrompt customerUser={customerUser} isDarkMode={isDarkMode} />

@@ -9,7 +9,7 @@ import OrdersPanel from './OrdersPanel';
 import StoreSettings from './StoreSettings';
 import { SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
 
-export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct, clearProductForm, handleDeleteRequest }) {
+export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, productCosts = {}, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct, clearProductForm, handleDeleteRequest }) {
   const isOwner = adminRole === 'owner';
   const canManageTeam = adminRole === 'owner' || adminRole === 'manager';
   const formColors = ((newProductForm && newProductForm.colors) || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -38,6 +38,11 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
       return { ...prev, colors: left.join(', '), colorStock, colorImages };
     });
   };
+  // supplier shop names used before (for the suggestion list in the form)
+  const supplierNames = [...new Set(['SelfShop', ...Object.values(productCosts).map((c) => (c && c.supplierName) || '').filter(Boolean)])];
+  const formCostNum = parseFloat(newProductForm && newProductForm.supplierCost);
+  const formPriceNum = parseFloat(newProductForm && newProductForm.price);
+  const formProfit = !Number.isNaN(formCostNum) && !Number.isNaN(formPriceNum) ? formPriceNum - formCostNum : null;
   const roleLabel = adminRole ? adminRole.charAt(0).toUpperCase() + adminRole.slice(1) : '';
 
   return (
@@ -143,7 +148,15 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                             </div>
                           </td>
                           <td className="p-4 text-gray-500">{p.gender === p.category ? p.category : `${p.gender} / ${p.category}`}</td>
-                          <td className="p-4 text-[#D4AF37] font-bold">{formatPrice(p.price)}</td>
+                          <td className="p-4 text-[#D4AF37] font-bold">
+                            {formatPrice(p.price)}
+                            {productCosts[String(p.id)] && productCosts[String(p.id)].supplierCost !== undefined && (
+                              <p className="text-[10px] font-normal text-gray-500 mt-0.5">
+                                Cost {formatPrice(productCosts[String(p.id)].supplierCost)} · <span className={p.price - productCosts[String(p.id)].supplierCost >= 0 ? 'text-green-600' : 'text-red-500'}>Profit {formatPrice(p.price - productCosts[String(p.id)].supplierCost)}</span>
+                                {productCosts[String(p.id)].supplierName ? ` · ${productCosts[String(p.id)].supplierName}` : ''}
+                              </p>
+                            )}
+                          </td>
                           <td className="p-4 text-gray-500">
                             {totalStock(p)} units
                             {hasSizeStock(p) && (
@@ -285,6 +298,54 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                         isDarkMode={isDarkMode}
                       />
                     </div>
+                    <div className={`sm:col-span-2 rounded-lg border p-4 space-y-3 ${isDarkMode ? 'border-[#D4AF37]/40 bg-[#D4AF37]/5' : 'border-[#D4AF37]/50 bg-[#D4AF37]/5'}`}>
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wider text-[#D4AF37]">Supplier details (dropshipping) · private</p>
+                        <p className="text-[11px] text-gray-500 mt-0.5">Only the Owner, Managers and Admins can see this. Customers never see it. Leave it empty for products you keep in your own stock.</p>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">Shop name (where you buy it)</label>
+                          <input
+                            type="text"
+                            list="kyvro-supplier-names"
+                            placeholder="e.g. SelfShop"
+                            maxLength={80}
+                            value={newProductForm.supplierName || ''}
+                            onChange={e => setNewProductForm({...newProductForm, supplierName: e.target.value})}
+                            className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
+                          />
+                          <datalist id="kyvro-supplier-names">{supplierNames.map(n => <option key={n} value={n} />)}</datalist>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">Original price (BDT, per piece)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="e.g. 440"
+                            value={newProductForm.supplierCost ?? ''}
+                            onChange={e => setNewProductForm({...newProductForm, supplierCost: e.target.value})}
+                            className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-semibold text-gray-500 mb-1">Supplier product link (optional)</label>
+                          <input
+                            type="url"
+                            placeholder="https://selfshop.com.bd/product/..."
+                            maxLength={500}
+                            value={newProductForm.supplierLink || ''}
+                            onChange={e => setNewProductForm({...newProductForm, supplierLink: e.target.value})}
+                            className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
+                          />
+                        </div>
+                      </div>
+                      {formProfit !== null && (
+                        <p className={`text-xs font-semibold ${formProfit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                          Selling price {formatPrice(formPriceNum)} − original price {formatPrice(formCostNum)} = {formProfit >= 0 ? 'profit' : 'LOSS'} {formatPrice(Math.abs(formProfit))} per piece
+                        </p>
+                      )}
+                    </div>
                     <div className="sm:col-span-2">
                       <label className="block text-xs font-semibold text-gray-500 mb-1">Description *</label>
                       <textarea 
@@ -303,7 +364,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                 </form>
               )}
 
-              {adminTab === 'orders' && <OrdersPanel orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} canUnblock={adminRole === 'owner' || adminRole === 'manager'} isOwner={adminRole === 'owner'} />}
+              {adminTab === 'orders' && <OrdersPanel orders={orders} productCosts={productCosts} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} canUnblock={adminRole === 'owner' || adminRole === 'manager'} isOwner={adminRole === 'owner'} />}
             </div>
           )}
         </div>

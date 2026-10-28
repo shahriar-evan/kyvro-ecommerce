@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ORDER_STATUSES, DELIVERY_AREA_BN } from '../data/shopConfig';
-import { updateOrderStatus, markOrderPaid, deleteOrders } from '../orders';
+import { updateOrderStatus, markOrderPaid, deleteOrders, watchOrderSupply, markSupplierOrdered, unmarkSupplierOrdered, supplierKey } from '../orders';
 import { formatDateTime, toDate } from '../utils/dates';
 import { phoneKey, emailKey } from '../data/shopConfig';
 import { watchBlocked, blockPhone, blockEmail, unblockPhone, unblockEmail } from '../blocklist';
@@ -21,7 +21,7 @@ const PAYMENT_STYLE = {
 
 const csv = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
-export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName, loggedInUserEmail, canUnblock, isOwner }) {
+export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, formatPrice, adminName, loggedInUserEmail, canUnblock, isOwner }) {
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState(null);
@@ -38,6 +38,96 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
     const stop = watchBlocked(setBlocked);
     return () => stop();
   }, []);
+
+  // Which supplier shops each order was already placed at (private, team members only)
+  const [supply, setSupply] = useState({});
+  useEffect(() => {
+    const stop = watchOrderSupply(setSupply, (err) => console.error('Could not load supplier orders:', err));
+    return () => stop();
+  }, []);
+
+  // ---- Dropshipping: cost, profit and the text to paste into the supplier's site ----
+  // Cost comes from the private "productCosts" (set in the product form). Items are grouped by supplier shop.
+  const supplyInfo = (o) => {
+    const groups = {};
+    const missing = [];
+    let cost = 0;
+    (o.items || []).forEach((it) => {
+      const c = productCosts[String(it.id)];
+      const qty = parseInt(it.quantity, 10) || 0;
+      if (!c || c.supplierCost === undefined || c.supplierCost === null || c.supplierCost === '') { missing.push(it.name); return; }
+      const name = String(c.supplierName || 'Supplier').trim() || 'Supplier';
+      const g = groups[supplierKey(name)] || (groups[supplierKey(name)] = { key: supplierKey(name), name, items: [], cost: 0, sell: 0 });
+      const line = (Number(c.supplierCost) || 0) * qty;
+      g.items.push({ ...it, link: c.supplierLink || '', unitCost: Number(c.supplierCost) || 0 });
+      g.cost += line;
+      g.sell += (Number(it.price) || 0) * qty;
+      cost += line;
+    });
+    const revenue = (Number(o.subtotal) || 0) - (Number(o.discount) || 0);
+    return { groups: Object.values(groups), missing, cost, revenue, profit: revenue - cost, hasSupplier: Object.keys(groups).length > 0 };
+  };
+  const placedAt = (o, g) => (supply[o.id] && supply[o.id].placed && supply[o.id].placed[g.key]) || null;
+
+  // City / Zone / Area / House-Road are saved on separate labelled lines in the address
+  const parseAddress = (addr) => {
+    const out = {};
+    String(addr || '').split('\n').forEach((line) => {
+      const m = line.match(/^\s*(House\/Road|Area|Zone|City)\s*:\s*(.*)$/i);
+      if (m) out[m[1].toLowerCase()] = m[2].trim();
+    });
+    return out;
+  };
+
+  // Everything the supplier's "confirm order" page asks for, in one block (no cost / profit inside)
+  const supplierText = (o, g) => {
+    const money = (n) => `${Number(n || 0).toLocaleString('en-US')} BDT`;
+    const a = parseAddress(o.customer?.address);
+    const lines = [
+      `${g.name.toUpperCase()} ORDER (Kyvro ${o.orderNumber})`,
+      '',
+      `Customer name: ${o.customer?.name || ''}`,
+      `Customer phone: ${o.customer?.phone || ''}`,
+    ];
+    if (a.city || a.zone) {
+      lines.push(`City / District: ${a.city || ''}`, `Zone: ${a.zone || ''}`);
+      if (a.area) lines.push(`Area: ${a.area}`);
+      lines.push(`Customer address: ${a['house/road'] || ''}`);
+    } else {
+      lines.push('Customer address:', `${o.customer?.address || ''}`);
+    }
+    if (o.customer?.notes) lines.push(`Custom note: ${o.customer.notes}`);
+    lines.push('', 'PRODUCTS:');
+    g.items.forEach((it, i) => {
+      const bits = [it.size && it.size !== 'Standard' ? `Size ${it.size}` : '', it.color ? `Color ${it.color}` : ''].filter(Boolean).join(', ');
+      lines.push(`${i + 1}. ${it.name}${bits ? ` (${bits})` : ''} x ${it.quantity}`);
+      if (it.link) lines.push(`   ${it.link}`);
+    });
+    lines.push('', `Selling price (items): ${money(g.sell)}`);
+    if (o.discount > 0) lines.push(`Order discount given to customer: -${money(o.discount)}`);
+    lines.push(`Delivery charge taken by Kyvro: ${o.shipping === 0 ? 'FREE' : money(o.shipping)}`);
+    lines.push(`Customer pays in total: ${money(o.total)}${o.paymentStatus === 'Paid' ? ' (already paid)' : ''}`);
+    return lines.join('\n');
+  };
+  const copyText = async (text, id) => {
+    try { await navigator.clipboard.writeText(text); }
+    catch (e) {
+      const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch (e2) {}
+      document.body.removeChild(ta);
+    }
+    setCopiedId(id);
+    setTimeout(() => setCopiedId((c) => (c === id ? '' : c)), 2000);
+  };
+  const doMarkPlaced = (o, g) => {
+    const no = window.prompt(`You placed this order at ${g.name}.\n\nWrite the ${g.name} order number (optional), then press OK:`, '');
+    if (no === null) return;
+    run(o.id, () => markSupplierOrdered(o.id, g, no, staff));
+  };
+  const doUnmarkPlaced = (o, g) => {
+    if (!confirm(`Remove the "ordered at ${g.name}" mark from this order?`)) return;
+    run(o.id, () => unmarkSupplierOrdered(o.id, g.name));
+  };
 
   const staff = { email: loggedInUserEmail, name: adminName || loggedInUserEmail };
   const countOf = (s) => orders.filter((o) => o.status === s).length;
@@ -266,6 +356,17 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
               <div className="text-right shrink-0">
                 <span className={`inline-block px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${STATUS_STYLE[o.status] || ''}`}>{o.status}</span>
                 <p className="text-sm font-bold mt-1">{formatPrice(o.total)}</p>
+                {(() => {
+                  const sp = supplyInfo(o);
+                  if (!sp.hasSupplier || o.status === 'Cancelled') return null;
+                  const todo = o.status !== 'Pending' && sp.groups.some((g) => !placedAt(o, g));
+                  return (
+                    <p className="text-[10px] mt-0.5 font-semibold">
+                      {sp.missing.length === 0 && <span className={sp.profit >= 0 ? 'text-green-600' : 'text-red-500'}>Profit {formatPrice(sp.profit)}</span>}
+                      {todo && <span className="ml-1.5 text-amber-600">· order from {sp.groups.filter((g) => !placedAt(o, g)).map((g) => g.name).join(', ')}</span>}
+                    </p>
+                  );
+                })()}
               </div>
               <span className="text-[#D4AF37] text-lg leading-none shrink-0" aria-hidden="true">{isOpen ? '▲' : '▼'}</span>
             </button>
@@ -303,6 +404,63 @@ export default function OrdersPanel({ orders, isDarkMode, formatPrice, adminName
                 <p className="text-sm font-bold">Total: {formatPrice(o.total)}</p>
               </div>
             </div>
+
+            {/* supplier / dropshipping (private) */}
+            {(() => {
+              const sp = supplyInfo(o);
+              if (!sp.hasSupplier && sp.missing.length === 0) return null;
+              if (!sp.hasSupplier) return null;
+              const finished = o.status === 'Cancelled';
+              return (
+                <div className={`rounded border border-[#D4AF37]/50 bg-[#D4AF37]/5 p-3 text-xs space-y-3`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-bold text-[11px] uppercase tracking-wider text-[#D4AF37]">Supplier order · private (customers cannot see this)</p>
+                    <p className="font-semibold">
+                      Sold {formatPrice(sp.revenue)} − cost {formatPrice(sp.cost)} = <span className={sp.profit >= 0 ? 'text-green-600' : 'text-red-500'}>{sp.profit >= 0 ? 'profit' : 'LOSS'} {formatPrice(Math.abs(sp.profit))}</span>
+                    </p>
+                  </div>
+                  {sp.missing.length > 0 && <p className="text-amber-600">Supplier price is not set for: {sp.missing.join(', ')}. The profit above does not include these items.</p>}
+                  <p className="text-[11px] text-gray-500">Delivery charge you collected ({o.shipping === 0 ? 'FREE' : formatPrice(o.shipping)}) is not counted in the profit, because the supplier's own delivery fee can be different.</p>
+                  {o.status === 'Pending' && !finished && (
+                    <p className="p-2 rounded bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 font-semibold">Step 1: press "Confirm &amp; start processing" below. After that, order from the supplier shop.</p>
+                  )}
+                  {sp.groups.map((g) => {
+                    const placed = placedAt(o, g);
+                    const canOrder = !finished && o.status !== 'Pending';
+                    return (
+                      <div key={g.key} className={`rounded border p-3 space-y-2 ${isDarkMode ? 'bg-[#121212] border-gray-800' : 'bg-white border-gray-200'}`}>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="font-bold">{g.name} <span className="font-normal text-gray-500">· cost {formatPrice(g.cost)}</span></p>
+                          {placed
+                            ? <span className="px-2 py-1 rounded text-[10px] font-bold bg-green-600/15 text-green-600 uppercase tracking-wider">Ordered at {g.name} ✓</span>
+                            : <span className="px-2 py-1 rounded text-[10px] font-bold bg-amber-500/15 text-amber-600 uppercase tracking-wider">{canOrder ? 'Not ordered yet' : 'Waiting for confirmation'}</span>}
+                        </div>
+                        <ul className="text-[11px] text-gray-500 space-y-0.5">
+                          {g.items.map((it, i) => (
+                            <li key={i}>
+                              {it.name}{it.size && it.size !== 'Standard' ? ` · Size ${it.size}` : ''}{it.color ? ` · ${it.color}` : ''} × {it.quantity} · {formatPrice(it.unitCost)} each
+                              {it.link && <> · <a href={it.link} target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] underline">open product</a></>}
+                            </li>
+                          ))}
+                        </ul>
+                        {placed && <p className="text-[11px] text-gray-500">Marked by {placed.byName || placed.by} · {formatDateTime(placed.at)}{placed.orderNo ? ` · ${g.name} order no: ${placed.orderNo}` : ''}</p>}
+                        <div className="flex flex-wrap gap-2">
+                          <button type="button" disabled={!canOrder} onClick={() => copyText(supplierText(o, g), `${o.id}|${g.key}`)}
+                            className={`${btn} ${copiedId === `${o.id}|${g.key}` ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                            {copiedId === `${o.id}|${g.key}` ? 'Copied ✓' : `Copy for ${g.name}`}
+                          </button>
+                          {g.items.find((it) => it.link) && canOrder && (
+                            <a href={g.items.find((it) => it.link).link} target="_blank" rel="noopener noreferrer" className={`${btn} border border-gray-400 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#222]`}>Open {g.name}</a>
+                          )}
+                          {!placed && canOrder && <button type="button" disabled={busy} onClick={() => doMarkPlaced(o, g)} className={`${btn} bg-[#D4AF37] text-black hover:opacity-90`}>I ordered at {g.name}</button>}
+                          {placed && !finished && <button type="button" disabled={busy} onClick={() => doUnmarkPlaced(o, g)} className="text-[11px] underline text-gray-500">Undo mark</button>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
             {/* items */}
             <div>

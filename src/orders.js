@@ -1,6 +1,6 @@
 import { getApp } from "firebase/app";
 import {
-  getFirestore, doc, setDoc, updateDoc, runTransaction, writeBatch, collection, query, orderBy, onSnapshot, serverTimestamp, arrayUnion,
+  getFirestore, doc, setDoc, updateDoc, runTransaction, writeBatch, collection, query, orderBy, onSnapshot, serverTimestamp, arrayUnion, deleteField,
 } from "firebase/firestore";
 import "./firebase"; // makes sure the default Firebase app exists
 
@@ -166,6 +166,37 @@ export async function markOrderPaid(orderId, staff) {
     updatedAt: serverTimestamp(),
     history: arrayUnion(historyEntry("Payment received", staff)),
   });
+}
+
+// ---- Supplier orders (dropshipping): PRIVATE ----
+// "orderSupply/{orderId}" remembers which supplier shops this order was already placed at. Only team members can read it
+// (never the customer, who can read the order itself). placed = { <shopKey>: { supplierName, orderNo, cost, at, by, byName } }
+export function watchOrderSupply(onData, onError) {
+  return onSnapshot(
+    collection(db, "orderSupply"),
+    (snap) => {
+      const map = {};
+      snap.docs.forEach((d) => { map[d.id] = d.data(); });
+      onData(map);
+    },
+    (err) => onError && onError(err)
+  );
+}
+export const supplierKey = (name) => String(name || "supplier").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "supplier";
+
+export async function markSupplierOrdered(orderId, group, orderNo, staff) {
+  const entry = {
+    supplierName: group.name,
+    orderNo: String(orderNo || "").trim().slice(0, 80),
+    cost: Number(group.cost) || 0,
+    at: new Date().toISOString(),
+    by: staff.email || "",
+    byName: staff.name || staff.email || "",
+  };
+  await setDoc(doc(db, "orderSupply", orderId), { placed: { [supplierKey(group.name)]: entry }, updatedAt: new Date().toISOString() }, { merge: true });
+}
+export async function unmarkSupplierOrdered(orderId, name) {
+  await updateDoc(doc(db, "orderSupply", orderId), { [`placed.${supplierKey(name)}`]: deleteField(), updatedAt: new Date().toISOString() });
 }
 
 // Owner only (the Firestore rules check it too): permanently deletes finished orders (Delivered / Cancelled)
