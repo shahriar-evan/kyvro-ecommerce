@@ -382,7 +382,7 @@ export default function App() {
   const discountInfo = bestDiscount(subtotal, storeSettings);
   const discount = discountInfo.amount;
   // Flat delivery charge; free above the Owner's minimum (see data/shopConfig.js and Admin > Store Settings)
-  const deliveryCharge = deliveryFee(checkoutForm.deliveryArea, checkoutForm.paymentMethod, subtotal - discount, storeSettings);
+  const deliveryCharge = deliveryFee(checkoutForm.deliveryArea, checkoutForm.paymentMethod, subtotal - discount, storeSettings, cart.reduce((n, i) => n + (parseInt(i.quantity, 10) || 0), 0));
   const discountLabel = discountInfo.rule ? describeRule(discountInfo.rule) : '';
   const reward = nextReward(subtotal, storeSettings);
   const grandTotal = subtotal - discount + deliveryCharge;

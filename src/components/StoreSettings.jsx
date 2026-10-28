@@ -10,6 +10,7 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
   const [rules, setRules] = useState(settings.discountRules.map((r) => ({ ...r })));
   const [dIn, setDIn] = useState(String(settings.deliveryInside));
   const [dOut, setDOut] = useState(String(settings.deliveryOutside));
+  const [dExtra, setDExtra] = useState(String(settings.deliveryExtraPerItem));
   const [freeOn, setFreeOn] = useState(settings.freeDeliveryEnabled);
   const [freeMin, setFreeMin] = useState(String(settings.freeDeliveryMin));
   const [freeFor, setFreeFor] = useState(settings.freeDeliveryFor);
@@ -45,6 +46,7 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
     setRules(settings.discountRules.map((r) => ({ ...r })));
     setDIn(String(settings.deliveryInside));
     setDOut(String(settings.deliveryOutside));
+    setDExtra(String(settings.deliveryExtraPerItem));
     setFreeOn(settings.freeDeliveryEnabled);
     setFreeMin(String(settings.freeDeliveryMin));
     setFreeFor(settings.freeDeliveryFor);
@@ -53,7 +55,7 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
   const card = `rounded-lg border p-5 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`;
   const input = `w-full border rounded px-3 py-2 text-sm outline-none focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#0f0f0f] border-gray-700' : 'bg-white border-gray-300'}`;
 
-  const draft = normalizeSettings({ announcementText: text, discountEnabled: enabled, discountRules: rules, deliveryInside: dIn === '' ? 0 : dIn, deliveryOutside: dOut === '' ? 0 : dOut, freeDeliveryEnabled: freeOn, freeDeliveryMin: freeMin === '' ? 0 : freeMin, freeDeliveryFor: freeFor });
+  const draft = normalizeSettings({ announcementText: text, discountEnabled: enabled, discountRules: rules, deliveryInside: dIn === '' ? 0 : dIn, deliveryOutside: dOut === '' ? 0 : dOut, deliveryExtraPerItem: dExtra === '' ? 0 : dExtra, freeDeliveryEnabled: freeOn, freeDeliveryMin: freeMin === '' ? 0 : freeMin, freeDeliveryFor: freeFor });
   const t = Number(testTotal) || 0;
   const hit = bestDiscount(t, draft);
   const next = nextReward(t, draft);
@@ -99,7 +101,7 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
     setMsg('');
     const bad = rules.some((r) => !(Number(r.min) > 0) || !(Number(r.value) > 0));
     if (enabled && bad) { setMsg('Error: every discount rule needs a minimum total and a value above 0 (or delete the empty rule).'); return; }
-    if (dIn === '' || dOut === '' || !(Number(dIn) >= 0) || !(Number(dOut) >= 0)) { setMsg('Error: type both delivery charges (0 or more).'); return; }
+    if (dIn === '' || dOut === '' || dExtra === '' || !(Number(dExtra) >= 0) || !(Number(dIn) >= 0) || !(Number(dOut) >= 0)) { setMsg('Error: type both delivery charges (0 or more).'); return; }
     if (freeOn && !(Number(freeMin) > 0)) { setMsg('Error: type the minimum order amount for free delivery (above 0), or switch free delivery OFF.'); return; }
     if (rules.some((r) => r.type === 'percent' && Number(r.value) > 100)) { setMsg('Error: a percent discount cannot be more than 100.'); return; }
     setSaving(true);
@@ -183,7 +185,7 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
 
       <div className={card}>
         <h3 className="font-bold text-sm uppercase tracking-wider mb-1">Delivery Charge</h3>
-        <p className="text-xs text-gray-500 mb-4">The charge is added at checkout, by the customer's delivery area. Free delivery is counted on the product total after the discount.</p>
+        <p className="text-xs text-gray-500 mb-4">The charge is added at checkout by the customer's delivery area. The first item costs the area charge; every additional item adds the extra amount (the supplier charges more for more items). Free delivery is counted on the product total after the discount.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-[11px] font-semibold mb-1">Inside Dhaka (BDT)</label>
@@ -192,6 +194,10 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
           <div>
             <label className="block text-[11px] font-semibold mb-1">Outside Dhaka (BDT)</label>
             <input type="number" min="0" value={dOut} onChange={(e) => setDOut(e.target.value)} className={input} placeholder="150" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold mb-1">Extra for each additional item (BDT)</label>
+            <input type="number" min="0" value={dExtra} onChange={(e) => setDExtra(e.target.value)} className={input} placeholder="15" />
           </div>
         </div>
         <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer mt-4">

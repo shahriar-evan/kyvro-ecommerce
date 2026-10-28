@@ -115,7 +115,7 @@ const PAGES = {
           'Online payment: you pay in advance with the payment method shown at checkout. Your order is processed after we receive the payment.',
         ] },
         { h: '6. Delivery', li: [
-          'Delivery charge: a charge that depends on your delivery area (inside or outside Dhaka), shown at checkout before you order. Delivery may be free when your order reaches the minimum amount shown on the website (and you use the payment method it names). See the Return & Refund Policy for what happens if you return the product.',
+          'Delivery charge: a charge that depends on your delivery area (inside or outside Dhaka) and the number of items, shown at checkout before you order. Delivery may be free when your order reaches the minimum amount shown on the website (and you use the payment method it names). See the Return & Refund Policy for what happens if you return the product.',
           'Our team will tell you the expected delivery time when the order is confirmed. Delays caused by couriers, weather or other things outside our control may happen.',
           'Please keep your phone on so the delivery person can reach you.',
         ] },
@@ -148,7 +148,7 @@ const PAGES = {
           'অনলাইন পেমেন্ট: চেকআউটে দেখানো পদ্ধতিতে আগে টাকা দেবেন। পেমেন্ট পাওয়ার পর আপনার অর্ডার প্রসেস হবে।',
         ] },
         { h: '৬. ডেলিভারি', li: [
-          'ডেলিভারি চার্জ: ডেলিভারি এলাকা (ঢাকার ভিতরে বা বাইরে) অনুযায়ী ঠিক হয়, অর্ডারের আগে চেকআউটে দেখানো হয়। ওয়েবসাইটে দেখানো ন্যূনতম অর্ডার পূর্ণ হলে (এবং উল্লেখ করা পেমেন্ট পদ্ধতি ব্যবহার করলে) ডেলিভারি ফ্রি হতে পারে। পণ্য ফেরত দিলে কী হবে তা রিটার্ন ও রিফান্ড নীতিতে দেখুন।',
+          'ডেলিভারি চার্জ: ডেলিভারি এলাকা (ঢাকার ভিতরে বা বাইরে) ও পণ্যের সংখ্যা অনুযায়ী ঠিক হয়, অর্ডারের আগে চেকআউটে দেখানো হয়। ওয়েবসাইটে দেখানো ন্যূনতম অর্ডার পূর্ণ হলে (এবং উল্লেখ করা পেমেন্ট পদ্ধতি ব্যবহার করলে) ডেলিভারি ফ্রি হতে পারে। পণ্য ফেরত দিলে কী হবে তা রিটার্ন ও রিফান্ড নীতিতে দেখুন।',
           'অর্ডার নিশ্চিত হলে আমাদের টিম আনুমানিক ডেলিভারির সময় জানাবে। কুরিয়ার, আবহাওয়া বা আমাদের নিয়ন্ত্রণের বাইরের কারণে দেরি হতে পারে।',
           'ডেলিভারি ম্যান যেন যোগাযোগ করতে পারে, তাই ফোন চালু রাখুন।',
         ] },
