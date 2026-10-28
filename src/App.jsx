@@ -590,11 +590,6 @@ export default function App() {
     e.preventDefault();
     const existingProduct = editingProductId ? products.find(p => p.id === editingProductId) : null;
 
-    if (!newProductForm.image) {
-      alert('Please add a product image: paste an image link or upload a photo.');
-      return;
-    }
-
     // Sizes with their own quantity, e.g. { M: 20, L: 15, XL: 10 }
     const formSizes = newProductForm.sizeStock || {};
     let colorList = newProductForm.colors.split(',').map(s => s.trim()).filter(Boolean);
@@ -649,6 +644,16 @@ export default function App() {
         : Math.max(0, parseInt(newProductForm.stock, 10) || 0);
     }
 
+    // Main photo: when the colors have their own photos, the first color photo IS the main photo (no second upload needed,
+    // and no double photo in the gallery). Otherwise the separate Product Image field is used.
+    const colorPhotoMap = {};
+    for (const c of colorList) { const u = (newProductForm.colorImages || {})[c]; if (u) colorPhotoMap[c] = u; }
+    const mainImage = Object.values(colorPhotoMap)[0] || newProductForm.image;
+    if (!mainImage) {
+      alert(colorList.length ? 'Please upload a photo for at least one color (or add a main product image).' : 'Please add a product image: paste an image link or upload a photo.');
+      return;
+    }
+
     // Private supplier details (dropshipping). Cost is optional; if it is typed, the shop name is needed too.
     const costRaw = String(newProductForm.supplierCost ?? '').trim();
     const supplierName = String(newProductForm.supplierName || '').trim();
@@ -689,8 +694,8 @@ export default function App() {
       gender: newProductForm.gender,
       price: parseFloat(newProductForm.price) || 0,
       originalPrice: parseFloat(newProductForm.originalPrice) || 0,
-      image: newProductForm.image,
-      images: [newProductForm.image],
+      image: mainImage,
+      images: [mainImage],
       description: newProductForm.description,
       colors: colorList,
       sizes: hasSizes ? sizeNames : ["Standard"],

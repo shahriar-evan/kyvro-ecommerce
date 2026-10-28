@@ -43,6 +43,8 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
   const formCostNum = parseFloat(newProductForm && newProductForm.supplierCost);
   const formPriceNum = parseFloat(newProductForm && newProductForm.price);
   const formProfit = !Number.isNaN(formCostNum) && !Number.isNaN(formPriceNum) ? formPriceNum - formCostNum : null;
+  const firstPhotoColor = photoColors.find((c) => (newProductForm.colorImages || {})[c]);
+  const hasColorPhotos = !!firstPhotoColor;
   const inputCls = `w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`;
   const linkPerColor = !!(newProductForm && newProductForm.linkPerColor);
   const colorLinks = (newProductForm && newProductForm.colorLinks) || {};
@@ -356,13 +358,20 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                         <ColorPhotos colors={photoColors} value={newProductForm.colorImages || {}} onChange={(colorImages) => setNewProductForm({...newProductForm, colorImages})} isDarkMode={isDarkMode} />
                       </div>
                     </div>
-                    <div className="sm:col-span-2">
-                      <ImageField
-                        value={newProductForm.image}
-                        onChange={(image) => setNewProductForm(prev => ({...prev, image}))}
-                        isDarkMode={isDarkMode}
-                      />
-                    </div>
+                    {hasColorPhotos ? (
+                      <div className="sm:col-span-2 rounded border border-dashed border-gray-400/60 p-3 text-[11px] text-gray-500">
+                        <strong className="text-gray-700 dark:text-gray-300">Main product photo: automatic.</strong> The photo of the first color ({firstPhotoColor}) is used as the main photo, so you do not need to upload it again.
+                      </div>
+                    ) : (
+                      <div className="sm:col-span-2">
+                        <ImageField
+                          value={newProductForm.image}
+                          onChange={(image) => setNewProductForm(prev => ({...prev, image}))}
+                          isDarkMode={isDarkMode}
+                        />
+                        {photoColors.length > 0 && <p className="text-[11px] text-gray-500 mt-1">Tip: upload a photo for each color above instead, and the first color photo becomes the main photo automatically.</p>}
+                      </div>
+                    )}
                     {/* on phones / small screens the supplier box sits here; on large screens it is in the empty space on the right */}
                     <div className="sm:col-span-2 lg:hidden">{supplierPanel}</div>
                     <div className="sm:col-span-2">
