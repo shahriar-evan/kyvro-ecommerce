@@ -21,3 +21,13 @@
 @keyframes kyvroFadeIn { from { opacity: 0; } to { opacity: 1; } }
 .kyvro-slide { animation: kyvroSlideIn 0.28s cubic-bezier(0.22, 1, 0.36, 1); }
 .kyvro-fade { animation: kyvroFadeIn 0.2s ease-out; }
+
+/* Top announcement bar: endless scroll at a steady speed (the duration is set from the text length) */
+@keyframes kyvroMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.kyvro-marquee {
+  display: inline-flex;
+  white-space: nowrap;
+  will-change: transform;
+  animation: kyvroMarquee 60s linear infinite;
+}
+.kyvro-marquee:hover { animation-play-state: paused; }
