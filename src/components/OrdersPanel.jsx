@@ -59,7 +59,9 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
       const name = String(c.supplierName || 'Supplier').trim() || 'Supplier';
       const g = groups[supplierKey(name)] || (groups[supplierKey(name)] = { key: supplierKey(name), name, items: [], cost: 0, sell: 0 });
       const line = (Number(c.supplierCost) || 0) * qty;
-      g.items.push({ ...it, link: c.supplierLink || '', unitCost: Number(c.supplierCost) || 0 });
+      const cl = c.colorLinks || {};
+      const colorKey = Object.keys(cl).find((k) => k.toLowerCase() === String(it.color || '').trim().toLowerCase());
+      g.items.push({ ...it, link: (colorKey && cl[colorKey]) || c.supplierLink || '', unitCost: Number(c.supplierCost) || 0 });
       g.cost += line;
       g.sell += (Number(it.price) || 0) * qty;
       cost += line;
@@ -449,7 +451,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
                             className={`${btn} ${copiedId === `${o.id}|${g.key}` ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
                             {copiedId === `${o.id}|${g.key}` ? 'Copied ✓' : `Copy for ${g.name}`}
                           </button>
-                          {g.items.find((it) => it.link) && canOrder && (
+                          {new Set(g.items.map((it) => it.link).filter(Boolean)).size === 1 && canOrder && (
                             <a href={g.items.find((it) => it.link).link} target="_blank" rel="noopener noreferrer" className={`${btn} border border-gray-400 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#222]`}>Open {g.name}</a>
                           )}
                           {!placed && canOrder && <button type="button" disabled={busy} onClick={() => doMarkPlaced(o, g)} className={`${btn} bg-[#D4AF37] text-black hover:opacity-90`}>I ordered at {g.name}</button>}

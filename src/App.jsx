@@ -46,7 +46,7 @@ const EMPTY_CHECKOUT = {
 const EMPTY_PRODUCT_FORM = {
   name: '', gender: 'Men', category: 'Shirt', price: '', originalPrice: '', image: '', description: '',
   colors: '', sizeStock: {}, colorStock: {}, colorImages: {}, trackColors: false, stock: '10', isNew: true, isFeatured: false, isBestSeller: false,
-  supplierName: '', supplierCost: '', supplierLink: ''
+  supplierName: '', supplierCost: '', supplierLink: '', linkPerColor: false, colorLinks: {}
 };
 
 export default function App() {
@@ -653,7 +653,17 @@ export default function App() {
     const costRaw = String(newProductForm.supplierCost ?? '').trim();
     const supplierName = String(newProductForm.supplierName || '').trim();
     const supplierLink = String(newProductForm.supplierLink || '').trim();
-    const hasSupplier = costRaw !== '' || supplierName !== '' || supplierLink !== '';
+    const perColorLinks = !!newProductForm.linkPerColor;
+    // links per color: only for colors the product really has
+    const colorLinks = {};
+    if (perColorLinks) {
+      for (const c of colorList) {
+        const u = String((newProductForm.colorLinks || {})[c] || '').trim();
+        if (u) colorLinks[c] = u;
+      }
+    }
+    const supplierLinkUsed = perColorLinks ? '' : supplierLink;
+    const hasSupplier = costRaw !== '' || supplierName !== '' || supplierLinkUsed !== '' || Object.keys(colorLinks).length > 0;
     const supplierCost = costRaw === '' ? 0 : parseFloat(costRaw);
     if (hasSupplier) {
       if (costRaw === '' || Number.isNaN(supplierCost) || supplierCost < 0) {
@@ -664,8 +674,9 @@ export default function App() {
         alert('Supplier details: please write the name of the shop you buy this product from (for example SelfShop).');
         return;
       }
-      if (supplierLink && !/^https?:\/\//i.test(supplierLink)) {
-        alert('Supplier details: the product link must start with http:// or https://');
+      const badLink = [supplierLinkUsed, ...Object.values(colorLinks)].find((u) => u && !/^https?:\/\//i.test(u));
+      if (badLink) {
+        alert('Supplier details: every product link must start with http:// or https://');
         return;
       }
       if (supplierCost > (parseFloat(newProductForm.price) || 0) && !confirm(`Your selling price (${newProductForm.price}) is LOWER than the supplier price (${supplierCost}). You will lose money on every sale. Save anyway?`)) return;
@@ -725,7 +736,7 @@ export default function App() {
     }
     // Save (or clear) the private supplier details in their own admin-only collection
     try {
-      if (hasSupplier) await saveProductCost(productData.id, { supplierName, supplierCost, supplierLink }, { email: loggedInUserEmail });
+      if (hasSupplier) await saveProductCost(productData.id, { supplierName, supplierCost, supplierLink: supplierLinkUsed, colorLinks }, { email: loggedInUserEmail });
       else if (editingProductId && productCosts[String(editingProductId)]) await removeProductCost(productData.id);
     } catch (err) {
       console.error(err);
@@ -774,7 +785,9 @@ export default function App() {
       isBestSeller: prod.isBestSeller,
       supplierName: sup.supplierName || '',
       supplierCost: sup.supplierCost === undefined ? '' : String(sup.supplierCost),
-      supplierLink: sup.supplierLink || ''
+      supplierLink: sup.supplierLink || '',
+      linkPerColor: !!(sup.colorLinks && Object.keys(sup.colorLinks).length),
+      colorLinks: { ...(sup.colorLinks || {}) }
     });
     setAdminTab('add-product');
   };

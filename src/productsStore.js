@@ -69,6 +69,8 @@ export const saveProductCost = (id, cost, staff) =>
     supplierName: String(cost.supplierName || "").trim().slice(0, 80),
     supplierCost: Number(cost.supplierCost) || 0,
     supplierLink: String(cost.supplierLink || "").trim().slice(0, 500),
+    // optional: a different supplier link for each color, e.g. { White: "https://...", Red: "https://..." }
+    colorLinks: Object.fromEntries(Object.entries(cost.colorLinks || {}).filter(([, u]) => u).map(([c, u]) => [String(c).slice(0, 40), String(u).trim().slice(0, 500)])),
     updatedAt: new Date().toISOString(),
     updatedBy: (staff && staff.email) || "",
   }));

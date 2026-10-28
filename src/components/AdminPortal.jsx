@@ -43,6 +43,69 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
   const formCostNum = parseFloat(newProductForm && newProductForm.supplierCost);
   const formPriceNum = parseFloat(newProductForm && newProductForm.price);
   const formProfit = !Number.isNaN(formCostNum) && !Number.isNaN(formPriceNum) ? formPriceNum - formCostNum : null;
+  const inputCls = `w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`;
+  const linkPerColor = !!(newProductForm && newProductForm.linkPerColor);
+  const colorLinks = (newProductForm && newProductForm.colorLinks) || {};
+  const setColorLink = (c, v) => setNewProductForm(prev => ({ ...prev, colorLinks: { ...(prev.colorLinks || {}), [c]: v } }));
+  const supplierPanel = (
+    <div className="rounded-lg border border-[#D4AF37]/50 bg-[#D4AF37]/5 p-4 space-y-3">
+      <div>
+        <p className="text-xs font-bold uppercase tracking-wider text-[#D4AF37]">Supplier details (dropshipping) · private</p>
+        <p className="text-[11px] text-gray-500 mt-0.5">Only the Owner, Managers and Admins can see this. Customers never see it. Leave it empty for products you keep in your own stock.</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 mb-1">Shop name (where you buy it)</label>
+          <input type="text" list="kyvro-supplier-names" placeholder="e.g. SelfShop" maxLength={80}
+            value={newProductForm.supplierName || ''}
+            onChange={e => setNewProductForm(prev => ({ ...prev, supplierName: e.target.value }))}
+            className={inputCls} />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 mb-1">Original price (BDT, per piece)</label>
+          <input type="number" placeholder="e.g. 440"
+            value={newProductForm.supplierCost ?? ''}
+            onChange={e => setNewProductForm(prev => ({ ...prev, supplierCost: e.target.value }))}
+            className={inputCls} />
+        </div>
+      </div>
+      {formProfit !== null && (
+        <p className={`text-xs font-semibold ${formProfit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+          Selling price {formatPrice(formPriceNum)} − original price {formatPrice(formCostNum)} = {formProfit >= 0 ? 'profit' : 'LOSS'} {formatPrice(Math.abs(formProfit))} per piece
+        </p>
+      )}
+      {!linkPerColor && (
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 mb-1">Supplier product link (optional){photoColors.length > 1 ? ' · same for all colors' : ''}</label>
+          <input type="text" placeholder="https://selfshop.com.bd/product/..." maxLength={500}
+            value={newProductForm.supplierLink || ''}
+            onChange={e => setNewProductForm(prev => ({ ...prev, supplierLink: e.target.value }))}
+            className={inputCls} />
+        </div>
+      )}
+      {photoColors.length > 0 && (
+        <label className="flex items-start gap-2 text-xs cursor-pointer select-none">
+          <input type="checkbox" className="mt-0.5 accent-[#D4AF37]" checked={linkPerColor}
+            onChange={e => setNewProductForm(prev => ({ ...prev, linkPerColor: e.target.checked }))} />
+          <span><strong>Each color has its own link</strong><br /><span className="text-[11px] text-gray-500">Tick this if the supplier has a separate product page for each color (for example White and Red). Leave it unticked when one link is enough.</span></span>
+        </label>
+      )}
+      {linkPerColor && photoColors.length > 0 && (
+        <div className="space-y-2">
+          {photoColors.map((c) => (
+            <div key={c}>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">{c} · supplier link</label>
+              <input type="text" placeholder="https://..." maxLength={500}
+                value={colorLinks[c] || ''}
+                onChange={e => setColorLink(c, e.target.value)}
+                className={inputCls} />
+            </div>
+          ))}
+        </div>
+      )}
+      {linkPerColor && photoColors.length === 0 && <p className="text-[11px] text-amber-600">Add the product colors first, then a link box will appear for each color.</p>}
+    </div>
+  );
   const roleLabel = adminRole ? adminRole.charAt(0).toUpperCase() + adminRole.slice(1) : '';
 
   return (
@@ -190,7 +253,9 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
               )}
 
               {adminTab === 'add-product' && (
-                <form onSubmit={handleSaveProduct} className={`p-8 rounded-lg border space-y-6 max-w-3xl ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
+                <div className="flex flex-col lg:flex-row lg:items-start gap-6">
+                <datalist id="kyvro-supplier-names">{supplierNames.map(n => <option key={n} value={n} />)}</datalist>
+                <form onSubmit={handleSaveProduct} className={`p-8 rounded-lg border space-y-6 w-full lg:flex-1 min-w-0 max-w-3xl ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
                     <h3 className="text-lg font-serif font-bold">
                       {editingProductId ? 'Edit Product Details' : 'Add New Luxury Product'}
@@ -298,54 +363,8 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                         isDarkMode={isDarkMode}
                       />
                     </div>
-                    <div className={`sm:col-span-2 rounded-lg border p-4 space-y-3 ${isDarkMode ? 'border-[#D4AF37]/40 bg-[#D4AF37]/5' : 'border-[#D4AF37]/50 bg-[#D4AF37]/5'}`}>
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-wider text-[#D4AF37]">Supplier details (dropshipping) · private</p>
-                        <p className="text-[11px] text-gray-500 mt-0.5">Only the Owner, Managers and Admins can see this. Customers never see it. Leave it empty for products you keep in your own stock.</p>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">Shop name (where you buy it)</label>
-                          <input
-                            type="text"
-                            list="kyvro-supplier-names"
-                            placeholder="e.g. SelfShop"
-                            maxLength={80}
-                            value={newProductForm.supplierName || ''}
-                            onChange={e => setNewProductForm({...newProductForm, supplierName: e.target.value})}
-                            className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
-                          />
-                          <datalist id="kyvro-supplier-names">{supplierNames.map(n => <option key={n} value={n} />)}</datalist>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">Original price (BDT, per piece)</label>
-                          <input
-                            type="number"
-                            min="0"
-                            placeholder="e.g. 440"
-                            value={newProductForm.supplierCost ?? ''}
-                            onChange={e => setNewProductForm({...newProductForm, supplierCost: e.target.value})}
-                            className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">Supplier product link (optional)</label>
-                          <input
-                            type="url"
-                            placeholder="https://selfshop.com.bd/product/..."
-                            maxLength={500}
-                            value={newProductForm.supplierLink || ''}
-                            onChange={e => setNewProductForm({...newProductForm, supplierLink: e.target.value})}
-                            className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
-                          />
-                        </div>
-                      </div>
-                      {formProfit !== null && (
-                        <p className={`text-xs font-semibold ${formProfit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                          Selling price {formatPrice(formPriceNum)} − original price {formatPrice(formCostNum)} = {formProfit >= 0 ? 'profit' : 'LOSS'} {formatPrice(Math.abs(formProfit))} per piece
-                        </p>
-                      )}
-                    </div>
+                    {/* on phones / small screens the supplier box sits here; on large screens it is in the empty space on the right */}
+                    <div className="sm:col-span-2 lg:hidden">{supplierPanel}</div>
                     <div className="sm:col-span-2">
                       <label className="block text-xs font-semibold text-gray-500 mb-1">Description *</label>
                       <textarea 
@@ -362,6 +381,8 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                     {editingProductId ? 'Update Product' : 'Save Product to Store'}
                   </button>
                 </form>
+                <aside className="hidden lg:block w-80 xl:w-96 shrink-0 lg:sticky lg:top-24">{supplierPanel}</aside>
+                </div>
               )}
 
               {adminTab === 'orders' && <OrdersPanel orders={orders} productCosts={productCosts} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} canUnblock={adminRole === 'owner' || adminRole === 'manager'} isOwner={adminRole === 'owner'} />}
