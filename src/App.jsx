@@ -44,7 +44,7 @@ const EMPTY_CHECKOUT = {
 
 const EMPTY_PRODUCT_FORM = {
   name: '', gender: 'Men', category: 'Shirt', price: '', originalPrice: '', image: '', description: '',
-  colors: 'Matte Black, Charcoal', sizeStock: {}, colorStock: {}, colorImages: {}, trackColors: false, stock: '10', isNew: true, isFeatured: false, isBestSeller: false
+  colors: '', sizeStock: {}, colorStock: {}, colorImages: {}, trackColors: false, stock: '10', isNew: true, isFeatured: false, isBestSeller: false
 };
 
 export default function App() {

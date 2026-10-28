@@ -4,6 +4,7 @@ import AdminManager from './AdminManager';
 import ImageField from './ImageField';
 import SizeStockEditor from './SizeStockEditor';
 import ColorPhotos from './ColorPhotos';
+import ColorPicker from './ColorPicker';
 import OrdersPanel from './OrdersPanel';
 import StoreSettings from './StoreSettings';
 import { SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
@@ -23,6 +24,20 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
   const photoColors = perColorOn
     ? [...new Set(Object.keys((newProductForm && newProductForm.colorStock) || {}).filter((k) => (formSizeNames.length ? formSizeNames : ['']).includes(k.split('|')[0])).map((k) => k.split('|').slice(1).join('|').trim()).filter(Boolean))]
     : formColors;
+  // tap a color on / off. Switching one off also removes its stock rows and its photo.
+  const setFormColors = (list) => setNewProductForm(prev => ({ ...prev, colors: list.join(', ') }));
+  const addFormColor = (c) => setFormColors([...formColors, c]);
+  const toggleFormColor = (c) => {
+    if (!formColors.some(x => x.toLowerCase() === c.toLowerCase())) { addFormColor(c); return; }
+    setNewProductForm(prev => {
+      const colorStock = {};
+      Object.entries(prev.colorStock || {}).forEach(([k, v]) => { if (k.split('|').slice(1).join('|').trim().toLowerCase() !== c.toLowerCase()) colorStock[k] = v; });
+      const colorImages = { ...(prev.colorImages || {}) };
+      Object.keys(colorImages).forEach(k => { if (k.toLowerCase() === c.toLowerCase()) delete colorImages[k]; });
+      const left = (prev.colors || '').split(',').map(x => x.trim()).filter(x => x && x.toLowerCase() !== c.toLowerCase());
+      return { ...prev, colors: left.join(', '), colorStock, colorImages };
+    });
+  };
   const roleLabel = adminRole ? adminRole.charAt(0).toUpperCase() + adminRole.slice(1) : '';
 
   return (
@@ -245,6 +260,9 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                     </div>
 
                     <div className="sm:col-span-2">
+                      <div className="mb-4">
+                        <ColorPicker colors={formColors} onToggle={toggleFormColor} onAdd={addFormColor} isDarkMode={isDarkMode} />
+                      </div>
                       <SizeStockEditor
                         gender={newProductForm.gender}
                         value={newProductForm.sizeStock || {}}
@@ -253,6 +271,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                         onPerColorChange={(trackColors) => setNewProductForm({...newProductForm, trackColors})}
                         colorValue={newProductForm.colorStock || {}}
                         onColorChange={(colorStock) => setNewProductForm({...newProductForm, colorStock})}
+                        colors={formColors}
                         isDarkMode={isDarkMode}
                       />
                       <div className="mt-3">
