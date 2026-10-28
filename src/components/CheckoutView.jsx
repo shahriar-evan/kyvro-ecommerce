@@ -212,7 +212,7 @@ export default function CheckoutView({
                 const net = subtotal - discount;
                 const miss = freeDeliveryMissing(net, s);
                 if (miss > 0) return <p className="mt-1 font-semibold">আর {toBanglaDigits(miss)} টাকার পণ্য যোগ করলে ডেলিভারি ফ্রি পাবেন।</p>;
-                if (s.freeDeliveryEnabled && !freeDeliveryApplies(net, checkoutForm.paymentMethod, s)) return <p className="mt-1 font-semibold">আপনার অর্ডার ডেলিভারি ফ্রি-র যোগ্য। ফ্রি ডেলিভারি পেতে {s.freeDeliveryFor === 'online' ? 'অনলাইন পেমেন্ট' : 'ক্যাশ অন ডেলিভারি'} নির্বাচন করুন।</p>;
+                if (s.freeDeliveryEnabled && !freeDeliveryApplies(net, checkoutForm.paymentMethod, s)) return <p className="mt-1 font-semibold">{toBanglaDigits(s.freeDeliveryMin)} টাকা বা এর বেশি পণ্য কিনলে ফ্রি ডেলিভারি পাবেন। ফ্রি ডেলিভারি পেতে {s.freeDeliveryFor === 'online' ? 'অনলাইন পেমেন্ট' : 'ক্যাশ অন ডেলিভারি'} নির্বাচন করুন।</p>;
                 return null;
               })()}
               {online && <p className="mt-1">অনলাইন পেমেন্ট নির্বাচন করলে অর্ডার করার পর আমাদের প্রতিনিধি আপনাকে ফোন করে পেমেন্টের নির্দেশনা জানাবেন।</p>}
