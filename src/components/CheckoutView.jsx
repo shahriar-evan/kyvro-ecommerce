@@ -110,10 +110,14 @@ export default function CheckoutView({
               </div>
               <div>
                 <label className="block text-xs font-semibold mb-1">Area (এলাকা / ইউনিয়ন)</label>
-                <select disabled={!upazilaObj || upazilaObj.a.length === 0} value={checkoutForm.area} onChange={(e) => set('area', e.target.value)} className={`${input} disabled:opacity-60`}>
-                  <option value="">{!upazilaObj ? 'Select zone first' : upazilaObj.a.length ? 'Select Area (optional)' : 'Write your area below'}</option>
-                  {upazilaObj && upazilaObj.a.map((a, i) => <option key={a[0] + i} value={a[0]}>{a[0]}{a[1] ? ` (PO: ${a[1]}${a[2] ? ', ' + a[2] : ''})` : ''}</option>)}
-                </select>
+                {upazilaObj && upazilaObj.a.length === 0 ? (
+                  <input type="text" maxLength={60} value={checkoutForm.area} onChange={(e) => set('area', e.target.value)} placeholder="Type your area (optional)" className={input} />
+                ) : (
+                  <select disabled={!upazilaObj} value={checkoutForm.area} onChange={(e) => set('area', e.target.value)} className={`${input} disabled:opacity-60`}>
+                    <option value="">{!upazilaObj ? 'Select zone first' : 'Select Area (optional)'}</option>
+                    {upazilaObj && upazilaObj.a.map((a, i) => <option key={a[0] + i} value={a[0]}>{a[0]}{a[1] ? ` (PO: ${a[1]}${a[2] ? ', ' + a[2] : ''})` : ''}</option>)}
+                  </select>
+                )}
               </div>
             </div>
             <p className="text-[11px] text-gray-500">Selecting city &amp; zone helps ensure accurate courier delivery. Your exact village / road goes in the box below.</p>
