@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Heart } from 'lucide-react';
-import WhatsAppButton from './WhatsAppButton';
+import WhatsAppButton, { WhatsAppIcon } from './WhatsAppButton';
+import useSwipe from '../utils/useSwipe';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
 import StockLabel from './StockLabel';
 import { hasSizeStock, hasColorStock, totalStock, stockForSize, stockFor, stockForColor, productColors, imageFor, orderedSizes } from '../data/catalog';
@@ -20,6 +21,16 @@ export default function ProductDetail({ product, products, addToCart, calculateD
   const [size, setSize] = useState('');
   const [color, setColor] = useState(byColor ? firstColorFor('') : (colors[0] || ''));
   const [qty, setQty] = useState(1);
+  const sizeRef = useRef(null);
+
+  // photo gallery: the main photo + the photo of each color. Swipe sideways to change.
+  const gallery = [...new Set([live.image, ...Object.values(live.colorImages || {}), ...(Array.isArray(live.images) ? live.images : [])].filter(Boolean))];
+  const [manualIdx, setManualIdx] = useState(null); // null = show the photo of the chosen color
+  const colorPhoto = imageFor(live, color);
+  const currentIdx = manualIdx !== null ? Math.min(manualIdx, gallery.length - 1) : Math.max(0, gallery.indexOf(colorPhoto));
+  const shownPhoto = gallery[currentIdx] || colorPhoto;
+  const goPhoto = (d) => { if (gallery.length > 1) setManualIdx((currentIdx + d + gallery.length) % gallery.length); };
+  const photoSwipe = useSwipe(() => goPhoto(1), () => goPhoto(-1));
 
   const total = totalStock(live);
   const available = byColor
@@ -37,6 +48,7 @@ export default function ProductDetail({ product, products, addToCart, calculateD
   };
   const pickColor = (c) => {
     setColor(c);
+    setManualIdx(null);
     setQty(1);
   };
   // the green line follows the choice: size M + blue -> only the pieces of M blue
@@ -68,7 +80,7 @@ export default function ProductDetail({ product, products, addToCart, calculateD
   const waNeedsSize = needsSize;
 
   const cardBtn = (active, disabled) =>
-    `min-w-[3rem] px-3 py-2 text-xs rounded border transition ${
+    `min-w-[3.5rem] h-12 sm:h-auto px-4 sm:px-3 py-2 text-sm sm:text-xs rounded-lg sm:rounded border transition active:scale-95 ${
       disabled
         ? 'opacity-40 line-through cursor-not-allowed border-gray-300 dark:border-gray-700'
         : active
@@ -77,12 +89,19 @@ export default function ProductDetail({ product, products, addToCart, calculateD
     }`;
 
   return (
-    <div className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 w-full">
+    <div className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-32 md:py-12 w-full">
       <button onClick={() => setCurrentView('shop')} className="text-xs text-gray-500 hover:text-[#D4AF37] mb-6">&larr; Back to shop</button>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
-        <div className={`relative rounded-lg overflow-hidden border ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-gray-100 border-gray-200'}`}>
-          <img src={imageFor(live, color)} alt={live.name} className="w-full h-full max-h-[560px] object-cover" />
+        <div {...photoSwipe} className={`relative rounded-lg overflow-hidden border select-none ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-gray-100 border-gray-200'}`}>
+          <img src={shownPhoto} alt={live.name} draggable={false} className="w-full h-full max-h-[560px] object-cover" />
+          {gallery.length > 1 && (
+            <div className="absolute bottom-3 inset-x-0 z-10 flex justify-center gap-1.5">
+              {gallery.map((_, i) => (
+                <button key={i} type="button" aria-label={`Photo ${i + 1}`} onClick={() => setManualIdx(i)} className={`h-2 rounded-full transition-all ${i === currentIdx ? 'w-5 bg-[#D4AF37]' : 'w-2 bg-white/70'}`} />
+              ))}
+            </div>
+          )}
           <button
             type="button"
             onClick={() => toggleSaved(live.id)}
@@ -123,7 +142,7 @@ export default function ProductDetail({ product, products, addToCart, calculateD
           <StockLabel count={labelCount} className="!text-base" />
 
           {sized && (
-            <div>
+            <div ref={sizeRef} className="scroll-mt-24">
               <p className="text-xs font-semibold mb-2">
                 Size: <span className="font-normal text-gray-500">{size || 'select a size'}</span>
               </p>
@@ -155,14 +174,14 @@ export default function ProductDetail({ product, products, addToCart, calculateD
               <button
                 onClick={handleAdd}
                 disabled={needsSize || colorOut}
-                className="flex-1 bg-[#D4AF37] text-black font-bold py-3 rounded text-xs uppercase tracking-widest hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="hidden md:block flex-1 bg-[#D4AF37] text-black font-bold py-3 rounded text-xs uppercase tracking-widest hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {needsSize ? 'Select a size' : colorOut ? 'Out of stock' : 'Add to Cart'}
               </button>
               <button
                 onClick={handleBuyNow}
                 disabled={needsSize || colorOut}
-                className={`flex-1 font-bold py-3 rounded text-xs uppercase tracking-widest border-2 border-[#D4AF37] transition disabled:opacity-50 disabled:cursor-not-allowed ${isDarkMode ? 'text-[#D4AF37] hover:bg-[#D4AF37]/10' : 'text-black hover:bg-[#D4AF37]/10'}`}
+                className={`hidden md:block flex-1 font-bold py-3 rounded text-xs uppercase tracking-widest border-2 border-[#D4AF37] transition disabled:opacity-50 disabled:cursor-not-allowed ${isDarkMode ? 'text-[#D4AF37] hover:bg-[#D4AF37]/10' : 'text-black hover:bg-[#D4AF37]/10'}`}
               >
                 Buy Now
               </button>
@@ -177,6 +196,40 @@ export default function ProductDetail({ product, products, addToCart, calculateD
           {soldOut && <p className="text-sm font-bold text-red-500">This product is currently sold out.</p>}
         </div>
       </div>
+
+      {/* Phone only: the buy buttons stay at the bottom of the screen while the customer scrolls */}
+      {!soldOut && (
+        <div className={`md:hidden fixed bottom-0 inset-x-0 z-40 border-t px-3 pt-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] flex items-center gap-2 shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.35)] ${isDarkMode ? 'bg-[#121212]/95 border-gray-800' : 'bg-white/95 border-gray-200'} backdrop-blur`}>
+          <div className="leading-tight pr-1 min-w-[4.5rem]">
+            <p className="text-[10px] text-gray-500">{qty > 1 ? `Total (${qty})` : 'Price'}</p>
+            <p className="text-base font-bold text-[#D4AF37]">{formatPrice(live.price * qty)}</p>
+          </div>
+          <button
+            onClick={needsSize ? () => sizeRef.current && sizeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' }) : handleAdd}
+            disabled={colorOut}
+            className="flex-1 h-12 rounded-lg bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold text-xs uppercase tracking-wider shadow active:scale-95 transition disabled:opacity-50"
+          >
+            {needsSize ? 'Select size' : colorOut ? 'Out of stock' : 'Add to Cart'}
+          </button>
+          <button
+            onClick={needsSize ? () => sizeRef.current && sizeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' }) : handleBuyNow}
+            disabled={colorOut}
+            className={`flex-1 h-12 rounded-lg border-2 border-[#D4AF37] font-bold text-xs uppercase tracking-wider active:scale-95 transition disabled:opacity-50 ${isDarkMode ? 'text-[#D4AF37]' : 'text-black'}`}
+          >
+            Buy Now
+          </button>
+          <a
+            href={waNeedsSize ? undefined : waLink}
+            onClick={(e) => { if (waNeedsSize) { e.preventDefault(); sizeRef.current && sizeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Order on WhatsApp"
+            className="w-12 h-12 shrink-0 rounded-lg bg-gradient-to-br from-[#128C7E] to-[#25D366] text-white flex items-center justify-center shadow active:scale-95 transition"
+          >
+            <WhatsAppIcon size={22} />
+          </a>
+        </div>
+      )}
     </div>
   );
 }

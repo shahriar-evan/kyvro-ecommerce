@@ -36,6 +36,7 @@ import PolicyPages from './components/PolicyPages';
 import OrderSuccess from './components/OrderSuccess';
 import ProductDetail from './components/ProductDetail';
 import AccountView from './components/AccountView';
+import { initAnalytics, trackPageView, trackViewContent, trackAddToCart, trackInitiateCheckout, trackPurchase } from './analytics';
 
 const EMPTY_CHECKOUT = {
   fullName: '', phone: '', address: '', notes: '',
@@ -89,6 +90,14 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedSubCategory, setSelectedSubCategory] = useState(null); // null = default view of the collection
   const [selectedProduct, setSelectedProduct] = useState(null);
+
+  // Visitor tracking (Facebook Pixel + Google Analytics). Off until the IDs are filled in src/analyticsConfig.js.
+  useEffect(() => { initAnalytics(); }, []);
+  useEffect(() => {
+    if (currentView === 'admin') return; // never track the admin panel
+    trackPageView(currentView);
+    if (currentView === 'product-detail' && selectedProduct) trackViewContent(selectedProduct);
+  }, [currentView, selectedProduct]);
   
   // Choosing a collection always starts at its default view
   const selectCategory = (category) => {
@@ -309,6 +318,7 @@ export default function App() {
       const { colorImages, ...rest } = live; // color photos stay out of the cart (keeps it small)
       return [...prev, { ...rest, image: imageFor(live, color), cartItemId, selectedColor: color, selectedSize: size, quantity: qty }];
     });
+    trackAddToCart({ ...live, selectedColor: color }, qty);
     if (goCheckout) {
       // Buy Now: skip the cart drawer and go straight to checkout
       setIsCartOpen(false);
@@ -367,6 +377,7 @@ export default function App() {
   const discountLabel = discountInfo.rule ? describeRule(discountInfo.rule) : '';
   const reward = nextReward(subtotal, storeSettings);
   const grandTotal = subtotal - discount + deliveryCharge;
+  useEffect(() => { if (currentView === 'checkout' && cart.length) trackInitiateCheckout(cart, subtotal - discount); }, [currentView]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCheckoutSubmit = async (e) => {
     e.preventDefault();
@@ -435,6 +446,7 @@ export default function App() {
     try {
       const { orderNumber } = await placeOrder(order);
       setOrderCompleteData({ ...order, orderNumber, date: new Date().toISOString() });
+      trackPurchase({ ...order, orderNumber });
       setCart([]);
       setCheckoutForm(EMPTY_CHECKOUT);
       setCurrentView('order-success');

@@ -69,14 +69,14 @@ export default function CheckoutView({
   }
 
   return (
-    <div className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 w-full">
+    <div className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-36 lg:py-12 w-full">
       <button onClick={() => setCurrentView('shop')} className="text-xs text-gray-500 hover:text-[#D4AF37] mb-4">&larr; Continue shopping</button>
       <h1 className="text-3xl font-serif font-bold mb-4">Checkout</h1>
       <p className="text-sm font-semibold text-red-500 mb-6">
         বিঃদ্রঃ দ্রুত ডেলিভারী নিশ্চিত করার জন্য সঠিক ভাবে আপনার ঠিকানা লিখুন (জেলা উপজেলা উল্লেখ করুন)।
       </p>
 
-      <form onSubmit={handleCheckoutSubmit} className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8 items-start">
+      <form id="kyvro-checkout-form" onSubmit={handleCheckoutSubmit} className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8 items-start">
         {/* BILLING & SHIPPING */}
         <div className={`${panel} lg:col-span-3 space-y-5`}>
           <h2 className="text-xl font-bold border-b pb-3">Billing &amp; Shipping Information</h2>
@@ -221,12 +221,31 @@ export default function CheckoutView({
               <button type="button" onClick={() => setCurrentView('refund')} className="underline hover:text-[#D4AF37]">Return &amp; Refund Policy</button>.
               <span className="block mt-0.5">অর্ডার করার মাধ্যমে আপনি আমাদের শর্তাবলি, গোপনীয়তা নীতি ও রিটার্ন-রিফান্ড নীতি মেনে নিচ্ছেন।</span>
             </p>
-            <button type="submit" disabled={placingOrder} className="w-full bg-[#D4AF37] text-black font-bold py-4 rounded text-sm tracking-widest uppercase hover:opacity-90 transition disabled:opacity-50">
+            <button type="submit" disabled={placingOrder} className="hidden lg:block w-full bg-[#D4AF37] text-black font-bold py-4 rounded text-sm tracking-widest uppercase hover:opacity-90 transition disabled:opacity-50">
               {placingOrder ? 'Placing order...' : 'Place Order'}
             </button>
           </div>
         </div>
       </form>
+
+      {/* Phone only: the total and the Place Order button stay at the bottom of the screen */}
+      <div className={`lg:hidden fixed bottom-0 inset-x-0 z-40 border-t px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.35)] backdrop-blur ${isDarkMode ? 'bg-[#121212]/95 border-gray-800' : 'bg-white/95 border-gray-200'}`}>
+        {checkoutError && <p className="text-[11px] leading-snug text-red-500 mb-2 line-clamp-2">{checkoutError}</p>}
+        <div className="flex items-center gap-3">
+          <div className="leading-tight min-w-[5.5rem]">
+            <p className="text-[10px] text-gray-500">{areaChosen ? 'Total' : 'Total (+ delivery)'}</p>
+            <p className="text-lg font-bold text-[#D4AF37]">{formatPrice(grandTotal)}</p>
+          </div>
+          <button
+            type="submit"
+            form="kyvro-checkout-form"
+            disabled={placingOrder}
+            className="flex-1 h-12 rounded-lg bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold text-sm tracking-widest uppercase shadow active:scale-95 transition disabled:opacity-50"
+          >
+            {placingOrder ? 'Placing order...' : 'Place Order'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
