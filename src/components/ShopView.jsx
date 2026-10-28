@@ -1,5 +1,6 @@
 import React from 'react';
-import { MessageCircle, Heart } from 'lucide-react';
+import { Heart } from 'lucide-react';
+import WhatsAppButton from './WhatsAppButton';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
 import StockLabel from './StockLabel';
 import { SUB_CATEGORIES, COLLECTION_LABELS, DEFAULT_SUB_LABEL, hasSizeStock, totalStock } from '../data/catalog';
@@ -144,14 +145,7 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
                         >
                           Buy Now
                         </button>
-                        <a
-                          href={`https://wa.me/${WHATSAPP_NUMBER}?text=Hello%20Kyvro,%20I%20want%20to%20order:%0A*%20Name:%20${encodeURIComponent(product.name)}%0A*%20Price:%20${encodeURIComponent(formatPrice(product.price))}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full bg-[#25D366] text-white font-bold py-2 rounded text-[11px] uppercase tracking-wider hover:opacity-90 transition flex items-center justify-center gap-1.5 shadow"
-                        >
-                          <MessageCircle size={13} /> Order on WhatsApp
-                        </a>
+                        <WhatsAppButton compact href={`https://wa.me/${WHATSAPP_NUMBER}?text=Hello%20Kyvro,%20I%20want%20to%20order:%0A*%20Name:%20${encodeURIComponent(product.name)}%0A*%20Price:%20${encodeURIComponent(formatPrice(product.price))}`} />
                       </div>
                     </div>
                   </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { hasSizeStock, totalStock } from '../data/catalog';
 import StockLabel from './StockLabel';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
-import { User, Shield, Truck, RefreshCw, ChevronRight, MessageCircle, Heart } from 'lucide-react';
+import { User, Shield, Truck, RefreshCw, ChevronRight, ArrowRight, MessageCircle, Heart } from 'lucide-react';
 import heroBannerImg from '../assets/hero-banner.png';
 import heroBanner1Img from '../assets/hero-banner1.png';
 import heroBanner2Img from '../assets/hero-banner2.png';
@@ -73,9 +73,13 @@ export default function HomeView({ requestAdd, addToCart, banners, calculateDisc
             <div className="absolute inset-x-0 bottom-3 sm:bottom-8 z-10 flex justify-center">
               <button
                 onClick={() => setCurrentView('shop')}
-                className="bg-[#D4AF37] text-black font-bold px-4 sm:px-8 py-2 sm:py-3.5 rounded text-[10px] sm:text-xs tracking-[0.2em] uppercase hover:bg-white transition shadow-2xl transform hover:scale-105"
+                className="group relative overflow-hidden inline-flex items-center gap-2 sm:gap-3 rounded-full bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold pl-5 pr-2 sm:pl-9 sm:pr-3 py-1.5 sm:py-2.5 text-[10px] sm:text-xs tracking-[0.2em] uppercase shadow-[0_10px_28px_-8px_rgba(0,0,0,0.7)] ring-1 ring-white/40 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_32px_-8px_rgba(212,175,55,0.7)] active:scale-95"
               >
-                Explore Collection
+                <span className="pointer-events-none absolute inset-y-0 -left-full w-1/2 -skew-x-12 bg-white/40 transition-all duration-700 group-hover:left-[140%]" />
+                <span className="relative">Explore Collection</span>
+                <span className="relative flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-black text-[#D4AF37] transition-transform duration-300 group-hover:translate-x-0.5">
+                  <ArrowRight size={14} />
+                </span>
               </button>
             </div>
             {HERO_IMAGES.length > 1 && (
@@ -98,18 +102,20 @@ export default function HomeView({ requestAdd, addToCart, banners, calculateDisc
                 >
                   {/* the box takes the photo's own shape: nothing is cropped and there is no empty space */}
                   <img src={img} alt={`Kyvro Banner ${idx + 1}`} className="block w-full h-auto" />
-                  <div className="absolute inset-x-0 bottom-6 z-20 flex justify-center">
-                    <button 
+                  <div className="absolute inset-x-0 bottom-1.5 sm:bottom-5 z-20 flex justify-center">
+                    <button
                       onClick={() => setCurrentView('shop')}
-                      className="bg-[#D4AF37] text-black text-xs font-bold px-6 sm:px-8 py-2.5 sm:py-3 uppercase tracking-widest rounded shadow-2xl hover:bg-white transition transform hover:scale-105"
+                      className="group relative overflow-hidden inline-flex items-center gap-1.5 sm:gap-2 rounded-full bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold pl-4 pr-2.5 sm:pl-7 sm:pr-4 py-1 sm:py-2.5 text-[9px] sm:text-xs uppercase tracking-[0.18em] shadow-[0_8px_22px_-8px_rgba(0,0,0,0.7)] ring-1 ring-white/40 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
                     >
-                      Shop Now
+                      <span className="pointer-events-none absolute inset-y-0 -left-full w-1/2 -skew-x-12 bg-white/40 transition-all duration-700 group-hover:left-[140%]" />
+                      <span className="relative">Shop Now</span>
+                      <ArrowRight size={12} className="relative transition-transform duration-300 group-hover:translate-x-0.5" />
                     </button>
                   </div>
                 </div>
               ))}
 
-              <div className="absolute bottom-4 right-6 z-20 flex gap-2">
+              <div className="absolute bottom-2 sm:bottom-4 right-4 sm:right-6 z-20 flex gap-1.5 sm:gap-2">
                 {banners.map((_, idx) => (
                   <button 
                     key={idx}

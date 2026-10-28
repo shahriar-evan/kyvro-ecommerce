@@ -51,13 +51,16 @@ export default function Footer({ isDarkMode, setCurrentView, setSelectedCategory
             <p className="leading-relaxed mb-4">
               All transactions and customer details are encrypted and securely handled.
             </p>
-            <button 
-              onClick={() => setCurrentView('admin')}
-              className={`border px-4 py-2 rounded font-bold transition ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-[#D4AF37] hover:bg-[#222]' : 'bg-gray-100 border-gray-300 text-black hover:bg-gray-200'}`}
-            >
-              Admin Portal Login
-            </button>
           </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10 flex justify-center">
+          <button
+            onClick={() => setCurrentView('admin')}
+            className={`inline-flex items-center gap-2 border px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest transition ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-[#D4AF37] hover:bg-[#222]' : 'bg-gray-100 border-gray-300 text-black hover:bg-gray-200'}`}
+          >
+            Admin Portal Login
+          </button>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10 sm:mt-12 pt-6 border-t text-center text-gray-500 text-[11px]">

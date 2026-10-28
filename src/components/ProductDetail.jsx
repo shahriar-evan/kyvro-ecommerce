@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { MessageCircle, Heart } from 'lucide-react';
+import { Heart } from 'lucide-react';
+import WhatsAppButton from './WhatsAppButton';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
 import StockLabel from './StockLabel';
 import { hasSizeStock, hasColorStock, totalStock, stockForSize, stockFor, stockForColor, productColors, imageFor, orderedSizes } from '../data/catalog';
@@ -168,15 +169,10 @@ export default function ProductDetail({ product, products, addToCart, calculateD
             </div>
           )}
           {!soldOut && (
-            <a
+            <WhatsAppButton
               href={waNeedsSize ? undefined : waLink}
               onClick={(e) => { if (waNeedsSize) { e.preventDefault(); alert('Please select a size first.'); } }}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full bg-[#25D366] text-white font-bold py-3 rounded text-xs uppercase tracking-widest hover:opacity-90 transition flex items-center justify-center gap-2 shadow"
-            >
-              <MessageCircle size={16} /> Order on WhatsApp
-            </a>
+            />
           )}
           {soldOut && <p className="text-sm font-bold text-red-500">This product is currently sold out.</p>}
         </div>
