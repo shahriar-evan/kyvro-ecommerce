@@ -20,7 +20,7 @@ export const deliveryAreaFor = (district, zone, isCityThana) =>
 // Delivery charge: 100 inside Dhaka, 150 outside Dhaka (default). The Owner can change them, and set a "free delivery"
 // minimum, in Admin > Store Settings. These defaults are used until the Owner saves something.
 // NOTE: firestore.rules checks the same rules (charge by area, free delivery) against settings/store.
-export const DEFAULT_DELIVERY = { deliveryInside: 100, deliveryOutside: 150, deliveryExtraPerItem: 15, freeDeliveryEnabled: true, freeDeliveryMin: 2000, freeDeliveryFor: 'online' };
+export const DEFAULT_DELIVERY = { deliveryInside: 100, deliveryOutside: 150, deliveryExtraPerItem: 15, deliveryIncludedItems: 2, freeDeliveryEnabled: true, freeDeliveryMin: 2000, freeDeliveryFor: 'online' };
 export const FREE_DELIVERY_FOR = ['online', 'cod', 'both'];
 
 export const PAYMENT_METHODS = ['Cash on Delivery', 'Online Payment'];
@@ -38,14 +38,14 @@ export const freeDeliveryApplies = (netTotal, method, settings) => {
 };
 
 // Delivery charge for the order. 0 until the customer has chosen the delivery area (checkout shows "Select city & zone").
-// units = number of items in the cart (all quantities added). The first item costs the area charge,
-// every additional item adds "deliveryExtraPerItem" (default 15), because the supplier charges extra per item.
+// units = number of items in the cart (all quantities added). The area charge covers the first "deliveryIncludedItems"
+// items (default 2); every item after that adds "deliveryExtraPerItem" (default 15), because the supplier charges extra per item.
 export const deliveryFee = (area, method, netTotal, settings, units = 1) => {
   if (!area) return 0;
   const s = normalizeSettings(settings);
   if (freeDeliveryApplies(netTotal, method, s)) return 0;
   const base = area === 'Inside Dhaka' ? s.deliveryInside : s.deliveryOutside;
-  return base + s.deliveryExtraPerItem * Math.max(0, (parseInt(units, 10) || 1) - 1);
+  return base + s.deliveryExtraPerItem * Math.max(0, (parseInt(units, 10) || 1) - s.deliveryIncludedItems);
 };
 
 // Short sentence about delivery for the cart / checkout (English + Bangla)
@@ -53,8 +53,8 @@ export const deliveryNote = (settings) => {
   const s = normalizeSettings(settings);
   const who = { online: ['with Online Payment', 'অনলাইন পেমেন্ট করলে'], cod: ['with Cash on Delivery', 'ক্যাশ অন ডেলিভারিতে'], both: ['on any payment method', 'যেকোনো পেমেন্টে'] }[s.freeDeliveryFor];
   return {
-    en: `Delivery charge: ${s.deliveryInside} BDT inside Dhaka, ${s.deliveryOutside} BDT outside Dhaka${s.deliveryExtraPerItem > 0 ? `, +${s.deliveryExtraPerItem} BDT for each extra item` : ''}.${s.freeDeliveryEnabled ? ` Free delivery ${who[0]} when your order is ${s.freeDeliveryMin} BDT or more.` : ''}`,
-    bn: `ডেলিভারি চার্জ: ঢাকার ভিতরে ${toBanglaDigits(s.deliveryInside)} টাকা, ঢাকার বাইরে ${toBanglaDigits(s.deliveryOutside)} টাকা${s.deliveryExtraPerItem > 0 ? `, প্রতিটি অতিরিক্ত পণ্যে +${toBanglaDigits(s.deliveryExtraPerItem)} টাকা` : ''}।${s.freeDeliveryEnabled ? ` ${who[1]} ${toBanglaDigits(s.freeDeliveryMin)} টাকা বা তার বেশির অর্ডারে ডেলিভারি ফ্রি।` : ''}`,
+    en: `Delivery charge: ${s.deliveryInside} BDT inside Dhaka, ${s.deliveryOutside} BDT outside Dhaka${s.deliveryExtraPerItem > 0 ? `, +${s.deliveryExtraPerItem} BDT for each item after the first ${s.deliveryIncludedItems}` : ''}.${s.freeDeliveryEnabled ? ` Free delivery ${who[0]} when your order is ${s.freeDeliveryMin} BDT or more.` : ''}`,
+    bn: `ডেলিভারি চার্জ: ঢাকার ভিতরে ${toBanglaDigits(s.deliveryInside)} টাকা, ঢাকার বাইরে ${toBanglaDigits(s.deliveryOutside)} টাকা${s.deliveryExtraPerItem > 0 ? `, প্রথম ${toBanglaDigits(s.deliveryIncludedItems)}টি পণ্যের পর প্রতিটি পণ্যে +${toBanglaDigits(s.deliveryExtraPerItem)} টাকা` : ''}।${s.freeDeliveryEnabled ? ` ${who[1]} ${toBanglaDigits(s.freeDeliveryMin)} টাকা বা তার বেশির অর্ডারে ডেলিভারি ফ্রি।` : ''}`,
   };
 };
 
@@ -107,6 +107,7 @@ export function normalizeSettings(raw) {
     discountRules: rules,
     deliveryInside: raw.deliveryInside === undefined ? DEFAULT_DELIVERY.deliveryInside : Math.min(100000, Math.max(0, Math.round(num(raw.deliveryInside)))),
     deliveryExtraPerItem: raw.deliveryExtraPerItem === undefined ? DEFAULT_DELIVERY.deliveryExtraPerItem : Math.min(10000, Math.max(0, Math.round(num(raw.deliveryExtraPerItem)))),
+    deliveryIncludedItems: raw.deliveryIncludedItems === undefined ? DEFAULT_DELIVERY.deliveryIncludedItems : Math.min(100, Math.max(1, Math.round(num(raw.deliveryIncludedItems)))),
     deliveryOutside: raw.deliveryOutside === undefined ? DEFAULT_DELIVERY.deliveryOutside : Math.min(100000, Math.max(0, Math.round(num(raw.deliveryOutside)))),
     freeDeliveryEnabled: raw.freeDeliveryEnabled === undefined ? DEFAULT_DELIVERY.freeDeliveryEnabled : raw.freeDeliveryEnabled === true,
     freeDeliveryMin: raw.freeDeliveryMin === undefined ? DEFAULT_DELIVERY.freeDeliveryMin : Math.min(10000000, Math.max(0, Math.round(num(raw.freeDeliveryMin)))),

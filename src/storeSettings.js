@@ -24,6 +24,7 @@ export async function saveStoreSettings(settings, staff) {
     deliveryInside: clean.deliveryInside,
     deliveryOutside: clean.deliveryOutside,
     deliveryExtraPerItem: clean.deliveryExtraPerItem,
+    deliveryIncludedItems: clean.deliveryIncludedItems,
     freeDeliveryEnabled: clean.freeDeliveryEnabled,
     freeDeliveryMin: clean.freeDeliveryMin,
     freeDeliveryFor: clean.freeDeliveryFor,
