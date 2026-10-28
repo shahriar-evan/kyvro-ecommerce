@@ -44,11 +44,18 @@ async function saveToken(user, token) {
   });
 }
 
-// Asks the browser for permission (call from a click) and saves this device
+// Register the service worker ahead of time, so tapping "Allow" later is quick
+export function warmPush() {
+  registration().catch(() => {});
+}
+
+// Asks the browser for permission (call straight from a click) and saves this device
 export async function enablePush(user) {
-  if (!(await pushSupported())) return { ok: false, reason: "unsupported" };
+  if (typeof window === "undefined" || !("Notification" in window)) return { ok: false, reason: "unsupported" };
+  // The permission popup must be asked first, right inside the click
   const perm = await Notification.requestPermission();
   if (perm !== "granted") return { ok: false, reason: perm };
+  if (!(await pushSupported())) return { ok: false, reason: "unsupported" };
   const token = await currentToken();
   if (!token) return { ok: false, reason: "no-token" };
   await saveToken(user, token);
