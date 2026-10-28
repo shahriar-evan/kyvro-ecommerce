@@ -181,12 +181,27 @@ export default function CheckoutView({
               <span className="font-semibold">{areaChosen ? `${checkoutForm.deliveryArea} (${DELIVERY_AREA_BN[checkoutForm.deliveryArea]})` : 'Select your city & zone'}</span>
             </div>
 
-            <div className="flex justify-between">
-              <span>Delivery charge</span>
-              <span className="font-semibold">
-                {!areaChosen ? 'Select city & zone' : deliveryCharge === 0 ? 'FREE' : formatPrice(deliveryCharge)}
-              </span>
-            </div>
+            {(() => {
+              const st = normalizeSettings(storeSettings);
+              const base = checkoutForm.deliveryArea === 'Inside Dhaka' ? st.deliveryInside : st.deliveryOutside;
+              const extra = areaChosen && deliveryCharge > base ? deliveryCharge - base : 0;
+              return (
+                <>
+                  <div className="flex justify-between">
+                    <span>Delivery charge</span>
+                    <span className="font-semibold">
+                      {!areaChosen ? 'Select city & zone' : deliveryCharge === 0 ? 'FREE' : formatPrice(deliveryCharge - extra)}
+                    </span>
+                  </div>
+                  {extra > 0 && (
+                    <div className="flex justify-between text-red-500">
+                      <span>Extra Delivery <span className="text-xs">(+{formatPrice(st.deliveryExtraPerItem)} per item after the first {st.deliveryIncludedItems})</span></span>
+                      <span className="font-semibold">+ {formatPrice(extra)}</span>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
 
             <div className="flex justify-between text-lg font-bold border-t pt-3">
               <span>TOTAL</span><span className="text-[#D4AF37]">{formatPrice(grandTotal)}</span>
