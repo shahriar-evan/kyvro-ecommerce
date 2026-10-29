@@ -38,6 +38,28 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
       return { ...prev, colors: left.join(', '), colorStock, colorImages };
     });
   };
+  // rename a color everywhere it is used (colors list, stock rows, photo, supplier link) instead of removing + re-adding it
+  const renameFormColor = (oldName, rawNew) => {
+    const nn = String(rawNew || '').trim();
+    if (!nn || nn.toLowerCase() === oldName.toLowerCase()) return;
+    if (formColors.some(x => x.toLowerCase() === nn.toLowerCase())) { alert(`"${nn}" is already in the colors list.`); return; }
+    setNewProductForm(prev => {
+      const same = (x) => String(x).trim().toLowerCase() === oldName.toLowerCase();
+      const colors = (prev.colors || '').split(',').map(x => x.trim()).filter(Boolean).map(x => (same(x) ? nn : x));
+      const colorStock = {};
+      Object.entries(prev.colorStock || {}).forEach(([k, v]) => {
+        const [size, ...rest] = k.split('|');
+        colorStock[rest.length && same(rest.join('|')) ? `${size}|${nn}` : k] = v;
+      });
+      const colorImages = {};
+      Object.entries(prev.colorImages || {}).forEach(([k, v]) => { colorImages[same(k) ? nn : k] = v; });
+      const colorLinks = {};
+      Object.entries(prev.colorLinks || {}).forEach(([k, v]) => { colorLinks[same(k) ? nn : k] = v; });
+      return { ...prev, colors: colors.join(', '), colorStock, colorImages, colorLinks };
+    });
+  };
+  const stockNow = sizesUsed ? sizesTotal : (parseInt(newProductForm && newProductForm.stock, 10) || 0);
+  const autoStockText = stockNow > 0 && stockNow <= 10 ? `Only ${stockNow} left!` : 'In Stock';
   // supplier shop names used before (for the suggestion list in the form)
   const supplierNames = [...new Set(['SelfShop', ...Object.values(productCosts).map((c) => (c && c.supplierName) || '').filter(Boolean)])];
   const formCostNum = parseFloat(newProductForm && newProductForm.supplierCost);
@@ -362,15 +384,22 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                         maxLength={40}
                         placeholder="e.g. In Stock · Only 7 left · Selling fast"
                         value={newProductForm.stockText || ''}
+                        onFocus={() => { if (!newProductForm.stockText) setNewProductForm(prev => ({ ...prev, stockText: autoStockText })); }}
                         onChange={e => setNewProductForm({...newProductForm, stockText: e.target.value})}
                         className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
                       />
-                      <p className="text-[11px] text-gray-400 mt-1">Empty = automatic: "In Stock", and "Only N left!" when 10 or fewer. Shown only while the product is in stock; "Out of Stock" always appears when the real stock is 0.</p>
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        {[autoStockText, 'In Stock', 'Selling fast', 'Limited stock'].filter((t, i, a) => a.indexOf(t) === i).map(t => (
+                          <button key={t} type="button" onClick={() => setNewProductForm(prev => ({ ...prev, stockText: t }))} className="text-[11px] px-2 py-1 rounded border border-gray-300 text-gray-600 hover:border-[#D4AF37]">{t}</button>
+                        ))}
+                        {newProductForm.stockText && <button type="button" onClick={() => setNewProductForm(prev => ({ ...prev, stockText: '' }))} className="text-[11px] px-2 py-1 rounded border border-red-300 text-red-500">Clear (automatic)</button>}
+                      </div>
+                      <p className="text-[11px] text-gray-400 mt-1">Click the box to fill the automatic text, then edit it if you like. Empty = automatic: "In Stock", and "Only N left!" when 10 or fewer. Shown only while the product is in stock; "Out of Stock" always appears when the real stock is 0.</p>
                     </div>
 
                     <div className="sm:col-span-2">
                       <div className="mb-4">
-                        <ColorPicker colors={formColors} onToggle={toggleFormColor} onAdd={addFormColor} isDarkMode={isDarkMode} />
+                        <ColorPicker colors={formColors} onToggle={toggleFormColor} onAdd={addFormColor} onRename={renameFormColor} isDarkMode={isDarkMode} />
                       </div>
                       <SizeStockEditor
                         gender={newProductForm.gender}
