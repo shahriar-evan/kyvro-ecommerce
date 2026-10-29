@@ -28,6 +28,7 @@ export default function Footer({ isDarkMode, setCurrentView, setSelectedCategory
               <li><span>Facebook: www.facebook.com/kyvrofashion</span></li>
               <li><span>Instagram: @kyvro_fashion</span></li>
               <li><span>TikTok: tiktok.com/@kyvro.store</span></li>
+              <li><button onClick={() => setCurrentView('tracking')} className="hover:text-[#D4AF37]">Order Tracking</button></li>
               <li><button onClick={() => setCurrentView('privacy')} className="hover:text-[#D4AF37]">Privacy Policy</button></li>
               <li><button onClick={() => setCurrentView('terms')} className="hover:text-[#D4AF37]">Terms &amp; Conditions</button></li>
               <li><button onClick={() => setCurrentView('refund')} className="hover:text-[#D4AF37]">Return &amp; Refund Policy</button></li>

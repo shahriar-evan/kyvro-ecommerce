@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingBag, Search, User, Menu, Sun, Moon } from 'lucide-react';
+import { ShoppingBag, Search, User, Menu, Sun, Moon, Truck } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 import { CURRENCIES } from '../data/currencies';
 
@@ -76,6 +76,14 @@ export default function Header({ cart, curr, currencyKey, currentView, isDarkMod
               {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
             </button>
 
+            <button
+              onClick={() => setCurrentView('tracking')}
+              className={`transition p-1 flex items-center gap-1 ${isDarkMode ? 'text-gray-300 hover:text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]'}`}
+              title="Order Tracking"
+            >
+              <Truck size={18} /><span className="hidden lg:inline text-xs font-semibold">Order Tracking</span>
+            </button>
+
             <button 
               onClick={() => setCurrentView('shop')}
               className={`transition p-1 ${isDarkMode ? 'text-gray-300 hover:text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]'}`}
@@ -106,6 +114,7 @@ export default function Header({ cart, curr, currencyKey, currentView, isDarkMod
                       <button onClick={() => go(onSignIn)} className={itemCls}>Sign In</button>
                     )}
                     <button onClick={() => go(() => goAccount('orders'))} className={itemCls}>My Orders</button>
+                    <button onClick={() => go(() => setCurrentView('tracking'))} className={itemCls}>Order Tracking</button>
                     <button onClick={() => go(() => goAccount('settings'))} className={itemCls}>My Account Settings</button>
                     <button onClick={() => go(() => goAccount('wallet'))} className={itemCls}>My Wallet</button>
                     <button onClick={() => go(() => goAccount('saved'))} className={itemCls}>My Saved Items</button>

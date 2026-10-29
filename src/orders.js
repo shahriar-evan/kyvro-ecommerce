@@ -1,6 +1,6 @@
 import { getApp } from "firebase/app";
 import {
-  getFirestore, doc, setDoc, updateDoc, runTransaction, writeBatch, collection, query, orderBy, onSnapshot, serverTimestamp, arrayUnion, deleteField,
+  getFirestore, doc, getDoc, getDocs, where, setDoc, updateDoc, runTransaction, writeBatch, collection, query, orderBy, onSnapshot, serverTimestamp, arrayUnion, deleteField,
 } from "firebase/firestore";
 import "./firebase"; // makes sure the default Firebase app exists
 
@@ -207,4 +207,41 @@ export async function deleteOrders(ids) {
     await batch.commit();
   }
   return ids.length;
+}
+
+// ---- Order tracking (signed-in customers) ----
+// A guest order has no account on it, so the customer proves it is theirs with the tracking code + the phone number
+// used on the order. Firestore rules compare the phone with the order and then save a "claim" for this account.
+const normPhone = (p) => String(p || '').replace(/[\s-]/g, '');
+
+export async function claimOrder(user, orderNumber, phone) {
+  const code = String(orderNumber || '').trim().toUpperCase();
+  const ph = normPhone(phone);
+  if (!/^KYV-[0-9]{6}-[0-9]{4}$/.test(code)) throw new Error('bad-code');
+  if (!/^[+]?[0-9]{7,15}$/.test(ph)) throw new Error('bad-phone');
+  try {
+    await setDoc(doc(db, 'orderClaims', `${user.uid}_${code}`), { uid: user.uid, orderNumber: code, phone: ph, claimedAt: serverTimestamp() });
+  } catch (e) {
+    // already claimed before (the claim cannot be written twice)? then the order is readable anyway
+    try {
+      const again = await getDoc(doc(db, 'orders', code));
+      if (again.exists()) return { id: again.id, ...again.data() };
+    } catch (e2) { /* not claimed */ }
+    throw new Error('no-match');
+  }
+  const snap = await getDoc(doc(db, 'orders', code));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+// Every order this account has tracked or placed (newest first)
+export async function loadTrackedOrders(user) {
+  const out = new Map();
+  const claims = await getDocs(query(collection(db, 'orderClaims'), where('uid', '==', user.uid)));
+  await Promise.all(claims.docs.map(async (c) => {
+    try {
+      const o = await getDoc(doc(db, 'orders', c.data().orderNumber));
+      if (o.exists()) out.set(o.id, { id: o.id, ...o.data() });
+    } catch (e) { /* order was deleted */ }
+  }));
+  return [...out.values()].sort((a, b) => ((b.createdAt && b.createdAt.seconds) || 0) - ((a.createdAt && a.createdAt.seconds) || 0));
 }
