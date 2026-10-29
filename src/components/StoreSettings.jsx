@@ -15,6 +15,10 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
   const [freeOn, setFreeOn] = useState(settings.freeDeliveryEnabled);
   const [freeMin, setFreeMin] = useState(String(settings.freeDeliveryMin));
   const [freeFor, setFreeFor] = useState(settings.freeDeliveryFor);
+  const [maintOn, setMaintOn] = useState(settings.maintenanceMode);
+  const [maintMsg, setMaintMsg] = useState(settings.maintenanceMessage || '');
+  const [maintBusy, setMaintBusy] = useState(false);
+  const [maintNote, setMaintNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [msgAt, setMsgAt] = useState('discount'); // which Save button the message belongs to
@@ -53,6 +57,8 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
     setFreeOn(settings.freeDeliveryEnabled);
     setFreeMin(String(settings.freeDeliveryMin));
     setFreeFor(settings.freeDeliveryFor);
+    setMaintOn(settings.maintenanceMode);
+    setMaintMsg(settings.maintenanceMessage || '');
   }, [settings]);
 
   // Look: deep indigo accent (readable in both light and dark), soft rounded cards
@@ -66,7 +72,7 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
   const linkBtn = `text-xs font-medium underline underline-offset-4 decoration-indigo-400/60 hover:decoration-indigo-400 ${accentText}`;
   const subBox = `rounded-xl border p-4 ${isDarkMode ? 'border-white/10 bg-[#0e0e13]' : 'border-slate-200 bg-slate-50'}`;
 
-  const draft = normalizeSettings({ announcementText: text, discountEnabled: enabled, discountRules: rules, deliveryInside: dIn === '' ? 0 : dIn, deliveryOutside: dOut === '' ? 0 : dOut, deliveryExtraPerItem: dExtra === '' ? 0 : dExtra, deliveryIncludedItems: dIncl === '' ? 1 : dIncl, freeDeliveryEnabled: freeOn, freeDeliveryMin: freeMin === '' ? 0 : freeMin, freeDeliveryFor: freeFor });
+  const draft = normalizeSettings({ announcementText: text, discountEnabled: enabled, discountRules: rules, deliveryInside: dIn === '' ? 0 : dIn, deliveryOutside: dOut === '' ? 0 : dOut, deliveryExtraPerItem: dExtra === '' ? 0 : dExtra, deliveryIncludedItems: dIncl === '' ? 1 : dIncl, freeDeliveryEnabled: freeOn, freeDeliveryMin: freeMin === '' ? 0 : freeMin, freeDeliveryFor: freeFor, maintenanceMode: maintOn, maintenanceMessage: maintMsg });
   const t = Number(testTotal) || 0;
   const hit = bestDiscount(t, draft);
   const next = nextReward(t, draft);
@@ -127,6 +133,26 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
     setSaving(false);
   };
 
+  // Website ON / OFF: saves right away (other unsaved edits on this page are NOT saved by this button)
+  const toggleMaintenance = async () => {
+    const next = !maintOn;
+    const ask = next
+      ? 'Turn ON maintenance?\n\nVisitors will see a "we\'ll be back soon" page and nobody can place an order. You and your team can still use the website and the admin panel.'
+      : 'Turn OFF maintenance and open the website for everyone?';
+    if (!window.confirm(ask)) return;
+    setMaintBusy(true);
+    setMaintNote('');
+    try {
+      await saveStoreSettings({ ...settings, maintenanceMode: next, maintenanceMessage: maintMsg }, staff);
+      setMaintOn(next);
+      setMaintNote(next ? 'Maintenance is ON. Visitors now see the maintenance page.' : 'Website is LIVE for everyone.');
+    } catch (err) {
+      console.error(err);
+      setMaintNote('Error: could not change it (' + (err.code === 'permission-denied' ? 'only the Owner can do this, and the Firestore rules must be published' : err.message) + ').');
+    }
+    setMaintBusy(false);
+  };
+
   const msgClass = (m) => `text-xs ${m.startsWith('Error') || m.startsWith('Could not') ? 'text-red-500' : 'text-emerald-500'}`;
 
   // Card shell with a thin gradient line on top and a small accent dot before the title
@@ -154,6 +180,28 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,46rem)_minmax(0,28rem)] gap-6 items-start">
       <div className="space-y-6 min-w-0">
+        {section(
+          'Website Status',
+          'Switch maintenance ON while you work on the website. Visitors see a "we\'ll be back soon" page and cannot order. You and your team can still use the admin panel and see the real website (with an orange bar on top).',
+          <>
+            <div className="flex flex-wrap items-center gap-4">
+              <span className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-bold tracking-widest uppercase ${maintOn ? 'bg-amber-500/15 text-amber-500' : 'bg-emerald-500/15 text-emerald-500'}`}>
+                <span className={`w-2 h-2 rounded-full ${maintOn ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                {maintOn ? 'Maintenance ON' : 'Website LIVE'}
+              </span>
+              <button type="button" onClick={toggleMaintenance} disabled={maintBusy} className={maintOn ? primaryBtn : outlineBtn}>
+                {maintBusy ? 'Please wait...' : maintOn ? 'Turn OFF (open website)' : 'Turn ON maintenance'}
+              </button>
+            </div>
+            <div className="mt-4">
+              <label className={label}>Message visitors will read (optional, leave empty for the default English + Bangla message)</label>
+              <textarea rows={2} maxLength={300} value={maintMsg} onChange={(e) => setMaintMsg(e.target.value)} className={input} placeholder="Sorry, we are improving Kyvro. Back in 30 minutes." />
+              <p className={`text-[11px] mt-1 ${muted}`}>The message is saved when you press the button above, or with "Save Settings".</p>
+            </div>
+            {maintNote && <p className={`mt-3 ${msgClass(maintNote)}`}>{maintNote}</p>}
+          </>
+        )}
+
         {section(
           'Top Banner Text',
           'This text scrolls in the bar at the very top of the website.',

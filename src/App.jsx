@@ -36,6 +36,7 @@ import PolicyPages from './components/PolicyPages';
 import OrderSuccess from './components/OrderSuccess';
 import ProductDetail from './components/ProductDetail';
 import AccountView from './components/AccountView';
+import MaintenancePage from './components/MaintenancePage';
 import { initAnalytics, trackPageView, trackViewContent, trackAddToCart, trackInitiateCheckout, trackPurchase } from './analytics';
 
 const EMPTY_CHECKOUT = {
@@ -74,6 +75,7 @@ export default function App() {
   // Customer account (Google sign-in). Team members who sign in this way are also recognised as team below.
   const [customerUser, setCustomerUser] = useState(null);
   const [authReady, setAuthReady] = useState(false); // true once Firebase has told us whether someone is signed in
+  const [accessChecked, setAccessChecked] = useState(false); // true once we also know whether the signed-in person is a team member
   const [profile, setProfile] = useState({});
   const [myOrders, setMyOrders] = useState([]);
   const [accountTab, setAccountTab] = useState('orders');
@@ -161,13 +163,15 @@ export default function App() {
         setCustomerUser(null);
         setProfile({});
         setMyOrders([]);
+        setAccessChecked(true);
         return;
       }
       // Everyone who signs in is a customer; team members are recognised on top of that
       setCustomerUser({ uid: user.uid, email: user.email || '', displayName: user.displayName || '', photoURL: user.photoURL || '' });
       // offer emails: a signed-in customer joins the list once (they can switch it off in Account -> Settings)
       if (user.email && user.emailVerified) ensureSubscribed(user).catch(() => {});
-      const access = await checkAccess(user.email);
+      let access = { ok: false };
+      try { access = await checkAccess(user.email); } catch (e) { console.error(e); }
       if (access.ok) {
         setAdminRole(access.role);
         setAdminName(access.name || user.displayName || '');
@@ -179,6 +183,7 @@ export default function App() {
         setIsAdminLoggedIn(false);
         setLoggedInUserEmail('');
       }
+      setAccessChecked(true);
     });
     return () => unsubscribe();
   }, []);
@@ -880,8 +885,22 @@ export default function App() {
   });
 
 
+  // Maintenance mode (Owner switch in Admin > Store Settings): visitors see a "we'll be back soon" page,
+  // team members keep the real website + admin panel. The team login page stays reachable.
+  const maintenanceOn = storeSettings.maintenanceMode === true;
+  if (maintenanceOn && !isAdminLoggedIn && currentView !== 'admin') {
+    if (!accessChecked) return <div className={`min-h-screen ${isDarkMode ? 'bg-[#0f0f0f]' : 'bg-white'}`} />;
+    return <MaintenancePage message={storeSettings.maintenanceMessage} isDarkMode={isDarkMode} onTeamLogin={() => setCurrentView('admin')} />;
+  }
+
   return (
     <div className={`min-h-screen flex flex-col font-sans relative transition-colors duration-300 overflow-x-clip ${isDarkMode ? 'bg-[#0f0f0f] text-gray-100' : 'bg-white text-gray-900'}`}>
+
+      {maintenanceOn && isAdminLoggedIn && (
+        <div className="bg-amber-500 text-black text-center text-xs font-semibold py-2 px-3">
+          Maintenance mode is ON: visitors see the "we'll be back soon" page. Only team members can see the website right now.
+        </div>
+      )}
 
       {/* 1. ANNOUNCEMENT BAR */}
       <AnnouncementBar announcementText={announcementText} isDarkMode={isDarkMode} />

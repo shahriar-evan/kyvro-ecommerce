@@ -28,6 +28,8 @@ export async function saveStoreSettings(settings, staff) {
     freeDeliveryEnabled: clean.freeDeliveryEnabled,
     freeDeliveryMin: clean.freeDeliveryMin,
     freeDeliveryFor: clean.freeDeliveryFor,
+    maintenanceMode: clean.maintenanceMode,
+    maintenanceMessage: clean.maintenanceMessage.trim().slice(0, 300),
     ...discountLimits(clean),
     updatedAt: serverTimestamp(),
     updatedByName: (staff && (staff.name || staff.email)) || "",

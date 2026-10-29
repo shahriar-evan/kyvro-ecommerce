@@ -81,6 +81,8 @@ export const DEFAULT_STORE_SETTINGS = {
   discountEnabled: true,
   discountRules: [{ min: 3500, type: 'percent', value: 20 }],
   ...DEFAULT_DELIVERY,
+  maintenanceMode: false, // true = visitors see the "under maintenance" page; team members still see the real website
+  maintenanceMessage: '',
 };
 
 const num = (v) => {
@@ -115,6 +117,8 @@ export function normalizeSettings(raw) {
     freeDeliveryEnabled: raw.freeDeliveryEnabled === undefined ? DEFAULT_DELIVERY.freeDeliveryEnabled : raw.freeDeliveryEnabled === true,
     freeDeliveryMin: raw.freeDeliveryMin === undefined ? DEFAULT_DELIVERY.freeDeliveryMin : Math.min(10000000, Math.max(0, Math.round(num(raw.freeDeliveryMin)))),
     freeDeliveryFor: FREE_DELIVERY_FOR.includes(raw.freeDeliveryFor) ? raw.freeDeliveryFor : DEFAULT_DELIVERY.freeDeliveryFor,
+    maintenanceMode: raw.maintenanceMode === true,
+    maintenanceMessage: typeof raw.maintenanceMessage === 'string' ? raw.maintenanceMessage.slice(0, 300) : '',
   };
 }
 
