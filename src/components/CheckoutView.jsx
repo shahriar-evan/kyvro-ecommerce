@@ -43,30 +43,7 @@ export default function CheckoutView({
     );
   }
 
-  // Your cart works without an account, but placing the order needs a Google sign-in (the cart stays as it is)
-  if (!customerUser) {
-    return (
-      <div className="flex-1 max-w-3xl mx-auto px-4 sm:px-6 py-10 sm:py-16 w-full">
-        <button onClick={() => setCurrentView('shop')} className="text-xs text-gray-500 hover:text-[#D4AF37] mb-4">&larr; Continue shopping</button>
-        <div className={`${panel} text-center space-y-4`}>
-          <h1 className="text-2xl font-serif font-bold">Sign in to place your order</h1>
-          <p className="text-sm text-gray-500">অর্ডার করতে আপনার Google অ্যাকাউন্ট দিয়ে সাইন ইন করুন। আপনার কার্টের সব প্রোডাক্ট যেমন আছে তেমনই থাকবে।</p>
-          <div className="space-y-2 text-left max-w-md mx-auto">
-            {cart.map((item) => (
-              <div key={item.cartItemId} className={`flex items-center gap-3 p-2 rounded border ${isDarkMode ? 'bg-[#121212] border-gray-800' : 'bg-white border-gray-200'}`}>
-                <img src={item.image} alt={item.name} className="w-12 h-12 object-cover rounded" />
-                <span className="flex-1 min-w-0 text-sm font-semibold truncate">{item.name} &times; {item.quantity}</span>
-                <span className="text-sm font-bold">{formatPrice(item.price * item.quantity)}</span>
-              </div>
-            ))}
-          </div>
-          <button onClick={onSignIn} disabled={!authReady} className="inline-flex items-center justify-center gap-2 bg-[#D4AF37] text-black text-xs font-bold px-8 py-3.5 tracking-widest uppercase rounded hover:opacity-90 transition disabled:opacity-60">
-            {authReady ? 'Continue with Google' : 'Please wait...'}
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // No sign-in needed to order: guests can place an order with just their details. Signing in with Google is optional (it lets them see the order status).
 
   return (
     <div className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-36 lg:py-12 w-full">
@@ -75,6 +52,17 @@ export default function CheckoutView({
       <p className="text-sm font-semibold text-red-500 mb-6">
         বিঃদ্রঃ দ্রুত ডেলিভারী নিশ্চিত করার জন্য সঠিক ভাবে আপনার ঠিকানা লিখুন (জেলা উপজেলা উল্লেখ করুন)।
       </p>
+
+      {!customerUser && (
+        <div className={`mb-6 rounded-lg border p-4 text-xs sm:text-sm flex flex-wrap items-center justify-between gap-3 ${isDarkMode ? 'border-gray-800 bg-[#161616]' : 'border-gray-200 bg-gray-50'}`}>
+          <p className="leading-relaxed">
+            <strong>সাইন ইন ছাড়াই অর্ডার করতে পারবেন।</strong> আপনার অর্ডারের অবস্থা অনলাইনে দেখতে চাইলে Google দিয়ে সাইন ইন করুন (ঐচ্ছিক)।
+          </p>
+          <button type="button" onClick={onSignIn} disabled={!authReady} className="border border-[#D4AF37] text-[#D4AF37] font-bold px-4 py-2 rounded text-[11px] uppercase tracking-widest hover:bg-[#D4AF37]/10 disabled:opacity-60">
+            {authReady ? 'Sign in with Google' : 'Please wait...'}
+          </button>
+        </div>
+      )}
 
       <form id="kyvro-checkout-form" onSubmit={handleCheckoutSubmit} className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8 items-start">
         {/* BILLING & SHIPPING */}

@@ -97,7 +97,7 @@ const PAGES = {
       title: 'Terms & Conditions',
       intro: 'By using www.kyvro.store and placing an order, you agree to these terms. Please read them together with our Privacy Policy and Return & Refund Policy.',
       sections: [
-        { h: '1. Your account', p: ['You need to sign in with a Google account to place an order. You can add products to your cart without signing in. You are responsible for the information you give us and must provide a correct name, phone number and address.'] },
+        { h: '1. Your account', p: ['You can browse, save items, add products to your cart and place an order without signing in. Signing in with Google is optional: it lets you see your orders and their status in your account. You are responsible for the information you give us and must provide a correct name, phone number and address.'] },
         { h: '2. Products and prices', li: [
           'All prices are in Bangladeshi Taka (BDT). Other currencies shown on the site are only an estimate.',
           'Photos are for reference. Colours may look slightly different on your screen.',
@@ -130,7 +130,7 @@ const PAGES = {
       title: 'শর্তাবলি (Terms & Conditions)',
       intro: 'www.kyvro.store ব্যবহার করলে এবং অর্ডার দিলে আপনি এই শর্তগুলো মেনে নিচ্ছেন। অনুগ্রহ করে এটি আমাদের গোপনীয়তা নীতি ও রিটার্ন ও রিফান্ড নীতির সাথে পড়ুন।',
       sections: [
-        { h: '১. আপনার অ্যাকাউন্ট', p: ['অর্ডার দিতে Google অ্যাকাউন্ট দিয়ে লগইন করতে হয়। লগইন ছাড়াই কার্টে পণ্য যোগ করা যায়। আপনার দেওয়া তথ্যের দায়িত্ব আপনার, তাই সঠিক নাম, ফোন নম্বর ও ঠিকানা দিন।'] },
+        { h: '১. আপনার অ্যাকাউন্ট', p: ['লগইন ছাড়াই আপনি পণ্য দেখতে, সেভ করতে, কার্টে যোগ করতে ও অর্ডার দিতে পারবেন। Google দিয়ে লগইন করা ঐচ্ছিক: এতে আপনি নিজের অ্যাকাউন্টে অর্ডার ও অর্ডারের অবস্থা দেখতে পারবেন। আপনার দেওয়া তথ্যের দায়িত্ব আপনার, তাই সঠিক নাম, ফোন নম্বর ও ঠিকানা দিন।'] },
         { h: '২. পণ্য ও দাম', li: [
           'সব দাম বাংলাদেশি টাকায় (BDT)। সাইটে দেখানো অন্য মুদ্রা শুধু আনুমানিক।',
           'ছবি রেফারেন্সের জন্য। আপনার স্ক্রিনে রঙ সামান্য আলাদা দেখাতে পারে।',

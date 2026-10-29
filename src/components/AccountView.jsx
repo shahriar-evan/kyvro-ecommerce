@@ -91,6 +91,39 @@ export default function AccountView({
   const card = `rounded-lg border p-5 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`;
   const input = `w-full border rounded px-3 py-2.5 text-sm outline-none focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#0f0f0f] border-gray-700' : 'bg-white border-gray-300'}`;
 
+  // Saved items work without an account (they stay on this device). Orders, wallet and settings need a Google sign-in.
+  if (!customerUser && activeTab === 'saved') {
+    return (
+      <div className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 w-full">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <h1 className="text-xl sm:text-2xl font-serif font-bold">Saved Items {savedProducts.length > 0 && <span className="text-sm opacity-60">({savedProducts.length})</span>}</h1>
+          <button onClick={onSignIn} className="border border-[#D4AF37] text-[#D4AF37] font-bold px-4 py-2 rounded text-[11px] uppercase tracking-widest hover:bg-[#D4AF37]/10">Sign in to keep them on every device</button>
+        </div>
+        {savedProducts.length === 0 ? (
+          <div className={card}><p className="text-sm text-gray-500">You have not saved anything yet. Tap the heart on a product to save it here.</p></div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {savedProducts.map((p) => (
+              <div key={p.id} className={`rounded-lg overflow-hidden border ${isDarkMode ? 'bg-[#181818] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
+                <div className="h-44 bg-gray-900 cursor-pointer" onClick={() => { setSelectedProduct(p); setCurrentView('product-detail'); }}>
+                  <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                </div>
+                <div className="p-3">
+                  <p className="text-sm font-semibold line-clamp-1">{p.name}</p>
+                  <p className="text-sm font-bold mt-1">{formatPrice(p.price)}</p>
+                  <div className="grid grid-cols-2 gap-2 mt-3">
+                    <button onClick={() => { setSelectedProduct(p); setCurrentView('product-detail'); }} className="bg-[#D4AF37] text-black text-[11px] font-bold py-2 rounded">View</button>
+                    <button onClick={() => toggleSaved(p.id)} className="border text-[11px] font-semibold py-2 rounded hover:border-red-500 hover:text-red-500">Remove</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (!customerUser) {
     return (
       <div className="flex-1 max-w-md mx-auto px-4 py-16 w-full text-center">

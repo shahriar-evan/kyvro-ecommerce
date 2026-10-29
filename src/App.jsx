@@ -77,11 +77,16 @@ export default function App() {
   const [authReady, setAuthReady] = useState(false); // true once Firebase has told us whether someone is signed in
   const [accessChecked, setAccessChecked] = useState(false); // true once we also know whether the signed-in person is a team member
   const [profile, setProfile] = useState({});
+  const [profileReady, setProfileReady] = useState(false); // true once the signed-in customer's profile has arrived
+  // Favourites of a visitor who is not signed in: kept on this device (and moved into the account after sign-in)
+  const [guestSaved, setGuestSaved] = useState(() => {
+    try { const v = JSON.parse(localStorage.getItem('kyvro_saved') || '[]'); return Array.isArray(v) ? v.filter(x => typeof x === 'string' || typeof x === 'number').slice(0, 300) : []; } catch (e) { return []; }
+  });
   const [myOrders, setMyOrders] = useState([]);
   const [accountTab, setAccountTab] = useState('orders');
   const displayName = profile.name || (customerUser && customerUser.displayName) || '';
   const photoURL = profile.photoURL !== undefined && profile.photoURL !== '' ? profile.photoURL : ((customerUser && customerUser.photoURL) || '');
-  const savedIds = Array.isArray(profile.saved) ? profile.saved : [];
+  const savedIds = customerUser ? (Array.isArray(profile.saved) ? profile.saved : []) : guestSaved;
 
   // Banner text + discount rules: edited by the Owner in the admin panel (Firestore settings/store)
   const [storeSettings, setStoreSettings] = useState(DEFAULT_STORE_SETTINGS);
@@ -246,11 +251,23 @@ export default function App() {
   // The signed-in customer's profile (name, photo, saved items) and own orders
   const customerUid = customerUser ? customerUser.uid : null;
   useEffect(() => {
-    if (!customerUid) return;
-    const stopProfile = watchProfile(customerUid, setProfile);
+    if (!customerUid) { setProfileReady(false); return; }
+    setProfileReady(false);
+    const stopProfile = watchProfile(customerUid, (p) => { setProfile(p); setProfileReady(true); });
     const stopOrders = watchMyOrders(customerUid, setMyOrders, (err) => console.error('Could not load your orders:', err));
     return () => { stopProfile(); stopOrders(); };
   }, [customerUid]);
+
+  // Keep a visitor's favourites on this device
+  useEffect(() => { try { localStorage.setItem('kyvro_saved', JSON.stringify(guestSaved)); } catch (e) {} }, [guestSaved]);
+
+  // After sign-in: favourites saved on this device join the account's saved items (nothing is lost)
+  useEffect(() => {
+    if (!customerUid || !profileReady || guestSaved.length === 0) return;
+    const cloud = Array.isArray(profile.saved) ? profile.saved : [];
+    const merged = [...cloud, ...guestSaved.filter(id => !cloud.includes(id))].slice(0, 300);
+    saveProfile(customerUid, { saved: merged }).then(() => setGuestSaved([])).catch(() => {});
+  }, [customerUid, profileReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Make checkout easier: pre-fill the name of a signed-in customer
   useEffect(() => {
@@ -397,7 +414,6 @@ export default function App() {
     e.preventDefault();
     if (placingOrder || cart.length === 0) return;
     setCheckoutError('');
-    if (!customerUser) { setCheckoutError('Please sign in with Google to place your order.'); return; }
 
     const name = checkoutForm.fullName.trim();
     const phone = cleanPhone(checkoutForm.phone.trim());
@@ -538,11 +554,11 @@ export default function App() {
 
   const handleSaveProfile = (patch) => saveProfile(customerUser.uid, patch);
 
-  // Heart button: saved items are kept in the customer's profile (sign in first)
+  // Heart button: saved items are kept in the customer's profile when signed in, otherwise on this device
   const toggleSaved = async (productId) => {
     if (!customerUser) {
-      alert('Please sign in to save items.');
-      await handleCustomerSignIn();
+      // no sign-in needed: kept on this device
+      setGuestSaved(prev => (prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]));
       return;
     }
     const next = savedIds.includes(productId) ? savedIds.filter(id => id !== productId) : [...savedIds, productId];

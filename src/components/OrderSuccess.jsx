@@ -32,6 +32,9 @@ export default function OrderSuccess({ order, formatPrice, isDarkMode, setCurren
         </p>
         <p className="text-sm pt-1">Your order number is <strong className="text-[#D4AF37] text-lg">{order.orderNumber}</strong></p>
         <p className="text-xs text-gray-500">Placed on {formatDateTime(order.date)}</p>
+        {!order.uid && (
+          <p className="text-xs text-gray-500 pt-1">অর্ডার নম্বরটি সেভ করে রাখুন (স্ক্রিনশট নিতে পারেন)। অর্ডারের অবস্থা জানতে আমাদের WhatsApp-এ এই নম্বর পাঠান।</p>
+        )}
       </div>
 
       <div className={`${panel} space-y-4`}>
