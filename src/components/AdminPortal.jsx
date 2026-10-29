@@ -5,6 +5,7 @@ import ImageField from './ImageField';
 import SizeStockEditor from './SizeStockEditor';
 import ColorPhotos from './ColorPhotos';
 import ColorPicker from './ColorPicker';
+import MorePhotos from './MorePhotos';
 import OrdersPanel from './OrdersPanel';
 import StoreSettings from './StoreSettings';
 import { SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
@@ -34,8 +35,10 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
       Object.entries(prev.colorStock || {}).forEach(([k, v]) => { if (k.split('|').slice(1).join('|').trim().toLowerCase() !== c.toLowerCase()) colorStock[k] = v; });
       const colorImages = { ...(prev.colorImages || {}) };
       Object.keys(colorImages).forEach(k => { if (k.toLowerCase() === c.toLowerCase()) delete colorImages[k]; });
+      const colorGallery = { ...(prev.colorGallery || {}) };
+      Object.keys(colorGallery).forEach(k => { if (k.toLowerCase() === c.toLowerCase()) delete colorGallery[k]; });
       const left = (prev.colors || '').split(',').map(x => x.trim()).filter(x => x && x.toLowerCase() !== c.toLowerCase());
-      return { ...prev, colors: left.join(', '), colorStock, colorImages };
+      return { ...prev, colors: left.join(', '), colorStock, colorImages, colorGallery };
     });
   };
   // rename a color everywhere it is used (colors list, stock rows, photo, supplier link) instead of removing + re-adding it
@@ -55,7 +58,9 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
       Object.entries(prev.colorImages || {}).forEach(([k, v]) => { colorImages[same(k) ? nn : k] = v; });
       const colorLinks = {};
       Object.entries(prev.colorLinks || {}).forEach(([k, v]) => { colorLinks[same(k) ? nn : k] = v; });
-      return { ...prev, colors: colors.join(', '), colorStock, colorImages, colorLinks };
+      const colorGallery = {};
+      Object.entries(prev.colorGallery || {}).forEach(([k, v]) => { colorGallery[same(k) ? nn : k] = v; });
+      return { ...prev, colors: colors.join(', '), colorStock, colorImages, colorLinks, colorGallery };
     });
   };
   const stockNow = sizesUsed ? sizesTotal : (parseInt(newProductForm && newProductForm.stock, 10) || 0);
@@ -413,7 +418,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                         isDarkMode={isDarkMode}
                       />
                       <div className="mt-3">
-                        <ColorPhotos colors={photoColors} value={newProductForm.colorImages || {}} onChange={(colorImages) => setNewProductForm({...newProductForm, colorImages})} isDarkMode={isDarkMode} />
+                        <ColorPhotos colors={photoColors} value={newProductForm.colorImages || {}} onChange={(colorImages) => setNewProductForm({...newProductForm, colorImages})} gallery={newProductForm.colorGallery || {}} onGalleryChange={(colorGallery) => setNewProductForm(prev => ({...prev, colorGallery}))} isDarkMode={isDarkMode} />
                       </div>
                     </div>
                     {hasColorPhotos ? (
@@ -430,6 +435,9 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                         {photoColors.length > 0 && <p className="text-[11px] text-gray-500 mt-1">Tip: upload a photo for each color above instead, and the first color photo becomes the main photo automatically.</p>}
                       </div>
                     )}
+                    <div className="sm:col-span-2">
+                      <MorePhotos max={5} title="More photos of this product (optional)" hint="Extra angles / details. Customers swipe through them on the product page. Works with or without colors." value={newProductForm.extraImages || []} onChange={(extraImages) => setNewProductForm(prev => ({...prev, extraImages}))} isDarkMode={isDarkMode} />
+                    </div>
                     {/* on phones / small screens the supplier box sits here; on large screens it is in the empty space on the right */}
                     <div className="sm:col-span-2 lg:hidden">{supplierPanel}</div>
                     <div className="sm:col-span-2">

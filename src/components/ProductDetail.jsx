@@ -25,7 +25,9 @@ export default function ProductDetail({ product, products, addToCart, calculateD
   const sizeRef = useRef(null);
 
   // photo gallery: the main photo + the photo of each color. Swipe sideways to change.
-  const gallery = [...new Set([live.image, ...Object.values(live.colorImages || {}), ...(Array.isArray(live.images) ? live.images : [])].filter(Boolean))];
+  // order: main photo, then each color's photos together (its main photo, then its extra ones), then the product's extra photos
+  const colorOrder = Object.keys({ ...(live.colorImages || {}), ...(live.colorGallery || {}) });
+  const gallery = [...new Set([live.image, ...colorOrder.flatMap((c) => [(live.colorImages || {})[c], ...(((live.colorGallery || {})[c]) || [])]), ...(Array.isArray(live.images) ? live.images : [])].filter(Boolean))];
   const [manualIdx, setManualIdx] = useState(null); // null = show the photo of the chosen color
   const colorPhoto = imageFor(live, color);
   const currentIdx = manualIdx !== null ? Math.min(manualIdx, gallery.length - 1) : Math.max(0, gallery.indexOf(colorPhoto));

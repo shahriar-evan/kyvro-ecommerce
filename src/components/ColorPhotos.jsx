@@ -1,9 +1,10 @@
 import React, { useRef, useState } from 'react';
 import { imageFileToDataURL } from '../utils/imageUpload';
+import MorePhotos from './MorePhotos';
 
 // One photo per color: the customer sees the photo of the color he picks.
 // colors = ['Red','Blue'], value = { Red: url }, onChange(newValue)
-export default function ColorPhotos({ colors, value = {}, onChange, isDarkMode }) {
+export default function ColorPhotos({ colors, value = {}, onChange, gallery = {}, onGalleryChange, isDarkMode }) {
   if (!colors.length) return null;
   const set = (color, url) => {
     const next = { ...value };
@@ -14,9 +15,19 @@ export default function ColorPhotos({ colors, value = {}, onChange, isDarkMode }
     <div className={`rounded border p-3 space-y-3 ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
       <div>
         <p className="text-xs font-bold">Photo for each color (optional)</p>
-        <p className="text-[11px] text-gray-500">Upload a photo of the product in that color. When a customer picks the color, this photo shows. Colors without a photo use the main image.</p>
+        <p className="text-[11px] text-gray-500">Upload a photo of the product in that color. When a customer picks the color, this photo shows. Colors without a photo use the main image. You can add 2-3 more photos of the same color with "+ Add" under it.</p>
       </div>
-      {colors.map((c) => <Row key={c} color={c} url={value[c] || ''} set={set} isDarkMode={isDarkMode} />)}
+      {colors.map((c) => (
+        <div key={c} className="space-y-2">
+          <Row color={c} url={value[c] || ''} set={set} isDarkMode={isDarkMode} />
+          {onGalleryChange && (
+            <div className="pl-[68px]">
+              <MorePhotos compact max={3} title={`More ${c} photos`} value={gallery[c] || []} isDarkMode={isDarkMode}
+                onChange={(list) => { const next = { ...gallery }; if (list.length) next[c] = list; else delete next[c]; onGalleryChange(next); }} />
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

@@ -47,7 +47,7 @@ const EMPTY_CHECKOUT = {
 
 const EMPTY_PRODUCT_FORM = {
   name: '', gender: 'Men', category: 'Shirt', price: '', originalPrice: '', stockText: '', image: '', description: '',
-  colors: '', sizeStock: {}, colorStock: {}, colorImages: {}, trackColors: false, stock: '10', isNew: true, isFeatured: false, isBestSeller: false,
+  colors: '', sizeStock: {}, colorStock: {}, colorImages: {}, colorGallery: {}, extraImages: [], trackColors: false, stock: '10', isNew: true, isFeatured: false, isBestSeller: false,
   supplierName: '', supplierCost: '', supplierLink: '', linkPerColor: false, colorLinks: {}
 };
 
@@ -347,7 +347,7 @@ export default function App() {
       if (existing) {
         return prev.map(item => item.cartItemId === cartItemId ? { ...item, quantity: item.quantity + qty } : item);
       }
-      const { colorImages, ...rest } = live; // color photos stay out of the cart (keeps it small)
+      const { colorImages, colorGallery, images, ...rest } = live; // extra photos stay out of the cart (keeps it small)
       return [...prev, { ...rest, image: imageFor(live, color), cartItemId, selectedColor: color, selectedSize: size, quantity: qty }];
     });
     trackAddToCart({ ...live, selectedColor: color }, qty);
@@ -676,6 +676,16 @@ export default function App() {
       return;
     }
 
+    // Extra photos: product level (up to 5) and per color (up to 3). All photos together must fit in one Firestore document (1 MB).
+    const extraList = (newProductForm.extraImages || []).filter((u) => u && u !== mainImage).slice(0, 5);
+    const colorGalleryOut = {};
+    for (const c of colorList) { const g = ((newProductForm.colorGallery || {})[c] || []).filter(Boolean).slice(0, 3); if (g.length) colorGalleryOut[c] = g; }
+    const photoBytes = JSON.stringify([mainImage, extraList, colorPhotoMap, colorGalleryOut]).length;
+    if (photoBytes > 850000) {
+      alert(`All photos together are too big (${Math.round(photoBytes / 1000)} KB, the limit is about 850 KB). Remove a few photos, or paste image links instead of uploading.`);
+      return;
+    }
+
     // Private supplier details (dropshipping). Cost is optional; if it is typed, the shop name is needed too.
     const costRaw = String(newProductForm.supplierCost ?? '').trim();
     const supplierName = String(newProductForm.supplierName || '').trim();
@@ -718,7 +728,7 @@ export default function App() {
       originalPrice: parseFloat(newProductForm.originalPrice) || 0,
       stockText: String(newProductForm.stockText || '').trim().slice(0, 40),
       image: mainImage,
-      images: [mainImage],
+      images: [mainImage, ...extraList],
       description: newProductForm.description,
       colors: colorList,
       sizes: hasSizes ? sizeNames : ["Standard"],
@@ -729,6 +739,7 @@ export default function App() {
         for (const c of colorList) { const u = (newProductForm.colorImages || {})[c]; if (u) ci[c] = u; }
         return Object.keys(ci).length ? { colorImages: ci } : {};
       })(),
+      ...(Object.keys(colorGalleryOut).length ? { colorGallery: colorGalleryOut } : {}),
       stock,
       isNew: newProductForm.isNew,
       isFeatured: newProductForm.isFeatured,
@@ -807,6 +818,8 @@ export default function App() {
       sizeStock,
       colorStock,
       colorImages: { ...(prod.colorImages || {}) },
+      colorGallery: { ...(prod.colorGallery || {}) },
+      extraImages: (Array.isArray(prod.images) ? prod.images : []).filter((u) => u && u !== prod.image && !Object.values(prod.colorImages || {}).includes(u)),
       trackColors: hasColorStock(prod),
       stock: prod.stock,
       isNew: prod.isNew,
