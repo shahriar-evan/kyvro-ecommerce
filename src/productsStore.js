@@ -71,6 +71,8 @@ export const saveProductCost = (id, cost, staff) =>
     supplierLink: String(cost.supplierLink || "").trim().slice(0, 500),
     // optional: a different supplier link for each color, e.g. { White: "https://...", Red: "https://..." }
     colorLinks: Object.fromEntries(Object.entries(cost.colorLinks || {}).filter(([, u]) => u).map(([c, u]) => [String(c).slice(0, 40), String(u).trim().slice(0, 500)])),
+    // optional: what the supplier charges for each color when the prices differ, e.g. { White: 1849, Red: 2750 }
+    colorCosts: Object.fromEntries(Object.entries(cost.colorCosts || {}).filter(([, n]) => Number.isFinite(Number(n)) && Number(n) >= 0).map(([c, n]) => [String(c).slice(0, 40), Number(n)])),
     updatedAt: new Date().toISOString(),
     updatedBy: (staff && staff.email) || "",
   }));

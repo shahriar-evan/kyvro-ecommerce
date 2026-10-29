@@ -105,6 +105,10 @@ export const stockForColor = (p, color) => {
   return Object.entries(p.colorStock).reduce((sum, [k, n]) => (k.split('|')[1] === color ? sum + (parseInt(n, 10) || 0) : sum), 0);
 };
 
+// Best sellers first (pieces sold, counted when the team confirms an order), then the newest product.
+// A product you upload today still comes before older products that have the same number of sales.
+export const rankBySales = (list) => [...list].sort((a, b) => ((parseInt(b.sold, 10) || 0) - (parseInt(a.sold, 10) || 0)) || ((Number(b.id) || 0) - (Number(a.id) || 0)));
+
 // photo of the chosen color (falls back to the main image)
 export const imageFor = (p, color) => (color && p?.colorImages && p.colorImages[color]) || p?.image;
 

@@ -1,6 +1,6 @@
 import PriceTag, { DiscountBadge } from './PriceTag';
 import React, { useState, useEffect } from 'react';
-import { hasSizeStock, totalStock } from '../data/catalog';
+import { hasSizeStock, totalStock, rankBySales } from '../data/catalog';
 import StockLabel from './StockLabel';
 import WhatsAppButton from './WhatsAppButton';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
@@ -176,7 +176,7 @@ export default function HomeView({ requestAdd, addToCart, banners, calculateDisc
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-                {products.slice(0, 4).map(product => {
+                {rankBySales(products).slice(0, 8).map(product => {
                   const discountPct = calculateDiscountPercent(product.price, product.originalPrice);
                   return (
                     <div key={product.id} className={`group rounded-lg overflow-hidden border flex flex-col ${isDarkMode ? 'bg-[#181818] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
@@ -242,6 +242,18 @@ export default function HomeView({ requestAdd, addToCart, banners, calculateDisc
                     </div>
                   );
                 })}
+              </div>
+
+              <div className="mt-12 sm:mt-14 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView('shop')}
+                  className="group relative inline-flex items-center gap-3 px-10 py-4 rounded-full text-xs sm:text-sm font-bold uppercase tracking-[0.25em] text-black transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0"
+                  style={{ background: 'linear-gradient(135deg,#F2D675 0%,#D4AF37 50%,#B8932A 100%)', boxShadow: '0 12px 30px rgba(212,175,55,.35), inset 0 1px 0 rgba(255,255,255,.5)' }}
+                >
+                  More Collection
+                  <ArrowRight size={16} className="transition-transform duration-300 group-hover:translate-x-1.5" />
+                </button>
               </div>
             </div>
           </section>

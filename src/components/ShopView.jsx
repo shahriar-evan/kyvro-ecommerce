@@ -34,7 +34,7 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
                 onChange={(e) => setSortBy(e.target.value)}
                 className={`border px-4 py-2 text-xs rounded focus:outline-none focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#181818] border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`}
               >
-                <option value="featured">Sort by: Featured</option>
+                <option value="featured">Sort by: Best selling</option>
                 <option value="newest">Sort by: Newest</option>
                 <option value="price-low">Price: Low to High</option>
                 <option value="price-high">Price: High to Low</option>

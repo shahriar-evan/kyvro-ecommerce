@@ -49,7 +49,7 @@ const EMPTY_CHECKOUT = {
 const EMPTY_PRODUCT_FORM = {
   name: '', gender: 'Men', category: 'Shirt', price: '', originalPrice: '', stockText: '', image: '', description: '',
   colors: '', sizeStock: {}, colorStock: {}, colorImages: {}, colorGallery: {}, extraImages: [], trackColors: false, stock: '10', isNew: true, isFeatured: false, isBestSeller: false,
-  supplierName: '', supplierCost: '', supplierLink: '', linkPerColor: false, colorLinks: {}
+  supplierName: '', supplierCost: '', supplierLink: '', linkPerColor: false, colorLinks: {}, colorCosts: {}
 };
 
 export default function App() {
@@ -700,11 +700,21 @@ export default function App() {
         if (u) colorLinks[c] = u;
       }
     }
+    // price per color (only when the supplier's price differs between colors)
+    const colorCosts = {};
+    if (perColorLinks) {
+      for (const c of colorList) {
+        const raw = String((newProductForm.colorCosts || {})[c] ?? '').trim();
+        const n = parseFloat(raw);
+        if (raw !== '' && !Number.isNaN(n) && n >= 0) colorCosts[c] = n;
+      }
+    }
+    const allColorsPriced = colorList.length > 0 && colorList.every((c) => colorCosts[c] !== undefined);
     const supplierLinkUsed = perColorLinks ? '' : supplierLink;
-    const hasSupplier = costRaw !== '' || supplierName !== '' || supplierLinkUsed !== '' || Object.keys(colorLinks).length > 0;
-    const supplierCost = costRaw === '' ? 0 : parseFloat(costRaw);
+    const hasSupplier = costRaw !== '' || supplierName !== '' || supplierLinkUsed !== '' || Object.keys(colorLinks).length > 0 || Object.keys(colorCosts).length > 0;
+    const supplierCost = costRaw === '' ? (allColorsPriced ? Math.min(...Object.values(colorCosts)) : 0) : parseFloat(costRaw);
     if (hasSupplier) {
-      if (costRaw === '' || Number.isNaN(supplierCost) || supplierCost < 0) {
+      if ((costRaw === '' && !allColorsPriced) || Number.isNaN(supplierCost) || supplierCost < 0) {
         alert('Supplier details: please enter the original price (what the supplier charges you per piece), or clear the supplier fields.');
         return;
       }
@@ -717,7 +727,8 @@ export default function App() {
         alert('Supplier details: every product link must start with http:// or https://');
         return;
       }
-      if (supplierCost > (parseFloat(newProductForm.price) || 0) && !confirm(`Your selling price (${newProductForm.price}) is LOWER than the supplier price (${supplierCost}). You will lose money on every sale. Save anyway?`)) return;
+      const worstCost = Math.max(supplierCost, ...Object.values(colorCosts));
+      if (worstCost > (parseFloat(newProductForm.price) || 0) && !confirm(`Your selling price (${newProductForm.price}) is LOWER than the supplier price (${worstCost}). You will lose money on every sale. Save anyway?`)) return;
     }
 
     const productData = {
@@ -752,6 +763,8 @@ export default function App() {
       // New products from an Admin wait for approval; Owner and Manager products go live at once.
       // Editing keeps the current status.
       status: existingProduct ? (existingProduct.status || 'approved') : (isCloud && adminRole === 'admin' ? 'pending' : 'approved'),
+      // pieces sold so far must survive an edit
+      ...(existingProduct && existingProduct.sold ? { sold: existingProduct.sold } : {}),
       // a waiting delete request must survive an edit
       ...(existingProduct && existingProduct.deleteRequested ? {
         deleteRequested: true,
@@ -776,7 +789,7 @@ export default function App() {
     }
     // Save (or clear) the private supplier details in their own admin-only collection
     try {
-      if (hasSupplier) await saveProductCost(productData.id, { supplierName, supplierCost, supplierLink: supplierLinkUsed, colorLinks }, { email: loggedInUserEmail });
+      if (hasSupplier) await saveProductCost(productData.id, { supplierName, supplierCost, supplierLink: supplierLinkUsed, colorLinks, colorCosts }, { email: loggedInUserEmail });
       else if (editingProductId && productCosts[String(editingProductId)]) await removeProductCost(productData.id);
     } catch (err) {
       console.error(err);
@@ -830,7 +843,8 @@ export default function App() {
       supplierCost: sup.supplierCost === undefined ? '' : String(sup.supplierCost),
       supplierLink: sup.supplierLink || '',
       linkPerColor: !!(sup.colorLinks && Object.keys(sup.colorLinks).length),
-      colorLinks: { ...(sup.colorLinks || {}) }
+      colorLinks: { ...(sup.colorLinks || {}) },
+      colorCosts: Object.fromEntries(Object.entries(sup.colorCosts || {}).map(([c, n]) => [c, String(n)]))
     });
     setAdminTab('add-product');
   };
@@ -914,7 +928,8 @@ export default function App() {
     if (sortBy === 'price-low') return a.price - b.price;
     if (sortBy === 'price-high') return b.price - a.price;
     if (sortBy === 'newest') return b.id - a.id;
-    return 0;
+    // default: best selling first, then the newest product
+    return ((parseInt(b.sold, 10) || 0) - (parseInt(a.sold, 10) || 0)) || ((Number(b.id) || 0) - (Number(a.id) || 0));
   });
 
 

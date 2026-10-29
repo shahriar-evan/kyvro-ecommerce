@@ -123,6 +123,9 @@ export async function updateOrderStatus(orderId, status, staff) {
               ? { sizeStock, stock: Object.values(sizeStock).reduce((a, n) => a + (parseInt(n, 10) || 0), 0) }
               : { stock };
           }
+          // pieces sold (for the "best selling first" order of the shop): +qty when confirmed, -qty when a confirmed order is cancelled
+          const qtyTotal = lines.reduce((a, it) => a + (parseInt(it.quantity, 10) || 0), 0);
+          patch.sold = Math.max(0, (parseInt(p.sold, 10) || 0) + (deduct ? qtyTotal : -qtyTotal));
           productWrites.push([doc(db, "products", id), patch]);
         }
       }

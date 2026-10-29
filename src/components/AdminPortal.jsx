@@ -60,7 +60,9 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
       Object.entries(prev.colorLinks || {}).forEach(([k, v]) => { colorLinks[same(k) ? nn : k] = v; });
       const colorGallery = {};
       Object.entries(prev.colorGallery || {}).forEach(([k, v]) => { colorGallery[same(k) ? nn : k] = v; });
-      return { ...prev, colors: colors.join(', '), colorStock, colorImages, colorLinks, colorGallery };
+      const colorCosts = {};
+      Object.entries(prev.colorCosts || {}).forEach(([k, v]) => { colorCosts[same(k) ? nn : k] = v; });
+      return { ...prev, colors: colors.join(', '), colorStock, colorImages, colorLinks, colorGallery, colorCosts };
     });
   };
   const stockNow = sizesUsed ? sizesTotal : (parseInt(newProductForm && newProductForm.stock, 10) || 0);
@@ -75,6 +77,8 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
   const inputCls = `w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`;
   const linkPerColor = !!(newProductForm && newProductForm.linkPerColor);
   const colorLinks = (newProductForm && newProductForm.colorLinks) || {};
+  const colorCostsForm = (newProductForm && newProductForm.colorCosts) || {};
+  const setColorCost = (c, v) => setNewProductForm(prev => ({ ...prev, colorCosts: { ...(prev.colorCosts || {}), [c]: v } }));
   const setColorLink = (c, v) => setNewProductForm(prev => ({ ...prev, colorLinks: { ...(prev.colorLinks || {}), [c]: v } }));
   const supplierPanel = (
     <div className="rounded-lg border border-[#D4AF37]/50 bg-[#D4AF37]/5 p-4 space-y-3">
@@ -98,7 +102,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
             className={inputCls} />
         </div>
       </div>
-      {formProfit !== null && (
+      {formProfit !== null && !(linkPerColor && photoColors.some((c) => String(colorCostsForm[c] ?? '').trim() !== '')) && (
         <p className={`text-xs font-semibold ${formProfit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
           Selling price {formatPrice(formPriceNum)} − supplier cost {formatPrice(formCostNum)} = {formProfit >= 0 ? 'profit' : 'LOSS'} {formatPrice(Math.abs(formProfit))} per piece
         </p>
@@ -116,18 +120,32 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
         <label className="flex items-start gap-2 text-xs cursor-pointer select-none">
           <input type="checkbox" className="mt-0.5 accent-[#D4AF37]" checked={linkPerColor}
             onChange={e => setNewProductForm(prev => ({ ...prev, linkPerColor: e.target.checked }))} />
-          <span><strong>Each color has its own link</strong><br /><span className="text-[11px] text-gray-500">Tick this if the supplier has a separate product page for each color (for example White and Red). Leave it unticked when one link is enough.</span></span>
+          <span><strong>Each color has its own link</strong><br /><span className="text-[11px] text-gray-500">Tick this if the supplier has a separate product page for each color (for example White and Red), and/or a different price for each color. Leave it unticked when one link and one price are enough.</span></span>
         </label>
       )}
       {linkPerColor && photoColors.length > 0 && (
         <div className="space-y-2">
           {photoColors.map((c) => (
             <div key={c}>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">{c} · supplier link</label>
-              <input type="text" placeholder="https://..." maxLength={500}
-                value={colorLinks[c] || ''}
-                onChange={e => setColorLink(c, e.target.value)}
-                className={inputCls} />
+              <label className="block text-xs font-semibold text-gray-500 mb-1">{c} · supplier link &amp; price</label>
+              <div className="grid grid-cols-[1fr_104px] gap-2">
+                <input type="text" placeholder="https://..." maxLength={500}
+                  value={colorLinks[c] || ''}
+                  onChange={e => setColorLink(c, e.target.value)}
+                  className={inputCls} />
+                <input type="number" min="0" placeholder={newProductForm.supplierCost ? `৳ ${newProductForm.supplierCost}` : '৳ price'}
+                  value={colorCostsForm[c] ?? ''}
+                  onChange={e => setColorCost(c, e.target.value)}
+                  title="Supplier price for this color. Leave empty to use the supplier cost above."
+                  className={inputCls} />
+              </div>
+              {(() => {
+                const raw = String(colorCostsForm[c] ?? '').trim();
+                const cost = raw !== '' ? parseFloat(raw) : formCostNum;
+                if (Number.isNaN(cost) || Number.isNaN(formPriceNum)) return null;
+                const pr = formPriceNum - cost;
+                return <p className={`text-[11px] font-semibold mt-1 ${pr >= 0 ? 'text-green-600' : 'text-red-500'}`}>{pr >= 0 ? 'Profit' : 'LOSS'} {formatPrice(Math.abs(pr))} per piece{raw === '' ? ' (using the cost above)' : ''}</p>;
+              })()}
             </div>
           ))}
         </div>

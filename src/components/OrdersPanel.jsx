@@ -67,10 +67,14 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
       if (!c || c.supplierCost === undefined || c.supplierCost === null || c.supplierCost === '') { missing.push(it.name); return; }
       const name = String(c.supplierName || 'Supplier').trim() || 'Supplier';
       const g = groups[supplierKey(name)] || (groups[supplierKey(name)] = { key: supplierKey(name), name, items: [], cost: 0, sell: 0, units: 0 });
-      const line = (Number(c.supplierCost) || 0) * qty;
+      // the supplier's price for this color when the colors are priced differently, otherwise the one product price
+      const ccs = c.colorCosts || {};
+      const ccKey = Object.keys(ccs).find((k) => k.toLowerCase() === String(it.color || '').trim().toLowerCase());
+      const unitCost = ccKey !== undefined ? (Number(ccs[ccKey]) || 0) : (Number(c.supplierCost) || 0);
+      const line = unitCost * qty;
       const cl = c.colorLinks || {};
       const colorKey = Object.keys(cl).find((k) => k.toLowerCase() === String(it.color || '').trim().toLowerCase());
-      g.items.push({ ...it, link: (colorKey && cl[colorKey]) || c.supplierLink || '', unitCost: Number(c.supplierCost) || 0 });
+      g.items.push({ ...it, link: (colorKey && cl[colorKey]) || c.supplierLink || '', unitCost });
       g.cost += line;
       g.sell += (Number(it.price) || 0) * qty;
       g.units += qty;
