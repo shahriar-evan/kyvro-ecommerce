@@ -1,3 +1,4 @@
+import PriceTag, { DiscountBadge } from './PriceTag';
 import React from 'react';
 import { Heart } from 'lucide-react';
 import WhatsAppButton from './WhatsAppButton';
@@ -108,6 +109,7 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
                       >
                         <Heart size={16} className={savedIds.includes(product.id) ? 'fill-red-500 text-red-500' : ''} />
                       </button>
+                      <DiscountBadge price={product.price} originalPrice={product.originalPrice} className="absolute top-3 right-3" />
                       {totalStock(product) <= 0 && <span className="absolute top-2 left-2 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded">SOLD OUT</span>}
                     </div>
                     <div className="p-4 flex-1 flex flex-col justify-between">
@@ -116,8 +118,8 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
                         <h3 onClick={() => { setSelectedProduct(product); setCurrentView('product-detail'); }} className="text-sm font-semibold mt-1 cursor-pointer hover:text-[#D4AF37] line-clamp-1">
                           {product.name}
                         </h3>
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="text-sm font-bold">{formatPrice(product.price)}</span>
+                        <div className="mt-2">
+                          <PriceTag price={product.price} originalPrice={product.originalPrice} formatPrice={formatPrice} isDarkMode={isDarkMode} />
                         </div>
                         <StockLabel count={totalStock(product)} className="mt-1.5" />
                       </div>

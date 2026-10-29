@@ -1,3 +1,4 @@
+import PriceTag, { DiscountBadge } from './PriceTag';
 import React, { useState, useEffect } from 'react';
 import { hasSizeStock, totalStock } from '../data/catalog';
 import StockLabel from './StockLabel';
@@ -194,11 +195,7 @@ export default function HomeView({ requestAdd, addToCart, banners, calculateDisc
                             New
                           </span>
                         )}
-                        {product.originalPrice > product.price && (
-                          <div className="absolute top-3 right-3 flex flex-col items-end">
-                            <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 uppercase tracking-wider">Sale</span>
-                          </div>
-                        )}
+                        <DiscountBadge price={product.price} originalPrice={product.originalPrice} className="absolute top-3 right-3" />
                       </div>
 
                       <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between">
@@ -210,11 +207,8 @@ export default function HomeView({ requestAdd, addToCart, banners, calculateDisc
                           >
                             {product.name}
                           </h3>
-                          <div className="flex items-center gap-3 mt-2">
-                            <span className="text-sm sm:text-base font-bold">{formatPrice(product.price)}</span>
-                            {product.originalPrice > product.price && (
-                              <span className="text-xs text-gray-500 line-through">{formatPrice(product.originalPrice)}</span>
-                            )}
+                          <div className="mt-2">
+                            <PriceTag price={product.price} originalPrice={product.originalPrice} formatPrice={formatPrice} isDarkMode={isDarkMode} />
                           </div>
                           <StockLabel count={totalStock(product)} className="mt-1.5" />
                         </div>

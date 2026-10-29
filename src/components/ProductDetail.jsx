@@ -1,3 +1,4 @@
+import PriceTag, { DiscountBadge } from './PriceTag';
 import React, { useState, useRef } from 'react';
 import { Heart } from 'lucide-react';
 import WhatsAppButton, { WhatsAppIcon } from './WhatsAppButton';
@@ -111,7 +112,7 @@ export default function ProductDetail({ product, products, addToCart, calculateD
             <Heart size={18} className={savedIds.includes(live.id) ? 'fill-red-500 text-red-500' : ''} />
           </button>
           {soldOut && <span className="absolute top-3 left-3 bg-red-600 text-white text-[11px] font-bold px-3 py-1 rounded">SOLD OUT</span>}
-          {!soldOut && discount > 0 && <span className="absolute top-3 left-3 bg-[#D4AF37] text-black text-[11px] font-bold px-3 py-1 rounded">-{discount}%</span>}
+          {!soldOut && discount > 0 && <DiscountBadge price={live.price} originalPrice={live.originalPrice} className="absolute top-3 left-3" />}
         </div>
 
         <div className="space-y-5">
@@ -120,10 +121,7 @@ export default function ProductDetail({ product, products, addToCart, calculateD
             <h1 className="text-2xl sm:text-3xl font-serif font-bold mt-1">{live.name}</h1>
           </div>
 
-          <div className="flex items-end gap-3">
-            <span className="text-2xl font-bold text-[#D4AF37]">{formatPrice(live.price)}</span>
-            {live.originalPrice > live.price && <span className="text-sm text-gray-500 line-through">{formatPrice(live.originalPrice)}</span>}
-          </div>
+          <PriceTag price={live.price} originalPrice={live.originalPrice} formatPrice={formatPrice} isDarkMode={isDarkMode} size="lg" />
 
           <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{live.description}</p>
 
