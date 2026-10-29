@@ -31,6 +31,7 @@ import HomeView from './components/HomeView';
 import ShopView from './components/ShopView';
 import AdminPortal from './components/AdminPortal';
 import Footer from './components/Footer';
+import AlertCenter from './components/AlertCenter';
 import CheckoutView from './components/CheckoutView';
 import PolicyPages from './components/PolicyPages';
 import OrderSuccess from './components/OrderSuccess';
@@ -970,6 +971,7 @@ export default function App() {
 
       {/* FOOTER */}
       <PushPrompt customerUser={customerUser} isDarkMode={isDarkMode} />
+      <AlertCenter isDarkMode={isDarkMode} />
       <Footer isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} customerUser={customerUser} onSignIn={handleCustomerSignIn} goAccount={goAccount} />
 
     </div>
