@@ -46,7 +46,7 @@ const EMPTY_CHECKOUT = {
 };
 
 const EMPTY_PRODUCT_FORM = {
-  name: '', gender: 'Men', category: 'Shirt', price: '', originalPrice: '', image: '', description: '',
+  name: '', gender: 'Men', category: 'Shirt', price: '', originalPrice: '', stockText: '', image: '', description: '',
   colors: '', sizeStock: {}, colorStock: {}, colorImages: {}, trackColors: false, stock: '10', isNew: true, isFeatured: false, isBestSeller: false,
   supplierName: '', supplierCost: '', supplierLink: '', linkPerColor: false, colorLinks: {}
 };
@@ -716,6 +716,7 @@ export default function App() {
       gender: newProductForm.gender,
       price: parseFloat(newProductForm.price) || 0,
       originalPrice: parseFloat(newProductForm.originalPrice) || 0,
+      stockText: String(newProductForm.stockText || '').trim().slice(0, 40),
       image: mainImage,
       images: [mainImage],
       description: newProductForm.description,
@@ -799,6 +800,7 @@ export default function App() {
       category: prod.category,
       price: prod.price,
       originalPrice: prod.originalPrice || '',
+      stockText: prod.stockText || '',
       image: prod.image,
       description: prod.description,
       colors: (prod.colors || []).join(', '),

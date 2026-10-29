@@ -355,6 +355,18 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                         className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
                       />
                     </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">Stock text shown to customers (optional)</label>
+                      <input
+                        type="text"
+                        maxLength={40}
+                        placeholder="e.g. In Stock · Only 7 left · Selling fast"
+                        value={newProductForm.stockText || ''}
+                        onChange={e => setNewProductForm({...newProductForm, stockText: e.target.value})}
+                        className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
+                      />
+                      <p className="text-[11px] text-gray-400 mt-1">Empty = automatic: "In Stock", and "Only N left!" when 10 or fewer. Shown only while the product is in stock; "Out of Stock" always appears when the real stock is 0.</p>
+                    </div>
 
                     <div className="sm:col-span-2">
                       <div className="mb-4">

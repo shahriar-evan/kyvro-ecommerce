@@ -121,7 +121,7 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
                         <div className="mt-2">
                           <PriceTag price={product.price} originalPrice={product.originalPrice} formatPrice={formatPrice} isDarkMode={isDarkMode} />
                         </div>
-                        <StockLabel count={totalStock(product)} className="mt-1.5" />
+                        <StockLabel count={totalStock(product)} text={product.stockText} className="mt-1.5" />
                       </div>
 
                       <div className="mt-4 space-y-2">

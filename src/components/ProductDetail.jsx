@@ -137,7 +137,7 @@ export default function ProductDetail({ product, products, addToCart, calculateD
             </div>
           )}
 
-          <StockLabel count={labelCount} className="!text-base" />
+          <StockLabel count={labelCount} text={product.stockText} className="!text-base" />
 
           {sized && (
             <div ref={sizeRef} className="scroll-mt-24">

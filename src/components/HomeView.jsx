@@ -210,7 +210,7 @@ export default function HomeView({ requestAdd, addToCart, banners, calculateDisc
                           <div className="mt-2">
                             <PriceTag price={product.price} originalPrice={product.originalPrice} formatPrice={formatPrice} isDarkMode={isDarkMode} />
                           </div>
-                          <StockLabel count={totalStock(product)} className="mt-1.5" />
+                          <StockLabel count={totalStock(product)} text={product.stockText} className="mt-1.5" />
                         </div>
 
                         <div className="mt-5 space-y-2">
