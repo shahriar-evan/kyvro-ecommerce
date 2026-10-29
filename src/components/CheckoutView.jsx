@@ -3,7 +3,7 @@ import { deliveryAreaFor, DELIVERY_AREAS, DELIVERY_AREA_BN, PAYMENT_METHODS, PAY
 
 export default function CheckoutView({
   storeSettings, cart, checkoutForm, setCheckoutForm, checkoutError, deliveryCharge, grandTotal, formatPrice,
-  handleCheckoutSubmit, isDarkMode, placingOrder, removeFromCart, updateCartQty, setCurrentView, subtotal, discount = 0, discountLabel = '', customerUser = null, authReady = true, onSignIn,
+  handleCheckoutSubmit, isDarkMode, placingOrder, removeFromCart, updateCartQty, setCurrentView, subtotal, discount = 0, discountLabel = '', customerUser = null, authReady = true, onSignIn, reward = null,
 }) {
   const set = (field, value) => setCheckoutForm({ ...checkoutForm, [field]: value });
 
@@ -195,7 +195,7 @@ export default function CheckoutView({
                   </div>
                   {extra > 0 && (
                     <div className="flex justify-between text-red-500">
-                      <span>Extra Delivery <span className="text-xs">(+{formatPrice(st.deliveryExtraPerItem)} per item after the first {st.deliveryIncludedItems})</span></span>
+                      <span>Extra Delivery <span className="text-xs">(+{formatPrice(st.deliveryExtraPerItem)} per item)</span></span>
                       <span className="font-semibold">+ {formatPrice(extra)}</span>
                     </div>
                   )}
@@ -221,7 +221,7 @@ export default function CheckoutView({
             </div>
 
             <div className={`text-xs leading-relaxed rounded border p-3 ${isDarkMode ? 'border-[#D4AF37]/40 bg-[#D4AF37]/10' : 'border-[#D4AF37]/50 bg-[#D4AF37]/10'}`}>
-              <p>{deliveryNote(storeSettings).bn}</p>
+              <p>{deliveryNote(storeSettings, cart.reduce((n, i) => n + (parseInt(i.quantity, 10) || 0), 0)).bn}</p>
               {(() => {
                 const s = normalizeSettings(storeSettings);
                 const net = subtotal - discount;
@@ -230,6 +230,9 @@ export default function CheckoutView({
                 if (s.freeDeliveryEnabled && !freeDeliveryApplies(net, checkoutForm.paymentMethod, s)) return <p className="mt-1 font-semibold">{toBanglaDigits(s.freeDeliveryMin)} টাকা বা এর বেশি পণ্য কিনলে ফ্রি ডেলিভারি পাবেন। ফ্রি ডেলিভারি পেতে {s.freeDeliveryFor === 'online' ? 'অনলাইন পেমেন্ট' : 'ক্যাশ অন ডেলিভারি'} নির্বাচন করুন।</p>;
                 return null;
               })()}
+              {reward && reward.missing > 0 && reward.missing <= 1500 && (
+                <p className="mt-1 font-semibold">আর {toBanglaDigits(reward.missing)} টাকার পণ্য কিনলে {reward.rule.type === 'percent' ? `${toBanglaDigits(reward.rule.value)}% ছাড়` : `${toBanglaDigits(reward.rule.value)} টাকা ছাড়`} পাবেন।</p>
+              )}
               {online && <p className="mt-1">অনলাইন পেমেন্ট নির্বাচন করলে অর্ডার করার পর আমাদের প্রতিনিধি আপনাকে ফোন করে পেমেন্টের নির্দেশনা জানাবেন।</p>}
             </div>
 

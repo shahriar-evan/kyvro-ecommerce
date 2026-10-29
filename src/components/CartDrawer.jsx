@@ -81,7 +81,7 @@ export default function CartDrawer({ storeSettings, cart, formatPrice, isDarkMod
                     </p>
                   )}
                   <p className="text-[11px] text-gray-500">
-                    {deliveryNote(storeSettings).en}
+                    {deliveryNote(storeSettings, cart.reduce((n, i) => n + (parseInt(i.quantity, 10) || 0), 0)).en}
                   </p>
                   {(() => {
                     const s = normalizeSettings(storeSettings);

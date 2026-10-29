@@ -48,13 +48,16 @@ export const deliveryFee = (area, method, netTotal, settings, units = 1) => {
   return base + s.deliveryExtraPerItem * Math.max(0, (parseInt(units, 10) || 1) - s.deliveryIncludedItems);
 };
 
-// Short sentence about delivery for the cart / checkout (English + Bangla)
-export const deliveryNote = (settings) => {
+// Short sentence about delivery for the cart / checkout (English + Bangla).
+// units = items in the cart: the "+15 per extra item" sentence only shows when the cart has more items than the charge covers
+// (leave units out to always show it, e.g. in the admin preview).
+export const deliveryNote = (settings, units) => {
   const s = normalizeSettings(settings);
+  const showExtra = s.deliveryExtraPerItem > 0 && (units === undefined || units > s.deliveryIncludedItems);
   const who = { online: ['with Online Payment', 'অনলাইন পেমেন্ট করলে'], cod: ['with Cash on Delivery', 'ক্যাশ অন ডেলিভারিতে'], both: ['on any payment method', 'যেকোনো পেমেন্টে'] }[s.freeDeliveryFor];
   return {
-    en: `Delivery charge: ${s.deliveryInside} BDT inside Dhaka, ${s.deliveryOutside} BDT outside Dhaka${s.deliveryExtraPerItem > 0 ? `, +${s.deliveryExtraPerItem} BDT for each item after the first ${s.deliveryIncludedItems}` : ''}.${s.freeDeliveryEnabled ? ` Free delivery ${who[0]} when your order is ${s.freeDeliveryMin} BDT or more.` : ''}`,
-    bn: `ডেলিভারি চার্জ: ঢাকার ভিতরে ${toBanglaDigits(s.deliveryInside)} টাকা, ঢাকার বাইরে ${toBanglaDigits(s.deliveryOutside)} টাকা${s.deliveryExtraPerItem > 0 ? `, প্রথম ${toBanglaDigits(s.deliveryIncludedItems)}টি পণ্যের পর প্রতিটি পণ্যে +${toBanglaDigits(s.deliveryExtraPerItem)} টাকা` : ''}।${s.freeDeliveryEnabled ? ` ${who[1]} ${toBanglaDigits(s.freeDeliveryMin)} টাকা বা তার বেশির অর্ডারে ডেলিভারি ফ্রি।` : ''}`,
+    en: `Delivery charge: ${s.deliveryInside} BDT inside Dhaka, ${s.deliveryOutside} BDT outside Dhaka${showExtra ? `, +${s.deliveryExtraPerItem} BDT for each item after the first ${s.deliveryIncludedItems}` : ''}.${s.freeDeliveryEnabled ? ` Free delivery ${who[0]} when your order is ${s.freeDeliveryMin} BDT or more.` : ''}`,
+    bn: `ডেলিভারি চার্জ: ঢাকার ভিতরে ${toBanglaDigits(s.deliveryInside)} টাকা, ঢাকার বাইরে ${toBanglaDigits(s.deliveryOutside)} টাকা${showExtra ? `, প্রথম ${toBanglaDigits(s.deliveryIncludedItems)}টি পণ্যের পর প্রতিটি পণ্যে +${toBanglaDigits(s.deliveryExtraPerItem)} টাকা` : ''}।${s.freeDeliveryEnabled ? ` ${who[1]} ${toBanglaDigits(s.freeDeliveryMin)} টাকা বা তার বেশির অর্ডারে ডেলিভারি ফ্রি।` : ''}`,
   };
 };
 
