@@ -64,7 +64,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
             className={inputCls} />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1">Original price (BDT, per piece)</label>
+          <label className="block text-xs font-semibold text-gray-500 mb-1">Supplier cost (BDT, per piece)</label>
           <input type="number" placeholder="e.g. 440"
             value={newProductForm.supplierCost ?? ''}
             onChange={e => setNewProductForm(prev => ({ ...prev, supplierCost: e.target.value }))}
@@ -73,7 +73,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
       </div>
       {formProfit !== null && (
         <p className={`text-xs font-semibold ${formProfit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-          Selling price {formatPrice(formPriceNum)} − original price {formatPrice(formCostNum)} = {formProfit >= 0 ? 'profit' : 'LOSS'} {formatPrice(Math.abs(formProfit))} per piece
+          Selling price {formatPrice(formPriceNum)} − supplier cost {formatPrice(formCostNum)} = {formProfit >= 0 ? 'profit' : 'LOSS'} {formatPrice(Math.abs(formProfit))} per piece
         </p>
       )}
       {!linkPerColor && (
@@ -325,6 +325,23 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                         onChange={e => setNewProductForm({...newProductForm, price: e.target.value})}
                         className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
                       />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1">Old Price — crossed out (BDT, optional)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="e.g. 899 (shown struck-through)"
+                        value={newProductForm.originalPrice ?? ''}
+                        onChange={e => setNewProductForm({...newProductForm, originalPrice: e.target.value})}
+                        className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
+                      />
+                      {(() => {
+                        const o = parseFloat(newProductForm.originalPrice), pr = parseFloat(newProductForm.price);
+                        if (!o) return <p className="text-[11px] text-gray-400 mt-1">Leave empty for no discount badge.</p>;
+                        if (!pr || o <= pr) return <p className="text-[11px] text-red-500 mt-1">Old price must be higher than the selling price.</p>;
+                        return <p className="text-[11px] text-green-600 font-semibold mt-1">Customers will see -{Math.round((1 - pr / o) * 100)}% OFF (save {formatPrice(o - pr)})</p>;
+                      })()}
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 mb-1">{sizesUsed ? 'Total Stock (auto)' : 'Stock Quantity *'}</label>
