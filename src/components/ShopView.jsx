@@ -1,6 +1,6 @@
 import PriceTag, { DiscountBadge } from './PriceTag';
 import React from 'react';
-import { Heart, ArrowLeft } from 'lucide-react';
+import { Heart } from 'lucide-react';
 import WhatsAppButton from './WhatsAppButton';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
 import StockLabel from './StockLabel';
@@ -41,16 +41,6 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
               </select>
             </div>
           </div>
-
-          {/* Mobile: floating back button (stays while scrolling) */}
-          <button
-            type="button"
-            onClick={() => setCurrentView('home')}
-            aria-label="Back"
-            className="lg:hidden fixed top-20 left-3 z-40 w-10 h-10 rounded-full bg-[#D4AF37] text-black shadow-lg flex items-center justify-center active:scale-95 transition"
-          >
-            <ArrowLeft size={20} />
-          </button>
 
           {/* Mobile: sub-categories as a chip row at the top, products right below */}
           {(selectedCategory === 'Men' || selectedCategory === 'Women') && (() => {

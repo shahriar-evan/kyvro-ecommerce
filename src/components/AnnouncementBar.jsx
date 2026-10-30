@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 const SPEED_DESKTOP = 45;
 const SPEED_MOBILE = 32;
 
-export default function AnnouncementBar({ announcementText, isDarkMode }) {
+export default function AnnouncementBar({ announcementText, speed = 100, isDarkMode }) {
   const wrap = useRef(null);
   const unit = useRef(null);
   const [anim, setAnim] = useState({ copies: 2, seconds: 60 });
@@ -15,14 +15,15 @@ export default function AnnouncementBar({ announcementText, isDarkMode }) {
       const viewport = wrap.current.clientWidth || window.innerWidth;
       const w = unit.current.offsetWidth || 1;
       const half = Math.max(1, Math.ceil(viewport / w)); // copies in one half, so the half is at least as wide as the screen
-      const speed = viewport < 640 ? SPEED_MOBILE : SPEED_DESKTOP;
-      setAnim({ copies: half * 2, seconds: Math.max(10, (w * half) / speed) });
+      const base = viewport < 640 ? SPEED_MOBILE : SPEED_DESKTOP;
+      const speedPx = base * (Number(speed) || 100) / 100;
+      setAnim({ copies: half * 2, seconds: Math.max(4, (w * half) / speedPx) });
     };
     measure();
     window.addEventListener('resize', measure);
     const t = setTimeout(measure, 400); // again after fonts are loaded
     return () => { window.removeEventListener('resize', measure); clearTimeout(t); };
-  }, [announcementText]);
+  }, [announcementText, speed]);
 
   const renderUnit = (refEl, key) => (
     <span key={key} ref={refEl} className="inline-block pr-12">

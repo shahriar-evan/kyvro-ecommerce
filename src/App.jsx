@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { askConfirm } from './components/AlertCenter';
 import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth, googleProvider } from './firebase';
@@ -25,6 +25,7 @@ import shirtImg from './assets/shirts.png';
 import punjabiImg from './assets/punjabi.png';
 import sneakersImg from './assets/Snekers.png';
 import AnnouncementBar from './components/AnnouncementBar';
+import BackButton from './components/BackButton';
 import Header from './components/Header';
 import MobileMenu from './components/MobileMenu';
 import CartDrawer from './components/CartDrawer';
@@ -122,6 +123,23 @@ export default function App() {
   const [priceFilter, setPriceFilter] = useState(15000);
 
   const [isCartOpen, setIsCartOpen] = useState(false);
+  // View history for the floating Back button (phone + laptop)
+  const viewHistory = useRef([]);
+  const goingBack = useRef(false);
+  useEffect(() => {
+    if (goingBack.current) { goingBack.current = false; return; }
+    const h = viewHistory.current;
+    if (h[h.length - 1] !== currentView) h.push(currentView);
+    if (h.length > 30) h.shift();
+  }, [currentView]);
+  const goBack = () => {
+    const h = viewHistory.current;
+    h.pop();
+    const prev = h[h.length - 1] || 'home';
+    goingBack.current = prev !== currentView;
+    setCurrentView(prev);
+  };
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -952,7 +970,9 @@ export default function App() {
       )}
 
       {/* 1. ANNOUNCEMENT BAR */}
-      <AnnouncementBar announcementText={announcementText} isDarkMode={isDarkMode} />
+      <AnnouncementBar announcementText={announcementText} speed={storeSettings.bannerSpeed} isDarkMode={isDarkMode} />
+
+      {currentView !== 'home' && <BackButton onClick={goBack} />}
 
       {/* 2. HEADER */}
       <Header cart={cart} curr={curr} currencyKey={currencyKey} currentView={currentView} isDarkMode={isDarkMode} setCurrencyKey={setCurrencyKey} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} setIsDarkMode={setIsDarkMode} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} customerUser={customerUser} displayName={displayName} photoURL={photoURL} goAccount={goAccount} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} />

@@ -7,6 +7,7 @@ import { normalizeSettings, bestDiscount, nextReward, describeRule, bannerFromRu
 // Owner-only editor: top banner text + automatic discount rules + delivery charge + offer sending
 export default function StoreSettings({ settings, isDarkMode, staff, formatPrice }) {
   const [text, setText] = useState(settings.announcementText);
+  const [speed, setSpeed] = useState(settings.bannerSpeed || 100);
   const [enabled, setEnabled] = useState(settings.discountEnabled);
   const [rules, setRules] = useState(settings.discountRules.map((r) => ({ ...r })));
   const [dIn, setDIn] = useState(String(settings.deliveryInside));
@@ -49,6 +50,7 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
   // Pick up changes saved from another device
   useEffect(() => {
     setText(settings.announcementText);
+    setSpeed(settings.bannerSpeed || 100);
     setEnabled(settings.discountEnabled);
     setRules(settings.discountRules.map((r) => ({ ...r })));
     setDIn(String(settings.deliveryInside));
@@ -73,7 +75,7 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
   const linkBtn = `text-xs font-medium underline underline-offset-4 decoration-indigo-400/60 hover:decoration-indigo-400 ${accentText}`;
   const subBox = `rounded-xl border p-4 ${isDarkMode ? 'border-white/10 bg-[#0e0e13]' : 'border-slate-200 bg-slate-50'}`;
 
-  const draft = normalizeSettings({ announcementText: text, discountEnabled: enabled, discountRules: rules, deliveryInside: dIn === '' ? 0 : dIn, deliveryOutside: dOut === '' ? 0 : dOut, deliveryExtraPerItem: dExtra === '' ? 0 : dExtra, deliveryIncludedItems: dIncl === '' ? 1 : dIncl, freeDeliveryEnabled: freeOn, freeDeliveryMin: freeMin === '' ? 0 : freeMin, freeDeliveryFor: freeFor, maintenanceMode: maintOn, maintenanceMessage: maintMsg });
+  const draft = normalizeSettings({ announcementText: text, bannerSpeed: speed, discountEnabled: enabled, discountRules: rules, deliveryInside: dIn === '' ? 0 : dIn, deliveryOutside: dOut === '' ? 0 : dOut, deliveryExtraPerItem: dExtra === '' ? 0 : dExtra, deliveryIncludedItems: dIncl === '' ? 1 : dIncl, freeDeliveryEnabled: freeOn, freeDeliveryMin: freeMin === '' ? 0 : freeMin, freeDeliveryFor: freeFor, maintenanceMode: maintOn, maintenanceMessage: maintMsg });
   const t = Number(testTotal) || 0;
   const hit = bestDiscount(t, draft);
   const next = nextReward(t, draft);
@@ -212,6 +214,16 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
               <button type="button" onClick={() => setText(bannerFromRules(draft))} className={linkBtn}>Write it from my discount rules</button>
               <span className={`text-[11px] ${muted}`}>{text.length}/500</span>
               <button type="button" onClick={sendBannerMail} disabled={mailBusy} className={`ml-auto ${outlineBtn}`}>{mailBusy ? 'Sending...' : 'Send this banner (email + notification)'}</button>
+            </div>
+            <div className="mt-4">
+              <label className={label}>Scroll speed: {speed < 100 ? 'slower' : speed > 100 ? 'faster' : 'normal'} ({speed}%)</label>
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={() => setSpeed((v) => Math.max(25, v - 25))} className={outlineBtn}>Slower</button>
+                <input type="range" min="25" max="300" step="5" value={speed} onChange={(e) => setSpeed(Number(e.target.value))} className="flex-1" />
+                <button type="button" onClick={() => setSpeed((v) => Math.min(300, v + 25))} className={outlineBtn}>Faster</button>
+                <button type="button" onClick={() => setSpeed(100)} className={linkBtn}>Reset</button>
+              </div>
+              <p className={`text-[11px] mt-1 ${muted}`}>Press "Save" below to make the new speed live.</p>
             </div>
             {mailMsg && <p className={`mt-2 ${msgClass(mailMsg)}`}>{mailMsg}</p>}
           </>

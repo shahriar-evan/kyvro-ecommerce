@@ -12,6 +12,9 @@ import StoreSettings from './StoreSettings';
 import { SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
 
 export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, productCosts = {}, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct, clearProductForm, handleDeleteRequest }) {
+  const [productSearch, setProductSearch] = React.useState('');
+  const psq = productSearch.trim().toLowerCase();
+  const shownProducts = psq ? products.filter((p) => [p.name, p.category, p.gender, p.brand, p.id, p.supplierName].some((v) => String(v || '').toLowerCase().includes(psq))) : products;
   const isOwner = adminRole === 'owner';
   const canManageTeam = adminRole === 'owner' || adminRole === 'manager';
   const formColors = ((newProductForm && newProductForm.colors) || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -235,6 +238,12 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                 </div>
               )}
               {adminTab === 'products' && (
+                <div className="mb-3 flex items-center gap-3">
+                  <input type="text" value={productSearch} onChange={(e) => setProductSearch(e.target.value)} placeholder="Search products by name, category, brand..." className={`flex-1 border px-4 py-2.5 text-sm rounded focus:outline-none focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#181818] border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`} />
+                  {psq && <button type="button" onClick={() => setProductSearch('')} className="text-xs font-bold text-[#D4AF37] whitespace-nowrap">Clear ({shownProducts.length} found)</button>}
+                </div>
+              )}
+              {adminTab === 'products' && (
                 <div className={`rounded-lg border overflow-x-auto ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
                   <table className="w-full text-left text-xs">
                     <thead className={`uppercase tracking-wider border-b ${isDarkMode ? 'bg-[#1f1f1f] text-gray-400 border-gray-800' : 'bg-gray-100 text-gray-700 border-gray-200'}`}>
@@ -247,7 +256,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {products.map(p => (
+                      {shownProducts.map(p => (
                         <tr key={p.id} className={`hover:bg-gray-100 dark:hover:bg-[#1a1a1a] ${p.deleteRequested ? 'bg-red-500/10' : ''}`}>
                           <td className="p-4 flex items-center gap-3">
                             <img src={p.image} alt={p.name} className="w-10 h-10 object-cover rounded" />

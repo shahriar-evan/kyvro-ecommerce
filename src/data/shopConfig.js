@@ -78,6 +78,7 @@ export const toBanglaDigits = (n) => String(n).replace(/\d/g, (d) => '০১২�
 // ---------------------------------------------------------------------------
 export const DEFAULT_STORE_SETTINGS = {
   announcementText: 'Discover Your Signature Style | Shop 3500 BDT or more and get 20% OFF automatically',
+  bannerSpeed: 100, // top banner scroll speed in percent (25 = slow, 100 = normal, 300 = fast)
   discountEnabled: true,
   discountRules: [{ min: 3500, type: 'percent', value: 20 }],
   ...DEFAULT_DELIVERY,
@@ -108,6 +109,7 @@ export function normalizeSettings(raw) {
     .slice(0, 10);
   return {
     announcementText: typeof raw.announcementText === 'string' ? raw.announcementText : base.announcementText,
+    bannerSpeed: raw.bannerSpeed === undefined ? base.bannerSpeed : Math.min(300, Math.max(25, Math.round(num(raw.bannerSpeed)) || 100)),
     discountEnabled: raw.discountEnabled !== false,
     discountRules: rules,
     deliveryInside: raw.deliveryInside === undefined ? DEFAULT_DELIVERY.deliveryInside : Math.min(100000, Math.max(0, Math.round(num(raw.deliveryInside)))),

@@ -19,6 +19,7 @@ export async function saveStoreSettings(settings, staff) {
   const clean = normalizeSettings(settings);
   await setDoc(doc(db, "settings", "store"), {
     announcementText: clean.announcementText.trim().slice(0, 500),
+    bannerSpeed: clean.bannerSpeed,
     discountEnabled: clean.discountEnabled,
     discountRules: clean.discountRules,
     deliveryInside: clean.deliveryInside,
