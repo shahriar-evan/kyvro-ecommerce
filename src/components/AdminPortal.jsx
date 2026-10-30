@@ -70,7 +70,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
     });
   };
   const stockNow = sizesUsed ? sizesTotal : (parseInt(newProductForm && newProductForm.stock, 10) || 0);
-  const autoStockText = stockNow > 0 && stockNow <= 10 ? `Only ${stockNow} left!` : 'In Stock';
+  const autoStockText = stockNow > 0 && stockNow <= 10 ? `Only ${stockNow} left!` : stockNow > 0 ? `In Stock · ${stockNow} available` : 'In Stock';
   // supplier shop names used before (for the suggestion list in the form)
   const supplierNames = [...new Set(['SelfShop', ...Object.values(productCosts).map((c) => (c && c.supplierName) || '').filter(Boolean)])];
   const formCostNum = parseFloat(newProductForm && newProductForm.supplierCost);
@@ -422,7 +422,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                         className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
                       />
                       <div className="flex flex-wrap gap-1.5 mt-1.5">
-                        {[autoStockText, 'In Stock', 'Selling fast', 'Limited stock'].filter((t, i, a) => a.indexOf(t) === i).map(t => (
+                        {[autoStockText, stockNow > 0 ? `Only ${stockNow} left!` : '', 'In Stock', 'Selling fast', 'Limited stock'].filter(Boolean).filter((t, i, a) => a.indexOf(t) === i).map(t => (
                           <button key={t} type="button" onClick={() => setNewProductForm(prev => ({ ...prev, stockText: t }))} className="text-[11px] px-2 py-1 rounded border border-gray-300 text-gray-600 hover:border-[#D4AF37]">{t}</button>
                         ))}
                         {newProductForm.stockText && <button type="button" onClick={() => setNewProductForm(prev => ({ ...prev, stockText: '' }))} className="text-[11px] px-2 py-1 rounded border border-red-300 text-red-500">Clear (automatic)</button>}
