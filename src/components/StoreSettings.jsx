@@ -140,7 +140,7 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
   const toggleMaintenance = async () => {
     const next = !maintOn;
     const ask = next
-      ? 'Turn ON maintenance?\n\nVisitors will see a "we\'ll be back soon" page and nobody can place an order. You and your team can still use the website and the admin panel.'
+      ? 'Turn ON maintenance?\n\nVisitors can still browse the whole website, but Add to Cart, Buy Now, Order on WhatsApp and checkout are locked and a "maintenance mode ON, we\'ll be back soon" bar shows on top. You and your team can still test-order.'
       : 'Turn OFF maintenance and open the website for everyone?';
     if (!(await askConfirm(ask))) return;
     setMaintBusy(true);
@@ -148,7 +148,7 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
     try {
       await saveStoreSettings({ ...settings, maintenanceMode: next, maintenanceMessage: maintMsg }, staff);
       setMaintOn(next);
-      setMaintNote(next ? 'Maintenance is ON. Visitors now see the maintenance page.' : 'Website is LIVE for everyone.');
+      setMaintNote(next ? 'Maintenance is ON. Visitors can browse, but ordering is locked.' : 'Website is LIVE for everyone.');
     } catch (err) {
       console.error(err);
       setMaintNote('Error: could not change it (' + (err.code === 'permission-denied' ? 'only the Owner can do this, and the Firestore rules must be published' : err.message) + ').');
@@ -185,7 +185,7 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
       <div className="space-y-6 min-w-0">
         {section(
           'Website Status',
-          'Switch maintenance ON while you work on the website. Visitors see a "we\'ll be back soon" page and cannot order. You and your team can still use the admin panel and see the real website (with an orange bar on top).',
+          'Switch maintenance ON while you work on the website. Visitors can still see everything, but Add to Cart, Buy Now, Order on WhatsApp and checkout are locked, with an orange "maintenance mode ON, we\'ll be back soon" bar on top. You and your team can still test-order.',
           <>
             <div className="flex flex-wrap items-center gap-4">
               <span className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-bold tracking-widest uppercase ${maintOn ? 'bg-amber-500/15 text-amber-500' : 'bg-emerald-500/15 text-emerald-500'}`}>

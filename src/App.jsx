@@ -40,7 +40,6 @@ import OrderSuccess from './components/OrderSuccess';
 import ProductDetail from './components/ProductDetail';
 import AccountView from './components/AccountView';
 import OrderTracking from './components/OrderTracking';
-import MaintenancePage from './components/MaintenancePage';
 import { initAnalytics, trackPageView, trackViewContent, trackAddToCart, trackInitiateCheckout, trackPurchase } from './analytics';
 
 const EMPTY_CHECKOUT = {
@@ -169,6 +168,22 @@ export default function App() {
 
   // Admin & Firebase Auth States
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  // Maintenance mode: visitors can browse everything, but ordering is locked (team members can still test-order)
+  const visitorLocked = storeSettings.maintenanceMode === true && !isAdminLoggedIn;
+  const lockText = ((storeSettings.maintenanceMessage || '').trim()) || "Maintenance mode is ON. We'll be back soon - ordering is paused for a little while.\nওয়েবসাইটে কাজ চলছে, আমরা শীঘ্রই ফিরে আসছি। কিছুক্ষণের জন্য অর্ডার বন্ধ আছে।";
+  useEffect(() => {
+    if (!visitorLocked) return undefined;
+    // the WhatsApp "Order on WhatsApp" buttons are paused too
+    const onClick = (e) => {
+      const a = e.target && e.target.closest ? e.target.closest('a[href*="wa.me"]') : null;
+      if (a && /order on whatsapp/i.test(a.textContent || '')) { e.preventDefault(); e.stopPropagation(); alert(lockText); }
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, [visitorLocked, lockText]);
+  useEffect(() => {
+    if (visitorLocked && currentView === 'checkout') { setCurrentView('home'); alert(lockText); }
+  }, [visitorLocked, currentView]); // eslint-disable-line react-hooks/exhaustive-deps
   const [loggedInUserEmail, setLoggedInUserEmail] = useState('');
   const [adminRole, setAdminRole] = useState(null); // 'owner' | 'manager' | 'admin' | null
   const [adminName, setAdminName] = useState('');
@@ -344,6 +359,7 @@ export default function App() {
   };
 
   const addToCart = (product, selectedColor, selectedSize, quantity = 1, goCheckout = false) => {
+    if (visitorLocked) { alert(lockText); return; }
     const live = products.find(p => p.id === product.id) || product;
     const size = selectedSize || (live.sizes && live.sizes[0]);
     const color = selectedColor || (live.colors && live.colors[0]);
@@ -407,6 +423,7 @@ export default function App() {
   // Add to Cart / Buy Now on the product cards: ask for size / color first when the product has them
   const [quickAdd, setQuickAdd] = useState(null); // { product, goCheckout }
   const requestAdd = (product, goCheckout = false) => {
+    if (visitorLocked) { alert(lockText); return; }
     const live = products.find(p => p.id === product.id) || product;
     if (needsChoice(live)) setQuickAdd({ product: live, goCheckout });
     else addToCart(live, undefined, undefined, 1, goCheckout);
@@ -952,20 +969,17 @@ export default function App() {
   });
 
 
-  // Maintenance mode (Owner switch in Admin > Store Settings): visitors see a "we'll be back soon" page,
-  // team members keep the real website + admin panel. The team login page stays reachable.
+  // Maintenance mode (Owner switch in Admin > Store Settings): visitors see the whole website but cannot order.
   const maintenanceOn = storeSettings.maintenanceMode === true;
-  if (maintenanceOn && !isAdminLoggedIn && currentView !== 'admin') {
-    if (!accessChecked) return <div className={`min-h-screen ${isDarkMode ? 'bg-[#0f0f0f]' : 'bg-white'}`} />;
-    return <MaintenancePage message={storeSettings.maintenanceMessage} isDarkMode={isDarkMode} onTeamLogin={() => setCurrentView('admin')} />;
-  }
 
   return (
     <div className={`min-h-screen flex flex-col font-sans relative transition-colors duration-300 overflow-x-clip ${isDarkMode ? 'bg-[#0f0f0f] text-gray-100' : 'bg-white text-gray-900'}`}>
 
-      {maintenanceOn && isAdminLoggedIn && (
-        <div className="bg-amber-500 text-black text-center text-xs font-semibold py-2 px-3">
-          Maintenance mode is ON: visitors see the "we'll be back soon" page. Only team members can see the website right now.
+      {maintenanceOn && (
+        <div className="bg-amber-500 text-black text-center text-xs sm:text-sm font-semibold py-2.5 px-3">
+          {isAdminLoggedIn
+            ? 'Maintenance mode is ON: visitors can browse but cannot order (Add to Cart, Buy Now and checkout are locked). You can still test-order as a team member.'
+            : "Maintenance mode ON - we'll be back soon. You can look around, but ordering is paused for a little while. (ওয়েবসাইটে কাজ চলছে, অর্ডার সাময়িক বন্ধ।)"}
         </div>
       )}
 
