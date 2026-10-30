@@ -96,8 +96,8 @@ export default function ProductDetail({ product, products, addToCart, calculateD
       <button onClick={() => setCurrentView('shop')} className="text-xs text-gray-500 hover:text-[#D4AF37] mb-6">&larr; Back to shop</button>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
-        <div {...photoSwipe} className={`relative rounded-lg overflow-hidden border select-none ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-gray-100 border-gray-200'}`}>
-          <img src={shownPhoto} alt={live.name} draggable={false} className="w-full h-full max-h-[560px] object-cover" />
+        <div {...photoSwipe} className={`relative self-start md:sticky md:top-28 rounded-lg overflow-hidden border select-none ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-gray-100 border-gray-200'}`}>
+          <img src={shownPhoto} alt={live.name} draggable={false} className="block w-full h-auto max-h-[560px] object-contain mx-auto" />
           {gallery.length > 1 && (
             <div className="absolute bottom-3 inset-x-0 z-10 flex justify-center gap-1.5">
               {gallery.map((_, i) => (
