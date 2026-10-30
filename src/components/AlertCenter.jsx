@@ -31,6 +31,14 @@ export function askConfirm(message, opts = {}) {
   });
 }
 
+// Premium text box (replaces prompt). Usage: const v = await askInput('Order number?', { placeholder: 'e.g. SS-123' }); v is null when cancelled.
+export function askInput(message, opts = {}) {
+  return new Promise((resolve) => {
+    askQueue.push({ id: askId++, text: String(message == null ? '' : message), danger: false, input: true, placeholder: opts.placeholder || '', initial: opts.initial || '', yes: opts.confirmText || 'OK', no: opts.cancelText || 'Cancel', resolve });
+    emitAsk();
+  });
+}
+
 export function showAlert(message) {
   const text = String(message == null ? '' : message);
   if (!text.trim()) return;
@@ -54,6 +62,7 @@ const AUTO_MS = 2600;
 export default function AlertCenter({ isDarkMode }) {
   const [items, setItems] = useState([]);
   const [asks, setAsks] = useState([]);
+  const [inputVal, setInputVal] = useState('');
   useEffect(() => {
     listeners.push(setItems);
     askListeners.push(setAsks);
@@ -63,7 +72,8 @@ export default function AlertCenter({ isDarkMode }) {
   }, []);
 
   const ask = asks[0];
-  const answer = (v) => { const a = askQueue[0]; if (!a) return; askQueue = askQueue.slice(1); emitAsk(); a.resolve(v); };
+  const answer = (v) => { const a = askQueue[0]; if (!a) return; askQueue = askQueue.slice(1); emitAsk(); a.resolve(a.input ? (v ? inputVal.trim() : null) : v); };
+  useEffect(() => { setInputVal(ask && ask.input ? ask.initial : ''); }, [ask && ask.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!ask) return undefined;
     const onKey = (e) => { if (e.key === 'Escape') answer(false); };
@@ -103,13 +113,19 @@ export default function AlertCenter({ isDarkMode }) {
               {ask.danger ? <><path d="M12 8v5" /><path d="M12 17h.01" /></> : <><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7" /><path d="M12 17h.01" /></>}
             </svg>
           </div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.25em] mb-2" style={{ color: ring }}>{ask.danger ? 'Are you sure?' : 'Please confirm'}</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.25em] mb-2" style={{ color: ring }}>{ask.input ? 'Almost done' : ask.danger ? 'Are you sure?' : 'Please confirm'}</p>
           <p className="text-[15px] leading-relaxed whitespace-pre-line break-words max-h-[40vh] overflow-y-auto">{ask.text}</p>
+          {ask.input && (
+            <input type="text" autoFocus value={inputVal} placeholder={ask.placeholder}
+              onChange={(e) => setInputVal(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') answer(true); }}
+              className={`mt-4 w-full rounded-xl border px-4 py-3 text-sm text-center outline-none transition focus:ring-2 focus:ring-[#D4AF37]/40 focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#0e0e13] border-white/15 text-white placeholder-gray-600' : 'bg-gray-50 border-gray-300 text-black placeholder-gray-400'}`} />
+          )}
           {asks.length > 1 && <p className="mt-2 text-[11px] text-gray-500">+{asks.length - 1} more</p>}
           <div className="mt-6 grid grid-cols-2 gap-3">
             <button type="button" onClick={() => answer(false)}
               className={`py-3 rounded-xl text-xs font-bold uppercase tracking-[0.15em] border transition active:scale-[.98] ${isDarkMode ? 'border-white/15 text-gray-200 hover:bg-white/5' : 'border-gray-300 text-gray-700 hover:bg-gray-100'}`}>{ask.no}</button>
-            <button type="button" autoFocus onClick={() => answer(true)}
+            <button type="button" autoFocus={!ask.input} onClick={() => answer(true)}
               className={`py-3 rounded-xl text-xs font-bold uppercase tracking-[0.15em] transition hover:brightness-105 active:scale-[.98] ${ask.danger ? 'text-white' : 'text-black'}`}
               style={{ background: ask.danger ? 'linear-gradient(135deg,#f87171,#ef4444 55%,#b91c1c)' : 'linear-gradient(135deg,#F2D675,#D4AF37 55%,#B8932A)', boxShadow: `0 8px 20px ${glow}` }}>{ask.yes}</button>
           </div>

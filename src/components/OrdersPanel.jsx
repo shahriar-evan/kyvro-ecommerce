@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { askConfirm } from './AlertCenter';
+import { askConfirm, askInput } from './AlertCenter';
 import { ORDER_STATUSES, DELIVERY_AREA_BN } from '../data/shopConfig';
 import { updateOrderStatus, markOrderPaid, deleteOrders, watchOrderSupply, markSupplierOrdered, unmarkSupplierOrdered, supplierKey } from '../orders';
 import { formatDateTime, toDate } from '../utils/dates';
@@ -160,8 +160,8 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
     setCopiedId(id);
     setTimeout(() => setCopiedId((c) => (c === id ? '' : c)), 2000);
   };
-  const doMarkPlaced = (o, g) => {
-    const no = window.prompt(`You placed this order at ${g.name}.\n\nWrite the ${g.name} order number (optional), then press OK:`, '');
+  const doMarkPlaced = async (o, g) => {
+    const no = await askInput(`You placed this order at ${g.name}.\n\nWrite the ${g.name} order number (optional), then press OK.`, { placeholder: 'e.g. order number from ' + g.name });
     if (no === null) return;
     run(o.id, () => markSupplierOrdered(o.id, g, no, staff));
   };
