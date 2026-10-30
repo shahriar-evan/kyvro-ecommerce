@@ -1,6 +1,6 @@
 import PriceTag, { DiscountBadge } from './PriceTag';
 import React from 'react';
-import { Heart } from 'lucide-react';
+import { Heart, ArrowLeft } from 'lucide-react';
 import WhatsAppButton from './WhatsAppButton';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
 import StockLabel from './StockLabel';
@@ -42,8 +42,33 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
             </div>
           </div>
 
+          {/* Mobile: floating back button (stays while scrolling) */}
+          <button
+            type="button"
+            onClick={() => setCurrentView('home')}
+            aria-label="Back"
+            className="lg:hidden fixed top-20 left-3 z-40 w-10 h-10 rounded-full bg-[#D4AF37] text-black shadow-lg flex items-center justify-center active:scale-95 transition"
+          >
+            <ArrowLeft size={20} />
+          </button>
+
+          {/* Mobile: sub-categories as a chip row at the top, products right below */}
+          {(selectedCategory === 'Men' || selectedCategory === 'Women') && (() => {
+            const same = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
+            const names = SUB_CATEGORIES[selectedCategory].flatMap((it) => (it.group ? [it.group, ...it.items] : [it.name]));
+            const chip = (active) => `shrink-0 px-4 py-2 rounded-full text-xs font-semibold border transition ${active ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : isDarkMode ? 'border-gray-700 text-gray-300' : 'border-gray-300 text-gray-700'}`;
+            return (
+              <div className="lg:hidden -mx-4 px-4 mb-5 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+                <button onClick={() => setSelectedCategory(selectedCategory)} className={chip(!selectedSubCategory)}>All</button>
+                {names.map((n) => (
+                  <button key={n} onClick={() => setSelectedSubCategory(n)} className={chip(same(selectedSubCategory, n))}>{n}</button>
+                ))}
+              </div>
+            );
+          })()}
+
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            <div className="space-y-6">
+            <div className="space-y-6 hidden lg:block">
               <div className={`p-6 rounded-lg border ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
                 <h3 className="text-sm font-serif font-bold mb-4 uppercase tracking-wider">Categories</h3>
                 <div className="flex flex-col space-y-1 text-xs">
