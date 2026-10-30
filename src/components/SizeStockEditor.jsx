@@ -5,6 +5,7 @@ import { sizePresetsFor, orderedSizes, variantKey } from '../data/catalog';
 // value = { M: '20', XL: '10' }  (quantities kept as strings while typing)
 export default function SizeStockEditor({ gender, value, onChange, isDarkMode, perColor = false, onPerColorChange, colorValue = {}, onColorChange, colors = [] }) {
   const [custom, setCustom] = useState('');
+  const [autoQty, setAutoQty] = useState('');
   const presets = sizePresetsFor(gender);
   const sizes = orderedSizes(Object.keys(value || {}), gender);
   const total = sizes.reduce((sum, s) => sum + (parseInt(value[s], 10) || 0), 0);
@@ -31,6 +32,34 @@ export default function SizeStockEditor({ gender, value, onChange, isDarkMode, p
   };
 
   const inputClass = `w-24 border p-2 text-xs rounded focus:outline-none focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`;
+
+  // premium buttons
+  const goldBtn = 'px-4 py-2 text-[11px] font-bold uppercase tracking-wider rounded-lg text-black whitespace-nowrap transition hover:brightness-105 active:scale-[.97] disabled:opacity-40';
+  const goldStyle = { background: 'linear-gradient(135deg,#F2D675,#D4AF37 55%,#B8932A)', boxShadow: '0 6px 16px rgba(212,175,55,.3), inset 0 1px 0 rgba(255,255,255,.45)' };
+  const ghostBtn = `px-4 py-2 text-[11px] font-bold uppercase tracking-wider rounded-lg border whitespace-nowrap transition active:scale-[.97] hover:border-[#D4AF37] hover:text-[#D4AF37] ${isDarkMode ? 'border-gray-700 text-gray-300 bg-[#161616]' : 'border-gray-300 text-gray-700 bg-white shadow-sm'}`;
+  const chipBtn = (on) => `px-4 py-2 text-xs rounded-lg border transition active:scale-[.96] ${on ? 'text-black font-bold border-transparent' : (isDarkMode ? 'border-gray-700 text-gray-300 bg-[#161616] hover:border-[#D4AF37]' : 'border-gray-300 text-gray-700 bg-white shadow-sm hover:border-[#D4AF37]')}`;
+  const chipStyle = (on) => (on ? { background: 'linear-gradient(135deg,#F2D675,#D4AF37 60%,#B8932A)', boxShadow: '0 4px 12px rgba(212,175,55,.3)' } : undefined);
+
+  // Auto quantity: one number for all the ticked colour boxes (edit any box afterwards)
+  const qtyNum = String(autoQty).trim() === '' ? null : Math.max(0, parseInt(autoQty, 10) || 0);
+  const applyAuto = (onlyEmpty) => {
+    if (qtyNum === null) return;
+    const next = { ...colorValue };
+    Object.keys(next).forEach((k) => {
+      if (!k.split('|').slice(1).join('|').trim()) return;
+      if (!groups.includes(k.split('|')[0])) return;
+      if (onlyEmpty && String(next[k] ?? '').trim() !== '') return;
+      next[k] = String(qtyNum);
+    });
+    onColorChange(next);
+  };
+  const tickAll = () => {
+    const next = { ...colorValue };
+    groups.forEach((sz) => allColors.forEach((c) => {
+      if (!entriesOf(sz).some((e) => e.color.toLowerCase() === c.toLowerCase())) next[variantKey(sz, c)] = qtyNum === null ? '' : String(qtyNum);
+    }));
+    onColorChange(next);
+  };
 
   const has = (size) => Object.keys(value || {}).some((k) => k.toLowerCase() === size.toLowerCase());
 
@@ -67,9 +96,8 @@ export default function SizeStockEditor({ gender, value, onChange, isDarkMode, p
               key={s}
               type="button"
               onClick={() => togglePreset(s)}
-              className={`px-3 py-1.5 text-xs rounded border transition ${has(s)
-                ? 'bg-[#D4AF37] border-[#D4AF37] text-black font-bold'
-                : (isDarkMode ? 'border-gray-700 text-gray-300 hover:border-[#D4AF37]' : 'border-gray-300 text-gray-700 hover:border-[#D4AF37]')}`}
+              className={chipBtn(has(s))}
+              style={chipStyle(has(s))}
             >
               {s}
             </button>
@@ -89,7 +117,7 @@ export default function SizeStockEditor({ gender, value, onChange, isDarkMode, p
         <button
           type="button"
           onClick={() => { addSize(custom); setCustom(''); }}
-          className={`px-3 text-xs font-bold rounded border whitespace-nowrap ${isDarkMode ? 'border-gray-700 text-gray-300 hover:bg-[#222]' : 'border-gray-300 text-gray-700 hover:bg-gray-100'}`}
+          className={ghostBtn}
         >
           Add size
         </button>
@@ -104,6 +132,18 @@ export default function SizeStockEditor({ gender, value, onChange, isDarkMode, p
           </span>
         </span>
       </label>
+
+      {split && allColors.length > 0 && (
+        <div className={`rounded-xl border p-3 space-y-2 ${isDarkMode ? 'border-gray-700 bg-[#14141a]' : 'border-[#D4AF37]/40 bg-[#D4AF37]/5'}`}>
+          <p className="text-xs font-bold">Auto quantity <span className="font-normal text-gray-500">· type one number, put it in every box at once, then change any box you like</span></p>
+          <div className="flex flex-wrap items-center gap-2">
+            <input type="number" min="0" step="1" value={autoQty} onChange={(e) => setAutoQty(e.target.value)} placeholder="Qty e.g. 50" className={`${inputClass} !w-28`} />
+            <button type="button" disabled={qtyNum === null} onClick={() => applyAuto(false)} className={goldBtn} style={goldStyle}>Apply to all ticked</button>
+            <button type="button" disabled={qtyNum === null} onClick={() => applyAuto(true)} className={ghostBtn}>Fill empty only</button>
+            <button type="button" onClick={tickAll} className={ghostBtn} title="Tick every color in every size (with the auto quantity if you typed one)">Tick all colors &amp; sizes</button>
+          </div>
+        </div>
+      )}
 
       {split && sizes.length === 0 && (
         <div className={`rounded border divide-y ${isDarkMode ? 'border-gray-800 divide-gray-800' : 'border-gray-200 divide-gray-200'}`}>

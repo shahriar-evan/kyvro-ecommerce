@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { askConfirm } from './AlertCenter';
 import { OWNER_EMAILS, ownerName } from '../adminEmails';
 import { listAdmins, listPrivateDetails, createAdminAccount, updateAdminProfile, changeAdminEmail, setAdminRole, setAdminActive, removeAdmin, sendAdminPasswordReset, ROLES, ROLE_LABELS } from '../adminAuth';
 
@@ -154,7 +155,7 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
     setMessage(null);
     if (!name.trim() || !email.trim() || !password) return;
     const newRole = isOwner ? role : 'admin'; // Managers can only add Admins
-    if (newRole === 'owner' && !confirm(OWNER_WARNING)) return;
+    if (newRole === 'owner' && !(await askConfirm(OWNER_WARNING))) return;
     setBusy(true);
     try {
       const { accountCreated } = await createAdminAccount(email, password, newRole, {
@@ -184,7 +185,7 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
   const saveEmail = async (a) => {
     const to = emailDraft.email.trim();
     if (!to) { setMessage({ type: 'err', text: 'Type the new email first.' }); return; }
-    if (!confirm(`Change the login email of ${a.name || a.email}?\n\nOld: ${a.email}\nNew: ${to}\n\nA new login account is created for the new email with the password you typed. The old email will stop working for the Admin Portal. Their role and details move to the new email.`)) return;
+    if (!(await askConfirm(`Change the login email of ${a.name || a.email}?\n\nOld: ${a.email}\nNew: ${to}\n\nA new login account is created for the new email with the password you typed. The old email will stop working for the Admin Portal. Their role and details move to the new email.`))) return;
     setMessage(null);
     try {
       const { accountCreated } = await changeAdminEmail(a.email, to, emailDraft.password);
@@ -213,7 +214,7 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
 
   const handleRoleChange = async (a, newRole) => {
     setMessage(null);
-    if (newRole === 'owner' && !confirm(OWNER_WARNING)) return;
+    if (newRole === 'owner' && !(await askConfirm(OWNER_WARNING))) return;
     try {
       await setAdminRole(a.email, newRole);
       setMessage({ type: 'ok', text: `${a.name || a.email} is now ${ROLE_LABELS[newRole]}.` });
@@ -241,7 +242,7 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
   };
 
   const handleRemove = async (a) => {
-    if (!confirm(`Permanently remove ${a.name || a.email} from the team? (To block access temporarily, turn the Access switch OFF instead.)`)) return;
+    if (!(await askConfirm(`Permanently remove ${a.name || a.email} from the team? (To block access temporarily, turn the Access switch OFF instead.)`))) return;
     setMessage(null);
     try {
       await removeAdmin(a.email);

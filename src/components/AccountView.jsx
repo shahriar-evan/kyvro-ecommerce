@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { askConfirm } from './AlertCenter';
 import { Heart, User, Package, Wallet, Settings, LogOut } from 'lucide-react';
 import { formatDateTime, toDate } from '../utils/dates';
 import { CANCEL_WINDOW_MINUTES } from '../orders';
@@ -78,7 +79,7 @@ export default function AccountView({
     return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   };
   const cancelOrder = async (o) => {
-    if (!confirm(`Cancel order ${o.orderNumber}?`)) return;
+    if (!(await askConfirm(`Cancel order ${o.orderNumber}?`))) return;
     setCancelMsg(''); setCancelling(o.id);
     try { await onCancelOrder(o.id); }
     catch (e) { setCancelMsg('Sorry, this order can no longer be cancelled here (the 30 minutes are over or the team already confirmed it). Please contact us on WhatsApp or kyvrofashion@gmail.com.'); }

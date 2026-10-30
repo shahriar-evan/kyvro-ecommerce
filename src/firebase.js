@@ -4,7 +4,7 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 // FIREBASE CONFIGURATION
 // apiKey: Firebase Console -> Project settings -> Your apps -> Config theke COPY-PASTE koro (hat e type korbe na)
 const firebaseConfig = {
-  apiKey: "AIzaSyDAiO5aF_CfN1jMZKngS1lHCTp_I04SeL0",
+  apiKey: "PASTE_YOUR_FIREBASE_API_KEY_HERE",
   authDomain: "kyvro-admin-auth.firebaseapp.com",
   projectId: "kyvro-admin-auth",
   storageBucket: "kyvro-admin-auth.firebasestorage.app",

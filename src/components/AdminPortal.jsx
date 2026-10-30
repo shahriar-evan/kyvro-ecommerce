@@ -1,4 +1,5 @@
 import React from 'react';
+import { askConfirm } from './AlertCenter';
 import AdminLogin from './AdminLogin';
 import AdminManager from './AdminManager';
 import ImageField from './ImageField';
@@ -309,10 +310,10 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                     </h3>
                     <div className="flex gap-2">
                       {editingProductId && (
-                        <button type="button" onClick={() => { const saved = products.find((p) => p.id === editingProductId); if (saved && confirm('Undo all your changes and go back to the saved product?')) startEditProduct(saved); }}
+                        <button type="button" onClick={async () => { const saved = products.find((p) => p.id === editingProductId); if (saved && (await askConfirm('Undo all your changes and go back to the saved product?'))) startEditProduct(saved); }}
                           className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded border border-gray-400 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#222]">Reset changes</button>
                       )}
-                      <button type="button" onClick={() => { if (confirm(editingProductId ? 'Clear the whole form? You will leave edit mode (the saved product stays unchanged).' : 'Clear the whole form?')) clearProductForm(); }}
+                      <button type="button" onClick={async () => { if ((await askConfirm(editingProductId ? 'Clear the whole form? You will leave edit mode (the saved product stays unchanged).' : 'Clear the whole form?'))) clearProductForm(); }}
                         className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded border border-red-400 text-red-500 hover:bg-red-500/10">Clear form</button>
                     </div>
                   </div>

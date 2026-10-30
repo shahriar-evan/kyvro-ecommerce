@@ -17,6 +17,20 @@ const kindOf = (msg) => {
   return 'info';
 };
 
+// Premium yes/no question in the middle of the page (replaces confirm). Usage: if (!(await askConfirm('Delete this?'))) return;
+let askQueue = [];
+let askListeners = [];
+let askId = 1;
+const emitAsk = () => askListeners.forEach((fn) => fn([...askQueue]));
+export function askConfirm(message, opts = {}) {
+  return new Promise((resolve) => {
+    const text = String(message == null ? '' : message);
+    const danger = opts.danger !== undefined ? opts.danger : /(delete|remove|permanently|block|cannot be undone|clear|lose money|reject|cancel order)/i.test(text);
+    askQueue.push({ id: askId++, text, danger, yes: opts.confirmText || (danger ? 'Yes, continue' : 'Confirm'), no: opts.cancelText || 'Cancel', resolve });
+    emitAsk();
+  });
+}
+
 export function showAlert(message) {
   const text = String(message == null ? '' : message);
   if (!text.trim()) return;
@@ -39,11 +53,23 @@ const AUTO_MS = 2600;
 
 export default function AlertCenter({ isDarkMode }) {
   const [items, setItems] = useState([]);
+  const [asks, setAsks] = useState([]);
   useEffect(() => {
     listeners.push(setItems);
+    askListeners.push(setAsks);
     setItems([...queue]);
-    return () => { listeners = listeners.filter((l) => l !== setItems); };
+    setAsks([...askQueue]);
+    return () => { listeners = listeners.filter((l) => l !== setItems); askListeners = askListeners.filter((l) => l !== setAsks); };
   }, []);
+
+  const ask = asks[0];
+  const answer = (v) => { const a = askQueue[0]; if (!a) return; askQueue = askQueue.slice(1); emitAsk(); a.resolve(v); };
+  useEffect(() => {
+    if (!ask) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') answer(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [ask && ask.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cur = items[0];
   const close = () => { queue = queue.slice(1); emit(); };
@@ -60,6 +86,37 @@ export default function AlertCenter({ isDarkMode }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [cur && cur.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (ask) {
+    const ring = ask.danger ? '#ef4444' : '#D4AF37';
+    const glow = ask.danger ? 'rgba(239,68,68,.35)' : 'rgba(212,175,55,.35)';
+    return (
+      <div className="fixed inset-0 z-[310] flex items-center justify-center px-4" role="alertdialog" aria-modal="true" onClick={() => answer(false)}
+        style={{ background: 'rgba(8,8,12,.6)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', animation: 'kvFade .18s ease-out' }}>
+        <style>{`@keyframes kvFade{from{opacity:0}to{opacity:1}}@keyframes kvPop{0%{opacity:0;transform:translateY(14px) scale(.92)}100%{opacity:1;transform:none}}`}</style>
+        <div onClick={(e) => e.stopPropagation()}
+          className={`relative w-full max-w-sm rounded-2xl overflow-hidden text-center px-7 pt-8 pb-6 border ${isDarkMode ? 'bg-[#15151a] border-white/10 text-white' : 'bg-white border-black/5 text-gray-900'}`}
+          style={{ boxShadow: `0 24px 60px rgba(0,0,0,.45), 0 0 50px ${glow}`, animation: 'kvPop .26s cubic-bezier(.2,.9,.3,1.2)' }}>
+          <div className="absolute top-0 left-0 right-0 h-1" style={{ background: `linear-gradient(90deg, transparent, ${ring}, transparent)` }} />
+          <div className="mx-auto mb-4 w-16 h-16 rounded-full flex items-center justify-center" style={{ background: `${ring}22`, boxShadow: `inset 0 0 0 2px ${ring}` }}>
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke={ring} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+              {ask.danger ? <><path d="M12 8v5" /><path d="M12 17h.01" /></> : <><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7" /><path d="M12 17h.01" /></>}
+            </svg>
+          </div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.25em] mb-2" style={{ color: ring }}>{ask.danger ? 'Are you sure?' : 'Please confirm'}</p>
+          <p className="text-[15px] leading-relaxed whitespace-pre-line break-words max-h-[40vh] overflow-y-auto">{ask.text}</p>
+          {asks.length > 1 && <p className="mt-2 text-[11px] text-gray-500">+{asks.length - 1} more</p>}
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <button type="button" onClick={() => answer(false)}
+              className={`py-3 rounded-xl text-xs font-bold uppercase tracking-[0.15em] border transition active:scale-[.98] ${isDarkMode ? 'border-white/15 text-gray-200 hover:bg-white/5' : 'border-gray-300 text-gray-700 hover:bg-gray-100'}`}>{ask.no}</button>
+            <button type="button" autoFocus onClick={() => answer(true)}
+              className={`py-3 rounded-xl text-xs font-bold uppercase tracking-[0.15em] transition hover:brightness-105 active:scale-[.98] ${ask.danger ? 'text-white' : 'text-black'}`}
+              style={{ background: ask.danger ? 'linear-gradient(135deg,#f87171,#ef4444 55%,#b91c1c)' : 'linear-gradient(135deg,#F2D675,#D4AF37 55%,#B8932A)', boxShadow: `0 8px 20px ${glow}` }}>{ask.yes}</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!cur) return null;
   const look = LOOK[cur.kind];

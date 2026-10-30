@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { askConfirm } from './AlertCenter';
 import { ORDER_STATUSES, DELIVERY_AREA_BN } from '../data/shopConfig';
 import { updateOrderStatus, markOrderPaid, deleteOrders, watchOrderSupply, markSupplierOrdered, unmarkSupplierOrdered, supplierKey } from '../orders';
 import { formatDateTime, toDate } from '../utils/dates';
@@ -164,8 +165,8 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
     if (no === null) return;
     run(o.id, () => markSupplierOrdered(o.id, g, no, staff));
   };
-  const doUnmarkPlaced = (o, g) => {
-    if (!confirm(`Remove the "ordered at ${g.name}" mark from this order?`)) return;
+  const doUnmarkPlaced = async (o, g) => {
+    if (!(await askConfirm(`Remove the "ordered at ${g.name}" mark from this order?`))) return;
     run(o.id, () => unmarkSupplierOrdered(o.id, g.name));
   };
 
@@ -197,8 +198,8 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
     setBusyId(null);
   };
 
-  const setStatus = (o, status, confirmText) => {
-    if (confirmText && !confirm(confirmText)) return;
+  const setStatus = async (o, status, confirmText) => {
+    if (confirmText && !(await askConfirm(confirmText))) return;
     run(o.id, async () => {
       const { skipped } = await updateOrderStatus(o.id, status, staff);
       if (skipped && skipped.length) {
@@ -207,16 +208,16 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
     });
   };
 
-  const doBlockPhone = (o) => {
-    if (!confirm(`Block the phone number ${o.customer?.phone}? New orders from this number will be refused.`)) return;
+  const doBlockPhone = async (o) => {
+    if (!(await askConfirm(`Block the phone number ${o.customer?.phone}? New orders from this number will be refused.`))) return;
     run(o.id, () => blockPhone(o.customer.phone, o.orderNumber, staff));
   };
-  const doBlockEmail = (o) => {
-    if (!confirm(`Block the account ${o.email}? New orders from this account will be refused.`)) return;
+  const doBlockEmail = async (o) => {
+    if (!(await askConfirm(`Block the account ${o.email}? New orders from this account will be refused.`))) return;
     run(o.id, () => blockEmail(o.email, o.orderNumber, staff));
   };
-  const doUnblock = (kind, key) => {
-    if (!confirm('Unblock this customer?')) return;
+  const doUnblock = async (kind, key) => {
+    if (!(await askConfirm('Unblock this customer?'))) return;
     run(key, () => (kind === 'phone' ? unblockPhone(key) : unblockEmail(key)));
   };
   const blockedCount = Object.keys(blocked.phones).length + Object.keys(blocked.emails).length;
@@ -264,7 +265,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
     if (!rangeStart || !rangeEnd) { setError('Choose both dates (From and To) to clear history.'); return; }
     if (rangeStart > rangeEnd) { setError('The From date must be before the To date.'); return; }
     if (historyList.length === 0) { setError('There are no finished orders in this date range.'); return; }
-    if (!confirm(`Permanently delete ${historyList.length} finished order(s) (Delivered / Cancelled) from ${fromDate} to ${toDate_}?\n\nThis cannot be undone. Tip: press "Export Orders to CSV" first to keep a copy.\nThe customers will also stop seeing these orders in their account.`)) return;
+    if (!(await askConfirm(`Permanently delete ${historyList.length} finished order(s) (Delivered / Cancelled) from ${fromDate} to ${toDate_}?\n\nThis cannot be undone. Tip: press "Export Orders to CSV" first to keep a copy.\nThe customers will also stop seeing these orders in their account.`))) return;
     setError('');
     setBusyId('history');
     try { await deleteOrders(historyList.map((o) => o.id)); alert('History cleared.'); }

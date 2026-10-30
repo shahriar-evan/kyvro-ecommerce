@@ -34,7 +34,7 @@ export const DEFAULT_SUBS = {
   Men: ['Shirt', 'Punjabi'],
   Women: ['Sharee'],
 };
-export const DEFAULT_SUB_LABEL = { Men: 'Shirt & Punjabi', Women: 'Sharee' };
+export const DEFAULT_SUB_LABEL = { Men: 'All Men\'s products · best sellers first', Women: 'All Women\'s products · best sellers first' };
 
 export const hasSubCategories = (gender) => gender === 'Men' || gender === 'Women';
 
@@ -56,8 +56,9 @@ const same = (a, b) => String(a || '').toLowerCase() === String(b || '').toLower
 // Does a product belong to the Men/Women page the customer is looking at?
 export const matchesCollectionPage = (product, collection, sub) => {
   if (!same(product.gender, collection)) return false;
-  const wanted = sub ? subCategoryNames(collection, sub) : DEFAULT_SUBS[collection];
-  return wanted.some((n) => same(n, product.category));
+  // no sub-category chosen: the whole collection (the best sellers come first); a sub-category: only that one
+  if (!sub) return true;
+  return subCategoryNames(collection, sub).some((n) => same(n, product.category));
 };
 
 // ---- Sizes & stock ---------------------------------------------------------

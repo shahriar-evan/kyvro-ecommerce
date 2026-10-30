@@ -66,7 +66,7 @@ export default function ColorPicker({ colors, onToggle, onAdd, onRename, isDarkM
         <button
           type="button"
           onClick={add}
-          className={`px-3 text-xs font-bold rounded border whitespace-nowrap ${isDarkMode ? 'border-gray-700 text-gray-300 hover:bg-[#222]' : 'border-gray-300 text-gray-700 hover:bg-gray-100'}`}
+          className={`px-4 py-2 text-[11px] font-bold uppercase tracking-wider rounded-lg border whitespace-nowrap transition active:scale-[.97] hover:border-[#D4AF37] hover:text-[#D4AF37] ${isDarkMode ? 'border-gray-700 text-gray-300 bg-[#161616]' : 'border-gray-300 text-gray-700 bg-white shadow-sm'}`}
         >
           Add color
         </button>

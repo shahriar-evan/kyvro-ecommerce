@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { askConfirm } from './components/AlertCenter';
 import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth, googleProvider } from './firebase';
 import { isOwnerEmail } from './adminEmails';
@@ -577,7 +578,7 @@ export default function App() {
   const [migrating, setMigrating] = useState(false);
   const handleMigrateProducts = async () => {
     if (migrating || isCloud) return;
-    if (!confirm('Move all products to Firestore? After this, every customer on every device will see the same products.')) return;
+    if (!(await askConfirm('Move all products to Firestore? After this, every customer on every device will see the same products.'))) return;
     setMigrating(true);
     try {
       const byId = {};
@@ -728,7 +729,7 @@ export default function App() {
         return;
       }
       const worstCost = Math.max(supplierCost, ...Object.values(colorCosts));
-      if (worstCost > (parseFloat(newProductForm.price) || 0) && !confirm(`Your selling price (${newProductForm.price}) is LOWER than the supplier price (${worstCost}). You will lose money on every sale. Save anyway?`)) return;
+      if (worstCost > (parseFloat(newProductForm.price) || 0) && !(await askConfirm(`Your selling price (${newProductForm.price}) is LOWER than the supplier price (${worstCost}). You will lose money on every sale. Save anyway?`))) return;
     }
 
     const productData = {
@@ -875,7 +876,7 @@ export default function App() {
     // Manager / Admin: a live product is not deleted at once, the Owner has to confirm first
     if (isCloud && adminRole !== 'owner' && isApproved(target)) {
       if (target.deleteRequested) return;
-      if (confirm('This product is live on the shop. A delete request will be sent to the Owner, and it stays on the shop until the Owner confirms. Send the request?')) {
+      if ((await askConfirm('This product is live on the shop. A delete request will be sent to the Owner, and it stays on the shop until the Owner confirms. Send the request?'))) {
         try {
           await requestProductDelete(id, { email: loggedInUserEmail, name: adminName });
           alert('Delete request sent to the Owner.');
@@ -885,7 +886,7 @@ export default function App() {
       }
       return;
     }
-    if (confirm('Are you sure you want to delete this product?')) {
+    if ((await askConfirm('Are you sure you want to delete this product?'))) {
       try {
         if (isCloud) await removeProduct(id);
         else setLocalProducts(localProducts.filter(p => p.id !== id));
@@ -899,7 +900,7 @@ export default function App() {
   const handleDeleteRequest = async (p, approve) => {
     if (adminRole !== 'owner') return;
     const who = p.deleteRequestedByName || p.deleteRequestedBy || 'a team member';
-    if (!confirm(approve ? `Delete "${p.name}" permanently? (requested by ${who})` : `Keep "${p.name}" and reject the request from ${who}?`)) return;
+    if (!(await askConfirm(approve ? `Delete "${p.name}" permanently? (requested by ${who})` : `Keep "${p.name}" and reject the request from ${who}?`))) return;
     try {
       if (approve) await removeProduct(p.id); else await rejectProductDelete(p.id);
     } catch (err) {

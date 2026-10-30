@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { askConfirm } from './AlertCenter';
 import { saveStoreSettings } from '../storeSettings';
 import { countSubscribers, countPushDevices, sendOfferEmail } from '../subscribers';
 import { normalizeSettings, bestDiscount, nextReward, describeRule, bannerFromRules, deliveryNote } from '../data/shopConfig';
@@ -89,7 +90,7 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
   const sendMail = async (testOnly) => {
     setMailMsg('');
     if (mailSubject.trim().length < 3 || mailBody.trim().length < 10) { setMailMsg('Error: write a subject and a message first.'); return; }
-    if (!testOnly && !window.confirm(`${confirmText()}\n\nSend now? It cannot be undone.`)) return;
+    if (!testOnly && !(await askConfirm(`${confirmText()}\n\nSend now? It cannot be undone.`))) return;
     setMailBusy(true);
     try {
       const r = await sendOfferEmail({ subject: mailSubject.trim(), message: mailBody.trim(), testOnly, pushTitle: mailSubject.trim(), pushBody: mailBody.trim() });
@@ -104,7 +105,7 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
     setMailMsg('');
     const t = (text || '').trim();
     if (t.length < 10) { setMailMsg('Error: the banner text is too short to send.'); return; }
-    if (!window.confirm(`${confirmText()}\n\n"${t}"\n\nSend now? It cannot be undone.`)) return;
+    if (!(await askConfirm(`${confirmText()}\n\n"${t}"\n\nSend now? It cannot be undone.`))) return;
     setMailBusy(true);
     try {
       const r = await sendOfferEmail({ subject: 'Kyvro: ' + t.slice(0, 90), message: `${t}\n\nVisit kyvro.store to see what is new.`, testOnly: false, pushTitle: 'Kyvro', pushBody: t });
@@ -139,7 +140,7 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
     const ask = next
       ? 'Turn ON maintenance?\n\nVisitors will see a "we\'ll be back soon" page and nobody can place an order. You and your team can still use the website and the admin panel.'
       : 'Turn OFF maintenance and open the website for everyone?';
-    if (!window.confirm(ask)) return;
+    if (!(await askConfirm(ask))) return;
     setMaintBusy(true);
     setMaintNote('');
     try {

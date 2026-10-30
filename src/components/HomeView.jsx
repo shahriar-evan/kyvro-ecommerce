@@ -143,7 +143,13 @@ export default function HomeView({ requestAdd, addToCart, banners, calculateDisc
                 { name: "Shoes", label: "Shoes", image: sneakersImg },
                 { name: "Wallets", label: "Wallets", image: sneakersImg },
                 { name: "Watches", label: "Watches", image: sneakersImg }
-              ].map((cat, idx) => (
+              ].map((cat) => {
+                // the card shows the photo of the best selling product of this collection (newest wins a tie)
+                const top = rankBySales(products).find((p) => (cat.name === 'Men' || cat.name === 'Women')
+                  ? String(p.gender || '').toLowerCase() === cat.name.toLowerCase()
+                  : (p.category === cat.name || p.gender === cat.name));
+                return { ...cat, image: (top && top.image) || cat.image, hasProduct: !!top };
+              }).map((cat, idx) => (
                 <div 
                   key={idx}
                   onClick={() => { setSelectedCategory(cat.name); setCurrentView('shop'); }}
