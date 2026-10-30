@@ -20,16 +20,6 @@ export default function OrderSuccess({ order, formatPrice, isDarkMode, setCurren
         <div className="w-14 h-14 rounded-full bg-green-500/15 text-green-600 text-3xl flex items-center justify-center mx-auto">✓</div>
         <h1 className="text-3xl font-serif font-bold">Thank you for your order!</h1>
         <p className="text-sm text-gray-500">আপনার অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে। আমরা শীঘ্রই আপনার সাথে যোগাযোগ করব।</p>
-        <p className="text-base sm:text-lg font-bold text-black dark:text-white leading-relaxed pt-1">
-          কোনো সমস্যা হলে, অথবা অনলাইনে অর্ডার করতে না পারলে আমাদের WhatsApp বা Email-এ মেসেজ করুন।
-          <br />
-          <span className="text-sm sm:text-base font-semibold">
-            If you have any problem or cannot order online, message us on{' '}
-            <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noreferrer" className="underline">WhatsApp</a>
-            {' '}or email{' '}
-            <a href="mailto:kyvrofashion@gmail.com" className="underline">kyvrofashion@gmail.com</a>.
-          </span>
-        </p>
         <p className="text-sm pt-1">Your order number is <strong className="text-[#D4AF37] text-lg">{order.orderNumber}</strong></p>
         <p className="text-xs text-gray-500">Placed on {formatDateTime(order.date)}</p>
         {!order.uid && (
@@ -75,11 +65,6 @@ export default function OrderSuccess({ order, formatPrice, isDarkMode, setCurren
           {online
             ? 'অনলাইনে পেমেন্ট করতে না পারলে বা পেমেন্টে কোনো সমস্যা হলে সরাসরি আমাদের WhatsApp-এ মেসেজ করুন।'
             : 'অর্ডার বা পেমেন্ট নিয়ে কোনো সমস্যা হলে সরাসরি আমাদের WhatsApp-এ মেসেজ করুন।'}
-        </p>
-        <p className="text-sm font-semibold text-black dark:text-white">
-          {online
-            ? 'Cannot pay online or having a payment problem? Message us on WhatsApp and we will help you right away.'
-            : 'Any problem with your order or payment? Message us on WhatsApp and we will help you right away.'}
         </p>
         <a
           href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hello Kyvro, I need help with my order ${order.orderNumber}${online ? ' (online payment problem)' : ''}.`)}`}
