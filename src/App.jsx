@@ -47,6 +47,9 @@ const EMPTY_CHECKOUT = {
   district: '', upazila: '', area: '', deliveryArea: '', paymentMethod: 'Cash on Delivery', agree: false
 };
 
+const LAST_SHOP_KEY = 'kyvro_last_supplier_shop';
+const lastShop = () => { try { return localStorage.getItem(LAST_SHOP_KEY) || ''; } catch { return ''; } };
+const freshProductForm = () => ({ ...EMPTY_PRODUCT_FORM, supplierName: lastShop() });
 const EMPTY_PRODUCT_FORM = {
   name: '', gender: 'Men', category: 'Shirt', price: '', originalPrice: '', stockText: '', image: '', description: '',
   colors: '', sizeStock: {}, colorStock: {}, colorImages: {}, colorGallery: {}, extraImages: [], trackColors: false, stock: '10', isNew: true, isFeatured: false, isBestSeller: false,
@@ -262,7 +265,7 @@ export default function App() {
     return () => unsubscribe();
   }, [isAdminLoggedIn, loggedInUserEmail]);
 
-  const [newProductForm, setNewProductForm] = useState(EMPTY_PRODUCT_FORM);
+  const [newProductForm, setNewProductForm] = useState(freshProductForm);
   const [editingProductId, setEditingProductId] = useState(null);
 
   const [checkoutForm, setCheckoutForm] = useState(EMPTY_CHECKOUT);
@@ -861,7 +864,8 @@ export default function App() {
     if (editingProductId) setEditingProductId(null);
     const wentPending = productData.status === 'pending';
 
-    setNewProductForm(EMPTY_PRODUCT_FORM);
+    if (supplierName) { try { localStorage.setItem(LAST_SHOP_KEY, supplierName); } catch { /* ignore */ } }
+    setNewProductForm(freshProductForm());
     alert(wentPending ? 'Product saved. It is waiting for approval by the Owner or a Manager, then customers will see it.' : 'Product saved successfully!');
   };
 
@@ -1046,7 +1050,7 @@ export default function App() {
       {currentView === 'order-success' && <OrderSuccess order={orderCompleteData} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
 
       {/* ADMIN PORTAL VIEW (GOOGLE SIGN-IN, WHITELISTED EMAILS ONLY) */}
-      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} canApproveProduct={canApproveProduct} handleApproveProduct={handleApproveProduct} pendingCount={pendingCount} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} productCosts={productCosts} products={products} storeSettings={storeSettings} isCloud={isCloud} migrating={migrating} handleMigrateProducts={handleMigrateProducts} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} handleDeleteRequest={handleDeleteRequest} clearProductForm={() => { setEditingProductId(null); setNewProductForm(EMPTY_PRODUCT_FORM); }} />}
+      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} canApproveProduct={canApproveProduct} handleApproveProduct={handleApproveProduct} pendingCount={pendingCount} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} productCosts={productCosts} products={products} storeSettings={storeSettings} isCloud={isCloud} migrating={migrating} handleMigrateProducts={handleMigrateProducts} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} handleDeleteRequest={handleDeleteRequest} clearProductForm={() => { setEditingProductId(null); setNewProductForm(freshProductForm()); }} />}
 
       {/* FOOTER */}
       <PushPrompt customerUser={customerUser} isDarkMode={isDarkMode} />
