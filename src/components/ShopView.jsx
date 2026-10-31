@@ -4,7 +4,7 @@ import { Heart } from 'lucide-react';
 import WhatsAppButton from './WhatsAppButton';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
 import StockLabel from './StockLabel';
-import { SUB_CATEGORIES, COLLECTION_LABELS, DEFAULT_SUB_LABEL, hasSizeStock, totalStock } from '../data/catalog';
+import { SUB_CATEGORIES, COLLECTION_LABELS, DEFAULT_SUB_LABEL, hasSubCategories, hasSizeStock, totalStock } from '../data/catalog';
 
 export default function ShopView({ requestAdd, addToCart, filteredProducts, formatPrice, isDarkMode, products, searchQuery, selectedCategory, selectedSubCategory, setSelectedSubCategory, setCurrentView, setSearchQuery, setSelectedCategory, setSelectedProduct, setSortBy, sortBy, savedIds = [], toggleSaved = () => {} }) {
   return (
@@ -13,10 +13,10 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b gap-4 mb-8">
             <div>
               <h1 className="text-2xl sm:text-3xl font-serif font-bold">
-                {selectedCategory === 'All' ? 'Complete Collection' : (selectedCategory === 'Women' || selectedCategory === 'Jackets') ? COLLECTION_LABELS[selectedCategory] : `${selectedCategory} Collection`}
+                {selectedCategory === 'All' ? 'Complete Collection' : (selectedCategory === 'Women' || selectedCategory === 'Winter') ? COLLECTION_LABELS[selectedCategory] : `${selectedCategory} Collection`}
               </h1>
               <p className="text-xs text-gray-500 mt-1">
-                {(selectedCategory === 'Men' || selectedCategory === 'Women') && <span className="text-[#D4AF37] font-semibold">{selectedSubCategory || DEFAULT_SUB_LABEL[selectedCategory]} &middot; </span>}
+                {hasSubCategories(selectedCategory) && <span className="text-[#D4AF37] font-semibold">{selectedSubCategory || DEFAULT_SUB_LABEL[selectedCategory]} &middot; </span>}
                 Showing {filteredProducts.length} luxury products
               </p>
             </div>
@@ -43,7 +43,7 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
           </div>
 
           {/* Mobile: sub-categories as a chip row at the top, products right below */}
-          {(selectedCategory === 'Men' || selectedCategory === 'Women') && (() => {
+          {hasSubCategories(selectedCategory) && (() => {
             const same = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
             const names = SUB_CATEGORIES[selectedCategory].flatMap((it) => (it.group ? [it.group, ...it.items] : [it.name]));
             const chip = (active) => `shrink-0 px-4 py-2 rounded-full text-xs font-semibold border transition ${active ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : isDarkMode ? 'border-gray-700 text-gray-300' : 'border-gray-300 text-gray-700'}`;
@@ -74,7 +74,7 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
                       <>
                         <button onClick={() => setSelectedCategory('All')} className={row(selectedCategory === 'All')}>All Products</button>
 
-                        {['Men', 'Women'].map((col) => (
+                        {['Men', 'Women', 'Winter'].map((col) => (
                           <div key={col}>
                             <button onClick={() => setSelectedCategory(col)} className={row(selectedCategory === col && !selectedSubCategory, 'ml-2')}>
                               &bull; {COLLECTION_LABELS[col]}
@@ -98,7 +98,7 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
                           </div>
                         ))}
 
-                        {['Jackets', 'Shoes', 'Wallets', 'Watches'].map((col) => (
+                        {['Shoes', 'Wallets', 'Watches'].map((col) => (
                           <button key={col} onClick={() => setSelectedCategory(col)} className={row(selectedCategory === col, 'ml-2')}>
                             &bull; {COLLECTION_LABELS[col]}
                           </button>

@@ -13,7 +13,7 @@ import { watchStoreSettings } from './storeSettings';
 import { cleanPhone, DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
 import { INITIAL_PRODUCTS } from './data/products';
 import { CURRENCIES } from './data/currencies';
-import { defaultCategoryFor, matchesCollectionPage, hasSizeStock, stockForSize, orderedSizes, hasColorStock, stockFor, variantKey, needsChoice, imageFor } from './data/catalog';
+import { hasSubCategories, defaultCategoryFor, matchesCollectionPage, hasSizeStock, stockForSize, orderedSizes, hasColorStock, stockFor, variantKey, needsChoice, imageFor } from './data/catalog';
 import QuickAdd from './components/QuickAdd';
 import heroBannerImg from './assets/hero-banner.png';
 import coverPhoto1Img from './assets/cover_photo1.png';
@@ -972,11 +972,9 @@ export default function App() {
 
   const filteredProducts = shopProducts.filter(p => {
     let matchesCategory = true;
-    if (selectedCategory === 'Men' || selectedCategory === 'Women') {
+    if (hasSubCategories(selectedCategory)) {
       // Men: Shirt & Punjabi by default, Women: Sharee by default, or the chosen sub-category
       matchesCategory = matchesCollectionPage(p, selectedCategory, selectedSubCategory);
-    } else if (selectedCategory === 'Jackets') {
-      matchesCategory = p.category === 'Jackets' || p.gender === 'Jackets';
     } else if (selectedCategory === 'Shoes') {
       matchesCategory = p.category === 'Shoes' || p.gender === 'Shoes';
     } else if (selectedCategory === 'Wallets') {

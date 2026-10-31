@@ -459,7 +459,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                       >
                         <option value="Men">Men's Collection</option>
                         <option value="Women">Women's & Girls' Fashion</option>
-                        <option value="Jackets">Varsity / Denim Jacket</option>
+                        <option value="Winter">Winter Collection</option>
                         <option value="Shoes">Shoes</option>
                         <option value="Wallets">Wallets</option>
                         <option value="Watches">Watches</option>

@@ -5,7 +5,7 @@
 export const COLLECTION_LABELS = {
   Men: "Men's Collection",
   Women: "Women's & Girls' Fashion",
-  Jackets: 'Varsity / Denim Jacket',
+  Winter: 'Winter Collection',
   Shoes: 'Shoes',
   Wallets: 'Wallets',
   Watches: 'Watches',
@@ -18,6 +18,7 @@ export const SUB_CATEGORIES = {
     { name: 'Punjabi' },
     { name: 'Polo' },
     { name: 'T-Shirt' },
+    { name: 'Jacket' },
     { name: 'Joggers & Sweats' },
     { name: 'Jersey' },
   ],
@@ -25,8 +26,13 @@ export const SUB_CATEGORIES = {
     { name: 'Saree' },
     { name: 'Bags' },
     { name: 'Three Piece' },
+    { name: 'Jacket' },
     { group: 'Western Wear', items: ['Tops', 'T-Shirt'] },
     { group: 'Muslim Wear', items: ['Borka', 'Hijab'] },
+  ],
+  Winter: [
+    { name: 'Varsity Jacket' },
+    { name: 'Denim Jacket' },
   ],
 };
 
@@ -35,9 +41,9 @@ export const DEFAULT_SUBS = {
   Men: ['Shirt', 'Punjabi'],
   Women: ['Saree'],
 };
-export const DEFAULT_SUB_LABEL = { Men: 'All Men\'s products · best sellers first', Women: 'All Women\'s products · best sellers first' };
+export const DEFAULT_SUB_LABEL = { Men: 'All Men\'s products · best sellers first', Women: 'All Women\'s products · best sellers first', Winter: 'All winter products · best sellers first' };
 
-export const hasSubCategories = (gender) => gender === 'Men' || gender === 'Women';
+export const hasSubCategories = (gender) => !!SUB_CATEGORIES[gender];
 
 // Every selectable category name of a collection (groups are expanded)
 export const flatSubCategories = (gender) =>
@@ -59,7 +65,9 @@ const same = (a, b) => canon(a) === canon(b);
 
 // Does a product belong to the Men/Women page the customer is looking at?
 export const matchesCollectionPage = (product, collection, sub) => {
-  if (!same(product.gender, collection)) return false;
+  // products saved earlier under the old name "Jackets" belong to the Winter Collection
+  const g = product.gender === 'Jackets' ? 'Winter' : product.gender;
+  if (!same(g, collection)) return false;
   // no sub-category chosen: the whole collection (the best sellers come first); a sub-category: only that one
   if (!sub) return true;
   return subCategoryNames(collection, sub).some((n) => same(n, product.category));
@@ -75,7 +83,7 @@ export const SIZE_PRESETS = {
 
 export const sizePresetsFor = (gender) => {
   if (gender === 'Shoes') return SIZE_PRESETS.shoes;
-  if (gender === 'Jackets') return SIZE_PRESETS.clothing;
+  if (gender === 'Winter' || gender === 'Jackets') return SIZE_PRESETS.clothing;
   if (gender === 'Men') return SIZE_PRESETS.clothing;
   if (gender === 'Women') return [...SIZE_PRESETS.clothing, ...SIZE_PRESETS.womenExtra];
   return [];
