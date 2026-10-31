@@ -4,7 +4,7 @@ import { Heart } from 'lucide-react';
 import WhatsAppButton from './WhatsAppButton';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
 import StockLabel from './StockLabel';
-import { SUB_CATEGORIES, COLLECTION_LABELS, DEFAULT_SUB_LABEL, hasSubCategories, hasSizeStock, totalStock } from '../data/catalog';
+import { subLabel, SUB_CATEGORIES, COLLECTION_LABELS, DEFAULT_SUB_LABEL, hasSubCategories, hasSizeStock, totalStock } from '../data/catalog';
 
 export default function ShopView({ requestAdd, addToCart, filteredProducts, formatPrice, isDarkMode, products, searchQuery, selectedCategory, selectedSubCategory, setSelectedSubCategory, setCurrentView, setSearchQuery, setSelectedCategory, setSelectedProduct, setSortBy, sortBy, savedIds = [], toggleSaved = () => {} }) {
   return (
@@ -51,7 +51,7 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
               <div className="lg:hidden -mx-4 px-4 mb-5 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
                 <button onClick={() => setSelectedCategory(selectedCategory)} className={chip(!selectedSubCategory)}>All</button>
                 {names.map((n) => (
-                  <button key={n} onClick={() => setSelectedSubCategory(n)} className={chip(same(selectedSubCategory, n))}>{n}</button>
+                  <button key={n} onClick={() => setSelectedSubCategory(n)} className={chip(same(selectedSubCategory, n))}>{subLabel(n)}</button>
                 ))}
               </div>
             );
@@ -67,7 +67,7 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
                     const row = (active, extra = '') => `text-left py-1.5 px-3 rounded transition w-full ${extra} ${active ? 'bg-[#D4AF37] text-black font-bold' : 'hover:bg-gray-200 dark:hover:bg-[#222]'}`;
                     const subBtn = (name, indent = '') => (
                       <button key={name} onClick={() => setSelectedSubCategory(name)} className={row(same(selectedSubCategory, name), indent)}>
-                        {name}
+                        {subLabel(name)}
                       </button>
                     );
                     return (

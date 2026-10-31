@@ -8,7 +8,7 @@ import ColorPhotos from './ColorPhotos';
 import ColorPicker from './ColorPicker';
 import OrdersPanel from './OrdersPanel';
 import StoreSettings from './StoreSettings';
-import { SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
+import { subLabel, allPlaces, COLLECTION_LABELS, SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
 
 export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, productCosts = {}, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct, clearProductForm, handleDeleteRequest }) {
   const [productSearch, setProductSearch] = React.useState('');
@@ -372,7 +372,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                                     <p className="text-[11px] font-bold uppercase tracking-wider text-[#D4AF37] mb-1">Product</p>
                                     {row('Name', p.name)}
                                     {row('Collection', catLabel(p))}
-                                    {row('Also shown in', Array.isArray(p.alsoShowIn) && p.alsoShowIn.length ? p.alsoShowIn.map(c => (c === 'Men' ? "Men's" : "Women's") + ' Jacket').join(', ') : '')}
+                                    {row('Also shown in', Array.isArray(p.alsoShowIn) && p.alsoShowIn.length ? p.alsoShowIn.map(k => { const pl = allPlaces().find(x => x.key === k); return pl ? pl.label : (k === 'Men' ? "Men's Jacket" : "Women's Ladies Jacket"); }).join(', ') : '')}
                                     {row('Selling price', formatPrice(p.price))}
                                     {row('Old price', p.originalPrice ? `${formatPrice(p.originalPrice)}${disc ? ` (-${disc}%)` : ''}` : '')}
                                     {row('Stock text', p.stockText)}
@@ -485,27 +485,42 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                         >
                           {SUB_CATEGORIES[newProductForm.gender].map(item => item.group ? (
                             <optgroup key={item.group} label={item.group}>
-                              {item.items.map(i => <option key={i} value={i}>{i}</option>)}
+                              {item.items.map(i => <option key={i} value={i}>{subLabel(i)}</option>)}
                             </optgroup>
                           ) : (
-                            <option key={item.name} value={item.name}>{item.name}</option>
+                            <option key={item.name} value={item.name}>{subLabel(item.name)}</option>
                           ))}
                         </select>
                       </div>
                     )}
-                    {newProductForm.gender === 'Winter' && (() => {
+                    {hasSubCategories(newProductForm.gender) && (() => {
                       const also = newProductForm.alsoShowIn || [];
-                      const toggle = (c) => setNewProductForm(prev => ({ ...prev, alsoShowIn: (prev.alsoShowIn || []).includes(c) ? (prev.alsoShowIn || []).filter(x => x !== c) : [...(prev.alsoShowIn || []), c] }));
-                      const chip = (on) => `px-4 py-2 rounded-full text-xs font-semibold border transition ${on ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : isDarkMode ? 'border-gray-700 text-gray-300 hover:border-[#D4AF37]' : 'border-gray-300 text-gray-700 hover:border-[#D4AF37]'}`;
+                      const own = `${newProductForm.gender}:${newProductForm.category}`;
+                      const toggle = (k) => setNewProductForm(prev => ({ ...prev, alsoShowIn: (prev.alsoShowIn || []).includes(k) ? (prev.alsoShowIn || []).filter(x => x !== k) : [...(prev.alsoShowIn || []), k] }));
+                      const places = allPlaces().filter(pl => pl.key !== own);
                       return (
                         <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-gray-500 mb-1">Also show in (optional)</label>
-                          <div className="flex flex-wrap gap-2">
-                            <button type="button" onClick={() => setNewProductForm(prev => ({ ...prev, alsoShowIn: [] }))} className={chip(also.length === 0)}>Only Winter</button>
-                            <button type="button" onClick={() => toggle('Men')} className={chip(also.includes('Men'))}>{also.includes('Men') ? '✓ ' : ''}Men's Jacket</button>
-                            <button type="button" onClick={() => toggle('Women')} className={chip(also.includes('Women'))}>{also.includes('Women') ? '✓ ' : ''}Women's Jacket</button>
+                          <label className="block text-xs font-semibold text-gray-500 mb-2">Also show in (optional) — tick every place this product should appear</label>
+                          <div className={`border rounded p-3 space-y-3 ${isDarkMode ? 'border-gray-700 bg-[#121212]' : 'border-gray-300 bg-gray-50'}`}>
+                            {Object.keys(SUB_CATEGORIES).map(col => {
+                              const list = places.filter(pl => pl.collection === col);
+                              if (!list.length) return null;
+                              return (
+                                <div key={col}>
+                                  <p className="text-[11px] font-bold uppercase tracking-wider text-[#D4AF37] mb-1.5">{COLLECTION_LABELS[col]}</p>
+                                  <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                                    {list.map(pl => (
+                                      <label key={pl.key} className="flex items-center gap-2 text-xs cursor-pointer select-none">
+                                        <input type="checkbox" checked={also.includes(pl.key)} onChange={() => toggle(pl.key)} className="w-4 h-4 accent-[#D4AF37]" />
+                                        {subLabel(pl.name)}
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
-                          <p className="text-[11px] text-gray-500 mt-1">Same product and same stock, shown in the Jacket section of Men's and/or Women's too. Pick both for a unisex jacket.</p>
+                          <p className="text-[11px] text-gray-500 mt-1">Same product and same stock, also shown in every ticked place. Leave all unticked to show it only in its own category.</p>
                         </div>
                       );
                     })()}

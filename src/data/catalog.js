@@ -16,17 +16,15 @@ export const SUB_CATEGORIES = {
   Men: [
     { name: 'Shirt' },
     { name: 'Punjabi' },
-    { name: 'Polo' },
     { name: 'T-Shirt' },
     { name: 'Jacket' },
     { name: 'Joggers & Sweats' },
-    { name: 'Jersey' },
   ],
   Women: [
     { name: 'Saree' },
     { name: 'Bags' },
     { name: 'Three Piece' },
-    { name: 'Jacket' },
+    { name: 'Ladies Jacket' },
     { group: 'Western Wear', items: ['Tops', 'T-Shirt'] },
     { group: 'Muslim Wear', items: ['Borka', 'Hijab'] },
   ],
@@ -35,6 +33,16 @@ export const SUB_CATEGORIES = {
     { name: 'Denim Jacket' },
   ],
 };
+
+// Bangla helper shown next to a few category names (display only, the saved name stays English)
+export const SUB_LABELS = { Saree: 'Saree (শাড়ি)', 'Three Piece': 'Three Piece (থ্রি পিস)' };
+export const subLabel = (name) => SUB_LABELS[name] || name;
+
+// Every place a product can be shown in: [{ key:'Men:T-Shirt', collection:'Men', name:'T-Shirt', label }]
+export const allPlaces = () =>
+  Object.keys(SUB_CATEGORIES).flatMap((col) =>
+    flatSubCategories(col).map((n) => ({ key: `${col}:${n}`, collection: col, name: n, label: `${COLLECTION_LABELS[col]} › ${subLabel(n)}` }))
+  );
 
 // What a customer sees when they open the collection without choosing a sub-category
 export const DEFAULT_SUBS = {
@@ -59,7 +67,7 @@ export const subCategoryNames = (gender, sub) => {
 };
 
 // Old spellings saved on existing products still count (Sharee = Saree, Borkha = Borka, old Beauty products = Three Piece)
-const ALIAS = { sharee: 'saree', borkha: 'borka', 'beauty products': 'three piece' };
+const ALIAS = { 'ladies jacket': 'jacket', sharee: 'saree', borkha: 'borka', 'beauty products': 'three piece' };
 const canon = (v) => { const k = String(v || '').trim().toLowerCase(); return ALIAS[k] || k; };
 const same = (a, b) => canon(a) === canon(b);
 
@@ -68,8 +76,17 @@ export const matchesCollectionPage = (product, collection, sub) => {
   // products saved earlier under the old name "Jackets" belong to the Winter Collection
   const g = product.gender === 'Jackets' ? 'Winter' : product.gender;
   // a Winter product can also be shown in Men's and/or Women's (under "Jacket")
-  if (g === 'Winter' && Array.isArray(product.alsoShowIn) && product.alsoShowIn.includes(collection) && collection !== 'Winter') {
-    return !sub || same(sub, 'Jacket') || subCategoryNames(collection, sub).some((n) => same(n, product.category));
+  // extra places picked in the admin panel, e.g. 'Men:T-Shirt' (old Winter products used plain 'Men' / 'Women')
+  if (Array.isArray(product.alsoShowIn)) {
+    for (const e of product.alsoShowIn) {
+      if (String(e).includes(':')) {
+        const [c, s] = String(e).split(':');
+        if (c !== collection) continue;
+        if (!sub || subCategoryNames(collection, sub).some((n) => same(n, s))) return true;
+      } else if (g === 'Winter' && e === collection && collection !== 'Winter') {
+        if (!sub || same(sub, 'Jacket')) return true;
+      }
+    }
   }
   if (!same(g, collection)) return false;
   // no sub-category chosen: the whole collection (the best sellers come first); a sub-category: only that one

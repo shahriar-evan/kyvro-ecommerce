@@ -798,7 +798,7 @@ export default function App() {
       name: newProductForm.name,
       category: newProductForm.category,
       gender: newProductForm.gender,
-      alsoShowIn: newProductForm.gender === 'Winter' ? (newProductForm.alsoShowIn || []).filter((c) => c === 'Men' || c === 'Women') : [],
+      alsoShowIn: hasSubCategories(newProductForm.gender) ? (newProductForm.alsoShowIn || []).filter((k) => String(k).includes(':') && k !== `${newProductForm.gender}:${newProductForm.category}`) : [],
       price: parseFloat(newProductForm.price) || 0,
       originalPrice: parseFloat(newProductForm.originalPrice) || 0,
       stockText: String(newProductForm.stockText || '').trim().slice(0, 40),
@@ -885,7 +885,7 @@ export default function App() {
     setNewProductForm({
       name: prod.name,
       gender: prod.gender || 'Men',
-      category: prod.category,
+      category: (prod.gender === 'Women' && prod.category === 'Jacket') ? 'Ladies Jacket' : prod.category,
       price: prod.price,
       originalPrice: prod.originalPrice || '',
       stockText: prod.stockText || '',
@@ -908,7 +908,7 @@ export default function App() {
       linkPerColor: !!(sup.colorLinks && Object.keys(sup.colorLinks).length),
       colorLinks: { ...(sup.colorLinks || {}) },
       colorCosts: Object.fromEntries(Object.entries(sup.colorCosts || {}).map(([c, n]) => [c, String(n)])),
-      alsoShowIn: Array.isArray(prod.alsoShowIn) ? [...prod.alsoShowIn] : [],
+      alsoShowIn: Array.isArray(prod.alsoShowIn) ? prod.alsoShowIn.map((k) => (k === 'Men' ? 'Men:Jacket' : k === 'Women' ? 'Women:Ladies Jacket' : k)) : [],
       extraSuppliers: (Array.isArray(sup.extraSuppliers) ? sup.extraSuppliers : []).map((x) => ({ name: x.name || '', cost: x.cost === undefined ? '' : String(x.cost), link: x.link || '' }))
     });
     setAdminTab('add-product');
