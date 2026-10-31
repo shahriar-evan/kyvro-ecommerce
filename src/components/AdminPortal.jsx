@@ -346,7 +346,8 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                         className={`w-full border p-3 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
                       >
                         <option value="Men">Men's Collection</option>
-                        <option value="Women">Women's Collection</option>
+                        <option value="Women">Women's & Girls' Fashion</option>
+                        <option value="Jackets">Varsity / Denim Jacket</option>
                         <option value="Shoes">Shoes</option>
                         <option value="Wallets">Wallets</option>
                         <option value="Watches">Watches</option>

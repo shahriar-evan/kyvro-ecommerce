@@ -6,7 +6,8 @@ export default function MobileMenu({ isDarkMode, setCurrentView, setIsMobileMenu
   const items = [
     { label: 'Home', sub: 'Back to the front page', icon: Home, go: () => setCurrentView('home') },
     { label: "Men's", sub: 'Shirt, Punjabi, Pants...', icon: Shirt, go: () => { setCurrentView('shop'); setSelectedCategory('Men'); } },
-    { label: "Women's", sub: 'Sharee, Bags, Beauty...', icon: Sparkles, go: () => { setCurrentView('shop'); setSelectedCategory('Women'); } },
+    { label: "Women's & Girls'", sub: 'Saree, Bags, Three Piece...', icon: Sparkles, go: () => { setCurrentView('shop'); setSelectedCategory('Women'); } },
+    { label: 'Jackets', sub: 'Varsity & denim jackets', icon: Shirt, go: () => { setCurrentView('shop'); setSelectedCategory('Jackets'); } },
     { label: 'Shoes', sub: 'Sneakers & more', icon: Footprints, go: () => { setCurrentView('shop'); setSelectedCategory('Shoes'); } },
     { label: 'Wallets', sub: 'Genuine leather', icon: Wallet, go: () => { setCurrentView('shop'); setSelectedCategory('Wallets'); } },
     { label: 'Watches', sub: 'Classic & modern', icon: Watch, go: () => { setCurrentView('shop'); setSelectedCategory('Watches'); } },

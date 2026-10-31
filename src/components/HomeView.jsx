@@ -136,10 +136,11 @@ export default function HomeView({ requestAdd, addToCart, banners, calculateDisc
               <div className="w-12 h-0.5 bg-[#D4AF37] mx-auto mt-3"></div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-6 gap-4 sm:gap-6">
               {[
                 { name: "Men", label: "Men's Collection", image: shirtImg },
-                { name: "Women", label: "Women's Collection", image: shirtImg },
+                { name: "Women", label: "Women's & Girls' Fashion", image: shirtImg },
+                { name: "Jackets", label: "Varsity / Denim Jacket", image: shirtImg },
                 { name: "Shoes", label: "Shoes", image: sneakersImg },
                 { name: "Wallets", label: "Wallets", image: sneakersImg },
                 { name: "Watches", label: "Watches", image: sneakersImg }

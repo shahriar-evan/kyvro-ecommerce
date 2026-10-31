@@ -948,6 +948,8 @@ export default function App() {
     if (selectedCategory === 'Men' || selectedCategory === 'Women') {
       // Men: Shirt & Punjabi by default, Women: Sharee by default, or the chosen sub-category
       matchesCategory = matchesCollectionPage(p, selectedCategory, selectedSubCategory);
+    } else if (selectedCategory === 'Jackets') {
+      matchesCategory = p.category === 'Jackets' || p.gender === 'Jackets';
     } else if (selectedCategory === 'Shoes') {
       matchesCategory = p.category === 'Shoes' || p.gender === 'Shoes';
     } else if (selectedCategory === 'Wallets') {

@@ -4,7 +4,8 @@
 
 export const COLLECTION_LABELS = {
   Men: "Men's Collection",
-  Women: "Women's Collection",
+  Women: "Women's & Girls' Fashion",
+  Jackets: 'Varsity / Denim Jacket',
   Shoes: 'Shoes',
   Wallets: 'Wallets',
   Watches: 'Watches',
@@ -21,18 +22,18 @@ export const SUB_CATEGORIES = {
     { name: 'Jersey' },
   ],
   Women: [
-    { name: 'Sharee' },
+    { name: 'Saree' },
     { name: 'Bags' },
-    { name: 'Beauty Products' },
+    { name: 'Three Piece' },
     { group: 'Western Wear', items: ['Night Dress', 'Tops', 'T-Shirt'] },
-    { group: 'Muslim Wear', items: ['Borkha', 'Hijab'] },
+    { group: 'Muslim Wear', items: ['Borka', 'Hijab'] },
   ],
 };
 
 // What a customer sees when they open the collection without choosing a sub-category
 export const DEFAULT_SUBS = {
   Men: ['Shirt', 'Punjabi'],
-  Women: ['Sharee'],
+  Women: ['Saree'],
 };
 export const DEFAULT_SUB_LABEL = { Men: 'All Men\'s products · best sellers first', Women: 'All Women\'s products · best sellers first' };
 
@@ -51,7 +52,10 @@ export const subCategoryNames = (gender, sub) => {
   return group ? group.items : [sub];
 };
 
-const same = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
+// Old spellings saved on existing products still count (Sharee = Saree, Borkha = Borka, old Beauty products = Three Piece)
+const ALIAS = { sharee: 'saree', borkha: 'borka', 'beauty products': 'three piece' };
+const canon = (v) => { const k = String(v || '').trim().toLowerCase(); return ALIAS[k] || k; };
+const same = (a, b) => canon(a) === canon(b);
 
 // Does a product belong to the Men/Women page the customer is looking at?
 export const matchesCollectionPage = (product, collection, sub) => {
@@ -71,6 +75,7 @@ export const SIZE_PRESETS = {
 
 export const sizePresetsFor = (gender) => {
   if (gender === 'Shoes') return SIZE_PRESETS.shoes;
+  if (gender === 'Jackets') return SIZE_PRESETS.clothing;
   if (gender === 'Men') return SIZE_PRESETS.clothing;
   if (gender === 'Women') return [...SIZE_PRESETS.clothing, ...SIZE_PRESETS.womenExtra];
   return [];

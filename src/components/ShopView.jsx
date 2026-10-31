@@ -13,7 +13,7 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b gap-4 mb-8">
             <div>
               <h1 className="text-2xl sm:text-3xl font-serif font-bold">
-                {selectedCategory === 'All' ? 'Complete Collection' : `${selectedCategory} Collection`}
+                {selectedCategory === 'All' ? 'Complete Collection' : (selectedCategory === 'Women' || selectedCategory === 'Jackets') ? COLLECTION_LABELS[selectedCategory] : `${selectedCategory} Collection`}
               </h1>
               <p className="text-xs text-gray-500 mt-1">
                 {(selectedCategory === 'Men' || selectedCategory === 'Women') && <span className="text-[#D4AF37] font-semibold">{selectedSubCategory || DEFAULT_SUB_LABEL[selectedCategory]} &middot; </span>}
@@ -98,7 +98,7 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
                           </div>
                         ))}
 
-                        {['Shoes', 'Wallets', 'Watches'].map((col) => (
+                        {['Jackets', 'Shoes', 'Wallets', 'Watches'].map((col) => (
                           <button key={col} onClick={() => setSelectedCategory(col)} className={row(selectedCategory === col, 'ml-2')}>
                             &bull; {COLLECTION_LABELS[col]}
                           </button>
