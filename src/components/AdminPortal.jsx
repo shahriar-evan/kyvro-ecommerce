@@ -70,7 +70,9 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
       Object.entries(prev.colorGallery || {}).forEach(([k, v]) => { colorGallery[same(k) ? nn : k] = v; });
       const colorCosts = {};
       Object.entries(prev.colorCosts || {}).forEach(([k, v]) => { colorCosts[same(k) ? nn : k] = v; });
-      return { ...prev, colors: colors.join(', '), colorStock, colorImages, colorLinks, colorGallery, colorCosts };
+      const colorAltLinks = {};
+      Object.entries(prev.colorAltLinks || {}).forEach(([k, v]) => { colorAltLinks[same(k) ? nn : k] = v; });
+      return { ...prev, colors: colors.join(', '), colorStock, colorImages, colorLinks, colorGallery, colorCosts, colorAltLinks };
     });
   };
   const stockNow = sizesUsed ? sizesTotal : (parseInt(newProductForm && newProductForm.stock, 10) || 0);
@@ -87,6 +89,8 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
   const colorLinks = (newProductForm && newProductForm.colorLinks) || {};
   const colorCostsForm = (newProductForm && newProductForm.colorCosts) || {};
   const setColorCost = (c, v) => setNewProductForm(prev => ({ ...prev, colorCosts: { ...(prev.colorCosts || {}), [c]: v } }));
+  const altLinks = (newProductForm && newProductForm.colorAltLinks) || {};
+  const setAlt = (c, fn) => setNewProductForm(prev => ({ ...prev, colorAltLinks: { ...(prev.colorAltLinks || {}), [c]: fn((prev.colorAltLinks || {})[c] || []) } }));
   const setColorLink = (c, v) => setNewProductForm(prev => ({ ...prev, colorLinks: { ...(prev.colorLinks || {}), [c]: v } }));
   const extraSup = (newProductForm && newProductForm.extraSuppliers) || [];
   const setExtraSup = (i, patch) => setNewProductForm(prev => ({ ...prev, extraSuppliers: (prev.extraSuppliers || []).map((x, k) => (k === i ? { ...x, ...patch } : x)) }));
@@ -151,6 +155,19 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                   title="Supplier price for this color. Leave empty to use the supplier cost above."
                   className={inputCls} />
               </div>
+              {(altLinks[c] || []).map((a, i) => (
+                <div key={i} className="grid grid-cols-[1fr_104px_auto] gap-2 mt-2 items-center">
+                  <input type="text" placeholder={`Another ${c} link (optional)`} maxLength={500} value={a.link || ''}
+                    onChange={e => setAlt(c, arr => arr.map((x, k) => (k === i ? { ...x, link: e.target.value } : x)))} className={inputCls} />
+                  <input type="number" min="0" placeholder="৳ price" value={a.cost ?? ''}
+                    onChange={e => setAlt(c, arr => arr.map((x, k) => (k === i ? { ...x, cost: e.target.value } : x)))} className={inputCls} />
+                  <button type="button" onClick={() => setAlt(c, arr => arr.filter((_, k) => k !== i))} className="text-red-500 text-lg font-bold px-1" title="Remove this link">&times;</button>
+                </div>
+              ))}
+              {(altLinks[c] || []).length < 3 && (
+                <button type="button" onClick={() => setAlt(c, arr => [...arr, { link: '', cost: '' }])}
+                  className="mt-2 text-[11px] font-bold uppercase tracking-wider text-[#D4AF37] hover:underline">+ Add another {c} link</button>
+              )}
               {(() => {
                 const raw = String(colorCostsForm[c] ?? '').trim();
                 const cost = raw !== '' ? parseFloat(raw) : formCostNum;
@@ -396,6 +413,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                                         {sup.supplierLink && row('Link', <a href={sup.supplierLink} target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] underline break-all">open product</a>)}
                                         {Object.entries(sup.colorCosts || {}).map(([c, n]) => <div key={'cc' + c}>{row(`${c} cost`, `${formatPrice(n)}${p.price - n >= 0 ? ` · profit ${formatPrice(p.price - n)}` : ` · LOSS ${formatPrice(n - p.price)}`}`)}</div>)}
                                         {Object.entries(sup.colorLinks || {}).map(([c, u]) => <div key={'cl' + c}>{row(`${c} link`, <a href={u} target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] underline">open</a>)}</div>)}
+                                        {Object.entries(sup.colorAltLinks || {}).flatMap(([c, arr]) => (arr || []).map((x, i) => <div key={'ca' + c + i}>{row(`${c} link ${i + 2}`, <span>{x.cost ? `${formatPrice(x.cost)} · ` : ''}{x.link && <a href={x.link} target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] underline">open</a>}</span>)}</div>))}
                                         {(sup.extraSuppliers || []).map((x, i) => (
                                           <div key={'x' + i} className="pt-1 mt-1 border-t border-black/10">
                                             {row(`Supplier ${i + 2}`, x.name)}

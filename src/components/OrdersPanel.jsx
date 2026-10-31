@@ -75,7 +75,9 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
       const line = unitCost * qty;
       const cl = c.colorLinks || {};
       const colorKey = Object.keys(cl).find((k) => k.toLowerCase() === String(it.color || '').trim().toLowerCase());
-      g.items.push({ ...it, link: (colorKey && cl[colorKey]) || c.supplierLink || '', unitCost, alts: Array.isArray(c.extraSuppliers) ? c.extraSuppliers : [] });
+      const ca = c.colorAltLinks || {};
+      const caKey = Object.keys(ca).find((k) => k.toLowerCase() === String(it.color || '').trim().toLowerCase());
+      g.items.push({ ...it, colorAlts: caKey ? ca[caKey] : [], link: (colorKey && cl[colorKey]) || c.supplierLink || '', unitCost, alts: Array.isArray(c.extraSuppliers) ? c.extraSuppliers : [] });
       g.cost += line;
       g.sell += (Number(it.price) || 0) * qty;
       g.units += qty;
@@ -488,6 +490,13 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
                             <li key={i}>
                               {it.name}{it.size && it.size !== 'Standard' ? ` · Size ${it.size}` : ''}{it.color ? ` · ${it.color}` : ''} × {it.quantity} · {formatPrice(it.unitCost)} each
                               {it.link && <> · <a href={it.link} target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] underline">open product</a></>}
+                              {it.colorAlts && it.colorAlts.length > 0 && (
+                                <span className="block pl-3 text-[10px] text-gray-400">
+                                  Other {it.color} links: {it.colorAlts.map((a, k) => (
+                                    <span key={k}>{k > 0 ? ' · ' : ''}{a.cost ? formatPrice(a.cost) : ''}{a.link && <> (<a href={a.link} target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] underline">open</a>)</>}</span>
+                                  ))}
+                                </span>
+                              )}
                               {it.alts && it.alts.length > 0 && (
                                 <span className="block pl-3 text-[10px] text-gray-400">
                                   Other suppliers: {it.alts.map((a, k) => (

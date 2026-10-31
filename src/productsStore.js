@@ -73,6 +73,12 @@ export const saveProductCost = (id, cost, staff) =>
     colorLinks: Object.fromEntries(Object.entries(cost.colorLinks || {}).filter(([, u]) => u).map(([c, u]) => [String(c).slice(0, 40), String(u).trim().slice(0, 500)])),
     // optional: what the supplier charges for each color when the prices differ, e.g. { White: 1849, Red: 2750 }
     colorCosts: Object.fromEntries(Object.entries(cost.colorCosts || {}).filter(([, n]) => Number.isFinite(Number(n)) && Number(n) >= 0).map(([c, n]) => [String(c).slice(0, 40), Number(n)])),
+    // optional: more than one link for the SAME color, e.g. { Red: [{ link: "https://...", cost: 500 }] }
+    // (only saved when there is one, so older Firestore rules keep working until they are updated)
+    ...(Object.values(cost.colorAltLinks || {}).some((a) => Array.isArray(a) && a.length)
+      ? { colorAltLinks: Object.fromEntries(Object.entries(cost.colorAltLinks).filter(([, a]) => Array.isArray(a) && a.length)
+          .map(([c, a]) => [String(c).slice(0, 40), a.slice(0, 3).map((x) => ({ link: String((x && x.link) || "").trim().slice(0, 500), cost: Math.max(0, Number(x && x.cost) || 0) }))])) }
+      : {}),
     // optional: other shops that sell the same product (name, price, link), e.g. [{ name: "ShopBaseBD", cost: 560, link: "https://..." }]
     // (only saved when there is one, so products without extra suppliers also save with the older Firestore rules)
     ...((Array.isArray(cost.extraSuppliers) ? cost.extraSuppliers : []).filter((x) => x && String(x.name || "").trim()).length

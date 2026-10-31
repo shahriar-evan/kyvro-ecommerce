@@ -53,7 +53,7 @@ const freshProductForm = () => ({ ...EMPTY_PRODUCT_FORM, supplierName: lastShop(
 const EMPTY_PRODUCT_FORM = {
   name: '', gender: 'Men', category: 'Shirt', price: '', originalPrice: '', stockText: '', image: '', description: '',
   colors: '', sizeStock: {}, colorStock: {}, colorImages: {}, colorGallery: {}, extraImages: [], trackColors: false, stock: '10', isNew: true, isFeatured: false, isBestSeller: false,
-  supplierName: '', supplierCost: '', supplierLink: '', linkPerColor: false, colorLinks: {}, colorCosts: {}, extraSuppliers: [], alsoShowIn: []
+  supplierName: '', supplierCost: '', supplierLink: '', linkPerColor: false, colorLinks: {}, colorCosts: {}, extraSuppliers: [], colorAltLinks: {}, alsoShowIn: []
 };
 
 export default function App() {
@@ -762,6 +762,18 @@ export default function App() {
         if (raw !== '' && !Number.isNaN(n) && n >= 0) colorCosts[c] = n;
       }
     }
+    // extra links for the same color (optional): { Red: [{ link, cost }] }
+    const colorAltLinks = {};
+    if (perColorLinks) {
+      for (const c of colorList) {
+        const arr = ((newProductForm.colorAltLinks || {})[c] || [])
+          .map((x) => ({ link: String((x && x.link) || '').trim(), cost: String((x && x.cost) ?? '').trim() }))
+          .filter((x) => x.link || x.cost !== '')
+          .slice(0, 3)
+          .map((x) => ({ link: x.link, cost: Number.isNaN(parseFloat(x.cost)) ? 0 : Math.max(0, parseFloat(x.cost)) }));
+        if (arr.length) colorAltLinks[c] = arr;
+      }
+    }
     // more suppliers (other shops that sell the same product)
     const extraSuppliers = [];
     for (const x of (newProductForm.extraSuppliers || [])) {
@@ -776,7 +788,7 @@ export default function App() {
     }
     const allColorsPriced = colorList.length > 0 && colorList.every((c) => colorCosts[c] !== undefined);
     const supplierLinkUsed = perColorLinks ? '' : supplierLink;
-    const hasSupplier = extraSuppliers.length > 0 || costRaw !== '' || supplierName !== '' || supplierLinkUsed !== '' || Object.keys(colorLinks).length > 0 || Object.keys(colorCosts).length > 0;
+    const hasSupplier = extraSuppliers.length > 0 || Object.keys(colorAltLinks).length > 0 || costRaw !== '' || supplierName !== '' || supplierLinkUsed !== '' || Object.keys(colorLinks).length > 0 || Object.keys(colorCosts).length > 0;
     const supplierCost = costRaw === '' ? (allColorsPriced ? Math.min(...Object.values(colorCosts)) : 0) : parseFloat(costRaw);
     if (hasSupplier) {
       if ((costRaw === '' && !allColorsPriced) || Number.isNaN(supplierCost) || supplierCost < 0) {
@@ -787,7 +799,7 @@ export default function App() {
         alert('Supplier details: please write the name of the shop you buy this product from (for example SelfShop).');
         return;
       }
-      const badLink = [supplierLinkUsed, ...Object.values(colorLinks)].find((u) => u && !/^https?:\/\//i.test(u));
+      const badLink = [supplierLinkUsed, ...Object.values(colorLinks), ...Object.values(colorAltLinks).flat().map((x) => x.link)].find((u) => u && !/^https?:\/\//i.test(u));
       if (badLink) {
         alert('Supplier details: every product link must start with http:// or https://');
         return;
@@ -855,7 +867,7 @@ export default function App() {
     }
     // Save (or clear) the private supplier details in their own admin-only collection
     try {
-      if (hasSupplier) await saveProductCost(productData.id, { supplierName, supplierCost, supplierLink: supplierLinkUsed, colorLinks, colorCosts, extraSuppliers }, { email: loggedInUserEmail });
+      if (hasSupplier) await saveProductCost(productData.id, { supplierName, supplierCost, supplierLink: supplierLinkUsed, colorLinks, colorCosts, colorAltLinks, extraSuppliers }, { email: loggedInUserEmail });
       else if (editingProductId && productCosts[String(editingProductId)]) await removeProductCost(productData.id);
     } catch (err) {
       console.error(err);
@@ -913,6 +925,7 @@ export default function App() {
       colorLinks: { ...(sup.colorLinks || {}) },
       colorCosts: Object.fromEntries(Object.entries(sup.colorCosts || {}).map(([c, n]) => [c, String(n)])),
       alsoShowIn: Array.isArray(prod.alsoShowIn) ? prod.alsoShowIn.map((k) => (k === 'Men' ? 'Men:Jacket' : k === 'Women' ? 'Women:Ladies Jacket' : k)) : [],
+      colorAltLinks: Object.fromEntries(Object.entries(sup.colorAltLinks || {}).map(([c, arr]) => [c, (Array.isArray(arr) ? arr : []).map((x) => ({ link: x.link || '', cost: x.cost === undefined || x.cost === null ? '' : String(x.cost) }))])),
       extraSuppliers: (Array.isArray(sup.extraSuppliers) ? sup.extraSuppliers : []).map((x) => ({ name: x.name || '', cost: x.cost === undefined ? '' : String(x.cost), link: x.link || '' }))
     });
     setAdminTab('add-product');
