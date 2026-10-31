@@ -219,7 +219,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                 )}
               </div>
 
-              {adminTab === 'settings' && isOwner && <StoreSettings settings={storeSettings} isDarkMode={isDarkMode} formatPrice={formatPrice} staff={{ email: loggedInUserEmail, name: adminName }} />}
+              {adminTab === 'settings' && isOwner && <StoreSettings products={products} settings={storeSettings} isDarkMode={isDarkMode} formatPrice={formatPrice} staff={{ email: loggedInUserEmail, name: adminName }} />}
 
               {adminTab === 'admins' && canManageTeam && <AdminManager isDarkMode={isDarkMode} currentEmail={loggedInUserEmail} currentName={adminName} adminRole={adminRole} />}
 

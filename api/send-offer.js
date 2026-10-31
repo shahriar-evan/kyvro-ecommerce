@@ -93,7 +93,7 @@ async function fcmAccessToken(sa) {
 }
 
 // Returns { pushSent, pushFailed, pushTotal } or { pushError }
-async function sendPush(idToken, { title, text, onlyEmail }) {
+async function sendPush(idToken, { title, text, onlyEmail, link }) {
   let sa;
   try { sa = readServiceAccount(); } catch (e) { return { pushError: 'FIREBASE_SERVICE_ACCOUNT is not valid JSON.' }; }
   if (!sa || !sa.client_email || !sa.private_key) return { pushError: 'Notifications are not set up yet (add FIREBASE_SERVICE_ACCOUNT in Vercel).' };
@@ -113,7 +113,7 @@ async function sendPush(idToken, { title, text, onlyEmail }) {
           headers: { Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: {
             token: t.token,
-            data: { title, body: text, link: SITE, icon: `${SITE}/kyvro-icon.png` },
+            data: { title, body: text, link: link || SITE, icon: `${SITE}/kyvro-icon.png` },
             webpush: { headers: { Urgency: 'high', TTL: '86400' } },
           } }),
         });
@@ -138,21 +138,21 @@ const emailFromToken = (idToken) => {
   try { return JSON.parse(Buffer.from(idToken.split('.')[1], 'base64url').toString('utf8')).email || ''; } catch (e) { return ''; }
 };
 
-function buildMail(subject, message, sub) {
+function buildMail(subject, message, sub, link, hasProduct) {
   const unsub = `${SITE}/api/unsubscribe?e=${encodeURIComponent(sub.email)}&t=${encodeURIComponent(sub.token)}`;
   const paragraphs = String(message).split(/\n{2,}/).map((p) => `<p style="margin:0 0 14px;line-height:1.6">${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
   const html = `<!doctype html><html><body style="margin:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif;color:#222">
 <div style="max-width:560px;margin:0 auto;background:#fff">
   <div style="background:#111;padding:20px;text-align:center"><span style="color:#D4AF37;font-size:22px;letter-spacing:4px;font-weight:bold">KYVRO</span><div style="color:#bbb;font-size:11px;letter-spacing:3px;margin-top:4px">কাইভ্রো &bull; WEAR YOUR STORY</div></div>
   <div style="padding:26px 24px">${sub.name ? `<p style="margin:0 0 14px">Hi ${esc(sub.name.split(' ')[0])},</p>` : ''}${paragraphs}
-    <p style="text-align:center;margin:26px 0"><a href="${SITE}" style="background:#D4AF37;color:#000;text-decoration:none;font-weight:bold;padding:14px 30px;border-radius:4px;letter-spacing:2px;font-size:13px">SHOP NOW</a></p>
+    <p style="text-align:center;margin:26px 0"><a href="${link}" style="background:#D4AF37;color:#000;text-decoration:none;font-weight:bold;padding:14px 30px;border-radius:4px;letter-spacing:2px;font-size:13px">${hasProduct ? 'VIEW THIS PRODUCT' : 'SHOP NOW'}</a></p>
   </div>
   <div style="padding:16px 24px;background:#fafafa;color:#888;font-size:11px;text-align:center;line-height:1.6">
     You get this email because you signed in to kyvro.store.<br>
     Questions? kyvrofashion@gmail.com &nbsp;|&nbsp; <a href="${unsub}" style="color:#888">Unsubscribe</a>
   </div>
 </div></body></html>`;
-  const text = `${sub.name ? `Hi ${sub.name.split(' ')[0]},\n\n` : ''}${message}\n\nShop now: ${SITE}\n\nUnsubscribe: ${unsub}`;
+  const text = `${sub.name ? `Hi ${sub.name.split(' ')[0]},\n\n` : ''}${message}\n\n${hasProduct ? 'See it here' : 'Shop now'}: ${link}\n\nUnsubscribe: ${unsub}`;
   return {
     from: process.env.MAIL_FROM,
     to: [sub.email],
@@ -189,11 +189,15 @@ export default async function handler(req, res) {
       targets = all.filter((s) => s.email && s.token && !s.unsubscribed);
     }
 
+    // Offer for one product: the email button and the notification open that product page on the website
+    const pid = /^[A-Za-z0-9_-]{1,60}$/.test(String(body.productId || '')) ? String(body.productId) : '';
+    const link = pid ? `${SITE}/?product=${encodeURIComponent(pid)}` : SITE;
+
     let sent = 0;
     let failed = 0;
     let lastError = '';
     for (let i = 0; i < targets.length; i += 100) {
-      const chunk = targets.slice(i, i + 100).map((s) => buildMail(body.testOnly ? `[TEST] ${subject}` : subject, message, s));
+      const chunk = targets.slice(i, i + 100).map((s) => buildMail(body.testOnly ? `[TEST] ${subject}` : subject, message, s, link, !!pid));
       const r = await fetch('https://api.resend.com/emails/batch', {
         method: 'POST',
         headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
@@ -224,6 +228,7 @@ export default async function handler(req, res) {
         title: body.testOnly ? `[TEST] ${pushTitle}` : pushTitle,
         text: pushText,
         onlyEmail: body.testOnly ? emailFromToken(idToken).toLowerCase() : '',
+        link,
       });
     }
 

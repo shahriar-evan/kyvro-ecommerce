@@ -67,7 +67,7 @@ export async function countPushDevices() {
   return snap.size;
 }
 
-export async function sendOfferEmail({ subject, message, testOnly, pushTitle, pushBody }) {
+export async function sendOfferEmail({ subject, message, testOnly, pushTitle, pushBody, productId }) {
   const user = auth.currentUser;
   if (!user) throw new Error("Please sign in again.");
   const idToken = await user.getIdToken();
@@ -76,7 +76,7 @@ export async function sendOfferEmail({ subject, message, testOnly, pushTitle, pu
     res = await fetch("/api/send-offer", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-      body: JSON.stringify({ subject, message, testOnly: !!testOnly, pushTitle, pushBody }),
+      body: JSON.stringify({ subject, message, testOnly: !!testOnly, pushTitle, pushBody, productId: productId || '' }),
     });
   } catch (e) {
     throw new Error("Could not reach the email service. This only works on the live site (Vercel), not on localhost.");

@@ -25,7 +25,7 @@ export const SUB_CATEGORIES = {
     { name: 'Saree' },
     { name: 'Bags' },
     { name: 'Three Piece' },
-    { group: 'Western Wear', items: ['Night Dress', 'Tops', 'T-Shirt'] },
+    { group: 'Western Wear', items: ['Tops', 'T-Shirt'] },
     { group: 'Muslim Wear', items: ['Borka', 'Hijab'] },
   ],
 };

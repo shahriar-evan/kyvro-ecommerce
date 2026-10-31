@@ -5,7 +5,7 @@ import { countSubscribers, countPushDevices, sendOfferEmail } from '../subscribe
 import { normalizeSettings, bestDiscount, nextReward, describeRule, bannerFromRules, deliveryNote } from '../data/shopConfig';
 
 // Owner-only editor: top banner text + automatic discount rules + delivery charge + offer sending
-export default function StoreSettings({ settings, isDarkMode, staff, formatPrice }) {
+export default function StoreSettings({ products = [], settings, isDarkMode, staff, formatPrice }) {
   const [text, setText] = useState(settings.announcementText);
   const [speed, setSpeed] = useState(settings.bannerSpeed || 100);
   const [enabled, setEnabled] = useState(settings.discountEnabled);
@@ -27,6 +27,10 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
   const [testTotal, setTestTotal] = useState('4000');
   const [mailSubject, setMailSubject] = useState('');
   const [mailBody, setMailBody] = useState('');
+  const [subjectEdited, setSubjectEdited] = useState(false); // the subject follows the message until you type your own
+  const [offerProduct, setOfferProduct] = useState(null);
+  const [pickOpen, setPickOpen] = useState(false);
+  const [pickQ, setPickQ] = useState('');
   const [mailBusy, setMailBusy] = useState(false);
   const [mailMsg, setMailMsg] = useState('');
   const [counts, setCounts] = useState(null);
@@ -84,18 +88,35 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
   const addRule = () => setRules((prev) => [...prev, { min: '', type: 'percent', value: '' }]);
   const removeRule = (i) => setRules((prev) => prev.filter((_, idx) => idx !== i));
 
+  // Subject: "Kyvro offer: <first line of the message>" (or of the banner text) - or whatever you type yourself
+  const firstLine = (v) => String(v || '').split('\n').map((x) => x.trim()).find(Boolean) || '';
+  const autoSubject = ('Kyvro offer: ' + (firstLine(mailBody) || firstLine(text) || 'new offers are live')).slice(0, 150);
+  const subjectNow = subjectEdited && mailSubject.trim() ? mailSubject.trim() : autoSubject;
+
   const fillMail = () => {
-    setMailSubject('Kyvro offer: ' + (text || 'new discounts are live').slice(0, 80));
     setMailBody(`${text || 'We have a new offer for you.'}\n\nVisit kyvro.store to see what is new.`);
   };
 
+  const pickProduct = (p) => {
+    setOfferProduct({ id: p.id, name: p.name });
+    const now = formatPrice ? formatPrice(p.price) : p.price;
+    const was = p.originalPrice && Number(p.originalPrice) > Number(p.price) ? ` (was ${formatPrice ? formatPrice(p.originalPrice) : p.originalPrice})` : '';
+    setMailBody(`${p.name} - now only ${now}${was}\n\nTap to see it on kyvro.store.`);
+    setPickOpen(false);
+    setPickQ('');
+  };
+  const pickList = products
+    .filter((p) => p.status !== 'pending')
+    .filter((p) => !pickQ.trim() || [p.name, p.category, p.gender].some((v) => String(v || '').toLowerCase().includes(pickQ.trim().toLowerCase())))
+    .slice(0, 30);
+
   const sendMail = async (testOnly) => {
     setMailMsg('');
-    if (mailSubject.trim().length < 3 || mailBody.trim().length < 10) { setMailMsg('Error: write a subject and a message first.'); return; }
+    if (subjectNow.length < 3 || mailBody.trim().length < 10) { setMailMsg('Error: write the message first (the subject fills itself).'); return; }
     if (!testOnly && !(await askConfirm(`${confirmText()}\n\nSend now? It cannot be undone.`))) return;
     setMailBusy(true);
     try {
-      const r = await sendOfferEmail({ subject: mailSubject.trim(), message: mailBody.trim(), testOnly, pushTitle: mailSubject.trim(), pushBody: mailBody.trim() });
+      const r = await sendOfferEmail({ subject: subjectNow, message: mailBody.trim(), testOnly, pushTitle: subjectNow, pushBody: mailBody.trim(), productId: offerProduct ? offerProduct.id : '' });
       setMailMsg(resultText(r, testOnly));
       loadCounts();
     } catch (e) { setMailMsg('Error: ' + e.message); }
@@ -293,7 +314,30 @@ export default function StoreSettings({ settings, isDarkMode, staff, formatPrice
             {counts && <> Email list: <strong className={accentText}>{counts.active}</strong> of {counts.total}. Notification devices: <strong className={accentText}>{counts.devices}</strong>.</>}
           </>,
           <div className="space-y-3">
-            <input value={mailSubject} onChange={(e) => setMailSubject(e.target.value)} maxLength={150} placeholder="Email subject" className={input} />
+            <div className={subBox}>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => setPickOpen((v) => !v)} className={outlineBtn}>{offerProduct ? 'Change product' : 'Choose a product'}</button>
+                {offerProduct
+                  ? <span className={`text-xs ${accentText} font-semibold`}>{offerProduct.name} <button type="button" onClick={() => setOfferProduct(null)} className="ml-1 text-red-500">&times; remove</button></span>
+                  : <span className={`text-[11px] ${muted}`}>Optional. The email button and the notification will open this product.</span>}
+              </div>
+              {pickOpen && (
+                <div className="mt-3">
+                  <input value={pickQ} onChange={(e) => setPickQ(e.target.value)} placeholder="Search product..." className={input} autoFocus />
+                  <div className="mt-2 max-h-64 overflow-y-auto divide-y rounded-lg border border-black/10">
+                    {pickList.length === 0 && <p className={`p-3 text-xs ${muted}`}>No product found.</p>}
+                    {pickList.map((p) => (
+                      <button key={p.id} type="button" onClick={() => pickProduct(p)} className="w-full flex items-center gap-3 p-2 text-left hover:bg-indigo-500/10">
+                        <img src={p.image} alt="" className="w-10 h-10 rounded object-cover shrink-0" />
+                        <span className="flex-1 min-w-0"><span className="block text-xs font-semibold truncate">{p.name}</span><span className={`block text-[11px] ${muted}`}>{formatPrice ? formatPrice(p.price) : p.price} &middot; {p.category}</span></span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <input value={subjectEdited ? mailSubject : autoSubject} onChange={(e) => { setSubjectEdited(true); setMailSubject(e.target.value); }} maxLength={150} placeholder="Email subject" className={input} />
+            {subjectEdited && <button type="button" onClick={() => { setSubjectEdited(false); setMailSubject(''); }} className={linkBtn}>Reset subject (automatic)</button>}
             <textarea value={mailBody} onChange={(e) => setMailBody(e.target.value)} maxLength={4000} rows={6} placeholder="Message (e.g. Eid offer: 10% off above 3000 BDT...)" className={input} />
             <button type="button" onClick={fillMail} className={linkBtn}>Fill from banner text</button>
             <div className="flex flex-wrap items-center gap-3 pt-1">

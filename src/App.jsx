@@ -122,6 +122,20 @@ export default function App() {
   const [priceFilter, setPriceFilter] = useState(15000);
 
   const [isCartOpen, setIsCartOpen] = useState(false);
+  // Offer link (?product=ID from an email or notification): open that product as soon as the products are loaded
+  const deepLinkDone = useRef(false);
+  useEffect(() => {
+    if (deepLinkDone.current) return;
+    let id = '';
+    try { id = new URLSearchParams(window.location.search).get('product') || ''; } catch (e) { /* ignore */ }
+    if (!id) { deepLinkDone.current = true; return; }
+    const found = shopProducts.find((x) => String(x.id) === id);
+    if (!found) return; // not loaded yet (or removed): try again when the product list changes
+    deepLinkDone.current = true;
+    setSelectedProduct(found); setCurrentView('product-detail');
+    try { window.history.replaceState({}, '', window.location.pathname); } catch (e) { /* ignore */ }
+  }, [products]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // View history for the floating Back button (phone + laptop)
   const viewHistory = useRef([]);
   const goingBack = useRef(false);
