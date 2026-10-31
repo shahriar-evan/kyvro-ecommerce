@@ -50,7 +50,7 @@ const EMPTY_CHECKOUT = {
 const EMPTY_PRODUCT_FORM = {
   name: '', gender: 'Men', category: 'Shirt', price: '', originalPrice: '', stockText: '', image: '', description: '',
   colors: '', sizeStock: {}, colorStock: {}, colorImages: {}, colorGallery: {}, extraImages: [], trackColors: false, stock: '10', isNew: true, isFeatured: false, isBestSeller: false,
-  supplierName: '', supplierCost: '', supplierLink: '', linkPerColor: false, colorLinks: {}, colorCosts: {}
+  supplierName: '', supplierCost: '', supplierLink: '', linkPerColor: false, colorLinks: {}, colorCosts: {}, extraSuppliers: []
 };
 
 export default function App() {
@@ -759,9 +759,21 @@ export default function App() {
         if (raw !== '' && !Number.isNaN(n) && n >= 0) colorCosts[c] = n;
       }
     }
+    // more suppliers (other shops that sell the same product)
+    const extraSuppliers = [];
+    for (const x of (newProductForm.extraSuppliers || [])) {
+      const name = String((x && x.name) || '').trim();
+      const link = String((x && x.link) || '').trim();
+      const costX = String((x && x.cost) ?? '').trim();
+      if (!name && !link && costX === '') continue; // empty row
+      if (!name) { alert('More suppliers: write the shop name for every extra supplier (or remove the empty one).'); return; }
+      if (costX === '' || Number.isNaN(parseFloat(costX)) || parseFloat(costX) < 0) { alert(`More suppliers: write the price of "${name}" (what it charges you per piece).`); return; }
+      if (link && !/^https?:\/\//i.test(link)) { alert(`More suppliers: the link of "${name}" must start with http:// or https://`); return; }
+      extraSuppliers.push({ name, cost: parseFloat(costX), link });
+    }
     const allColorsPriced = colorList.length > 0 && colorList.every((c) => colorCosts[c] !== undefined);
     const supplierLinkUsed = perColorLinks ? '' : supplierLink;
-    const hasSupplier = costRaw !== '' || supplierName !== '' || supplierLinkUsed !== '' || Object.keys(colorLinks).length > 0 || Object.keys(colorCosts).length > 0;
+    const hasSupplier = extraSuppliers.length > 0 || costRaw !== '' || supplierName !== '' || supplierLinkUsed !== '' || Object.keys(colorLinks).length > 0 || Object.keys(colorCosts).length > 0;
     const supplierCost = costRaw === '' ? (allColorsPriced ? Math.min(...Object.values(colorCosts)) : 0) : parseFloat(costRaw);
     if (hasSupplier) {
       if ((costRaw === '' && !allColorsPriced) || Number.isNaN(supplierCost) || supplierCost < 0) {
@@ -839,7 +851,7 @@ export default function App() {
     }
     // Save (or clear) the private supplier details in their own admin-only collection
     try {
-      if (hasSupplier) await saveProductCost(productData.id, { supplierName, supplierCost, supplierLink: supplierLinkUsed, colorLinks, colorCosts }, { email: loggedInUserEmail });
+      if (hasSupplier) await saveProductCost(productData.id, { supplierName, supplierCost, supplierLink: supplierLinkUsed, colorLinks, colorCosts, extraSuppliers }, { email: loggedInUserEmail });
       else if (editingProductId && productCosts[String(editingProductId)]) await removeProductCost(productData.id);
     } catch (err) {
       console.error(err);
@@ -894,7 +906,8 @@ export default function App() {
       supplierLink: sup.supplierLink || '',
       linkPerColor: !!(sup.colorLinks && Object.keys(sup.colorLinks).length),
       colorLinks: { ...(sup.colorLinks || {}) },
-      colorCosts: Object.fromEntries(Object.entries(sup.colorCosts || {}).map(([c, n]) => [c, String(n)]))
+      colorCosts: Object.fromEntries(Object.entries(sup.colorCosts || {}).map(([c, n]) => [c, String(n)])),
+      extraSuppliers: (Array.isArray(sup.extraSuppliers) ? sup.extraSuppliers : []).map((x) => ({ name: x.name || '', cost: x.cost === undefined ? '' : String(x.cost), link: x.link || '' }))
     });
     setAdminTab('add-product');
   };

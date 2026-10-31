@@ -84,6 +84,10 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
   const colorCostsForm = (newProductForm && newProductForm.colorCosts) || {};
   const setColorCost = (c, v) => setNewProductForm(prev => ({ ...prev, colorCosts: { ...(prev.colorCosts || {}), [c]: v } }));
   const setColorLink = (c, v) => setNewProductForm(prev => ({ ...prev, colorLinks: { ...(prev.colorLinks || {}), [c]: v } }));
+  const extraSup = (newProductForm && newProductForm.extraSuppliers) || [];
+  const setExtraSup = (i, patch) => setNewProductForm(prev => ({ ...prev, extraSuppliers: (prev.extraSuppliers || []).map((x, k) => (k === i ? { ...x, ...patch } : x)) }));
+  const addExtraSup = () => setNewProductForm(prev => ((prev.extraSuppliers || []).length >= 5 ? prev : { ...prev, extraSuppliers: [...(prev.extraSuppliers || []), { name: '', cost: '', link: '' }] }));
+  const removeExtraSup = (i) => setNewProductForm(prev => ({ ...prev, extraSuppliers: (prev.extraSuppliers || []).filter((_, k) => k !== i) }));
   const supplierPanel = (
     <div className="rounded-lg border border-[#D4AF37]/50 bg-[#D4AF37]/5 p-4 space-y-3">
       <div>
@@ -155,6 +159,31 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
         </div>
       )}
       {linkPerColor && photoColors.length === 0 && <p className="text-[11px] text-amber-600">Add the product colors first, then a link box will appear for each color.</p>}
+      {extraSup.map((x, i) => {
+        const cx = parseFloat(x.cost);
+        const pr = !Number.isNaN(cx) && !Number.isNaN(formPriceNum) ? formPriceNum - cx : null;
+        return (
+          <div key={i} className="rounded-lg border border-[#D4AF37]/40 p-3 space-y-2 bg-white/40 dark:bg-black/20">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold uppercase tracking-wider text-[#D4AF37]">Supplier {i + 2}</p>
+              <button type="button" onClick={() => removeExtraSup(i)} className="text-[11px] font-bold text-red-500">&times; Remove</button>
+            </div>
+            <input type="text" list="kyvro-supplier-names" placeholder="Shop name, e.g. ShopBaseBD" maxLength={80}
+              value={x.name || ''} onChange={e => setExtraSup(i, { name: e.target.value })} className={inputCls} />
+            <div className="grid grid-cols-[104px_1fr] gap-2">
+              <input type="number" min="0" placeholder="৳ cost" value={x.cost ?? ''} onChange={e => setExtraSup(i, { cost: e.target.value })} className={inputCls} />
+              <input type="text" placeholder="Product link (optional) https://..." maxLength={500} value={x.link || ''} onChange={e => setExtraSup(i, { link: e.target.value })} className={inputCls} />
+            </div>
+            {pr !== null && <p className={`text-[11px] font-semibold ${pr >= 0 ? 'text-green-600' : 'text-red-500'}`}>If bought here: {pr >= 0 ? 'profit' : 'LOSS'} {formatPrice(Math.abs(pr))} per piece</p>}
+          </div>
+        );
+      })}
+      {extraSup.length < 5 && (
+        <button type="button" onClick={addExtraSup}
+          className="w-full py-2.5 rounded-lg border border-dashed border-[#D4AF37] text-[#B8921F] text-xs font-bold uppercase tracking-wider hover:bg-[#D4AF37]/10 transition">
+          + More supplier
+        </button>
+      )}
     </div>
   );
   const roleLabel = adminRole ? adminRole.charAt(0).toUpperCase() + adminRole.slice(1) : '';
