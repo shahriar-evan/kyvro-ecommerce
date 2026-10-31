@@ -429,13 +429,22 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                     <h3 className="text-lg font-serif font-bold">
                       {editingProductId ? 'Edit Product Details' : 'Add New Luxury Product'}
                     </h3>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button type="button"
+                        onClick={() => { if (editingProductId) clearProductForm(); setAdminTab('products'); }}
+                        className={`inline-flex items-center gap-1.5 px-4 py-2 text-[11px] font-bold uppercase tracking-wider rounded-lg border transition active:scale-[.97] ${isDarkMode ? 'border-gray-600 text-gray-200 hover:bg-[#222]' : 'border-gray-300 text-gray-800 bg-white hover:bg-gray-100 shadow-sm'}`}>
+                        <span aria-hidden="true" className="text-sm leading-none">&larr;</span> Back
+                      </button>
                       {editingProductId && (
                         <button type="button" onClick={async () => { const saved = products.find((p) => p.id === editingProductId); if (saved && (await askConfirm('Undo all your changes and go back to the saved product?'))) startEditProduct(saved); }}
-                          className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded border border-gray-400 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#222]">Reset changes</button>
+                          className={`inline-flex items-center gap-1.5 px-4 py-2 text-[11px] font-bold uppercase tracking-wider rounded-lg border transition active:scale-[.97] ${isDarkMode ? 'border-[#D4AF37]/60 text-[#D4AF37] hover:bg-[#D4AF37]/10' : 'border-[#D4AF37] text-[#8A6A12] bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20'}`}>
+                          <span aria-hidden="true" className="text-sm leading-none">&#8635;</span> Reset changes
+                        </button>
                       )}
                       <button type="button" onClick={async () => { if ((await askConfirm(editingProductId ? 'Clear the whole form? You will leave edit mode (the saved product stays unchanged).' : 'Clear the whole form?'))) clearProductForm(); }}
-                        className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded border border-red-400 text-red-500 hover:bg-red-500/10">Clear form</button>
+                        className="inline-flex items-center gap-1.5 px-4 py-2 text-[11px] font-bold uppercase tracking-wider rounded-lg border border-red-400 text-red-500 hover:bg-red-500/10 transition active:scale-[.97]">
+                        <span aria-hidden="true" className="text-sm leading-none">&times;</span> Clear form
+                      </button>
                     </div>
                   </div>
 
