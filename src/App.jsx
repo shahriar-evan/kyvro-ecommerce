@@ -50,7 +50,7 @@ const EMPTY_CHECKOUT = {
 const EMPTY_PRODUCT_FORM = {
   name: '', gender: 'Men', category: 'Shirt', price: '', originalPrice: '', stockText: '', image: '', description: '',
   colors: '', sizeStock: {}, colorStock: {}, colorImages: {}, colorGallery: {}, extraImages: [], trackColors: false, stock: '10', isNew: true, isFeatured: false, isBestSeller: false,
-  supplierName: '', supplierCost: '', supplierLink: '', linkPerColor: false, colorLinks: {}, colorCosts: {}, extraSuppliers: []
+  supplierName: '', supplierCost: '', supplierLink: '', linkPerColor: false, colorLinks: {}, colorCosts: {}, extraSuppliers: [], alsoShowIn: []
 };
 
 export default function App() {
@@ -798,6 +798,7 @@ export default function App() {
       name: newProductForm.name,
       category: newProductForm.category,
       gender: newProductForm.gender,
+      alsoShowIn: newProductForm.gender === 'Winter' ? (newProductForm.alsoShowIn || []).filter((c) => c === 'Men' || c === 'Women') : [],
       price: parseFloat(newProductForm.price) || 0,
       originalPrice: parseFloat(newProductForm.originalPrice) || 0,
       stockText: String(newProductForm.stockText || '').trim().slice(0, 40),
@@ -907,6 +908,7 @@ export default function App() {
       linkPerColor: !!(sup.colorLinks && Object.keys(sup.colorLinks).length),
       colorLinks: { ...(sup.colorLinks || {}) },
       colorCosts: Object.fromEntries(Object.entries(sup.colorCosts || {}).map(([c, n]) => [c, String(n)])),
+      alsoShowIn: Array.isArray(prod.alsoShowIn) ? [...prod.alsoShowIn] : [],
       extraSuppliers: (Array.isArray(sup.extraSuppliers) ? sup.extraSuppliers : []).map((x) => ({ name: x.name || '', cost: x.cost === undefined ? '' : String(x.cost), link: x.link || '' }))
     });
     setAdminTab('add-product');

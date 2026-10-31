@@ -67,6 +67,10 @@ const same = (a, b) => canon(a) === canon(b);
 export const matchesCollectionPage = (product, collection, sub) => {
   // products saved earlier under the old name "Jackets" belong to the Winter Collection
   const g = product.gender === 'Jackets' ? 'Winter' : product.gender;
+  // a Winter product can also be shown in Men's and/or Women's (under "Jacket")
+  if (g === 'Winter' && Array.isArray(product.alsoShowIn) && product.alsoShowIn.includes(collection) && collection !== 'Winter') {
+    return !sub || same(sub, 'Jacket') || subCategoryNames(collection, sub).some((n) => same(n, product.category));
+  }
   if (!same(g, collection)) return false;
   // no sub-category chosen: the whole collection (the best sellers come first); a sub-category: only that one
   if (!sub) return true;
