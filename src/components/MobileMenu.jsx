@@ -1,13 +1,38 @@
 import React from 'react';
-import { X, ChevronRight, Home, Shirt, Sparkles, Footprints, Wallet, Watch } from 'lucide-react';
+import { X, ChevronRight, Home, Footprints, Wallet, Watch } from 'lucide-react';
+
+// Custom line icons: a man, a woman and a jacket (lucide has no icon for them)
+const mk = (paths) => function CustomIcon({ size = 20 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {paths}
+    </svg>
+  );
+};
+const ManIcon = mk(<>
+  <circle cx="12" cy="6.2" r="3" />
+  <path d="M4.8 21v-3.2a5.2 5.2 0 0 1 5.2-5.2h4a5.2 5.2 0 0 1 5.2 5.2V21" />
+  <path d="M9.6 12.7 12 15.2l2.4-2.5" />
+  <path d="m12 15.2-1.1 1.8L12 20l1.1-3z" />
+</>);
+const WomanIcon = mk(<>
+  <circle cx="12" cy="5.4" r="2.7" />
+  <path d="M9.2 6.4c-.9 2.2-.6 4.1.5 5.6M14.8 6.4c.9 2.2.6 4.1-.5 5.6" />
+  <path d="M12 9.6c-1.9 0-3.2 1-3.6 2.5L5.6 21h12.8l-2.8-8.9c-.4-1.5-1.7-2.5-3.6-2.5z" />
+  <path d="M9.3 13.4h5.4" />
+</>);
+const JacketIcon = mk(<>
+  <path d="M8.2 3.2 3 6.2l2 5 3-1V21h8V10.2l3 1 2-5-5.2-3c-.5 1.6-2 2.6-3.8 2.6S8.7 4.8 8.2 3.2z" />
+  <path d="M12 5.8V21" />
+</>);
 
 export default function MobileMenu({ isDarkMode, setCurrentView, setIsMobileMenuOpen, setSelectedCategory }) {
   const close = () => setIsMobileMenuOpen(false);
   const items = [
     { label: 'Home', sub: 'Back to the front page', icon: Home, go: () => setCurrentView('home') },
-    { label: "Men's", sub: 'Shirt, Punjabi, Pants...', icon: Shirt, go: () => { setCurrentView('shop'); setSelectedCategory('Men'); } },
-    { label: "Women's & Girls'", sub: 'Saree, Bags, Three Piece...', icon: Sparkles, go: () => { setCurrentView('shop'); setSelectedCategory('Women'); } },
-    { label: 'Winter', sub: 'Varsity & denim jackets', icon: Shirt, go: () => { setCurrentView('shop'); setSelectedCategory('Winter'); } },
+    { label: "Men's", sub: 'Shirt, Punjabi, Pants...', icon: ManIcon, go: () => { setCurrentView('shop'); setSelectedCategory('Men'); } },
+    { label: "Women's & Girls'", sub: 'Saree, Bags, Three Piece...', icon: WomanIcon, go: () => { setCurrentView('shop'); setSelectedCategory('Women'); } },
+    { label: 'Winter', sub: 'Varsity & denim jackets', icon: JacketIcon, go: () => { setCurrentView('shop'); setSelectedCategory('Winter'); } },
     { label: 'Shoes', sub: 'Sneakers & more', icon: Footprints, go: () => { setCurrentView('shop'); setSelectedCategory('Shoes'); } },
     { label: 'Wallets', sub: 'Genuine leather', icon: Wallet, go: () => { setCurrentView('shop'); setSelectedCategory('Wallets'); } },
     { label: 'Watches', sub: 'Classic & modern', icon: Watch, go: () => { setCurrentView('shop'); setSelectedCategory('Watches'); } },
@@ -33,8 +58,9 @@ export default function MobileMenu({ isDarkMode, setCurrentView, setIsMobileMenu
                   onClick={() => { go(); close(); }}
                   className={`group flex items-center gap-4 text-left rounded-xl px-3 py-3.5 transition active:scale-[0.99] ${isDarkMode ? 'hover:bg-white/5' : 'hover:bg-[#D4AF37]/10'}`}
                 >
-                  <span className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${isDarkMode ? 'bg-[#D4AF37]/15' : 'bg-[#D4AF37]/15'} text-[#B8921F]`}>
-                    <Icon size={20} />
+                  <span className="relative w-12 h-12 rounded-full flex items-center justify-center shrink-0 text-[#8A6A12] group-hover:text-black group-active:text-black transition-all duration-200 group-hover:scale-105"
+                    style={{ background: 'linear-gradient(145deg, #FBF1CF 0%, #EBCF74 55%, #D4AF37 100%)', boxShadow: '0 6px 14px -4px rgba(212,175,55,.55), inset 0 1px 0 rgba(255,255,255,.7), inset 0 0 0 1px rgba(184,146,31,.45)' }}>
+                    <Icon size={22} />
                   </span>
                   <span className="flex-1 min-w-0">
                     <span className="block text-sm font-bold uppercase tracking-wider">{label}</span>
