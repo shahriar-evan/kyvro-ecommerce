@@ -14,7 +14,12 @@ import { SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalSto
 export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, productCosts = {}, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct, clearProductForm, handleDeleteRequest }) {
   const [productSearch, setProductSearch] = React.useState('');
   const psq = productSearch.trim().toLowerCase();
-  const shownProducts = psq ? products.filter((p) => [p.name, p.category, p.gender, p.brand, p.id, p.supplierName].some((v) => String(v || '').toLowerCase().includes(psq))) : products;
+  const [catFilter, setCatFilter] = React.useState('All');
+  const [openId, setOpenId] = React.useState(null);
+  const catLabel = (p) => (p.gender === p.category ? p.category : `${p.gender} / ${p.category}`);
+  const catList = [...products.reduce((m, p) => m.set(catLabel(p), (m.get(catLabel(p)) || 0) + 1), new Map())].sort((a, b) => a[0].localeCompare(b[0]));
+  const searched = psq ? products.filter((p) => [p.name, p.category, p.gender, p.brand, p.id, p.supplierName].some((v) => String(v || '').toLowerCase().includes(psq))) : products;
+  const shownProducts = catFilter === 'All' ? searched : searched.filter((p) => catLabel(p) === catFilter);
   const isOwner = adminRole === 'owner';
   const canManageTeam = adminRole === 'owner' || adminRole === 'manager';
   const formColors = ((newProductForm && newProductForm.colors) || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -266,10 +271,21 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                   {products.filter((p) => p.deleteRequested).length} delete request(s) waiting for your decision. Use Delete or Keep on the highlighted rows below.
                 </div>
               )}
+              {adminTab === 'products' && catList.length > 1 && (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {[['All', products.length], ...catList].map(([name, n]) => (
+                    <button key={name} type="button" onClick={() => setCatFilter(name)}
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition ${catFilter === name ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : isDarkMode ? 'border-gray-700 text-gray-300 hover:border-[#D4AF37]' : 'border-gray-300 text-gray-700 hover:border-[#D4AF37]'}`}>
+                      {name} <span className="opacity-70">({n})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               {adminTab === 'products' && (
                 <div className="mb-3 flex items-center gap-3">
                   <input type="text" value={productSearch} onChange={(e) => setProductSearch(e.target.value)} placeholder="Search products by name, category, brand..." className={`flex-1 border px-4 py-2.5 text-sm rounded focus:outline-none focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#181818] border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`} />
                   {psq && <button type="button" onClick={() => setProductSearch('')} className="text-xs font-bold text-[#D4AF37] whitespace-nowrap">Clear ({shownProducts.length} found)</button>}
+                  {!psq && catFilter !== 'All' && <span className="text-xs text-gray-500 whitespace-nowrap">{shownProducts.length} product(s)</span>}
                 </div>
               )}
               {adminTab === 'products' && (
@@ -286,7 +302,8 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                     </thead>
                     <tbody className="divide-y">
                       {shownProducts.map(p => (
-                        <tr key={p.id} className={`hover:bg-gray-100 dark:hover:bg-[#1a1a1a] ${p.deleteRequested ? 'bg-red-500/10' : ''}`}>
+                        <React.Fragment key={p.id}>
+                        <tr className={`hover:bg-gray-100 dark:hover:bg-[#1a1a1a] ${p.deleteRequested ? 'bg-red-500/10' : ''}`}>
                           <td className="p-4 flex items-center gap-3">
                             <img src={p.image} alt={p.name} className="w-10 h-10 object-cover rounded" />
                             <div>
@@ -307,6 +324,8 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                             )}
                           </td>
                           <td className="p-4 text-gray-500">
+                            <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
                             {totalStock(p)} units
                             {hasSizeStock(p) && (
                               <p className="text-[10px] mt-0.5">
@@ -318,6 +337,12 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                                 {Object.entries(p.colorStock).map(([k, n]) => { const [sz, col] = k.split('|'); return `${sz ? sz + ' ' : ''}${col}: ${n}`; }).join(' · ')}
                               </p>
                             )}
+                            </div>
+                            <button type="button" onClick={() => setOpenId(openId === p.id ? null : p.id)}
+                              className={`shrink-0 px-3 py-1.5 rounded text-[11px] font-bold uppercase tracking-wider border transition ${openId === p.id ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'border-[#D4AF37] text-[#B8921F] hover:bg-[#D4AF37]/10'}`}>
+                              {openId === p.id ? 'Hide ▴' : 'Details ▾'}
+                            </button>
+                            </div>
                           </td>
                           <td className="p-4 text-right space-x-2">
                             {canApproveProduct(p) && <button onClick={() => handleApproveProduct(p)} className="px-3 py-1.5 rounded text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition">Approve</button>}
@@ -332,6 +357,64 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                             {!p.deleteRequested && canDeleteProduct(p) && <button onClick={() => deleteProduct(p.id)} className="px-3 py-1.5 rounded text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition">{p.status === 'pending' ? 'Reject' : (adminRole === 'owner' ? 'Delete' : 'Request delete')}</button>}
                           </td>
                         </tr>
+                        {openId === p.id && (() => {
+                          const sup = productCosts[String(p.id)] || {};
+                          const gal = [...new Set([p.image, ...(Array.isArray(p.images) ? p.images : []), ...Object.values(p.colorImages || {}), ...Object.values(p.colorGallery || {}).flat()].filter(Boolean))];
+                          const row = (k, v) => (v === undefined || v === null || v === '' ? null : <div className="flex gap-2"><span className="w-32 shrink-0 text-gray-500">{k}</span><span className="font-medium break-words min-w-0">{v}</span></div>);
+                          const disc = p.originalPrice && Number(p.originalPrice) > Number(p.price) ? Math.round((1 - p.price / p.originalPrice) * 100) : 0;
+                          return (
+                            <tr className={isDarkMode ? 'bg-[#121212]' : 'bg-[#D4AF37]/5'}>
+                              <td colSpan={5} className="p-5">
+                                <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr_1fr] gap-6">
+                                  <div className="flex flex-wrap lg:flex-col gap-2 lg:max-w-[96px]">
+                                    {gal.slice(0, 8).map((u, i) => <img key={i} src={u} alt="" className="w-20 h-20 object-cover rounded border border-black/10" />)}
+                                  </div>
+                                  <div className="space-y-1.5 text-xs">
+                                    <p className="text-[11px] font-bold uppercase tracking-wider text-[#D4AF37] mb-1">Product</p>
+                                    {row('Name', p.name)}
+                                    {row('Collection', catLabel(p))}
+                                    {row('Selling price', formatPrice(p.price))}
+                                    {row('Old price', p.originalPrice ? `${formatPrice(p.originalPrice)}${disc ? ` (-${disc}%)` : ''}` : '')}
+                                    {row('Stock text', p.stockText)}
+                                    {row('Total stock', `${totalStock(p)} units`)}
+                                    {row('Sold so far', p.sold ? `${p.sold} pcs` : '')}
+                                    {row('Colors', Array.isArray(p.colors) && p.colors.length ? p.colors.join(', ') : '')}
+                                    {row('Sizes', hasSizeStock(p) ? orderedSizes(Object.keys(p.sizeStock), p.gender).map(sz => `${sz}: ${p.sizeStock[sz]}`).join(' · ') : '')}
+                                    {row('Size + color', hasColorStock(p) ? Object.entries(p.colorStock).map(([k, n]) => { const [sz, col] = k.split('|'); return `${sz ? sz + ' ' : ''}${col}: ${n}`; }).join(' · ') : '')}
+                                    {row('Labels', [p.isNew && 'New', p.isFeatured && 'Featured', p.isBestSeller && 'Best seller'].filter(Boolean).join(', '))}
+                                    {row('Status', p.status === 'pending' ? 'Pending approval' : 'Live')}
+                                    {row('Added by', p.addedByName || p.addedBy)}
+                                    {p.description && <div className="pt-1"><span className="text-gray-500">Description</span><p className="mt-0.5 leading-relaxed whitespace-pre-line">{p.description}</p></div>}
+                                  </div>
+                                  <div className="space-y-1.5 text-xs">
+                                    <p className="text-[11px] font-bold uppercase tracking-wider text-[#D4AF37] mb-1">Supplier · private</p>
+                                    {sup.supplierName || sup.supplierCost !== undefined ? (
+                                      <>
+                                        {row('Shop', sup.supplierName)}
+                                        {row('Cost per piece', sup.supplierCost !== undefined ? formatPrice(sup.supplierCost) : '')}
+                                        {sup.supplierCost !== undefined && row('Profit per piece', <span className={p.price - sup.supplierCost >= 0 ? 'text-green-600' : 'text-red-500'}>{formatPrice(p.price - sup.supplierCost)}</span>)}
+                                        {sup.supplierLink && row('Link', <a href={sup.supplierLink} target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] underline break-all">open product</a>)}
+                                        {Object.entries(sup.colorCosts || {}).map(([c, n]) => <div key={'cc' + c}>{row(`${c} cost`, `${formatPrice(n)}${p.price - n >= 0 ? ` · profit ${formatPrice(p.price - n)}` : ` · LOSS ${formatPrice(n - p.price)}`}`)}</div>)}
+                                        {Object.entries(sup.colorLinks || {}).map(([c, u]) => <div key={'cl' + c}>{row(`${c} link`, <a href={u} target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] underline">open</a>)}</div>)}
+                                        {(sup.extraSuppliers || []).map((x, i) => (
+                                          <div key={'x' + i} className="pt-1 mt-1 border-t border-black/10">
+                                            {row(`Supplier ${i + 2}`, x.name)}
+                                            {row('Cost', formatPrice(x.cost))}
+                                            {x.link && row('Link', <a href={x.link} target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] underline">open product</a>)}
+                                          </div>
+                                        ))}
+                                      </>
+                                    ) : <p className="text-gray-500">No supplier saved (own stock).</p>}
+                                    <div className="pt-3">
+                                      <button type="button" onClick={() => startEditProduct(p)} className="px-4 py-2 rounded text-xs font-bold uppercase tracking-wider border border-gray-400 hover:bg-gray-100 dark:hover:bg-[#222] transition">Edit this product</button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })()}
+                        </React.Fragment>
                       ))}
                     </tbody>
                   </table>
