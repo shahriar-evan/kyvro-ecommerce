@@ -1,11 +1,95 @@
 import PriceTag, { DiscountBadge } from './PriceTag';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Heart } from 'lucide-react';
 import WhatsAppButton, { WhatsAppIcon } from './WhatsAppButton';
-import useSwipe from '../utils/useSwipe';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
 import StockLabel from './StockLabel';
 import { hasSizeStock, hasColorStock, totalStock, stockForSize, stockFor, stockForColor, productColors, imageFor, orderedSizes } from '../data/catalog';
+
+// Photo slider: the photos sit side by side and slide in from the side.
+// Works with a finger on a phone, mouse drag, and a two-finger sideways swipe on a laptop trackpad.
+function PhotoSlider({ photos, index, onIndex, alt, className, children }) {
+  const [drag, setDrag] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const box = useRef(null);
+  const st = useRef(null);
+  const wheel = useRef({ acc: 0, lock: false, idle: null });
+  const last = photos.length - 1;
+  const go = (d) => onIndex(Math.max(0, Math.min(last, index + d)));
+  const goRef = useRef(go);
+  goRef.current = go;
+
+  // trackpad: two fingers sideways (needs a non-passive listener so the browser does not go "back")
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return undefined;
+    const onWheel = (e) => {
+      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return; // normal vertical scroll
+      e.preventDefault();
+      const w = wheel.current;
+      if (w.lock) return;
+      w.acc += e.deltaX;
+      clearTimeout(w.idle);
+      w.idle = setTimeout(() => { w.acc = 0; }, 160);
+      if (Math.abs(w.acc) > 50) {
+        goRef.current(w.acc > 0 ? 1 : -1);
+        w.acc = 0;
+        w.lock = true;
+        setTimeout(() => { w.lock = false; }, 450); // ignore the trackpad's momentum
+      }
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  const onDown = (e) => { st.current = { x: e.clientX, y: e.clientY, t: Date.now(), id: e.pointerId, on: false }; };
+  const onMove = (e) => {
+    const s0 = st.current;
+    if (!s0 || s0.id !== e.pointerId) return;
+    const dx = e.clientX - s0.x, dy = e.clientY - s0.y;
+    if (!s0.on) {
+      if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+        s0.on = true;
+        setDragging(true);
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+      } else return;
+    }
+    // a little resistance at the first / last photo
+    const edge = (index === 0 && dx > 0) || (index === last && dx < 0);
+    setDrag(edge ? dx / 3 : dx);
+  };
+  const end = (e) => {
+    const s0 = st.current;
+    st.current = null;
+    if (!s0 || !s0.on) return;
+    const dx = e.clientX - s0.x;
+    const w = (box.current && box.current.clientWidth) || 300;
+    const fast = Math.abs(dx) / Math.max(1, Date.now() - s0.t) > 0.45;
+    if (Math.abs(dx) > w * 0.18 || (fast && Math.abs(dx) > 24)) go(dx < 0 ? 1 : -1);
+    setDrag(0);
+    setDragging(false);
+  };
+
+  return (
+    <div ref={box} className={className} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={end} onPointerCancel={end}
+      style={{ touchAction: 'pan-y', overscrollBehaviorX: 'contain', cursor: dragging ? 'grabbing' : photos.length > 1 ? 'grab' : 'default' }}>
+      <div className="flex h-full" style={{ transform: `translateX(calc(${-index * 100}% + ${drag}px))`, transition: dragging ? 'none' : 'transform 420ms cubic-bezier(.22,.8,.28,1)', willChange: 'transform' }}>
+        {photos.map((src, i) => (
+          <div key={src + i} className="shrink-0 w-full h-full flex items-center justify-center" aria-hidden={i !== index}>
+            <img src={src} alt={i === index ? alt : ''} draggable={false} loading={Math.abs(i - index) <= 1 ? 'eager' : 'lazy'} className="block w-full h-full object-contain select-none" />
+          </div>
+        ))}
+      </div>
+      {photos.length > 1 && index > 0 && (
+        <button type="button" aria-label="Previous photo" onClick={() => go(-1)} className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/85 text-black shadow items-center justify-center hover:scale-110 transition">&#8249;</button>
+      )}
+      {photos.length > 1 && index < last && (
+        <button type="button" aria-label="Next photo" onClick={() => go(1)} className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-white/85 text-black shadow items-center justify-center hover:scale-110 transition">&#8250;</button>
+      )}
+      {children}
+    </div>
+  );
+}
 
 export default function ProductDetail({ product, products, addToCart, calculateDiscountPercent, formatPrice, isDarkMode, setCurrentView, savedIds = [], toggleSaved = () => {} }) {
   // Always use the latest version of the product (admin may have changed stock)
@@ -32,8 +116,6 @@ export default function ProductDetail({ product, products, addToCart, calculateD
   const colorPhoto = imageFor(live, color);
   const currentIdx = manualIdx !== null ? Math.min(manualIdx, gallery.length - 1) : Math.max(0, gallery.indexOf(colorPhoto));
   const shownPhoto = gallery[currentIdx] || colorPhoto;
-  const goPhoto = (d) => { if (gallery.length > 1) setManualIdx((currentIdx + d + gallery.length) % gallery.length); };
-  const photoSwipe = useSwipe(() => goPhoto(1), () => goPhoto(-1));
 
   const total = totalStock(live);
   const available = byColor
@@ -96,8 +178,8 @@ export default function ProductDetail({ product, products, addToCart, calculateD
       <button onClick={() => setCurrentView('shop')} className="text-xs text-gray-500 hover:text-[#D4AF37] mb-6">&larr; Back to shop</button>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
-        <div {...photoSwipe} className={`relative self-start md:sticky md:top-28 rounded-lg overflow-hidden border select-none ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-gray-100 border-gray-200'}`}>
-          <img src={shownPhoto} alt={live.name} draggable={false} className="block w-full h-auto max-h-[560px] object-contain mx-auto" />
+        <PhotoSlider photos={gallery.length ? gallery : [shownPhoto]} index={currentIdx} onIndex={setManualIdx} alt={live.name}
+          className={`relative self-start md:sticky md:top-28 w-full h-[430px] sm:h-[540px] rounded-lg overflow-hidden border select-none ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-gray-100 border-gray-200'}`}>
           {gallery.length > 1 && (
             <div className="absolute bottom-3 inset-x-0 z-10 flex justify-center gap-1.5">
               {gallery.map((_, i) => (
@@ -115,7 +197,7 @@ export default function ProductDetail({ product, products, addToCart, calculateD
           </button>
           {soldOut && <span className="absolute top-3 left-3 bg-red-600 text-white text-[11px] font-bold px-3 py-1 rounded">SOLD OUT</span>}
           {!soldOut && discount > 0 && <DiscountBadge price={live.price} originalPrice={live.originalPrice} className="absolute top-3 left-3" />}
-        </div>
+        </PhotoSlider>
 
         <div className="space-y-5">
           <div>
