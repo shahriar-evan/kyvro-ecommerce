@@ -730,7 +730,7 @@ export default function App() {
     // Extra photos: product level (up to 5) and per color (up to 3). All photos together must fit in one Firestore document (1 MB).
     const extraList = (newProductForm.extraImages || []).filter((u) => u && u !== mainImage).slice(0, 5);
     const colorGalleryOut = {};
-    for (const c of colorList) { const g = ((newProductForm.colorGallery || {})[c] || []).filter(Boolean).slice(0, 3); if (g.length) colorGalleryOut[c] = g; }
+    for (const c of colorList) { const g = ((newProductForm.colorGallery || {})[c] || []).filter(Boolean).slice(0, 5); if (g.length) colorGalleryOut[c] = g; }
     const photoBytes = JSON.stringify([mainImage, extraList, colorPhotoMap, colorGalleryOut]).length;
     if (photoBytes > 850000) {
       alert(`All photos together are too big (${Math.round(photoBytes / 1000)} KB, the limit is about 850 KB). Remove a few photos, or paste image links instead of uploading.`);

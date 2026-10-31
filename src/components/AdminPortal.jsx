@@ -6,7 +6,6 @@ import ImageField from './ImageField';
 import SizeStockEditor from './SizeStockEditor';
 import ColorPhotos from './ColorPhotos';
 import ColorPicker from './ColorPicker';
-import MorePhotos from './MorePhotos';
 import OrdersPanel from './OrdersPanel';
 import StoreSettings from './StoreSettings';
 import { SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
@@ -593,9 +592,6 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                         {photoColors.length > 0 && <p className="text-[11px] text-gray-500 mt-1">Tip: upload a photo for each color above instead, and the first color photo becomes the main photo automatically.</p>}
                       </div>
                     )}
-                    <div className="sm:col-span-2">
-                      <MorePhotos max={5} title="More photos of this product (optional)" hint="Extra angles / details. Customers swipe through them on the product page. Works with or without colors." value={newProductForm.extraImages || []} onChange={(extraImages) => setNewProductForm(prev => ({...prev, extraImages}))} isDarkMode={isDarkMode} />
-                    </div>
                     {/* on phones / small screens the supplier box sits here; on large screens it is in the empty space on the right */}
                     <div className="sm:col-span-2 lg:hidden">{supplierPanel}</div>
                     <div className="sm:col-span-2">
