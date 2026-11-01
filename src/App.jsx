@@ -228,17 +228,7 @@ export default function App() {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   // Maintenance mode: visitors can browse everything, but ordering is locked (team members can still test-order)
   const visitorLocked = storeSettings.maintenanceMode === true && !isAdminLoggedIn;
-  const lockText = ((storeSettings.maintenanceMessage || '').trim()) || "Maintenance mode is ON. We'll be back soon - ordering is paused for a little while.\nওয়েবসাইটে কাজ চলছে, আমরা শীঘ্রই ফিরে আসছি। কিছুক্ষণের জন্য অর্ডার বন্ধ আছে।";
-  useEffect(() => {
-    if (!visitorLocked) return undefined;
-    // the WhatsApp "Order on WhatsApp" buttons are paused too
-    const onClick = (e) => {
-      const a = e.target && e.target.closest ? e.target.closest('a[href*="wa.me"]') : null;
-      if (a && /order on whatsapp/i.test(a.textContent || '')) { e.preventDefault(); e.stopPropagation(); alert(lockText); }
-    };
-    document.addEventListener('click', onClick, true);
-    return () => document.removeEventListener('click', onClick, true);
-  }, [visitorLocked, lockText]);
+  const lockText = ((storeSettings.maintenanceMessage || '').trim()) || "ওয়েবসাইটে কাজ চলছে, অর্ডার সাময়িক বন্ধ, কিন্তু added to cart করে রাখতে পারবেন। পরবর্তীতে ওয়েবসাইট পুনরায় চালু হলে পেমেন্ট করতে পারবেন অথবা ম্যানুয়ালি অর্ডার করতে WhatsApp এ যোগাযোগ করুন।\n\nMaintenance mode is ON. Ordering is paused for a little while, but you can keep items in your cart and pay when the website opens again, or contact us on WhatsApp to order manually.";
   useEffect(() => {
     if (visitorLocked && currentView === 'checkout') { setCurrentView('home'); alert(lockText); }
   }, [visitorLocked, currentView]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -424,7 +414,6 @@ export default function App() {
   };
 
   const addToCart = (product, selectedColor, selectedSize, quantity = 1, goCheckout = false) => {
-    if (visitorLocked) { alert(lockText); return; }
     const live = products.find(p => p.id === product.id) || product;
     const size = selectedSize || (live.sizes && live.sizes[0]);
     const color = selectedColor || (live.colors && live.colors[0]);
@@ -452,6 +441,12 @@ export default function App() {
       return [...prev, { ...rest, image: imageFor(live, color), cartItemId, selectedColor: color, selectedSize: size, quantity: qty }];
     });
     trackAddToCart({ ...live, selectedColor: color }, qty);
+    if (visitorLocked) {
+      // Maintenance mode: the item stays in the cart (it is saved on this device), but checkout is closed
+      setIsCartOpen(true);
+      alert(lockText);
+      return;
+    }
     if (goCheckout) {
       // Buy Now: skip the cart drawer and go straight to checkout
       setIsCartOpen(false);
@@ -488,7 +483,6 @@ export default function App() {
   // Add to Cart / Buy Now on the product cards: ask for size / color first when the product has them
   const [quickAdd, setQuickAdd] = useState(null); // { product, goCheckout }
   const requestAdd = (product, goCheckout = false) => {
-    if (visitorLocked) { alert(lockText); return; }
     const live = products.find(p => p.id === product.id) || product;
     if (needsChoice(live)) setQuickAdd({ product: live, goCheckout });
     else addToCart(live, undefined, undefined, 1, goCheckout);
@@ -1085,8 +1079,8 @@ export default function App() {
       {maintenanceOn && (
         <div className="bg-amber-500 text-black text-center text-xs sm:text-sm font-semibold py-2.5 px-3">
           {isAdminLoggedIn
-            ? 'Maintenance mode is ON: visitors can browse but cannot order (Add to Cart, Buy Now and checkout are locked). You can still test-order as a team member.'
-            : "Maintenance mode ON - we'll be back soon. You can look around, but ordering is paused for a little while. (ওয়েবসাইটে কাজ চলছে, অর্ডার সাময়িক বন্ধ।)"}
+            ? 'Maintenance mode is ON: visitors can browse and add to cart, but checkout is locked (they can still order on WhatsApp). You can still test-order as a team member.'
+            : "Maintenance mode ON - ordering is paused for a little while. You can add items to your cart and pay when we are back, or order on WhatsApp. (ওয়েবসাইটে কাজ চলছে, অর্ডার সাময়িক বন্ধ।)"}
         </div>
       )}
 

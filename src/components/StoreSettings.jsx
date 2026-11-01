@@ -161,7 +161,7 @@ export default function StoreSettings({ products = [], settings, isDarkMode, sta
   const toggleMaintenance = async () => {
     const next = !maintOn;
     const ask = next
-      ? 'Turn ON maintenance?\n\nVisitors can still browse the whole website, but Add to Cart, Buy Now, Order on WhatsApp and checkout are locked and a "maintenance mode ON, we\'ll be back soon" bar shows on top. You and your team can still test-order.'
+      ? 'Turn ON maintenance?\n\nVisitors can still browse the whole website and keep items in their cart, but checkout and Buy Now are locked (they can still order on WhatsApp) and a "maintenance mode ON" bar shows on top. You and your team can still test-order.'
       : 'Turn OFF maintenance and open the website for everyone?';
     if (!(await askConfirm(ask))) return;
     setMaintBusy(true);
@@ -206,7 +206,7 @@ export default function StoreSettings({ products = [], settings, isDarkMode, sta
       <div className="space-y-6 min-w-0">
         {section(
           'Website Status',
-          'Switch maintenance ON while you work on the website. Visitors can still see everything, but Add to Cart, Buy Now, Order on WhatsApp and checkout are locked, with an orange "maintenance mode ON, we\'ll be back soon" bar on top. You and your team can still test-order.',
+          'Switch maintenance ON while you work on the website. Visitors can still see everything and keep items in their cart (it is saved on their device), but checkout and Buy Now are locked. They can still order on WhatsApp. An orange "maintenance mode ON" bar shows on top. You and your team can still test-order.',
           <>
             <div className="flex flex-wrap items-center gap-4">
               <span className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-bold tracking-widest uppercase ${maintOn ? 'bg-amber-500/15 text-amber-500' : 'bg-emerald-500/15 text-emerald-500'}`}>
@@ -219,7 +219,7 @@ export default function StoreSettings({ products = [], settings, isDarkMode, sta
             </div>
             <div className="mt-4">
               <label className={label}>Message visitors will read (optional, leave empty for the default English + Bangla message)</label>
-              <textarea rows={2} maxLength={300} value={maintMsg} onChange={(e) => setMaintMsg(e.target.value)} className={input} placeholder="Sorry, we are improving Kyvro. Back in 30 minutes." />
+              <textarea rows={2} maxLength={300} value={maintMsg} onChange={(e) => setMaintMsg(e.target.value)} className={input} placeholder="Leave empty to show the default Bangla + English message (you can add to cart, pay when we are back, or order on WhatsApp)." />
               <p className={`text-[11px] mt-1 ${muted}`}>The message is saved when you press the button above, or with "Save Settings".</p>
             </div>
             {maintNote && <p className={`mt-3 ${msgClass(maintNote)}`}>{maintNote}</p>}
