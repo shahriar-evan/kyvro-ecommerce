@@ -27,8 +27,10 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState('');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate_, setToDate] = useState('');
+  // History starts on today's date (the device's own date). Both dates can be changed, or cleared with "All dates".
+  const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const [fromDate, setFromDate] = useState(todayStr);
+  const [toDate_, setToDate] = useState(todayStr);
   const [blocked, setBlocked] = useState({ phones: {}, emails: {} });
   const [showBlocked, setShowBlocked] = useState(false);
   const [copiedId, setCopiedId] = useState('');
@@ -342,7 +344,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
         />
         {filter === 'History' && (
           <div className={`${innerClass} !space-y-3`}>
-            <p className="text-gray-500">History shows finished orders (Delivered and Cancelled). Pick a date range to see only those, {isOwner ? 'and clear them to keep the panel clean.' : 'for your records.'}</p>
+            <p className="text-gray-500">History shows finished orders (Delivered and Cancelled). It opens on today's date. Change the From / To dates to see other days (or press All dates), {isOwner ? 'and clear them to keep the panel clean.' : 'for your records.'}</p>
             <div className="flex flex-wrap items-end gap-3">
               <label className="text-[11px] font-semibold text-gray-500">From
                 <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className={`block mt-1 border p-2 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`} />
@@ -350,7 +352,8 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
               <label className="text-[11px] font-semibold text-gray-500">To
                 <input type="date" value={toDate_} onChange={(e) => setToDate(e.target.value)} className={`block mt-1 border p-2 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`} />
               </label>
-              {(fromDate || toDate_) && <button type="button" onClick={() => { setFromDate(''); setToDate(''); }} className="text-xs underline text-gray-500 pb-2">Reset dates</button>}
+              <button type="button" onClick={() => { setFromDate(todayStr()); setToDate(todayStr()); }} className="text-xs underline text-gray-500 pb-2">Today</button>
+              {(fromDate || toDate_) && <button type="button" onClick={() => { setFromDate(''); setToDate(''); }} className="text-xs underline text-gray-500 pb-2">All dates</button>}
               <span className="text-xs text-gray-500 pb-2">{historyList.length} order(s) in this range</span>
               {isOwner
                 ? <button type="button" disabled={busyId === 'history'} onClick={clearHistory} className="ml-auto bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold uppercase tracking-wider px-4 py-2 rounded disabled:opacity-50">{busyId === 'history' ? 'Clearing...' : 'Clear history'}</button>

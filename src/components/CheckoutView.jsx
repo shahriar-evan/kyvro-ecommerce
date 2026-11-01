@@ -225,7 +225,10 @@ export default function CheckoutView({
                 <p className="mt-1 font-semibold">আর {toBanglaDigits(reward.missing)} টাকার পণ্য কিনলে {reward.rule.type === 'percent' ? `${toBanglaDigits(reward.rule.value)}% ছাড়` : `${toBanglaDigits(reward.rule.value)} টাকা ছাড়`} পাবেন।</p>
               )}
               {online ? (
-                <p className="mt-1 font-semibold">অনলাইন পেমেন্টে পুরো {formatPrice(grandTotal)} এখনই bKash / কার্ডে পরিশোধ করতে হবে। Place Order চাপলে সরাসরি পেমেন্ট পেজে নিয়ে যাওয়া হবে। / The full amount is paid now by bKash / card on the secure payment page.</p>
+                <>
+                  <p className="mt-1 font-semibold">অনলাইন পেমেন্ট {Number(grandTotal).toFixed(2)} টাকা বিকাশ, নগদ বা কার্ডের মাধ্যমে পরিশোধ করতে পারবেন। Place Order &amp; Pay তে ক্লিক করুন, এরপর Mobile Banking সিলেক্ট করে বিকাশ বা নগদ সিলেক্ট করে পেমেন্ট করুন অথবা Card সিলেক্ট করে কার্ডের মাধ্যমেও পেমেন্ট করতে পারবেন।</p>
+                  <p className="mt-1 text-gray-600">The full amount is paid now by bKash / card on the secure payment page.</p>
+                </>
               ) : areaChosen && deliveryCharge > 0 ? (
                 <p className="mt-1 font-semibold">ক্যাশ অন ডেলিভারিতে আগে {formatPrice(deliveryCharge)} ডেলিভারি চার্জ bKash / কার্ডে দিতে হবে। বাকি {formatPrice(grandTotal - deliveryCharge)} পণ্য হাতে পেয়ে দিবেন। / Pay the {formatPrice(deliveryCharge)} delivery charge now by bKash / card, the rest {formatPrice(grandTotal - deliveryCharge)} in cash on delivery.</p>
               ) : !areaChosen ? (

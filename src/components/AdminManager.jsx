@@ -158,14 +158,14 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
     if (newRole === 'owner' && !(await askConfirm(OWNER_WARNING))) return;
     setBusy(true);
     try {
-      const { accountCreated } = await createAdminAccount(email, password, newRole, {
+      const { accountCreated, resetSent } = await createAdminAccount(email, password, newRole, {
         name, phone, note, addedByName: currentName || currentEmail,
       });
       setMessage({
         type: 'ok',
         text: accountCreated
           ? `${name.trim()} (${email.trim()}) was added as ${ROLE_LABELS[newRole]}. Share the email and password with them so they can log in.`
-          : `${email.trim()} already had a Firebase account, so ${name.trim()} was added to the team as ${ROLE_LABELS[newRole]} (their existing password was not changed and is not saved).`
+          : `${email.trim()} already had an account (for example they signed in to the shop with Google before), so the password you typed was NOT set. ${name.trim()} was added to the team as ${ROLE_LABELS[newRole]}. They can log in right now with "Continue with Google" using this email.${resetSent ? ' We also emailed them a "set password" link: after they set a password, email + password login works too (check spam).' : ' To make email + password login work, press "Reset password" on their row so they get a set-password email.'}`
       });
       setName(''); setEmail(''); setPassword(''); setPhone(''); setNote(''); setRole('admin');
       await load();

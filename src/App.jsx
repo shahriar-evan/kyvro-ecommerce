@@ -638,7 +638,7 @@ export default function App() {
       setLoggedInUserEmail(result.user.email);
     } catch (error) {
       const wrong = ['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found', 'auth/invalid-email'];
-      alert(wrong.includes(error.code) ? 'Incorrect email or password.' : 'Sign-In Error: ' + error.message);
+      alert(wrong.includes(error.code) ? 'Incorrect email or password. If this team member signs in with Google, use "Continue with Google" instead (or ask the Owner to press "Reset password" for you).' : 'Sign-In Error: ' + error.message);
     }
   };
 

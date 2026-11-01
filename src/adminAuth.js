@@ -107,7 +107,13 @@ export async function createAdminAccount(email, password, role = "admin", profil
   } catch (err) {
     console.warn("Could not save private details:", err);
   }
-  return { accountCreated };
+  // This email already had a login (for example they once signed in to the shop with Google), so the password typed
+  // here was NOT set. Send them a "set your password" email so email + password login can work too.
+  let resetSent = false;
+  if (!accountCreated) {
+    try { await sendPasswordResetEmail(auth, e); resetSent = true; } catch (err) { console.warn("Could not send the password email:", err); }
+  }
+  return { accountCreated, resetSent };
 }
 
 // Owner changes the LOGIN email of a team member. A login account cannot be renamed from the browser,
