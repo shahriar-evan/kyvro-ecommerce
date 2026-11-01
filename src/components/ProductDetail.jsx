@@ -1,7 +1,7 @@
 import PriceTag, { DiscountBadge } from './PriceTag';
 import React, { useState, useRef, useEffect } from 'react';
 import { Heart, ZoomIn, X, Truck, Clock, Wallet, ChevronUp } from 'lucide-react';
-import { normalizeSettings, deliveryNote, freeDeliveryMissing, toBanglaDigits, bestDiscount, nextReward } from '../data/shopConfig';
+import { deliveryFee, normalizeSettings, deliveryNote, freeDeliveryMissing, toBanglaDigits, bestDiscount, nextReward } from '../data/shopConfig';
 import WhatsAppButton, { WhatsAppIcon } from './WhatsAppButton';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
 import StockLabel from './StockLabel';
@@ -149,6 +149,7 @@ export default function ProductDetail({ product, products, addToCart, calculateD
   const [qty, setQty] = useState(1);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [area, setArea] = useState(null); // 'Inside Dhaka' | 'Outside Dhaka'
   useEffect(() => { window.scrollTo(0, 0); }, [product.id]);
   const sizeRef = useRef(null);
 
@@ -169,6 +170,9 @@ export default function ProductDetail({ product, products, addToCart, calculateD
   const netTotal = baseTotal - discHit.amount;
   const missFree = freeDeliveryMissing(netTotal, stP);
   const nextRw = nextReward(baseTotal, stP);
+  const unitsAll = (cartSubtotal > 0 ? cartUnits : 0) + qty;
+  const feeCod = area ? deliveryFee(area, 'Cash on Delivery', netTotal, stP, unitsAll) : 0;
+  const feeOnline = area ? deliveryFee(area, 'Online Payment', netTotal, stP, unitsAll) : 0;
 
   // related products: same collection, same category first, best sellers first
   const gOf = (p) => (p.gender === 'Jackets' ? 'Winter' : p.gender);
@@ -407,7 +411,27 @@ export default function ProductDetail({ product, products, addToCart, calculateD
               {nextRw && nextRw.missing > 0 && nextRw.missing <= 1500 && (
                 <p className="text-[11px] font-semibold text-[#B8921F] pt-1">Add {formatPrice(nextRw.missing)} more to get {nextRw.rule.type === 'percent' ? `${nextRw.rule.value}%` : formatPrice(nextRw.rule.value)} OFF</p>
               )}
-              <p className="text-[10px] text-gray-500">Delivery charge is added at checkout.</p>
+              <div className="pt-1.5">
+                <p className="font-semibold mb-1.5">Delivery charge</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[['Inside Dhaka', stP.deliveryInside], ['Outside Dhaka', stP.deliveryOutside]].map(([a, fee]) => (
+                    <button key={a} type="button" onClick={() => setArea(a)}
+                      className={`py-2 rounded-lg border text-[11px] font-bold transition active:scale-95 ${area === a ? 'bg-[#D4AF37] border-[#D4AF37] text-black' : isDarkMode ? 'border-gray-600' : 'border-gray-300'}`}>
+                      {a}<span className="block font-semibold opacity-80">{formatPrice(fee)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {area ? (
+                <>
+                  <div className="flex justify-between pt-1"><span>Delivery ({area}, Cash on Delivery)</span><span className="font-semibold">{feeCod === 0 ? 'Free' : formatPrice(feeCod)}</span></div>
+                  {feeOnline !== feeCod && <div className="flex justify-between text-green-600 font-semibold"><span>Delivery with Online Payment</span><span>{feeOnline === 0 ? 'Free' : formatPrice(feeOnline)}</span></div>}
+                  <div className="flex justify-between border-t border-gray-400/40 pt-1.5 text-sm font-bold"><span>Total to pay (COD)</span><span className="text-[#D4AF37]">{formatPrice(netTotal + feeCod)}</span></div>
+                  {feeOnline !== feeCod && <div className="flex justify-between text-sm font-bold"><span>Total to pay (Online)</span><span className="text-[#D4AF37]">{formatPrice(netTotal + feeOnline)}</span></div>}
+                </>
+              ) : (
+                <p className="text-[10px] text-gray-500">Select your area to see the delivery charge and the total.</p>
+              )}
             </div>
           )}
           <button type="button" onClick={() => setShowBreakdown((v) => !v)} aria-expanded={showBreakdown} aria-label="Price details" className="leading-tight pr-1 min-w-[4.5rem] text-left">
