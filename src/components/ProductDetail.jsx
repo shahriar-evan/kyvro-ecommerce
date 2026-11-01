@@ -1,6 +1,7 @@
 import PriceTag, { DiscountBadge } from './PriceTag';
 import React, { useState, useRef, useEffect } from 'react';
-import { Heart, ZoomIn, X, Truck, Clock, Wallet } from 'lucide-react';
+import { Heart, ZoomIn, X, Truck, Clock, Wallet, Tag } from 'lucide-react';
+import { normalizeSettings, deliveryNote } from '../data/shopConfig';
 import WhatsAppButton, { WhatsAppIcon } from './WhatsAppButton';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
 import StockLabel from './StockLabel';
@@ -329,8 +330,25 @@ export default function ProductDetail({ product, products, addToCart, calculateD
           {/* Delivery information */}
           <div className={`rounded-lg border border-dashed p-4 space-y-2.5 text-sm ${isDarkMode ? 'border-[#D4AF37]/50 bg-[#161616]' : 'border-[#D4AF37] bg-[#D4AF37]/5'}`}>
             <p className="flex items-start gap-2.5"><Clock size={16} className="mt-0.5 shrink-0 text-[#D4AF37]" /><span><b>Delivery time:</b> Inside Dhaka 1&ndash;2 days &middot; Outside Dhaka 3&ndash;4 days</span></p>
-            <p className="flex items-start gap-2.5"><Truck size={16} className="mt-0.5 shrink-0 text-[#D4AF37]" /><span><b>Delivery charge:</b> Inside Dhaka {formatPrice(storeSettings.deliveryInside ?? 100)} &middot; Outside Dhaka {formatPrice(storeSettings.deliveryOutside ?? 150)}</span></p>
+            <p className="flex items-start gap-2.5"><Truck size={16} className="mt-0.5 shrink-0 text-[#D4AF37]" /><span>{deliveryNote(storeSettings).en}</span></p>
             <p className="flex items-start gap-2.5"><Wallet size={16} className="mt-0.5 shrink-0 text-[#D4AF37]" /><span>Cash on Delivery available</span></p>
+            {(() => {
+              const st = normalizeSettings(storeSettings);
+              if (!st.discountEnabled || !st.discountRules.length) return null;
+              return (
+                <div className="flex items-start gap-2.5">
+                  <Tag size={16} className="mt-0.5 shrink-0 text-[#D4AF37]" />
+                  <div>
+                    <p className="font-bold">Buy more, save more</p>
+                    <ul className="mt-1 space-y-0.5">
+                      {st.discountRules.map((ru, i) => (
+                        <li key={i}>Spend {formatPrice(ru.min)}{i === st.discountRules.length - 1 ? ' or more' : ''} &rarr; <b className="text-[#D4AF37]">{ru.type === 'percent' ? `${ru.value}% OFF` : `${formatPrice(ru.value)} OFF`}</b></li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
