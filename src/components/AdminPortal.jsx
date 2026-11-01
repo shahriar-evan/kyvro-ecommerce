@@ -247,6 +247,9 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                   className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'orders' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
                 >
                   Orders ({orders.length})
+                  {isOwner && orders.filter(o => o.cancelRequest && o.cancelRequest.status === 'pending' && o.status !== 'Cancelled').length > 0 && (
+                    <span className="ml-2 bg-red-600 text-white rounded-full px-2 py-0.5 text-[10px] animate-pulse">{orders.filter(o => o.cancelRequest && o.cancelRequest.status === 'pending' && o.status !== 'Cancelled').length} cancel request</span>
+                  )}
                   {orders.filter(o => o.status === 'Pending').length > 0 && (
                     <span className="ml-2 bg-red-600 text-white rounded-full px-2 py-0.5 text-[10px]">{orders.filter(o => o.status === 'Pending').length} new</span>
                   )}

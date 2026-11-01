@@ -147,6 +147,10 @@ export async function updateOrderStatus(orderId, status, staff) {
     }
     if (deduct) patch.stockDeducted = true;
     if (restore) patch.stockDeducted = false;
+    // the Owner cancelled an order that had a waiting cancel request: close the request as approved
+    if (status === "Cancelled" && order.cancelRequest && order.cancelRequest.status === "pending") {
+      patch.cancelRequest = { ...order.cancelRequest, status: "approved", decidedBy: staff.email || "", decidedByName: staff.name || staff.email || "", decidedAt: new Date().toISOString() };
+    }
     tx.update(orderRef, patch);
     return { skipped };
   });
@@ -160,6 +164,38 @@ export async function cancelMyOrder(orderId, customer) {
     status: "Cancelled",
     updatedAt: serverTimestamp(),
     history: arrayUnion({ status: "Cancelled", by: customer.email || "", byName: "Customer (cancelled own order)", at: new Date().toISOString() }),
+  });
+}
+
+// ---- Paid orders: only the Owner can cancel them. Manager / Admin send a cancel request instead. ----
+export const isPaidOrder = (o) => !!o && (o.paymentStatus === "Paid" || Number(o.advancePaid) > 0);
+
+// Manager / Admin: ask the Owner to cancel a paid order (reason is required). Firestore rules allow only this kind of change for non-owners.
+export async function requestCancelOrder(orderId, reason, staff) {
+  const text = String(reason || "").trim();
+  if (text.length < 5) throw new Error("Please write why this order should be cancelled (at least 5 letters).");
+  await updateDoc(doc(db, "orders", orderId), {
+    cancelRequest: { reason: text.slice(0, 500), by: String(staff.email || "").toLowerCase(), byName: String(staff.name || staff.email || "").slice(0, 100), at: new Date().toISOString(), status: "pending" },
+    updatedAt: serverTimestamp(),
+    history: arrayUnion(historyEntry("Cancel request sent to Owner", staff)),
+  });
+  // phone / browser notification to the Owner (best effort; the request is saved either way)
+  try {
+    const r = await fetch("/api/cancel-request-notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderNumber: orderId }) });
+    const j = await r.json().catch(() => ({}));
+    return { notified: !!(j && j.sent > 0) };
+  } catch (e) {
+    return { notified: false };
+  }
+}
+
+// Owner: decline a cancel request (approving = cancelling the order with updateOrderStatus, which closes the request)
+export async function declineCancelRequest(orderId, order, note, staff) {
+  const cr = (order && order.cancelRequest) || {};
+  await updateDoc(doc(db, "orders", orderId), {
+    cancelRequest: { ...cr, status: "declined", ownerNote: String(note || "").slice(0, 300), decidedBy: staff.email || "", decidedByName: staff.name || staff.email || "", decidedAt: new Date().toISOString() },
+    updatedAt: serverTimestamp(),
+    history: arrayUnion(historyEntry("Cancel request declined", staff)),
   });
 }
 

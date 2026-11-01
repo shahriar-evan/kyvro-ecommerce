@@ -70,6 +70,7 @@ export default function AccountView({
   // minutes left to cancel (0 when the time is over, the order moved on, or it was just placed and has no time yet)
   const msLeft = (o) => {
     if (o.status !== 'Pending') return 0;
+    if (o.paymentStatus === 'Paid' || Number(o.advancePaid) > 0) return 0; // paid orders can only be cancelled by our team
     const d = toDate(o.createdAt);
     if (!d) return CANCEL_WINDOW_MINUTES * 60000;
     return Math.max(0, d.getTime() + CANCEL_WINDOW_MINUTES * 60000 - now);
@@ -218,6 +219,9 @@ export default function AccountView({
                 <span className="text-gray-500">{o.paymentMethod} &middot; {o.deliveryArea}{o.discount > 0 ? ` · Discount ${formatPrice(o.discount)}` : ''}</span>
                 <span className="font-bold text-sm text-[#D4AF37]">{formatPrice(o.total)}</span>
               </div>
+              {o.status === 'Pending' && (o.paymentStatus === 'Paid' || Number(o.advancePaid) > 0) && (
+                <p className="mt-4 text-xs text-gray-500">This order is already paid online, so it cannot be cancelled here. To cancel it, please message us on WhatsApp or kyvrofashion@gmail.com.</p>
+              )}
               {msLeft(o) > 0 && (
                 <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
                   <button disabled={cancelling === o.id} onClick={() => cancelOrder(o)} className="px-5 py-2.5 rounded text-sm font-bold border-2 border-red-500 text-red-500 hover:bg-red-500 hover:text-white transition disabled:opacity-50">

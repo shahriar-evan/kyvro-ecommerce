@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { askConfirm, askInput } from './AlertCenter';
 import { ORDER_STATUSES, DELIVERY_AREA_BN } from '../data/shopConfig';
-import { updateOrderStatus, markOrderPaid, deleteOrders, watchOrderSupply, markSupplierOrdered, unmarkSupplierOrdered, supplierKey } from '../orders';
+import { updateOrderStatus, isPaidOrder, requestCancelOrder, declineCancelRequest, markOrderPaid, deleteOrders, watchOrderSupply, markSupplierOrdered, unmarkSupplierOrdered, supplierKey } from '../orders';
 import { formatDateTime, toDate } from '../utils/dates';
 import { phoneKey, emailKey } from '../data/shopConfig';
 import { watchBlocked, blockPhone, blockEmail, unblockPhone, unblockEmail } from '../blocklist';
@@ -34,6 +34,9 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
   const [copiedId, setCopiedId] = useState('');
   const [openIds, setOpenIds] = useState({}); // which orders are expanded (all start collapsed)
   const toggleOpen = (id) => setOpenIds((m) => ({ ...m, [id]: !m[id] }));
+  // Paid orders: Manager / Admin send a cancel request (reason box), the Owner decides
+  const [reqOpen, setReqOpen] = useState({});
+  const [reqText, setReqText] = useState({});
 
   useEffect(() => {
     const stop = watchBlocked(setBlocked);
@@ -208,6 +211,25 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
         alert('The order was updated, but the stock of these items was NOT changed (they are not in Firestore yet, or the size no longer exists):\n' + skipped.join('\n') + '\nUpdate their stock by hand.');
       }
     });
+  };
+
+  const cancelConfirmText = (o) => isPaidOrder(o)
+    ? `Cancel order ${o.orderNumber}?\n\nThis order is already PAID online. Cancelling does NOT refund the customer automatically: refund them yourself (SSLCommerz panel or bKash) after cancelling.`
+    : `Cancel order ${o.orderNumber}?`;
+  const sendCancelRequest = (o) => {
+    const text = (reqText[o.id] || '').trim();
+    if (text.length < 5) { setError('Please write why this paid order should be cancelled (at least 5 letters).'); return; }
+    run(o.id, async () => {
+      const { notified } = await requestCancelOrder(o.id, text, staff);
+      setReqOpen((m) => ({ ...m, [o.id]: false }));
+      setReqText((m) => ({ ...m, [o.id]: '' }));
+      alert(notified ? 'Cancel request sent. The Owner got a notification and will decide.' : 'Cancel request sent. The Owner will see it in the Orders tab.');
+    });
+  };
+  const declineRequest = async (o) => {
+    const note = await askInput(`Decline the cancel request for ${o.orderNumber}? You can write a short note for the team (optional).`, { placeholder: 'e.g. Customer already confirmed, parcel is ready' });
+    if (note === null) return;
+    run(o.id, () => declineCancelRequest(o.id, o, note, staff));
   };
 
   const doBlockPhone = async (o) => {
@@ -398,6 +420,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
               </div>
               <div className="text-right shrink-0">
                 <span className={`inline-block px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${STATUS_STYLE[o.status] || ''}`}>{o.status}</span>
+                {o.cancelRequest && o.cancelRequest.status === 'pending' && o.status !== 'Cancelled' && <span className="block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-600 text-white">Cancel request</span>}
                 <p className="text-sm font-bold mt-1">{formatPrice(o.total)}</p>
                 {(() => {
                   const sp = supplyInfo(o);
@@ -586,6 +609,36 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
             </div>
 
             {/* actions */}
+            {/* cancel request on a PAID order */}
+            {o.status !== 'Cancelled' && isPaidOrder(o) && !isOwner && !(o.cancelRequest && o.cancelRequest.status === 'pending') && reqOpen[o.id] && (
+              <div className="rounded border border-red-500/50 bg-red-500/5 p-3 space-y-2 text-xs">
+                <p className="font-bold text-red-600">This order is already paid online, so only the Owner can cancel it.</p>
+                <p className="text-gray-500">Write why you want to cancel it. The Owner gets a notification and decides.</p>
+                <textarea value={reqText[o.id] || ''} onChange={(e) => setReqText((m) => ({ ...m, [o.id]: e.target.value }))} rows={3} maxLength={500} placeholder="e.g. Customer called and does not want it, wrong size ordered, supplier is out of stock..." className={`w-full border rounded px-3 py-2 text-sm outline-none focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#0f0f0f] border-gray-700' : 'bg-white border-gray-300'}`} />
+                <div className="flex gap-2">
+                  <button disabled={busy} onClick={() => sendCancelRequest(o)} className={`${btn} bg-red-600 text-white hover:bg-red-700`}>Send request to Owner</button>
+                  <button type="button" onClick={() => setReqOpen((m) => ({ ...m, [o.id]: false }))} className={`${btn} border`}>Close</button>
+                </div>
+              </div>
+            )}
+            {o.cancelRequest && o.cancelRequest.status === 'pending' && o.status !== 'Cancelled' && (
+              <div className="rounded border border-red-500/60 bg-red-500/10 p-3 space-y-2 text-xs">
+                <p className="font-bold text-red-600 uppercase tracking-wider text-[11px]">Cancel request waiting for the Owner</p>
+                <p><strong>{o.cancelRequest.byName || o.cancelRequest.by}</strong> wants to cancel this order{o.cancelRequest.at ? ` (${formatDateTime(o.cancelRequest.at)})` : ''}:</p>
+                <p className="p-2 rounded bg-black/5 italic whitespace-pre-line">{o.cancelRequest.reason}</p>
+                {isOwner ? (
+                  <div className="flex flex-wrap gap-2">
+                    <button disabled={busy} onClick={() => setStatus(o, 'Cancelled', cancelConfirmText(o))} className={`${btn} bg-red-600 text-white hover:bg-red-700`}>Approve &amp; cancel order</button>
+                    <button disabled={busy} onClick={() => declineRequest(o)} className={`${btn} bg-gray-700 text-white hover:bg-gray-800`}>Decline request</button>
+                  </div>
+                ) : (
+                  <p className="text-gray-500">Waiting for the Owner to decide. You will see the answer here.</p>
+                )}
+              </div>
+            )}
+            {o.cancelRequest && o.cancelRequest.status === 'declined' && o.status !== 'Cancelled' && (
+              <p className="rounded border border-gray-500/40 p-2 text-xs text-gray-500">Cancel request declined by {o.cancelRequest.decidedByName || 'the Owner'}{o.cancelRequest.ownerNote ? `: "${o.cancelRequest.ownerNote}"` : '.'}</p>
+            )}
             <div className="flex flex-wrap gap-2 border-t pt-3">
               <button type="button" onClick={() => copyOrder(o)} className={`${btn} ${copiedId === o.id ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
                 {copiedId === o.id ? 'Copied ✓' : 'Copy order details'}
@@ -602,10 +655,16 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
               {o.paymentStatus === 'Awaiting payment' && o.status !== 'Cancelled' && (
                 <button disabled={busy} onClick={() => run(o.id, () => markOrderPaid(o.id, staff))} className={`${btn} bg-[#D4AF37] text-black hover:opacity-90`}>Mark payment received</button>
               )}
-              {o.status !== 'Cancelled' && o.status !== 'Delivered' && (
-                <button disabled={busy} onClick={() => setStatus(o, 'Cancelled', `Cancel order ${o.orderNumber}?`)} className={`${btn} bg-red-600 text-white hover:bg-red-700`}>Cancel order</button>
+              {o.status !== 'Cancelled' && o.status !== 'Delivered' && (isOwner || !isPaidOrder(o)) && (
+                <button disabled={busy} onClick={() => setStatus(o, 'Cancelled', cancelConfirmText(o))} className={`${btn} bg-red-600 text-white hover:bg-red-700`}>Cancel order</button>
               )}
-              {o.status === 'Cancelled' && (
+              {o.status !== 'Cancelled' && o.status !== 'Delivered' && !isOwner && isPaidOrder(o) && !(o.cancelRequest && o.cancelRequest.status === 'pending') && (
+                <button disabled={busy} onClick={() => setReqOpen((m) => ({ ...m, [o.id]: !m[o.id] }))} className={`${btn} border border-red-500 text-red-500 hover:bg-red-500/10`}>Request cancellation</button>
+              )}
+              {o.status === 'Cancelled' && !isOwner && isPaidOrder(o) && (
+                <span className="text-[11px] text-gray-500 self-center">Paid order: only the Owner can reopen it.</span>
+              )}
+              {o.status === 'Cancelled' && (isOwner || !isPaidOrder(o)) && (
                 <button disabled={busy} onClick={() => setStatus(o, 'Pending', `Reopen order ${o.orderNumber} as Pending?`)} className={`${btn} bg-gray-700 text-white hover:bg-gray-800`}>Reopen as pending</button>
               )}
             </div>

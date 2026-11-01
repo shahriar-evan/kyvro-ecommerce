@@ -15,7 +15,7 @@ export const PROJECT = process.env.FIREBASE_PROJECT_ID || 'kyvro-admin-auth';
 export const SITE = (process.env.SITE_URL || 'https://kyvro.store').replace(/\/$/, '');
 export const LIVE = String(process.env.SSLCOMMERZ_LIVE || '').toLowerCase() === 'true';
 export const SSL_BASE = LIVE ? 'https://securepay.sslcommerz.com' : 'https://sandbox.sslcommerz.com';
-const FS = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)`;
+export const FS = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)`;
 
 export const sslConfigured = () => !!(process.env.SSLCOMMERZ_STORE_ID && process.env.SSLCOMMERZ_STORE_PASSWORD);
 
@@ -30,7 +30,7 @@ function readServiceAccount() {
 }
 
 let cached = { token: '', exp: 0 };
-async function accessToken() {
+export async function accessToken() {
   if (cached.token && Date.now() < cached.exp) return cached.token;
   const sa = readServiceAccount();
   if (!sa || !sa.client_email || !sa.private_key) throw new Error('FIREBASE_SERVICE_ACCOUNT is not set in Vercel.');
@@ -38,7 +38,7 @@ async function accessToken() {
   const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
   const unsigned = `${b64({ alg: 'RS256', typ: 'JWT' })}.${b64({
     iss: sa.client_email,
-    scope: 'https://www.googleapis.com/auth/datastore',
+    scope: 'https://www.googleapis.com/auth/datastore https://www.googleapis.com/auth/firebase.messaging',
     aud: 'https://oauth2.googleapis.com/token',
     iat: now,
     exp: now + 3600,
@@ -55,7 +55,7 @@ async function accessToken() {
   return cached.token;
 }
 
-const val = (f) => {
+export const val = (f) => {
   if (!f) return undefined;
   if ('stringValue' in f) return f.stringValue;
   if ('integerValue' in f) return Number(f.integerValue);
