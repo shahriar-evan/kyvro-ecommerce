@@ -13,8 +13,22 @@ export default function SlideTrack({ items, index, onIndex, className = '', loop
   const box = useRef(null);
   const st = useRef(null);
   const wheel = useRef({ acc: 0, lock: false, idle: null });
+  const els = useRef([]);
+  const [h, setH] = useState(null);
   const posRef = useRef(pos);
   posRef.current = pos;
+
+  // the box is exactly as tall as the slide that is showing, so a shorter photo never leaves an empty gap under it
+  useEffect(() => {
+    const el = els.current[pos];
+    if (!el) return undefined;
+    const measure = () => setH(el.getBoundingClientRect().height);
+    measure();
+    let ro;
+    if (typeof ResizeObserver !== 'undefined') { ro = new ResizeObserver(measure); ro.observe(el); }
+    window.addEventListener('resize', measure);
+    return () => { if (ro) ro.disconnect(); window.removeEventListener('resize', measure); };
+  }, [pos, n]);
 
   // follow the index chosen from outside (dots, timer)
   useEffect(() => {
@@ -95,11 +109,11 @@ export default function SlideTrack({ items, index, onIndex, className = '', loop
   const slides = loop && n > 1 ? [...items, items[0]] : items;
   return (
     <div ref={box} className={className} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={end} onPointerCancel={end}
-      style={{ touchAction: 'pan-y', overscrollBehaviorX: 'contain', cursor: dragging ? 'grabbing' : 'default' }}>
-      <div className="flex" onTransitionEnd={onEnd}
+      style={{ touchAction: 'pan-y', overscrollBehaviorX: 'contain', cursor: dragging ? 'grabbing' : 'default', height: h || undefined, overflow: 'hidden', transition: snap ? 'none' : 'height 400ms ease' }}>
+      <div className="flex items-start" onTransitionEnd={onEnd}
         style={{ transform: `translateX(calc(${-pos * 100}% + ${drag}px))`, transition: dragging || snap ? 'none' : 'transform 600ms cubic-bezier(.22,.8,.28,1)', willChange: 'transform' }}>
         {slides.map((node, i) => (
-          <div key={i} className="shrink-0 w-full relative" aria-hidden={i % n !== index}>{node}</div>
+          <div key={i} ref={(el) => { els.current[i] = el; }} className="shrink-0 w-full relative" aria-hidden={i % n !== index}>{node}</div>
         ))}
       </div>
     </div>
