@@ -239,11 +239,11 @@ export default function ProductDetail({ product, products, addToCart, calculateD
                   );
                 })}
               </div>
-              {size && <p className="text-xs font-semibold text-gray-500 mt-2">{available} available in size {size}{byColor && color ? `, ${color}` : ''}</p>}
+              {size && available <= 0 && <p className="text-xs font-semibold text-red-500 mt-2">Out of stock in size {size}{byColor && color ? `, ${color}` : ''}</p>}
             </div>
           )}
 
-          {byColor && !sized && color && !soldOut && <p className="text-xs font-semibold text-gray-500">{available} available in {color}</p>}
+          {byColor && !sized && color && !soldOut && available <= 0 && <p className="text-xs font-semibold text-red-500">Out of stock in {color}</p>}
           {!sized && !soldOut && total <= 5 && <p className="text-xs font-semibold text-orange-600">Hurry! Only {total} left.</p>}
 
           {!soldOut && (

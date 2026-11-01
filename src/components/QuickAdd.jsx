@@ -81,7 +81,7 @@ export default function QuickAdd({ product, goCheckout, onConfirm, onClose, form
         )}
 
         <p className={`text-sm font-bold ${canBuy ? 'text-green-600' : (needsSize ? 'text-gray-500 font-semibold' : 'text-red-600')}`}>
-          {needsSize ? 'Select a size to see how many are available' : available > 0 ? `\u2713 ${available} available${size ? ` in size ${size}` : ''}${byColor && color ? `, ${color}` : ''}` : 'Out of Stock for this choice'}
+          {needsSize ? 'Select a size' : available > 0 ? '\u2713 In stock' : 'Out of Stock for this choice'}
         </p>
 
         <div className="flex items-center gap-3">
