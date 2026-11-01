@@ -1,6 +1,6 @@
 // Vercel serverless function: opens an SSLCommerz payment session (bKash + cards) for an order that is already saved.
 // The amount always comes from the saved order, never from the browser.
-import { SITE, SSL_BASE, sslConfigured, getOrder } from './_sslc.js';
+import { SITE, SSL_BASE, sslConfigured, getOrder, amountDue } from './_sslc.js';
 
 export const config = { maxDuration: 30 };
 
@@ -13,10 +13,9 @@ export default async function handler(req, res) {
     const orderNumber = String(body.orderNumber || '');
     const order = await getOrder(orderNumber);
     if (!order) return res.status(404).json({ error: 'Order not found.' });
-    if (order.paymentMethod !== 'Online Payment') return res.status(400).json({ error: 'This order is Cash on Delivery.' });
-    if (order.paymentStatus === 'Paid') return res.status(409).json({ error: 'This order is already paid.' });
-    if (order.status === 'Cancelled') return res.status(409).json({ error: 'This order was cancelled.' });
-    const total = Number(order.total);
+    const due = amountDue(order);
+    if (due.error) return res.status(409).json({ error: due.error });
+    const total = due.amount;
     if (!(total > 0)) return res.status(400).json({ error: 'Invalid order amount.' });
 
     const cb = (r) => `${SITE}/api/sslcommerz-callback?r=${r}`;
@@ -32,7 +31,7 @@ export default async function handler(req, res) {
       cancel_url: cb('cancel'),
       ipn_url: cb('ipn'),
       shipping_method: 'NO',
-      product_name: `Kyvro order ${orderNumber}`.slice(0, 250),
+      product_name: (due.kind === 'advance' ? `Delivery charge for Kyvro order ${orderNumber}` : `Kyvro order ${orderNumber}`).slice(0, 250),
       product_category: 'Fashion',
       product_profile: 'general',
       cus_name: String(c.name || 'Customer').slice(0, 50),
@@ -43,6 +42,7 @@ export default async function handler(req, res) {
       cus_country: 'Bangladesh',
       cus_phone: String(c.phone || '01700000000'),
       value_a: orderNumber,
+      value_b: due.kind,
     });
     if (process.env.SSLCOMMERZ_METHODS) form.set('multi_card_name', process.env.SSLCOMMERZ_METHODS);
     const r = await fetch(`${SSL_BASE}/gwprocess/v4/api.php`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form });
@@ -51,7 +51,7 @@ export default async function handler(req, res) {
       console.error('SSLCommerz session failed', j.status, j.failedreason);
       return res.status(502).json({ error: 'The payment page could not be opened. Please try again.' });
     }
-    return res.status(200).json({ url: j.GatewayPageURL });
+    return res.status(200).json({ url: j.GatewayPageURL, kind: due.kind, amount: total });
   } catch (e) {
     console.error('sslcommerz-init', e);
     return res.status(500).json({ error: 'Payment could not be started. Please try again or contact us.' });

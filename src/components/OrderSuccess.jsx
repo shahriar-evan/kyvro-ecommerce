@@ -3,7 +3,7 @@ import { startOnlinePayment } from '../payment';
 import { DELIVERY_AREA_BN, WHATSAPP_NUMBER } from '../data/shopConfig';
 import { formatDateTime } from '../utils/dates';
 
-export default function OrderSuccess({ order, formatPrice, isDarkMode, setCurrentView }) {
+export default function OrderSuccess({ payNotice = '', order, formatPrice, isDarkMode, setCurrentView }) {
   if (!order) {
     return (
       <div className="flex-1 max-w-3xl mx-auto px-4 py-20 text-center w-full">
@@ -31,11 +31,15 @@ export default function OrderSuccess({ order, formatPrice, isDarkMode, setCurren
         )}
       </div>
 
-      {online && order.paymentStatus !== 'Paid' && (
+      {(online || Number(order.shipping) > 0) && order.paymentStatus !== 'Paid' && (
         <div className={`${panel} text-center space-y-3`}>
-          <p className="text-sm font-semibold">পেমেন্ট এখনও বাকি আছে। bKash বা কার্ডে এখনই পেমেন্ট করুন। / Payment is still pending. Pay now with bKash or a card.</p>
-          <button type="button" disabled={payBusy} onClick={payNow} className="bg-[#D4AF37] text-black text-xs font-bold px-8 py-3.5 tracking-widest uppercase rounded disabled:opacity-60">{payBusy ? 'Please wait...' : `Pay ৳${Number(order.total).toLocaleString()} (bKash / Card)`}</button>
-          {payErr && <p className="text-xs text-red-500">{payErr}</p>}
+          <p className="text-sm font-semibold">
+            {online
+              ? 'পেমেন্ট এখনও বাকি আছে। bKash বা কার্ডে এখনই পেমেন্ট করুন। / Payment is still pending. Pay now with bKash or a card.'
+              : `ডেলিভারি চার্জ ${formatPrice(order.shipping)} এখনও বাকি আছে। bKash বা কার্ডে এখনই দিন, বাকি টাকা পণ্য হাতে পেয়ে দিবেন। / The delivery charge is still pending. Pay it now by bKash or card, the rest on delivery.`}
+          </p>
+          <button type="button" disabled={payBusy} onClick={payNow} className="bg-[#D4AF37] text-black text-xs font-bold px-8 py-3.5 tracking-widest uppercase rounded disabled:opacity-60">{payBusy ? 'Please wait...' : `Pay ${formatPrice(online ? order.total : order.shipping)} (bKash / Card)`}</button>
+          {(payErr || payNotice) && <p className="text-xs text-red-500">{payErr || payNotice}</p>}
         </div>
       )}
 

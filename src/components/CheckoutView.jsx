@@ -26,6 +26,9 @@ export default function CheckoutView({
   };
   const online = checkoutForm.paymentMethod === 'Online Payment';
   const areaChosen = !!checkoutForm.deliveryArea;
+  // what the customer pays online when pressing Place Order: Online Payment = everything, Cash on Delivery = the delivery charge
+  const payNow = online ? grandTotal : (areaChosen ? deliveryCharge : 0);
+  const placeLabel = placingOrder ? 'Placing order...' : (payNow > 0 ? `Place Order & Pay ${formatPrice(payNow)}` : 'Place Order');
 
   const panel = `rounded-lg border p-5 sm:p-7 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-gray-50 border-gray-200'}`;
   const input = `w-full border p-3 text-sm rounded focus:outline-none focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`;
@@ -221,7 +224,13 @@ export default function CheckoutView({
               {reward && reward.missing > 0 && reward.missing <= 1500 && (
                 <p className="mt-1 font-semibold">আর {toBanglaDigits(reward.missing)} টাকার পণ্য কিনলে {reward.rule.type === 'percent' ? `${toBanglaDigits(reward.rule.value)}% ছাড়` : `${toBanglaDigits(reward.rule.value)} টাকা ছাড়`} পাবেন।</p>
               )}
-              {online && <p className="mt-1">অনলাইন পেমেন্ট নির্বাচন করলে অর্ডার করার পরই আপনাকে bKash / কার্ড পেমেন্ট পেজে নিয়ে যাওয়া হবে। / After you place the order you will go to the secure bKash / Card payment page.</p>}
+              {online ? (
+                <p className="mt-1 font-semibold">অনলাইন পেমেন্টে পুরো {formatPrice(grandTotal)} এখনই bKash / কার্ডে পরিশোধ করতে হবে। Place Order চাপলে সরাসরি পেমেন্ট পেজে নিয়ে যাওয়া হবে। / The full amount is paid now by bKash / card on the secure payment page.</p>
+              ) : areaChosen && deliveryCharge > 0 ? (
+                <p className="mt-1 font-semibold">ক্যাশ অন ডেলিভারিতে আগে {formatPrice(deliveryCharge)} ডেলিভারি চার্জ bKash / কার্ডে দিতে হবে। বাকি {formatPrice(grandTotal - deliveryCharge)} পণ্য হাতে পেয়ে দিবেন। / Pay the {formatPrice(deliveryCharge)} delivery charge now by bKash / card, the rest {formatPrice(grandTotal - deliveryCharge)} in cash on delivery.</p>
+              ) : !areaChosen ? (
+                <p className="mt-1 font-semibold">ক্যাশ অন ডেলিভারিতে ডেলিভারি চার্জ আগে অনলাইনে (bKash / কার্ড) দিতে হবে। এলাকা সিলেক্ট করলে চার্জ দেখাবে। / For Cash on Delivery the delivery charge is paid online first.</p>
+              ) : null}
             </div>
 
             <label className="flex items-start gap-2 text-xs cursor-pointer">
@@ -238,7 +247,7 @@ export default function CheckoutView({
               <button type="button" onClick={() => setCurrentView('refund')} className="underline hover:text-[#D4AF37]">Return &amp; Refund Policy</button>.
             </p>
             <button type="submit" disabled={placingOrder} className="hidden lg:block w-full bg-[#D4AF37] text-black font-bold py-4 rounded text-sm tracking-widest uppercase hover:opacity-90 transition disabled:opacity-50">
-              {placingOrder ? 'Placing order...' : 'Place Order'}
+              {placeLabel}
             </button>
           </div>
         </div>
@@ -256,9 +265,9 @@ export default function CheckoutView({
             type="submit"
             form="kyvro-checkout-form"
             disabled={placingOrder}
-            className="flex-1 h-12 rounded-lg bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold text-sm tracking-widest uppercase shadow active:scale-95 transition disabled:opacity-50"
+            className="flex-1 h-12 rounded-lg bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold text-xs tracking-wider uppercase shadow active:scale-95 transition disabled:opacity-50"
           >
-            {placingOrder ? 'Placing order...' : 'Place Order'}
+            {placeLabel}
           </button>
         </div>
       </div>

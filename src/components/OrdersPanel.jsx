@@ -90,7 +90,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
     const total = Number(o.total) || 0;
     const online = o.paymentMethod === 'Online Payment';
     const sellTotal = list.reduce((a, g) => a + g.sell, 0) || 1;
-    const adv = !online && !!advance[o.id];
+    const adv = !online && (!!advance[o.id] || Number(o.advancePaid) > 0);
     const shipping = Number(o.shipping) || 0;
     // what to enter / pay on the supplier's confirm page, per supplier order
     list.forEach((g) => {
@@ -246,7 +246,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
     lines.push('', `Subtotal: ${money(o.subtotal)}`);
     if (o.discount > 0) lines.push(`Discount${o.discountLabel ? ` (${o.discountLabel})` : ''}: -${money(o.discount)}`);
     lines.push(`Delivery: ${o.shipping === 0 ? 'FREE' : money(o.shipping)}`, `TOTAL: ${money(o.total)}`, '');
-    const toCollect = o.paymentStatus === 'Paid' ? 0 : o.total;
+    const toCollect = o.paymentStatus === 'Paid' ? 0 : Math.max(0, o.total - (Number(o.advancePaid) || 0));
     lines.push(`Payment: ${o.paymentMethod} (${o.paymentStatus})`, `Collect from customer: ${money(toCollect)}`);
     return lines.join('\n');
   };
@@ -441,6 +441,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
                 <p className="font-bold text-[11px] uppercase tracking-wider text-gray-500 mb-1">Payment</p>
                 <p>Method: <strong>{o.paymentMethod}</strong></p>
                 <p>Status: <strong className={PAYMENT_STYLE[o.paymentStatus] || ''}>{o.paymentStatus}</strong></p>
+                {o.paymentMethod !== 'Online Payment' && Number(o.shipping) > 0 && <p>Delivery charge advance: <strong className={Number(o.advancePaid) > 0 ? 'text-green-600' : 'text-red-600'}>{Number(o.advancePaid) > 0 ? `Paid ${formatPrice(o.advancePaid)}` : 'Not paid'}</strong></p>}
                 <p>Subtotal: {formatPrice(o.subtotal)}</p>
                 {o.discount > 0 && <p className="text-green-600">Discount{o.discountLabel ? ` (${o.discountLabel})` : ''}: - {formatPrice(o.discount)}</p>}
                 <p>Delivery: {o.shipping === 0 ? 'FREE' : formatPrice(o.shipping)}</p>
@@ -464,7 +465,9 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
                   </div>
                   {sp.missing.length > 0 && <p className="text-amber-600">Supplier price is not set for: {sp.missing.join(', ')}. The profit above does not include these items.</p>}
                   <p className="text-[11px] text-gray-500">Profit includes the delivery charge you collect ({o.shipping === 0 ? 'FREE' : formatPrice(o.shipping)}) and the supplier's delivery fee ({formatPrice(sp.delivery)}: base fee + {formatPrice(SUPPLIER_EXTRA_PER_ITEM)} for each extra item).</p>
-                  {!sp.online && !finished && (
+                  {!sp.online && Number(o.advancePaid) > 0 && <p className="p-2 rounded bg-green-500/10 text-green-700 font-semibold">Delivery charge {formatPrice(o.advancePaid)} already paid online{o.advanceChannel ? ` (${o.advanceChannel})` : ''}. Collect only {formatPrice(Math.max(0, o.total - o.advancePaid))} on delivery.</p>}
+                  {!sp.online && !(Number(o.advancePaid) > 0) && Number(o.shipping) > 0 && !finished && <p className="p-2 rounded bg-red-500/10 text-red-600 font-semibold">Delivery charge {formatPrice(o.shipping)} is NOT paid online yet. Do not confirm this order until the customer pays it (or tick the box below if they paid you another way).</p>}
+                  {!sp.online && !finished && !(Number(o.advancePaid) > 0) && (
                     <label className="flex items-center gap-2 font-semibold cursor-pointer">
                       <input type="checkbox" checked={!!advance[o.id]} onChange={(e) => setAdvance((a) => ({ ...a, [o.id]: e.target.checked }))} className="accent-[#D4AF37]" />
                       Customer already paid the delivery charge to me in advance (bKash / Nagad)

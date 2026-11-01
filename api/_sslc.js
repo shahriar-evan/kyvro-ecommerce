@@ -79,32 +79,42 @@ export async function getOrder(orderNumber) {
   return o;
 }
 
-// Marks the order Paid (+ a line in the activity trail). Only called after SSLCommerz confirmed the payment.
-export async function markPaid(orderNumber, info) {
+// Writes the payment result into the order (+ a line in the activity trail). Only called after SSLCommerz confirmed it.
+//   kind "full"    : the whole order was paid online  -> paymentStatus = Paid
+//   kind "advance" : Cash on Delivery order, the customer paid the DELIVERY CHARGE online -> advancePaid = amount
+export async function markPaid(orderNumber, info, kind = 'full') {
   const token = await accessToken();
   const str = (s) => ({ stringValue: String(s || '').slice(0, 200) });
   const now = new Date().toISOString();
+  const channel = info.channel ? ' · ' + info.channel : '';
+  const fields = kind === 'advance'
+    ? {
+        advancePaid: { doubleValue: Number(info.amount) || 0 },
+        advancePaidAt: { timestampValue: now },
+        advanceTranId: str(info.tranId),
+        advanceBankTranId: str(info.bankTranId),
+        advanceChannel: str(info.channel),
+        updatedAt: { timestampValue: now },
+      }
+    : {
+        paymentStatus: str('Paid'),
+        paidAt: { timestampValue: now },
+        paymentTranId: str(info.tranId),
+        paymentBankTranId: str(info.bankTranId),
+        paymentChannel: str(info.channel),
+        paymentAmount: { doubleValue: Number(info.amount) || 0 },
+        updatedAt: { timestampValue: now },
+      };
   const body = {
     writes: [{
-      update: {
-        name: `projects/${PROJECT}/databases/(default)/documents/orders/${orderNumber}`,
-        fields: {
-          paymentStatus: str('Paid'),
-          paidAt: { timestampValue: now },
-          paymentTranId: str(info.tranId),
-          paymentBankTranId: str(info.bankTranId),
-          paymentChannel: str(info.channel),
-          paymentAmount: { doubleValue: Number(info.amount) || 0 },
-          updatedAt: { timestampValue: now },
-        },
-      },
-      updateMask: { fieldPaths: ['paymentStatus', 'paidAt', 'paymentTranId', 'paymentBankTranId', 'paymentChannel', 'paymentAmount', 'updatedAt'] },
+      update: { name: `projects/${PROJECT}/databases/(default)/documents/orders/${orderNumber}`, fields },
+      updateMask: { fieldPaths: Object.keys(fields) },
       updateTransforms: [{
         fieldPath: 'history',
         appendMissingElements: { values: [{ mapValue: { fields: {
-          status: str('Payment received'),
+          status: str(kind === 'advance' ? 'Delivery charge paid online' : 'Payment received'),
           by: str(''),
-          byName: str(`SSLCommerz${info.channel ? ' · ' + info.channel : ''}`),
+          byName: str(`SSLCommerz${channel}`),
           at: str(now),
         } } }] },
       }],
@@ -113,6 +123,22 @@ export async function markPaid(orderNumber, info) {
   };
   const r = await fetch(`${FS}/documents:commit`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (!r.ok) throw new Error('Could not mark the order paid.');
+}
+
+// What the customer has to pay online right now for this order:
+//   Online Payment order            -> the whole total
+//   Cash on Delivery order          -> the delivery charge only (the rest is paid when the parcel arrives)
+// Returns { kind, amount } or { error }
+export function amountDue(order) {
+  if (order.status === 'Cancelled') return { error: 'This order was cancelled.' };
+  if (order.paymentMethod === 'Online Payment') {
+    if (order.paymentStatus === 'Paid') return { error: 'This order is already paid.' };
+    return { kind: 'full', amount: Number(order.total) };
+  }
+  if (order.advancePaid > 0) return { error: 'The delivery charge is already paid.' };
+  const fee = Number(order.shipping) || 0;
+  if (fee <= 0) return { error: 'This order has no delivery charge to pay online.' };
+  return { kind: 'advance', amount: fee };
 }
 
 // Asks SSLCommerz whether the payment really happened. Returns the verified result.
@@ -128,20 +154,27 @@ export async function validatePayment(valId) {
   return r.json();
 }
 
-// Checks a callback / IPN against SSLCommerz AND against the saved order, then marks it Paid.
-// Returns { ok, orderNumber, reason }
+// Checks a callback / IPN against SSLCommerz AND against the saved order, then saves the payment on the order.
+// Returns { ok, orderNumber, kind, amount, reason }
 export async function confirmPayment(valId) {
   if (!valId) return { ok: false, reason: 'no val_id' };
   const v = await validatePayment(valId);
   const orderNumber = v.value_a || '';
-  if (!['VALID', 'VALIDATED'].includes(v.status)) return { ok: false, orderNumber, reason: `status ${v.status}` };
+  const kind = v.value_b === 'advance' ? 'advance' : 'full';
+  if (!['VALID', 'VALIDATED'].includes(v.status)) return { ok: false, orderNumber, kind, reason: `status ${v.status}` };
   const order = await getOrder(orderNumber);
-  if (!order) return { ok: false, orderNumber, reason: 'order not found' };
-  if (order.paymentStatus === 'Paid') return { ok: true, orderNumber, already: true };
-  if (order.paymentMethod !== 'Online Payment') return { ok: false, orderNumber, reason: 'not an online order' };
-  if (String(v.currency_type || v.currency || 'BDT').toUpperCase() !== 'BDT') return { ok: false, orderNumber, reason: 'currency' };
-  if (!(Math.abs(Number(v.amount) - Number(order.total)) < 0.01)) return { ok: false, orderNumber, reason: 'amount mismatch' };
-  if (String(v.risk_level) === '1') return { ok: false, orderNumber, reason: 'risky payment, check it in the SSLCommerz panel' };
-  await markPaid(orderNumber, { tranId: v.tran_id, bankTranId: v.bank_tran_id, channel: v.card_type || v.card_issuer || '', amount: v.amount });
-  return { ok: true, orderNumber };
+  if (!order) return { ok: false, orderNumber, kind, reason: 'order not found' };
+  const amount = Number(v.amount);
+  // what this order really asks for (never trust the browser or the gateway fields alone)
+  const expected = kind === 'advance'
+    ? (order.paymentMethod === 'Online Payment' ? null : Number(order.shipping) || 0)
+    : (order.paymentMethod === 'Online Payment' ? Number(order.total) : null);
+  if (expected === null || !(expected > 0)) return { ok: false, orderNumber, kind, reason: 'payment type does not match the order' };
+  if (kind === 'full' && order.paymentStatus === 'Paid') return { ok: true, orderNumber, kind, amount, already: true };
+  if (kind === 'advance' && order.advancePaid > 0) return { ok: true, orderNumber, kind, amount, already: true };
+  if (String(v.currency_type || v.currency || 'BDT').toUpperCase() !== 'BDT') return { ok: false, orderNumber, kind, reason: 'currency' };
+  if (!(Math.abs(amount - expected) < 0.01)) return { ok: false, orderNumber, kind, reason: 'amount mismatch' };
+  if (String(v.risk_level) === '1') return { ok: false, orderNumber, kind, reason: 'risky payment, check it in the SSLCommerz panel' };
+  await markPaid(orderNumber, { tranId: v.tran_id, bankTranId: v.bank_tran_id, channel: v.card_type || v.card_issuer || '', amount }, kind);
+  return { ok: true, orderNumber, kind, amount };
 }

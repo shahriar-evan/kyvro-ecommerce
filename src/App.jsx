@@ -108,7 +108,7 @@ export default function App() {
     try {
       const q = new URLSearchParams(window.location.search);
       const st = q.get('pay');
-      if (['ok', 'fail', 'cancel', 'check'].includes(st)) return { status: st, order: (q.get('order') || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40) };
+      if (['ok', 'fail', 'cancel', 'check'].includes(st)) return { status: st, order: (q.get('order') || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40), kind: q.get('kind') === 'advance' ? 'advance' : 'full', amount: parseInt(q.get('amt'), 10) || 0 };
     } catch (e) { /* ignore */ }
     return null;
   });
@@ -313,6 +313,7 @@ export default function App() {
   const [checkoutError, setCheckoutError] = useState('');
   const [placingOrder, setPlacingOrder] = useState(false);
   const [orderCompleteData, setOrderCompleteData] = useState(null);
+  const [payNotice, setPayNotice] = useState('');
 
   useEffect(() => {
     if (isCloud) return;
@@ -575,14 +576,16 @@ export default function App() {
       trackPurchase({ ...order, orderNumber });
       setCart([]);
       setCheckoutForm(EMPTY_CHECKOUT);
-      // Online Payment: take the customer straight to the bKash / card payment page.
+      // Online Payment: the whole total is paid now. Cash on Delivery: the delivery charge is paid now, the rest at delivery.
+      // Either way the customer goes straight to the bKash / card payment page.
       // If the payment page cannot be opened, the order is still saved and the thank-you page lets them pay again.
-      if (order.paymentMethod === 'Online Payment') {
+      setPayNotice('');
+      if (order.paymentMethod === 'Online Payment' || (Number(order.shipping) || 0) > 0) {
         try {
           const url = await getPaymentUrl(orderNumber);
           window.location.href = url;
           return;
-        } catch (payErr) { console.warn('Payment page not opened:', payErr.message); }
+        } catch (payErr) { console.warn('Payment page not opened:', payErr.message); setPayNotice(payErr.message); }
       }
       setCurrentView('order-success');
     } catch (err) {
@@ -1111,7 +1114,7 @@ export default function App() {
       {/* ORDER CONFIRMATION */}
       {['privacy', 'terms', 'refund'].includes(currentView) && <PolicyPages page={currentView} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
       {currentView === 'payment-result' && payResult && <PaymentResult result={payResult} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
-      {currentView === 'order-success' && <OrderSuccess order={orderCompleteData} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
+      {currentView === 'order-success' && <OrderSuccess payNotice={payNotice} order={orderCompleteData} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
 
       {/* ADMIN PORTAL VIEW (GOOGLE SIGN-IN, WHITELISTED EMAILS ONLY) */}
       {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} canApproveProduct={canApproveProduct} handleApproveProduct={handleApproveProduct} pendingCount={pendingCount} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} productCosts={productCosts} products={products} storeSettings={storeSettings} isCloud={isCloud} migrating={migrating} handleMigrateProducts={handleMigrateProducts} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} handleDeleteRequest={handleDeleteRequest} clearProductForm={() => { setEditingProductId(null); setNewProductForm(freshProductForm()); }} />}

@@ -4,8 +4,8 @@ import { SITE, sslConfigured, confirmPayment } from './_sslc.js';
 
 export const config = { maxDuration: 30 };
 
-const back = (res, status, order) => {
-  const q = new URLSearchParams({ pay: status, ...(order ? { order } : {}) });
+const back = (res, status, order, kind, amount) => {
+  const q = new URLSearchParams({ pay: status, ...(order ? { order } : {}), ...(kind === 'advance' ? { kind } : {}), ...(amount ? { amt: String(Math.round(Number(amount))) } : {}) });
   res.statusCode = 303;
   res.setHeader('Location', `${SITE}/?${q}`);
   res.end();
@@ -16,20 +16,21 @@ export default async function handler(req, res) {
   const kind = String((req.query && req.query.r) || '');
   const body = typeof req.body === 'string' ? Object.fromEntries(new URLSearchParams(req.body)) : (req.body || {});
   const order = String(body.value_a || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40);
+  const bKind = body.value_b === 'advance' ? 'advance' : 'full';
 
-  if (!sslConfigured()) return kind === 'ipn' ? res.status(503).end('not configured') : back(res, 'fail', order);
+  if (!sslConfigured()) return kind === 'ipn' ? res.status(503).end('not configured') : back(res, 'fail', order, bKind);
 
   if (kind === 'success' || kind === 'ipn') {
     try {
       const r = await confirmPayment(body.val_id);
       if (!r.ok) console.warn('payment not confirmed:', r.reason, r.orderNumber || order);
       if (kind === 'ipn') return res.status(200).end('OK');
-      return back(res, r.ok ? 'ok' : 'fail', r.orderNumber || order);
+      return back(res, r.ok ? 'ok' : 'fail', r.orderNumber || order, r.kind || bKind, r.ok ? r.amount : 0);
     } catch (e) {
       console.error('sslcommerz-callback', e);
       if (kind === 'ipn') return res.status(500).end('error');
-      return back(res, 'check', order); // could not verify right now: the team will check it
+      return back(res, 'check', order, bKind); // could not verify right now: the team will check it
     }
   }
-  return back(res, kind === 'cancel' ? 'cancel' : 'fail', order);
+  return back(res, kind === 'cancel' ? 'cancel' : 'fail', order, bKind);
 }
