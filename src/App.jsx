@@ -136,24 +136,51 @@ export default function App() {
     if (!found) return; // not loaded yet (or removed): try again when the product list changes
     deepLinkDone.current = true;
     setSelectedProduct(found); setCurrentView('product-detail');
-    try { window.history.replaceState({}, '', window.location.pathname); } catch (e) { /* ignore */ }
+    try { window.history.replaceState(window.history.state, '', window.location.pathname); } catch (e) { /* ignore */ }
   }, [products]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // View history for the floating Back button (phone + laptop)
-  const viewHistory = useRef([]);
-  const goingBack = useRef(false);
+  // Page history: every page the customer opens (home, a collection + sub-category, a product ...) is also a browser
+  // history entry, so the phone's Back button / swipe-back and the floating Back button go to the PREVIOUS page of the
+  // website instead of leaving it.
+  const nav = useRef({ snaps: [], idx: -1 });
   useEffect(() => {
-    if (goingBack.current) { goingBack.current = false; return; }
-    const h = viewHistory.current;
-    if (h[h.length - 1] !== currentView) h.push(currentView);
-    if (h.length > 30) h.shift();
-  }, [currentView]);
+    const n = nav.current;
+    const snap = { view: currentView, cat: selectedCategory, sub: selectedSubCategory, prod: selectedProduct };
+    const cur = n.snaps[n.idx];
+    if (cur && cur.view === snap.view && cur.cat === snap.cat && cur.sub === snap.sub && (cur.prod && cur.prod.id) === (snap.prod && snap.prod.id)) return;
+    try {
+      if (n.idx < 0) {
+        n.snaps = [snap]; n.idx = 0;
+        window.history.replaceState({ kv: 0 }, '', window.location.href);
+        return;
+      }
+      n.snaps = n.snaps.slice(0, n.idx + 1);
+      n.snaps.push(snap);
+      n.idx = n.snaps.length - 1;
+      window.history.pushState({ kv: n.idx }, '', window.location.pathname);
+    } catch (e) { /* ignore */ }
+  }, [currentView, selectedCategory, selectedSubCategory, selectedProduct]);
+  useEffect(() => {
+    const onPop = (e) => {
+      const n = nav.current;
+      let k = e.state && typeof e.state.kv === 'number' ? e.state.kv : 0;
+      if (!n.snaps[k]) k = 0;
+      const snap = n.snaps[k];
+      if (!snap) return;
+      n.idx = k;
+      setIsCartOpen(false);
+      setIsMobileMenuOpen(false);
+      setCurrentView(snap.view);
+      setSelectedCategory(snap.cat);
+      setSelectedSubCategory(snap.sub);
+      setSelectedProduct(snap.prod);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
   const goBack = () => {
-    const h = viewHistory.current;
-    h.pop();
-    const prev = h[h.length - 1] || 'home';
-    goingBack.current = prev !== currentView;
-    setCurrentView(prev);
+    if (nav.current.idx > 0) window.history.back();
+    else { setCurrentView('home'); setSelectedCategory('All'); setSelectedSubCategory(null); }
   };
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
