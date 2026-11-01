@@ -314,6 +314,12 @@ export default function App() {
   const [placingOrder, setPlacingOrder] = useState(false);
   const [orderCompleteData, setOrderCompleteData] = useState(null);
   const [payNotice, setPayNotice] = useState('');
+  // Back button from the payment page can restore this page exactly as it was (overlay on): switch it off
+  useEffect(() => {
+    const onShow = (e) => { if (e.persisted) setPlacingOrder(false); };
+    window.addEventListener('pageshow', onShow);
+    return () => window.removeEventListener('pageshow', onShow);
+  }, []);
 
   useEffect(() => {
     if (isCloud) return;
@@ -1122,6 +1128,17 @@ export default function App() {
       {/* FOOTER */}
       <PushPrompt customerUser={customerUser} isDarkMode={isDarkMode} />
       <AlertCenter isDarkMode={isDarkMode} />
+      {/* While the order is saved and the payment page is opened: one clean screen instead of a blank page in between */}
+      {placingOrder && (
+        <div className={`fixed inset-0 z-[300] flex flex-col items-center justify-center gap-5 px-6 text-center ${isDarkMode ? 'bg-[#0b0b0b] text-white' : 'bg-white text-gray-900'}`} role="status" aria-live="polite">
+          <div className="h-14 w-14 rounded-full border-4 border-[#D4AF37]/25 border-t-[#D4AF37] animate-spin" />
+          <div>
+            <p className="text-lg font-serif font-bold">Securing your order...</p>
+            <p className="text-sm text-gray-500 mt-1">Opening the secure payment page. Please do not close or go back.</p>
+            <p className="text-sm text-gray-500">সিকিউর পেমেন্ট পেজ খুলছে, একটু অপেক্ষা করুন।</p>
+          </div>
+        </div>
+      )}
       <Footer isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} customerUser={customerUser} onSignIn={handleCustomerSignIn} goAccount={goAccount} />
 
     </div>
