@@ -1,14 +1,14 @@
 import PriceTag, { DiscountBadge } from './PriceTag';
 import React, { useState, useRef, useEffect } from 'react';
-import { Heart } from 'lucide-react';
+import { Heart, ZoomIn, X, Truck, Clock, Wallet } from 'lucide-react';
 import WhatsAppButton, { WhatsAppIcon } from './WhatsAppButton';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
 import StockLabel from './StockLabel';
-import { hasSizeStock, hasColorStock, totalStock, stockForSize, stockFor, stockForColor, productColors, imageFor, orderedSizes } from '../data/catalog';
+import { rankBySales, hasSizeStock, hasColorStock, totalStock, stockForSize, stockFor, stockForColor, productColors, imageFor, orderedSizes } from '../data/catalog';
 
 // Photo slider: the photos sit side by side and slide in from the side.
 // Works with a finger on a phone, mouse drag, and a two-finger sideways swipe on a laptop trackpad.
-function PhotoSlider({ photos, index, onIndex, alt, className, children }) {
+function PhotoSlider({ photos, index, onIndex, alt, className, onTap, children }) {
   const [drag, setDrag] = useState(0);
   const [dragging, setDragging] = useState(false);
   const box = useRef(null);
@@ -61,7 +61,11 @@ function PhotoSlider({ photos, index, onIndex, alt, className, children }) {
   const end = (e) => {
     const s0 = st.current;
     st.current = null;
-    if (!s0 || !s0.on) return;
+    if (!s0) return;
+    if (!s0.on) {
+      if (onTap && Math.abs(e.clientX - s0.x) < 8 && Math.abs(e.clientY - s0.y) < 8 && !(e.target.closest && e.target.closest('button'))) onTap();
+      return;
+    }
     const dx = e.clientX - s0.x;
     const w = (box.current && box.current.clientWidth) || 300;
     const fast = Math.abs(dx) / Math.max(1, Date.now() - s0.t) > 0.45;
@@ -91,7 +95,43 @@ function PhotoSlider({ photos, index, onIndex, alt, className, children }) {
   );
 }
 
-export default function ProductDetail({ product, products, addToCart, calculateDiscountPercent, formatPrice, isDarkMode, setCurrentView, savedIds = [], toggleSaved = () => {} }) {
+// Full-screen photo viewer: tap the photo to zoom in / out, scroll or drag to look around, arrows to change photo.
+function ZoomViewer({ photos, index, onIndex, onClose }) {
+  const [zoomed, setZoomed] = useState(false);
+  const box = useRef(null);
+  useEffect(() => { setZoomed(false); }, [index]);
+  useEffect(() => {
+    const key = (e) => { if (e.key === 'Escape') onClose(); if (e.key === 'ArrowRight') onIndex(Math.min(photos.length - 1, index + 1)); if (e.key === 'ArrowLeft') onIndex(Math.max(0, index - 1)); };
+    window.addEventListener('keydown', key);
+    const old = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { window.removeEventListener('keydown', key); document.body.style.overflow = old; };
+  }, [index, photos.length, onClose, onIndex]);
+  useEffect(() => {
+    const el = box.current;
+    if (zoomed && el) { el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2; el.scrollTop = (el.scrollHeight - el.clientHeight) / 2; }
+  }, [zoomed]);
+  return (
+    <div className="fixed inset-0 z-[90] bg-black/95 flex flex-col" role="dialog" aria-label="Photo viewer">
+      <div className="flex items-center justify-between px-4 py-3 text-white text-xs">
+        <span>{index + 1} / {photos.length} &middot; {zoomed ? 'Tap to zoom out' : 'Tap photo to zoom in'}</span>
+        <button type="button" onClick={onClose} aria-label="Close" className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center hover:bg-white/25"><X size={20} /></button>
+      </div>
+      <div ref={box} className={`flex-1 min-h-0 ${zoomed ? 'overflow-auto' : 'overflow-hidden flex items-center justify-center'}`}>
+        <img src={photos[index]} alt="" draggable={false} onClick={() => setZoomed((z) => !z)}
+          className={zoomed ? 'block w-[250%] max-w-none h-auto cursor-zoom-out select-none' : 'block max-w-full max-h-full object-contain cursor-zoom-in select-none'} />
+      </div>
+      {photos.length > 1 && (
+        <div className="flex items-center justify-center gap-3 py-3">
+          <button type="button" disabled={index === 0} onClick={() => onIndex(index - 1)} className="w-10 h-10 rounded-full bg-white/15 text-white text-xl disabled:opacity-30">&#8249;</button>
+          <button type="button" disabled={index === photos.length - 1} onClick={() => onIndex(index + 1)} className="w-10 h-10 rounded-full bg-white/15 text-white text-xl disabled:opacity-30">&#8250;</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function ProductDetail({ product, products, addToCart, calculateDiscountPercent, formatPrice, isDarkMode, setCurrentView, setSelectedProduct = () => {}, storeSettings = {}, savedIds = [], toggleSaved = () => {} }) {
   // Always use the latest version of the product (admin may have changed stock)
   const live = (products || []).find((p) => p.id === product.id) || product;
   const sized = hasSizeStock(live);
@@ -106,6 +146,8 @@ export default function ProductDetail({ product, products, addToCart, calculateD
   const [size, setSize] = useState('');
   const [color, setColor] = useState(byColor ? firstColorFor('') : (colors[0] || ''));
   const [qty, setQty] = useState(1);
+  const [zoomOpen, setZoomOpen] = useState(false);
+  useEffect(() => { window.scrollTo(0, 0); }, [product.id]);
   const sizeRef = useRef(null);
 
   // photo gallery: the main photo + the photo of each color. Swipe sideways to change.
@@ -116,6 +158,12 @@ export default function ProductDetail({ product, products, addToCart, calculateD
   const colorPhoto = imageFor(live, color);
   const currentIdx = manualIdx !== null ? Math.min(manualIdx, gallery.length - 1) : Math.max(0, gallery.indexOf(colorPhoto));
   const shownPhoto = gallery[currentIdx] || colorPhoto;
+
+  // related products: same collection, same category first, best sellers first
+  const gOf = (p) => (p.gender === 'Jackets' ? 'Winter' : p.gender);
+  const related = rankBySales((products || []).filter((p) => p.id !== live.id && gOf(p) === gOf(live)))
+    .sort((x, y) => (y.category === live.category ? 1 : 0) - (x.category === live.category ? 1 : 0))
+    .slice(0, 8);
 
   const total = totalStock(live);
   const available = byColor
@@ -178,7 +226,7 @@ export default function ProductDetail({ product, products, addToCart, calculateD
       <button onClick={() => setCurrentView('shop')} className="text-xs text-gray-500 hover:text-[#D4AF37] mb-6">&larr; Back to shop</button>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
-        <PhotoSlider photos={gallery.length ? gallery : [shownPhoto]} index={currentIdx} onIndex={setManualIdx} alt={live.name}
+        <PhotoSlider photos={gallery.length ? gallery : [shownPhoto]} index={currentIdx} onIndex={setManualIdx} alt={live.name} onTap={() => setZoomOpen(true)}
           className={`relative self-start md:sticky md:top-28 w-full h-[430px] sm:h-[540px] rounded-lg overflow-hidden border select-none ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-gray-100 border-gray-200'}`}>
           {gallery.length > 1 && (
             <div className="absolute bottom-3 inset-x-0 z-10 flex justify-center gap-1.5">
@@ -195,6 +243,7 @@ export default function ProductDetail({ product, products, addToCart, calculateD
           >
             <Heart size={18} className={savedIds.includes(live.id) ? 'fill-red-500 text-red-500' : ''} />
           </button>
+          <span className="absolute bottom-9 left-1/2 -translate-x-1/2 z-10 pointer-events-none inline-flex items-center gap-1.5 bg-black/65 text-white text-[11px] font-semibold px-3 py-1.5 rounded-full"><ZoomIn size={13} /> Tap to zoom</span>
           {soldOut && <span className="absolute top-3 left-3 bg-red-600 text-white text-[11px] font-bold px-3 py-1 rounded">SOLD OUT</span>}
           {!soldOut && discount > 0 && <DiscountBadge price={live.price} originalPrice={live.originalPrice} className="absolute top-3 left-3" />}
         </PhotoSlider>
@@ -276,8 +325,40 @@ export default function ProductDetail({ product, products, addToCart, calculateD
             />
           )}
           {soldOut && <p className="text-sm font-bold text-red-500">This product is currently sold out.</p>}
+
+          {/* Delivery information */}
+          <div className={`rounded-lg border border-dashed p-4 space-y-2.5 text-sm ${isDarkMode ? 'border-[#D4AF37]/50 bg-[#161616]' : 'border-[#D4AF37] bg-[#D4AF37]/5'}`}>
+            <p className="flex items-start gap-2.5"><Clock size={16} className="mt-0.5 shrink-0 text-[#D4AF37]" /><span><b>Delivery time:</b> Inside Dhaka 1&ndash;2 days &middot; Outside Dhaka 3&ndash;4 days</span></p>
+            <p className="flex items-start gap-2.5"><Truck size={16} className="mt-0.5 shrink-0 text-[#D4AF37]" /><span><b>Delivery charge:</b> Inside Dhaka {formatPrice(storeSettings.deliveryInside ?? 100)} &middot; Outside Dhaka {formatPrice(storeSettings.deliveryOutside ?? 150)}</span></p>
+            <p className="flex items-start gap-2.5"><Wallet size={16} className="mt-0.5 shrink-0 text-[#D4AF37]" /><span>Cash on Delivery available</span></p>
+          </div>
         </div>
       </div>
+
+      {zoomOpen && <ZoomViewer photos={gallery.length ? gallery : [shownPhoto]} index={currentIdx} onIndex={setManualIdx} onClose={() => setZoomOpen(false)} />}
+
+      {/* Related products */}
+      {related.length > 0 && (
+        <section className="mt-14">
+          <h2 className="text-xl sm:text-2xl font-serif font-bold text-center mb-6">Related Products</h2>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+            {related.map((rp) => (
+              <div key={rp.id} onClick={() => { setSelectedProduct(rp); setCurrentView('product-detail'); }}
+                className={`cursor-pointer rounded-lg overflow-hidden border transition hover:shadow-lg hover:border-[#D4AF37] ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200'}`}>
+                <div className={`relative aspect-square overflow-hidden ${isDarkMode ? 'bg-[#0f0f0f]' : 'bg-gray-100'}`}>
+                  <img src={rp.image} alt={rp.name} loading="lazy" className="w-full h-full object-contain" />
+                  <DiscountBadge price={rp.price} originalPrice={rp.originalPrice} className="absolute top-2 left-2" />
+                </div>
+                <div className="p-3">
+                  <p className="text-[10px] uppercase tracking-widest text-[#D4AF37]">{rp.category}</p>
+                  <h3 className="text-xs sm:text-sm font-semibold mt-1 line-clamp-2 min-h-[2.5rem]">{rp.name}</h3>
+                  <div className="mt-2"><PriceTag price={rp.price} originalPrice={rp.originalPrice} formatPrice={formatPrice} isDarkMode={isDarkMode} /></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Phone only: the buy buttons stay at the bottom of the screen while the customer scrolls */}
       {!soldOut && (
