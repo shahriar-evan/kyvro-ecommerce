@@ -1,6 +1,6 @@
 import PriceTag, { DiscountBadge } from './PriceTag';
 import React, { useState, useRef, useEffect } from 'react';
-import { Heart, ZoomIn, X, Truck, Clock, Wallet } from 'lucide-react';
+import { Heart, ZoomIn, X, Truck, Clock, Wallet, ChevronUp } from 'lucide-react';
 import { normalizeSettings, deliveryNote, freeDeliveryMissing, toBanglaDigits, bestDiscount, nextReward } from '../data/shopConfig';
 import WhatsAppButton, { WhatsAppIcon } from './WhatsAppButton';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
@@ -148,6 +148,7 @@ export default function ProductDetail({ product, products, addToCart, calculateD
   const [color, setColor] = useState(byColor ? firstColorFor('') : (colors[0] || ''));
   const [qty, setQty] = useState(1);
   const [zoomOpen, setZoomOpen] = useState(false);
+  const [showBreakdown, setShowBreakdown] = useState(false);
   useEffect(() => { window.scrollTo(0, 0); }, [product.id]);
   const sizeRef = useRef(null);
 
@@ -159,6 +160,15 @@ export default function ProductDetail({ product, products, addToCart, calculateD
   const colorPhoto = imageFor(live, color);
   const currentIdx = manualIdx !== null ? Math.min(manualIdx, gallery.length - 1) : Math.max(0, gallery.indexOf(colorPhoto));
   const shownPhoto = gallery[currentIdx] || colorPhoto;
+
+  // price details for what is in the cart plus the quantity chosen here (discount rules from the Owner's settings)
+  const stP = normalizeSettings(storeSettings);
+  const thisTotal = live.price * qty;
+  const baseTotal = (cartSubtotal || 0) + thisTotal;
+  const discHit = bestDiscount(baseTotal, stP);
+  const netTotal = baseTotal - discHit.amount;
+  const missFree = freeDeliveryMissing(netTotal, stP);
+  const nextRw = nextReward(baseTotal, stP);
 
   // related products: same collection, same category first, best sellers first
   const gOf = (p) => (p.gender === 'Jackets' ? 'Winter' : p.gender);
@@ -329,13 +339,10 @@ export default function ProductDetail({ product, products, addToCart, calculateD
 
           {/* Delivery information */}
           {(() => {
-            const st = normalizeSettings(storeSettings);
-            // the cart total if the customer already has things in the cart, otherwise this product
-            const base = cartSubtotal > 0 ? cartSubtotal : live.price * qty;
-            const net = base - bestDiscount(base, st).amount;
-            const miss = freeDeliveryMissing(net, st);
-            const reward = nextReward(base, st);
-            const units = cartSubtotal > 0 ? cartUnits : qty;
+            const st = stP;
+            const miss = missFree;
+            const reward = nextRw;
+            const units = (cartSubtotal > 0 ? cartUnits : 0) + qty;
             return (
               <div className={`rounded-lg border border-dashed p-4 space-y-2.5 text-sm ${isDarkMode ? 'border-[#D4AF37]/50 bg-[#161616]' : 'border-[#D4AF37] bg-[#D4AF37]/5'}`}>
                 <p className="flex items-start gap-2.5"><Clock size={16} className="mt-0.5 shrink-0 text-[#D4AF37]" /><span><b>Delivery time:</b> Inside Dhaka 1&ndash;2 days &middot; Outside Dhaka 3&ndash;4 days</span></p>
@@ -344,9 +351,9 @@ export default function ProductDetail({ product, products, addToCart, calculateD
                   <Truck size={16} className="mt-0.5 shrink-0 text-[#D4AF37]" />
                   <div>
                     <p>{deliveryNote(st, units).bn}</p>
-                    {miss > 0 && <p className="mt-1 font-semibold">আর {toBanglaDigits(miss)} টাকার পণ্য যোগ করলে ডেলিভারি ফ্রি পাবেন।</p>}
+                    {miss > 0 && <p className="mt-1 font-semibold">আরও {toBanglaDigits(miss)} টাকার পণ্য যোগ করলে ডেলিভারি ফ্রি পাবেন।</p>}
                     {reward && reward.missing > 0 && reward.missing <= 1500 && (
-                      <p className="mt-1 font-semibold">আর {toBanglaDigits(reward.missing)} টাকার পণ্য কিনলে {reward.rule.type === 'percent' ? `${toBanglaDigits(reward.rule.value)}% ছাড়` : `${toBanglaDigits(reward.rule.value)} টাকা ছাড়`} পাবেন।</p>
+                      <p className="mt-1 font-semibold">আরও {toBanglaDigits(reward.missing)} টাকার পণ্য যোগ করলে {reward.rule.type === 'percent' ? `${toBanglaDigits(reward.rule.value)}% ছাড়` : `${toBanglaDigits(reward.rule.value)} টাকা ছাড়`} পাবেন।</p>
                     )}
                   </div>
                 </div>
@@ -384,10 +391,30 @@ export default function ProductDetail({ product, products, addToCart, calculateD
       {/* Phone only: the buy buttons stay at the bottom of the screen while the customer scrolls */}
       {!soldOut && (
         <div className={`md:hidden fixed bottom-0 inset-x-0 z-40 border-t px-3 pt-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] flex items-center gap-2 shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.35)] ${isDarkMode ? 'bg-[#121212]/95 border-gray-800' : 'bg-white/95 border-gray-200'} backdrop-blur`}>
-          <div className="leading-tight pr-1 min-w-[4.5rem]">
+          {showBreakdown && <div className="fixed inset-0 -z-10" onClick={() => setShowBreakdown(false)} />}
+          {showBreakdown && (
+            <div className={`absolute bottom-full inset-x-0 border-t px-4 py-3 text-xs space-y-1.5 shadow-[0_-12px_24px_-12px_rgba(0,0,0,0.35)] ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200'}`}>
+              <p className="font-bold text-sm mb-1">Price details</p>
+              <div className="flex justify-between"><span>{formatPrice(live.price)} &times; {qty}</span><span>{formatPrice(thisTotal)}</span></div>
+              {cartSubtotal > 0 && <div className="flex justify-between"><span>Already in your cart</span><span>{formatPrice(cartSubtotal)}</span></div>}
+              <div className="flex justify-between border-t border-dashed border-gray-400/40 pt-1.5"><span>Subtotal</span><span className="font-semibold">{formatPrice(baseTotal)}</span></div>
+              {discHit.amount > 0 && discHit.rule ? (
+                <div className="flex justify-between text-green-600 font-semibold"><span>Discount ({discHit.rule.type === 'percent' ? `${discHit.rule.value}%` : formatPrice(discHit.rule.value)} off on {formatPrice(discHit.rule.min)}+)</span><span>&minus; {formatPrice(discHit.amount)}</span></div>
+              ) : (
+                <div className="flex justify-between text-gray-500"><span>Discount</span><span>{formatPrice(0)}</span></div>
+              )}
+              <div className="flex justify-between border-t border-gray-400/40 pt-1.5 text-sm font-bold"><span>After discount</span><span className="text-[#D4AF37]">{formatPrice(netTotal)}</span></div>
+              {nextRw && nextRw.missing > 0 && nextRw.missing <= 1500 && (
+                <p className="text-[11px] font-semibold text-[#B8921F] pt-1">Add {formatPrice(nextRw.missing)} more to get {nextRw.rule.type === 'percent' ? `${nextRw.rule.value}%` : formatPrice(nextRw.rule.value)} OFF</p>
+              )}
+              <p className="text-[10px] text-gray-500">Delivery charge is added at checkout.</p>
+            </div>
+          )}
+          <button type="button" onClick={() => setShowBreakdown((v) => !v)} aria-expanded={showBreakdown} aria-label="Price details" className="leading-tight pr-1 min-w-[4.5rem] text-left">
+            <ChevronUp size={14} className={`text-[#D4AF37] transition-transform ${showBreakdown ? 'rotate-180' : ''}`} />
             <p className="text-[10px] text-gray-500">{qty > 1 ? `Total (${qty})` : 'Price'}</p>
-            <p className="text-base font-bold text-[#D4AF37]">{formatPrice(live.price * qty)}</p>
-          </div>
+            <p className="text-base font-bold text-[#D4AF37]">{formatPrice(thisTotal)}</p>
+          </button>
           <button
             onClick={needsSize ? () => sizeRef.current && sizeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' }) : handleAdd}
             disabled={colorOut}
