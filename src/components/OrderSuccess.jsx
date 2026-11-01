@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { startOnlinePayment } from '../payment';
 import { DELIVERY_AREA_BN, WHATSAPP_NUMBER } from '../data/shopConfig';
 import { formatDateTime } from '../utils/dates';
 
@@ -12,6 +13,9 @@ export default function OrderSuccess({ order, formatPrice, isDarkMode, setCurren
     );
   }
   const online = order.paymentMethod === 'Online Payment';
+  const [payBusy, setPayBusy] = useState(false);
+  const [payErr, setPayErr] = useState('');
+  const payNow = async () => { setPayBusy(true); setPayErr(''); try { await startOnlinePayment(order.orderNumber); } catch (e) { setPayErr(e.message); setPayBusy(false); } };
   const panel = `rounded-lg border p-5 sm:p-7 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-gray-50 border-gray-200'}`;
 
   return (
@@ -26,6 +30,14 @@ export default function OrderSuccess({ order, formatPrice, isDarkMode, setCurren
           <p className="text-xs text-gray-500 pt-1">অর্ডার নম্বরটি সেভ করে রাখুন (স্ক্রিনশট নিতে পারেন)। অর্ডারের অবস্থা জানতে আমাদের WhatsApp-এ এই নম্বর পাঠান।</p>
         )}
       </div>
+
+      {online && order.paymentStatus !== 'Paid' && (
+        <div className={`${panel} text-center space-y-3`}>
+          <p className="text-sm font-semibold">পেমেন্ট এখনও বাকি আছে। bKash বা কার্ডে এখনই পেমেন্ট করুন। / Payment is still pending. Pay now with bKash or a card.</p>
+          <button type="button" disabled={payBusy} onClick={payNow} className="bg-[#D4AF37] text-black text-xs font-bold px-8 py-3.5 tracking-widest uppercase rounded disabled:opacity-60">{payBusy ? 'Please wait...' : `Pay ৳${Number(order.total).toLocaleString()} (bKash / Card)`}</button>
+          {payErr && <p className="text-xs text-red-500">{payErr}</p>}
+        </div>
+      )}
 
       <div className={`${panel} space-y-4`}>
         <h2 className="font-bold text-lg border-b pb-2">Order details</h2>

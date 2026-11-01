@@ -221,7 +221,7 @@ export default function CheckoutView({
               {reward && reward.missing > 0 && reward.missing <= 1500 && (
                 <p className="mt-1 font-semibold">আর {toBanglaDigits(reward.missing)} টাকার পণ্য কিনলে {reward.rule.type === 'percent' ? `${toBanglaDigits(reward.rule.value)}% ছাড়` : `${toBanglaDigits(reward.rule.value)} টাকা ছাড়`} পাবেন।</p>
               )}
-              {online && <p className="mt-1">অনলাইন পেমেন্ট নির্বাচন করলে অর্ডার করার পর আমাদের প্রতিনিধি আপনাকে ফোন করে পেমেন্টের নির্দেশনা জানাবেন।</p>}
+              {online && <p className="mt-1">অনলাইন পেমেন্ট নির্বাচন করলে অর্ডার করার পরই আপনাকে bKash / কার্ড পেমেন্ট পেজে নিয়ে যাওয়া হবে। / After you place the order you will go to the secure bKash / Card payment page.</p>}
             </div>
 
             <label className="flex items-start gap-2 text-xs cursor-pointer">

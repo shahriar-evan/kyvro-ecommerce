@@ -40,6 +40,8 @@ import OrderSuccess from './components/OrderSuccess';
 import ProductDetail from './components/ProductDetail';
 import AccountView from './components/AccountView';
 import OrderTracking from './components/OrderTracking';
+import PaymentResult from './components/PaymentResult';
+import { getPaymentUrl } from './payment';
 import { initAnalytics, trackPageView, trackViewContent, trackAddToCart, trackInitiateCheckout, trackPurchase } from './analytics';
 
 const EMPTY_CHECKOUT = {
@@ -101,7 +103,19 @@ export default function App() {
   const curr = CURRENCIES[currencyKey];
 
 
-  const [currentView, setCurrentView] = useState('home');
+  // coming back from the SSLCommerz payment page: /?pay=ok|fail|cancel|check&order=KV...
+  const [payResult] = useState(() => {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      const st = q.get('pay');
+      if (['ok', 'fail', 'cancel', 'check'].includes(st)) return { status: st, order: (q.get('order') || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40) };
+    } catch (e) { /* ignore */ }
+    return null;
+  });
+  const [currentView, setCurrentView] = useState(payResult ? 'payment-result' : 'home');
+  useEffect(() => {
+    if (payResult) { try { window.history.replaceState(window.history.state, '', window.location.pathname); } catch (e) { /* ignore */ } }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedSubCategory, setSelectedSubCategory] = useState(null); // null = default view of the collection
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -561,6 +575,15 @@ export default function App() {
       trackPurchase({ ...order, orderNumber });
       setCart([]);
       setCheckoutForm(EMPTY_CHECKOUT);
+      // Online Payment: take the customer straight to the bKash / card payment page.
+      // If the payment page cannot be opened, the order is still saved and the thank-you page lets them pay again.
+      if (order.paymentMethod === 'Online Payment') {
+        try {
+          const url = await getPaymentUrl(orderNumber);
+          window.location.href = url;
+          return;
+        } catch (payErr) { console.warn('Payment page not opened:', payErr.message); }
+      }
       setCurrentView('order-success');
     } catch (err) {
       console.error('Order failed:', err);
@@ -1087,6 +1110,7 @@ export default function App() {
 
       {/* ORDER CONFIRMATION */}
       {['privacy', 'terms', 'refund'].includes(currentView) && <PolicyPages page={currentView} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
+      {currentView === 'payment-result' && payResult && <PaymentResult result={payResult} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
       {currentView === 'order-success' && <OrderSuccess order={orderCompleteData} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
 
       {/* ADMIN PORTAL VIEW (GOOGLE SIGN-IN, WHITELISTED EMAILS ONLY) */}
