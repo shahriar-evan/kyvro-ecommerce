@@ -1,6 +1,7 @@
 import PriceTag, { DiscountBadge } from './PriceTag';
 import React, { useState, useEffect } from 'react';
 import { hasSizeStock, totalStock, rankBySales } from '../data/catalog';
+import SlideTrack from './SlideTrack';
 import StockLabel from './StockLabel';
 import WhatsAppButton from './WhatsAppButton';
 import { WHATSAPP_NUMBER } from '../data/shopConfig';
@@ -16,36 +17,8 @@ import sneakersImg from '../assets/Snekers.png';
 const HERO_IMAGES = [heroBannerImg, heroBanner1Img, heroBanner2Img];
 const HERO_SECONDS = 10;
 
-// Swipe / drag sideways on a photo to change it (finger on a phone, mouse drag on a computer).
-// A normal click is not a swipe, so buttons on top of the photo keep working.
-function useSwipe(onNext, onPrev) {
-  const start = React.useRef(null);
-  return {
-    onPointerDown: (e) => { start.current = { x: e.clientX, y: e.clientY }; },
-    onPointerUp: (e) => {
-      const s0 = start.current;
-      start.current = null;
-      if (!s0) return;
-      const dx = e.clientX - s0.x;
-      const dy = e.clientY - s0.y;
-      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) (dx < 0 ? onNext : onPrev)();
-    },
-    onPointerCancel: () => { start.current = null; },
-    onDragStart: (e) => e.preventDefault(),
-    style: { touchAction: 'pan-y' },
-  };
-}
-
 export default function HomeView({ requestAdd, addToCart, banners, calculateDiscountPercent, currentBannerIndex, formatPrice, isDarkMode, products, setCurrentBannerIndex, setCurrentView, setSelectedCategory, setSelectedProduct, savedIds = [], toggleSaved = () => {} }) {
   const [heroIdx, setHeroIdx] = useState(0);
-  const heroSwipe = useSwipe(
-    () => setHeroIdx((i) => (i + 1) % HERO_IMAGES.length),
-    () => setHeroIdx((i) => (i - 1 + HERO_IMAGES.length) % HERO_IMAGES.length)
-  );
-  const bannerSwipe = useSwipe(
-    () => setCurrentBannerIndex((currentBannerIndex + 1) % banners.length),
-    () => setCurrentBannerIndex((currentBannerIndex - 1 + banners.length) % banners.length)
-  );
   useEffect(() => {
     if (HERO_IMAGES.length < 2) return undefined;
     const t = setTimeout(() => setHeroIdx((i) => (i + 1) % HERO_IMAGES.length), HERO_SECONDS * 1000);
@@ -56,17 +29,10 @@ export default function HomeView({ requestAdd, addToCart, banners, calculateDisc
   return (
     <>
         <div className="flex-1">
-          <section {...heroSwipe} style={heroSwipe.style} className="relative w-full overflow-hidden select-none">
+          <section className="relative w-full overflow-hidden select-none">
             {/* the box takes the shape of the photo: nothing is cropped and there is no blurred space */}
-            {HERO_IMAGES.map((src, i) => (
-              <img
-                key={i}
-                src={src}
-                alt={`Kyvro hero ${i + 1}`}
-                draggable={false}
-                className={`block w-full h-auto transition-opacity duration-1000 ease-in-out ${i === heroIdx ? 'relative opacity-100 z-0' : 'absolute top-0 left-0 opacity-0 pointer-events-none'}`}
-              />
-            ))}
+            <SlideTrack index={heroIdx} onIndex={setHeroIdx}
+              items={HERO_IMAGES.map((src, i) => <img key={i} src={src} alt={`Kyvro hero ${i + 1}`} draggable={false} className="block w-full h-auto" />)} />
             <div className="absolute inset-x-0 top-2 sm:top-4 z-10 flex justify-center px-4">
               <span className={`text-[8px] sm:text-xs uppercase tracking-[0.25em] sm:tracking-[0.4em] font-semibold px-3 sm:px-6 py-1 sm:py-2 rounded-full border shadow-xl ${isDarkMode ? 'bg-black/70 text-[#D4AF37] border-[#D4AF37]/50' : 'bg-white/90 text-black border-black/20'}`}>
                 KYVRO &bull; কাইভ্রো LUXURY COLLECTION
@@ -96,13 +62,11 @@ export default function HomeView({ requestAdd, addToCart, banners, calculateDisc
 
           {/* AUTOMATIC BANNERS SLIDER */}
           <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16 pb-4">
-            <div {...bannerSwipe} style={bannerSwipe.style} className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-800 select-none">
-              {banners.map((img, idx) => (
-                <div 
-                  key={idx}
-                  className={`transition-opacity duration-1000 ease-in-out ${idx === currentBannerIndex ? 'relative opacity-100 z-10' : 'absolute top-0 left-0 w-full opacity-0 z-0 pointer-events-none'}`}
-                >
-                  {/* the box takes the photo's own shape: nothing is cropped and there is no empty space */}
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-800 select-none">
+              <SlideTrack index={currentBannerIndex} onIndex={setCurrentBannerIndex}
+                items={banners.map((img, idx) => (
+                  <div key={idx}>
+                    {/* the box takes the photo's own shape: nothing is cropped and there is no empty space */}
                   <img src={img} alt={`Kyvro Banner ${idx + 1}`} className="block w-full h-auto" />
                   <div className="absolute inset-x-0 bottom-1.5 sm:bottom-5 z-20 flex justify-center">
                     <button
@@ -114,8 +78,8 @@ export default function HomeView({ requestAdd, addToCart, banners, calculateDisc
                       <ArrowRight size={12} className="relative transition-transform duration-300 group-hover:translate-x-0.5" />
                     </button>
                   </div>
-                </div>
-              ))}
+                  </div>
+                ))} />
 
               <div className="absolute bottom-2 sm:bottom-4 right-4 sm:right-6 z-20 flex gap-1.5 sm:gap-2">
                 {banners.map((_, idx) => (
