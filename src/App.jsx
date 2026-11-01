@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { askConfirm } from './components/AlertCenter';
+import { askConfirm, showMaintenance } from './components/AlertCenter';
 import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth, googleProvider } from './firebase';
 import { isOwnerEmail } from './adminEmails';
@@ -230,7 +230,7 @@ export default function App() {
   const visitorLocked = storeSettings.maintenanceMode === true && !isAdminLoggedIn;
   const lockText = ((storeSettings.maintenanceMessage || '').trim()) || "ওয়েবসাইটে কাজ চলছে, অর্ডার সাময়িক বন্ধ, কিন্তু added to cart করে রাখতে পারবেন। পরবর্তীতে ওয়েবসাইট পুনরায় চালু হলে পেমেন্ট করতে পারবেন অথবা ম্যানুয়ালি অর্ডার করতে WhatsApp এ যোগাযোগ করুন।\n\nMaintenance mode is ON. Ordering is paused for a little while, but you can keep items in your cart and pay when the website opens again, or contact us on WhatsApp to order manually.";
   useEffect(() => {
-    if (visitorLocked && currentView === 'checkout') { setCurrentView('home'); alert(lockText); }
+    if (visitorLocked && currentView === 'checkout') { setCurrentView('home'); showMaintenance(lockText); }
   }, [visitorLocked, currentView]); // eslint-disable-line react-hooks/exhaustive-deps
   const [loggedInUserEmail, setLoggedInUserEmail] = useState('');
   const [adminRole, setAdminRole] = useState(null); // 'owner' | 'manager' | 'admin' | null
@@ -444,7 +444,7 @@ export default function App() {
     if (visitorLocked) {
       // Maintenance mode: the item stays in the cart (it is saved on this device), but checkout is closed
       setIsCartOpen(true);
-      alert(lockText);
+      showMaintenance(lockText);
       return;
     }
     if (goCheckout) {

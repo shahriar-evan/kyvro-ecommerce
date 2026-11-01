@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { WHATSAPP_NUMBER } from '../data/shopConfig';
 
 // Replaces the plain browser pop-up (alert) with a premium message in the middle of the page.
 // Every existing alert("...") in the website now shows here automatically - nothing else has to change.
@@ -46,6 +47,15 @@ export function showAlert(message) {
   emit();
 }
 
+// Maintenance notice: a calm premium card that stays for 10 seconds (OK closes it right away)
+export const MAINT_MS = 10000;
+export function showMaintenance(message) {
+  const text = String(message == null ? '' : message);
+  if (!text.trim()) return;
+  queue.push({ id: nextId++, text, kind: 'maint', ms: MAINT_MS });
+  emit();
+}
+
 if (typeof window !== 'undefined' && !window.__kyvroAlert) {
   window.__kyvroAlert = true;
   window.alert = (m) => showAlert(m);
@@ -85,8 +95,8 @@ export default function AlertCenter({ isDarkMode }) {
   const close = () => { queue = queue.slice(1); emit(); };
 
   useEffect(() => {
-    if (!cur || cur.kind !== 'success') return undefined;
-    const t = setTimeout(close, AUTO_MS);
+    if (!cur || (cur.kind !== 'success' && cur.kind !== 'maint')) return undefined;
+    const t = setTimeout(close, cur.ms || AUTO_MS);
     return () => clearTimeout(t);
   }, [cur && cur.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -135,6 +145,55 @@ export default function AlertCenter({ isDarkMode }) {
   }
 
   if (!cur) return null;
+  if (cur.kind === 'maint') {
+    const parts = cur.text.split(/\n\s*\n/);
+    const main = parts[0];
+    const rest = parts.slice(1).join('\n\n');
+    const wa = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent('Hello Kyvro, I want to place an order manually.')}`;
+    const gold = '#D4AF37';
+    return (
+      <div className="fixed inset-0 z-[300] flex items-center justify-center px-4" role="alertdialog" aria-live="polite" onClick={close}
+        style={{ background: 'rgba(8,8,12,.62)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', animation: 'kvFade .35s ease-out' }}>
+        <style>{`@keyframes kvFade{from{opacity:0}to{opacity:1}}@keyframes kvPopSlow{0%{opacity:0;transform:translateY(22px) scale(.95)}100%{opacity:1;transform:none}}@keyframes kvBar{from{width:100%}to{width:0}}@keyframes kvSpin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}@keyframes kvPulse{0%,100%{box-shadow:0 0 0 0 rgba(212,175,55,.35)}50%{box-shadow:0 0 0 12px rgba(212,175,55,0)}}`}</style>
+        <div onClick={(e) => e.stopPropagation()}
+          className={`relative w-full max-w-md rounded-3xl overflow-hidden text-center px-6 sm:px-8 pt-9 pb-7 border ${isDarkMode ? 'bg-gradient-to-b from-[#1b1a16] to-[#121214] border-[#D4AF37]/25 text-white' : 'bg-gradient-to-b from-[#fffdf6] to-white border-[#D4AF37]/30 text-gray-900'}`}
+          style={{ boxShadow: '0 28px 70px rgba(0,0,0,.5), 0 0 60px rgba(212,175,55,.22)', animation: 'kvPopSlow .7s cubic-bezier(.2,.8,.2,1)' }}>
+          <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: `linear-gradient(90deg, transparent, ${gold}, #F2D675, ${gold}, transparent)` }} />
+          <div className="mx-auto mb-5 w-[72px] h-[72px] rounded-full flex items-center justify-center" style={{ background: 'radial-gradient(circle at 30% 25%, rgba(242,214,117,.35), rgba(212,175,55,.12))', boxShadow: `inset 0 0 0 2px ${gold}`, animation: 'kvPulse 2.6s ease-in-out infinite' }}>
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke={gold} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'kvSpin 9s linear infinite' }}>
+              <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4 2.6-2.6z" />
+            </svg>
+          </div>
+          <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.3em] mb-3" style={{ color: gold }}>Maintenance Mode</p>
+          <p className="text-[15px] sm:text-base leading-[1.85] font-medium whitespace-pre-line break-words">{main}</p>
+          {rest && (
+            <>
+              <div className="my-5 flex items-center gap-3 px-6">
+                <span className="h-px flex-1" style={{ background: 'linear-gradient(90deg, transparent, rgba(212,175,55,.6))' }} />
+                <span className="w-1.5 h-1.5 rotate-45" style={{ background: gold }} />
+                <span className="h-px flex-1" style={{ background: 'linear-gradient(270deg, transparent, rgba(212,175,55,.6))' }} />
+              </div>
+              <p className={`text-[13px] leading-relaxed whitespace-pre-line break-words ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{rest}</p>
+            </>
+          )}
+          <div className="mt-7 flex flex-col gap-3">
+            <button type="button" autoFocus onClick={close}
+              className="w-full py-3.5 rounded-xl text-xs font-bold uppercase tracking-[0.25em] text-black transition hover:brightness-105 active:scale-[.98]"
+              style={{ background: 'linear-gradient(135deg,#F2D675,#D4AF37 55%,#B8932A)', boxShadow: '0 10px 24px rgba(212,175,55,.35)' }}>
+              OK
+            </button>
+            <a href={wa} target="_blank" rel="noopener noreferrer" onClick={close}
+              className={`w-full py-3 rounded-xl text-xs font-bold tracking-[0.12em] border transition active:scale-[.98] inline-flex items-center justify-center gap-2 ${isDarkMode ? 'border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10' : 'border-emerald-500/50 text-emerald-600 hover:bg-emerald-50'}`}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.2 14.2c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.8-1.1-4.5-3.9-4.7-4.1-.1-.2-1.1-1.5-1.1-2.8s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.3.5-.4.4c-.1.1-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.1 1 2 1.3 2.3 1.4.3.1.4.1.6-.1l.8-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.2.1.7-.1 1.3z" /></svg>
+              WhatsApp এ অর্ডার করুন
+            </a>
+          </div>
+          <div className="absolute bottom-0 left-0 h-[3px]" style={{ background: `linear-gradient(90deg, ${gold}, #F2D675)`, animation: `kvBar ${cur.ms || MAINT_MS}ms linear forwards` }} />
+        </div>
+      </div>
+    );
+  }
+
   const look = LOOK[cur.kind];
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center px-4" role="alertdialog" aria-live="assertive" onClick={close}
