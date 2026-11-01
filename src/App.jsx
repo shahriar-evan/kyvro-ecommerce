@@ -517,6 +517,8 @@ export default function App() {
     e.preventDefault();
     if (placingOrder || cart.length === 0) return;
     setCheckoutError('');
+    // which Pay button was pressed: 'bkash' | 'card' (empty = normal Place Order)
+    const payVia = (e.nativeEvent && e.nativeEvent.submitter && e.nativeEvent.submitter.value) || 'any';
 
     const name = checkoutForm.fullName.trim();
     const phone = cleanPhone(checkoutForm.phone.trim());
@@ -588,7 +590,7 @@ export default function App() {
       setPayNotice('');
       if (order.paymentMethod === 'Online Payment' || (Number(order.shipping) || 0) > 0) {
         try {
-          const url = await getPaymentUrl(orderNumber);
+          const url = await getPaymentUrl(orderNumber, payVia);
           window.location.href = url;
           return;
         } catch (payErr) { console.warn('Payment page not opened:', payErr.message); setPayNotice(payErr.message); }

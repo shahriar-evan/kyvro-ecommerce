@@ -11,6 +11,7 @@ export default async function handler(req, res) {
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
     const orderNumber = String(body.orderNumber || '');
+    const method = ['bkash', 'card'].includes(body.method) ? body.method : 'any';
     const order = await getOrder(orderNumber);
     if (!order) return res.status(404).json({ error: 'Order not found.' });
     const due = amountDue(order);
@@ -51,7 +52,18 @@ export default async function handler(req, res) {
       console.error('SSLCommerz session failed', j.status, j.failedreason);
       return res.status(502).json({ error: 'The payment page could not be opened. Please try again.' });
     }
-    return res.status(200).json({ url: j.GatewayPageURL, kind: due.kind, amount: total });
+    // bKash: go straight to the bKash page where the customer types their number. Card / Bank: the card + bank list.
+    // If SSLCommerz does not give a direct link, the normal payment page is used instead.
+    let url = j.GatewayPageURL;
+    const gws = Array.isArray(j.desc) ? j.desc : [];
+    if (method === 'bkash') {
+      const bk = gws.find((g) => g && String(g.gw || g.name || '').toLowerCase().replace(/\s/g, '') === 'bkash' && g.redirectGatewayURL);
+      if (bk) url = bk.redirectGatewayURL;
+      else if (j.directPaymentURLMFS) url = j.directPaymentURLMFS;
+    } else if (method === 'card') {
+      if (j.directPaymentURLCard) url = j.directPaymentURLCard;
+    }
+    return res.status(200).json({ url, kind: due.kind, amount: total });
   } catch (e) {
     console.error('sslcommerz-init', e);
     return res.status(500).json({ error: 'Payment could not be started. Please try again or contact us.' });

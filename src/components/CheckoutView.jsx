@@ -226,7 +226,7 @@ export default function CheckoutView({
               )}
               {online ? (
                 <>
-                  <p className="mt-1 font-semibold">অনলাইন পেমেন্ট {Number(grandTotal).toFixed(2)} টাকা বিকাশ, নগদ বা কার্ডের মাধ্যমে পরিশোধ করতে পারবেন। Place Order &amp; Pay তে ক্লিক করুন, এরপর Mobile Banking সিলেক্ট করে বিকাশ বা নগদ সিলেক্ট করে পেমেন্ট করুন অথবা Card সিলেক্ট করে কার্ডের মাধ্যমেও পেমেন্ট করতে পারবেন।</p>
+                  <p className="mt-1 font-semibold">অনলাইন পেমেন্ট {Number(grandTotal).toFixed(2)} টাকা বিকাশ, নগদ বা কার্ডের মাধ্যমে পরিশোধ করতে পারবেন। বিকাশে পেমেন্ট করতে Pay with bKash এ ক্লিক করে নম্বর দিন, আর কার্ড বা ব্যাংকে পেমেন্ট করতে Pay with Card / Bank এ ক্লিক করুন।</p>
                   <p className="mt-1 text-gray-600">The full amount is paid now by bKash / card on the secure payment page.</p>
                 </>
               ) : areaChosen && deliveryCharge > 0 ? (
@@ -249,9 +249,20 @@ export default function CheckoutView({
               <button type="button" onClick={() => setCurrentView('privacy')} className="underline hover:text-[#D4AF37]">Privacy Policy</button> and{' '}
               <button type="button" onClick={() => setCurrentView('refund')} className="underline hover:text-[#D4AF37]">Return &amp; Refund Policy</button>.
             </p>
-            <button type="submit" disabled={placingOrder} className="hidden lg:block w-full bg-[#D4AF37] text-black font-bold py-4 rounded text-sm tracking-widest uppercase hover:opacity-90 transition disabled:opacity-50">
-              {placeLabel}
-            </button>
+            {payNow > 0 ? (
+              <div className="hidden lg:flex flex-col gap-3">
+                <button type="submit" name="payvia" value="bkash" disabled={placingOrder} className="w-full flex items-center justify-center gap-2 bg-[#E2136E] text-white font-bold py-4 rounded text-sm tracking-wider hover:opacity-90 transition disabled:opacity-50">
+                  {placingOrder ? 'Placing order...' : `Pay with bKash ${formatPrice(payNow)}`}
+                </button>
+                <button type="submit" name="payvia" value="card" disabled={placingOrder} className="w-full flex items-center justify-center gap-2 bg-[#D4AF37] text-black font-bold py-4 rounded text-sm tracking-wider hover:opacity-90 transition disabled:opacity-50">
+                  {placingOrder ? 'Placing order...' : `Pay with Card / Bank ${formatPrice(payNow)}`}
+                </button>
+              </div>
+            ) : (
+              <button type="submit" disabled={placingOrder} className="hidden lg:block w-full bg-[#D4AF37] text-black font-bold py-4 rounded text-sm tracking-widest uppercase hover:opacity-90 transition disabled:opacity-50">
+                {placeLabel}
+              </button>
+            )}
           </div>
         </div>
       </form>
@@ -264,14 +275,25 @@ export default function CheckoutView({
             <p className="text-[10px] text-gray-500">{areaChosen ? 'Total' : 'Total (+ delivery)'}</p>
             <p className="text-lg font-bold text-[#D4AF37]">{formatPrice(grandTotal)}</p>
           </div>
-          <button
-            type="submit"
-            form="kyvro-checkout-form"
-            disabled={placingOrder}
-            className="flex-1 h-12 rounded-lg bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold text-xs tracking-wider uppercase shadow active:scale-95 transition disabled:opacity-50"
-          >
-            {placeLabel}
-          </button>
+          {payNow > 0 ? (
+            <div className="flex-1 flex flex-col gap-1.5">
+              <button type="submit" name="payvia" value="bkash" form="kyvro-checkout-form" disabled={placingOrder} className="h-10 rounded-lg bg-[#E2136E] text-white font-bold text-xs tracking-wide shadow active:scale-95 transition disabled:opacity-50">
+                {placingOrder ? 'Placing order...' : 'Pay with bKash'}
+              </button>
+              <button type="submit" name="payvia" value="card" form="kyvro-checkout-form" disabled={placingOrder} className="h-10 rounded-lg bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold text-xs tracking-wide shadow active:scale-95 transition disabled:opacity-50">
+                {placingOrder ? 'Placing order...' : 'Pay with Card / Bank'}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="submit"
+              form="kyvro-checkout-form"
+              disabled={placingOrder}
+              className="flex-1 h-12 rounded-lg bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold text-xs tracking-wider uppercase shadow active:scale-95 transition disabled:opacity-50"
+            >
+              {placeLabel}
+            </button>
+          )}
         </div>
       </div>
     </div>
