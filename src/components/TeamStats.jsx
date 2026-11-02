@@ -31,7 +31,7 @@ const lastEntry = (o, status) => {
 };
 const keyOf = (email, name) => String(email || name || '').trim().toLowerCase();
 
-export default function TeamStats({ productCosts = {}, productCommissions = {}, products = [], startEditProduct, canEditProduct, orders, isDarkMode, formatPrice, isOwner, loggedInUserEmail, adminName }) {
+export default function TeamStats({ productCosts = {}, productCommissions = {}, showProfit = true, products = [], startEditProduct, canEditProduct, orders, isDarkMode, formatPrice, isOwner, loggedInUserEmail, adminName }) {
   const [preset, setPreset] = useState('month');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -47,12 +47,20 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
     const lines = [];
     for (const it of o.items || []) {
       const c = productCosts[String(it.id)];
+      const cm = productCommissions[String(it.id)];
       const q = parseInt(it.quantity, 10) || 0;
-      if (!c || c.supplierCost === undefined || c.supplierCost === null || c.supplierCost === '') { unknown += q; continue; }
-      const ccs = c.colorCosts || {};
-      const ck = Object.keys(ccs).find((k) => k.toLowerCase() === String(it.color || '').trim().toLowerCase());
-      const unit = ck !== undefined ? (Number(ccs[ck]) || 0) : (Number(c.supplierCost) || 0);
-      const lineProfit = ((Number(it.price) || 0) - unit) * q;
+      let lineProfit;
+      if (c && c.supplierCost !== undefined && c.supplierCost !== null && c.supplierCost !== '') {
+        const ccs = c.colorCosts || {};
+        const ck = Object.keys(ccs).find((k) => k.toLowerCase() === String(it.color || '').trim().toLowerCase());
+        const unit = ck !== undefined ? (Number(ccs[ck]) || 0) : (Number(c.supplierCost) || 0);
+        lineProfit = ((Number(it.price) || 0) - unit) * q;
+      } else if (cm && typeof cm.profit === 'number') {
+        // Admins do not get the supplier price: the profit per piece saved with the commission is used instead
+        const cps = cm.colorProfit || {};
+        const pk = Object.keys(cps).find((k) => k.toLowerCase() === String(it.color || '').trim().toLowerCase());
+        lineProfit = (pk !== undefined ? Number(cps[pk]) || 0 : cm.profit) * q;
+      } else { unknown += q; continue; }
       const pct = (productCommissions[String(it.id)] && Number(productCommissions[String(it.id)].pct)) || 0;
       const lineComm = lineProfit > 0 ? Math.round(lineProfit * pct) / 100 : 0;
       profit += lineProfit; commission += lineComm;
@@ -233,7 +241,7 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
 
             {anyCommission && (
               <div className={`rounded border p-3 text-xs flex flex-wrap items-center justify-between gap-2 ${isDarkMode ? 'border-gray-800 bg-[#121212]' : 'border-gray-200 bg-gray-50'}`}>
-                <span><strong>Commission</strong> on delivered orders {p.key === me ? 'you' : 'they'} confirmed: profit {formatPrice(s.profit)}{s.unknownCost > 0 ? ` (${s.unknownCost} pcs without a supplier price are not counted)` : ''}</span>
+                <span><strong>Commission</strong> on delivered orders {p.key === me ? 'you' : 'they'} confirmed{showProfit ? `: profit ${formatPrice(s.profit)}` : ''}{s.unknownCost > 0 ? ` (${s.unknownCost} pcs without a profit figure are not counted)` : ''}</span>
                 <strong className="text-[#D4AF37] text-base">{formatPrice(s.commTotal)}</strong>
               </div>
             )}
@@ -284,16 +292,16 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
                 {anyCommission && (
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wider mb-1">Commission details</p>
-                    <p className="text-[11px] text-gray-500 mb-2">Commission = profit of the product &times; the commission % the Owner set for that product. Profit = (selling price &minus; supplier price) &times; pieces. Only <strong>Delivered</strong> orders {p.key === me ? 'you' : 'they'} confirmed are counted, cancelled or returned orders earn nothing.</p>
+                    <p className="text-[11px] text-gray-500 mb-2">Commission = profit of the product &times; the commission % the Owner set for that product. {showProfit ? 'Profit = (selling price − supplier price) × pieces. ' : ''}Only <strong>Delivered</strong> orders {p.key === me ? 'you' : 'they'} confirmed are counted, cancelled or returned orders earn nothing.</p>
                     {s.comm.length === 0 ? <p className="text-xs text-gray-500">No delivered orders in this period yet.</p> : (
                       <div className="divide-y text-xs">
                         {[...s.comm].sort((a, b) => (b.ev.at || 0) - (a.ev.at || 0)).map((c) => (
                           <div key={c.ev.order.orderNumber + 'c'} className="py-2 space-y-0.5">
                             <div className="flex justify-between gap-3"><strong className="text-[#D4AF37]">{c.ev.order.orderNumber}</strong><strong className="text-[#D4AF37]">{formatPrice(c.commission)}</strong></div>
                             {c.lines.map((l, i) => (
-                              <p key={i} className="text-gray-500">{l.name} &times;{l.q}: profit {formatPrice(l.profit)}{l.pct > 0 ? ` × ${l.pct}% = ${formatPrice(Math.round(l.profit * l.pct) / 100)}` : ' · no commission on this product'}</p>
+                              <p key={i} className="text-gray-500">{l.name} &times;{l.q}: {showProfit ? `profit ${formatPrice(l.profit)}` : ''}{l.pct > 0 ? `${showProfit ? ' × ' : ''}${l.pct}% = ${formatPrice(Math.round(l.profit * l.pct) / 100)}` : ' no commission on this product'}</p>
                             ))}
-                            {c.unknown > 0 && <p className="text-gray-500">{c.unknown} pcs without a supplier price are not counted</p>}
+                            {c.unknown > 0 && <p className="text-gray-500">{c.unknown} pcs without a profit figure are not counted</p>}
                           </div>
                         ))}
                         <div className="py-2 flex justify-between font-bold"><span>Total commission</span><span className="text-[#D4AF37]">{formatPrice(s.commTotal)}</span></div>

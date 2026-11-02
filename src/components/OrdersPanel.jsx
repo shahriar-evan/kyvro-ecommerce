@@ -23,7 +23,7 @@ const PAYMENT_STYLE = {
 
 const csv = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
-export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, formatPrice, adminName, loggedInUserEmail, canUnblock, isOwner }) {
+export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, formatPrice, adminName, loggedInUserEmail, canUnblock, isOwner, showSupplier = true }) {
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState(null);
@@ -49,6 +49,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
   // Which supplier shops each order was already placed at (private, team members only)
   const [supply, setSupply] = useState({});
   useEffect(() => {
+    if (!showSupplier) return undefined; // Admins never see supplier details
     const stop = watchOrderSupply(setSupply, (err) => console.error('Could not load supplier orders:', err));
     return () => stop();
   }, []);
@@ -447,7 +448,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
                 <p className="text-sm font-bold mt-1">{formatPrice(o.total)}</p>
                 {(() => {
                   const sp = supplyInfo(o);
-                  if (!sp.hasSupplier || o.status === 'Cancelled') return null;
+                  if (!showSupplier || !sp.hasSupplier || o.status === 'Cancelled') return null;
                   const todo = o.status !== 'Pending' && sp.groups.some((g) => !placedAt(o, g));
                   return (
                     <p className="text-[10px] mt-0.5 font-semibold">
@@ -538,6 +539,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
             {/* supplier / dropshipping (private) */}
             {(() => {
               const sp = supplyInfo(o);
+              if (!showSupplier) return null;
               if (!sp.hasSupplier && sp.missing.length === 0) return null;
               if (!sp.hasSupplier) return null;
               if (o.status === 'Pending') return null; // the supplier box opens after the order is confirmed

@@ -24,6 +24,8 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
   const shownProducts = catFilter === 'All' ? searched : searched.filter((p) => catLabel(p) === catFilter);
   const isOwner = adminRole === 'owner';
   const canManageTeam = adminRole === 'owner' || adminRole === 'manager';
+  // Supplier name, price, link and profit are private to the Owner and Managers. Admins never see them.
+  const canSeeSupplier = adminRole === 'owner' || adminRole === 'manager';
   const formColors = ((newProductForm && newProductForm.colors) || '').split(',').map(s => s.trim()).filter(Boolean);
   const perColorOn = !!(newProductForm && newProductForm.trackColors);
   const formSizeNames = Object.keys((newProductForm && newProductForm.sizeStock) || {});
@@ -103,7 +105,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
     <div className="rounded-lg border border-[#D4AF37]/50 bg-[#D4AF37]/5 p-4 space-y-3">
       <div>
         <p className="text-xs font-bold uppercase tracking-wider text-[#D4AF37]">Supplier details (dropshipping) · private</p>
-        <p className="text-[11px] text-gray-500 mt-0.5">Only the Owner, Managers and Admins can see this. Customers never see it. Leave it empty for products you keep in your own stock.</p>
+        <p className="text-[11px] text-gray-500 mt-0.5">Only the Owner and Managers can see this later. Customers and Admins never see it. Leave it empty for products you keep in your own stock.</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
         <div>
@@ -360,7 +362,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                           <td className="p-4 text-gray-500">{p.gender === p.category ? p.category : `${p.gender} / ${p.category}`}</td>
                           <td className="p-4 text-[#D4AF37] font-bold">
                             {formatPrice(p.price)}
-                            {productCosts[String(p.id)] && productCosts[String(p.id)].supplierCost !== undefined && (
+                            {canSeeSupplier && productCosts[String(p.id)] && productCosts[String(p.id)].supplierCost !== undefined && (
                               <p className="text-[10px] font-normal text-gray-500 mt-0.5">
                                 Cost {formatPrice(productCosts[String(p.id)].supplierCost)} · <span className={p.price - productCosts[String(p.id)].supplierCost >= 0 ? 'text-green-600' : 'text-red-500'}>Profit {formatPrice(p.price - productCosts[String(p.id)].supplierCost)}</span>
                                 {productCosts[String(p.id)].supplierName ? ` · ${productCosts[String(p.id)].supplierName}` : ''}
@@ -368,7 +370,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                             )}
                             {productCommissions[String(p.id)] && productCommissions[String(p.id)].pct > 0 && (
                               <p className="text-[10px] font-bold text-green-600 mt-0.5">
-                                Commission {productCommissions[String(p.id)].pct}%{productCosts[String(p.id)] && productCosts[String(p.id)].supplierCost !== undefined && p.price - productCosts[String(p.id)].supplierCost > 0 ? ` (≈ ${formatPrice(Math.round((p.price - productCosts[String(p.id)].supplierCost) * productCommissions[String(p.id)].pct) / 100)} per piece)` : ''}
+                                Commission {productCommissions[String(p.id)].pct}%{canSeeSupplier && productCosts[String(p.id)] && productCosts[String(p.id)].supplierCost !== undefined && p.price - productCosts[String(p.id)].supplierCost > 0 ? ` (≈ ${formatPrice(Math.round((p.price - productCosts[String(p.id)].supplierCost) * productCommissions[String(p.id)].pct) / 100)} per piece)` : ''}
                               </p>
                             )}
                           </td>
@@ -439,8 +441,8 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                                     {p.description && <div className="pt-1"><span className="text-gray-500">Description</span><p className="mt-0.5 leading-relaxed whitespace-pre-line">{p.description}</p></div>}
                                   </div>
                                   <div className="space-y-1.5 text-xs">
-                                    <p className="text-[11px] font-bold uppercase tracking-wider text-[#D4AF37] mb-1">Supplier · private</p>
-                                    {sup.supplierName || sup.supplierCost !== undefined ? (
+                                    {canSeeSupplier && <p className="text-[11px] font-bold uppercase tracking-wider text-[#D4AF37] mb-1">Supplier · private</p>}
+                                    {!canSeeSupplier ? null : sup.supplierName || sup.supplierCost !== undefined ? (
                                       <>
                                         {row('Shop', sup.supplierName)}
                                         {row('Cost per piece', sup.supplierCost !== undefined ? formatPrice(sup.supplierCost) : '')}
@@ -674,7 +676,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                       </div>
                     )}
                     {/* on phones / small screens the supplier box sits here; on large screens it is in the empty space on the right */}
-                    <div className="sm:col-span-2 lg:hidden">{supplierPanel}</div>
+                    <div className="sm:col-span-2 lg:hidden">{(canSeeSupplier || !editingProductId) && supplierPanel}</div>
                     <div className="sm:col-span-2">
                       <label className="block text-xs font-semibold text-gray-500 mb-1">Description *</label>
                       <textarea 
@@ -691,15 +693,15 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                     {editingProductId ? 'Update Product' : 'Save Product to Store'}
                   </button>
                 </form>
-                <aside className="hidden lg:block w-80 xl:w-96 shrink-0 lg:sticky lg:top-24">{supplierPanel}</aside>
+                <aside className="hidden lg:block w-80 xl:w-96 shrink-0 lg:sticky lg:top-24">{(canSeeSupplier || !editingProductId) && supplierPanel}</aside>
                 </div>
               )}
 
               {adminTab === 'my-products' && <MyProducts products={products} loggedInUserEmail={loggedInUserEmail} isDarkMode={isDarkMode} formatPrice={formatPrice} startEditProduct={startEditProduct} canEditProduct={canEditProduct} />}
 
-              {adminTab === 'stats' && <TeamStats productCosts={productCosts} productCommissions={productCommissions} products={products} startEditProduct={startEditProduct} canEditProduct={canEditProduct} orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} isOwner={isOwner} loggedInUserEmail={loggedInUserEmail} adminName={adminName} />}
+              {adminTab === 'stats' && <TeamStats showProfit={canSeeSupplier} productCosts={productCosts} productCommissions={productCommissions} products={products} startEditProduct={startEditProduct} canEditProduct={canEditProduct} orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} isOwner={isOwner} loggedInUserEmail={loggedInUserEmail} adminName={adminName} />}
 
-              {adminTab === 'orders' && <OrdersPanel orders={orders} productCosts={productCosts} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} canUnblock={adminRole === 'owner' || adminRole === 'manager'} isOwner={adminRole === 'owner'} />}
+              {adminTab === 'orders' && <OrdersPanel orders={orders} productCosts={productCosts} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} canUnblock={adminRole === 'owner' || adminRole === 'manager'} isOwner={adminRole === 'owner'} showSupplier={canSeeSupplier} />}
             </div>
           )}
         </div>

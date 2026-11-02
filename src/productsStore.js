@@ -63,10 +63,16 @@ export function watchProductCommissions(onData, onError) {
     (err) => onError && onError(err)
   );
 }
-export const setProductCommission = (id, pct) => {
+// profit = what is left per piece after the supplier price (so Admins can see what they earn without ever seeing the supplier price)
+export const setProductCommission = (id, pct, info = {}) => {
   const n = Number(pct);
   if (!n || n <= 0) return deleteDoc(doc(db, "productCommission", String(id)));
-  return setDoc(doc(db, "productCommission", String(id)), { pct: n, updatedAt: new Date().toISOString() });
+  return setDoc(doc(db, "productCommission", String(id)), clean({
+    pct: n,
+    ...(typeof info.profit === "number" && isFinite(info.profit) ? { profit: info.profit } : {}),
+    ...(info.colorProfit && Object.keys(info.colorProfit).length ? { colorProfit: info.colorProfit } : {}),
+    updatedAt: new Date().toISOString(),
+  }));
 };
 
 // ---- Supplier details (dropshipping): PRIVATE ----

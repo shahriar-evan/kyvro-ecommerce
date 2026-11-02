@@ -350,10 +350,11 @@ export default function App() {
 
   // Private supplier details (cost, shop name) are loaded only for team members; customers never get them
   useEffect(() => {
-    if (!isAdminLoggedIn) { setProductCosts({}); return; }
+    // Supplier details are private to the Owner and Managers (Admins never get them)
+    if (!isAdminLoggedIn || (adminRole !== 'owner' && adminRole !== 'manager')) { setProductCosts({}); return; }
     const unsubscribe = watchProductCosts(setProductCosts, (err) => console.error('Could not load supplier details:', err));
     return () => unsubscribe();
-  }, [isAdminLoggedIn]);
+  }, [isAdminLoggedIn, adminRole]);
 
   useEffect(() => {
     if (!isAdminLoggedIn) { setProductCommissions({}); return; }
@@ -954,10 +955,18 @@ export default function App() {
       console.error(err);
       alert('The product was saved, but the supplier details could NOT be saved: ' + (err.code === 'permission-denied' ? 'publish the latest Firestore rules (productCosts), then edit the product and save again.' : err.message));
     }
-    // Team commission % for this product: only the Owner can set or change it
-    if (adminRole === 'owner') {
-      try { await setProductCommission(productData.id, Math.min(MAX_COMMISSION, Math.max(0, parseFloat(newProductForm.commission) || 0))); }
-      catch (err) { console.error(err); alert('The product was saved, but the commission could NOT be saved: ' + (err.code === 'permission-denied' ? 'publish the latest Firestore rules (productCommission), then edit the product and save again.' : err.message)); }
+    // Team commission % for this product: only the Owner can set or change it.
+    // The profit per piece is saved with it (Owner or Manager) so an Admin can see what they earn without seeing the supplier price.
+    if (adminRole === 'owner' || adminRole === 'manager') {
+      try {
+        const existing = productCommissions[String(productData.id)];
+        const pct = adminRole === 'owner' ? Math.min(MAX_COMMISSION, Math.max(0, parseFloat(newProductForm.commission) || 0)) : (existing ? Number(existing.pct) : 0);
+        if (pct > 0 || existing) {
+          const colorProfit = {};
+          Object.entries(colorCosts).forEach(([c, n]) => { colorProfit[c] = productData.price - Number(n); });
+          await setProductCommission(productData.id, pct, hasSupplier ? { profit: productData.price - supplierCost, colorProfit } : {});
+        }
+      } catch (err) { console.error(err); alert('The product was saved, but the commission could NOT be saved: ' + (err.code === 'permission-denied' ? 'publish the latest Firestore rules (productCommission), then edit the product and save again.' : err.message)); }
     }
     if (editingProductId) setEditingProductId(null);
     const wentPending = productData.status === 'pending';
