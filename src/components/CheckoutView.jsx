@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Trash2 } from 'lucide-react';
 import { deliveryAreaFor, DELIVERY_AREAS, DELIVERY_AREA_BN, PAYMENT_METHODS, PAYMENT_METHOD_BN, MANUAL_METHOD, ONLINE_PAY_ON, PAY_PROVIDER, CARD_PAY_ON, manualWallets, toBanglaDigits, deliveryNote, freeDeliveryApplies, freeDeliveryMissing, normalizeSettings } from '../data/shopConfig';
 
 export default function CheckoutView({
@@ -141,7 +142,12 @@ export default function CheckoutView({
           <div className="space-y-3">
             {cart.map((item) => (
               <div key={item.cartItemId} className={`flex gap-3 p-3 rounded border ${isDarkMode ? 'bg-[#121212] border-gray-800' : 'bg-white border-gray-200'}`}>
-                <img src={item.image} alt={item.name} className="w-16 h-16 object-cover rounded" />
+                <div className="flex flex-col items-center gap-2 shrink-0">
+                  <img src={item.image} alt={item.name} className="w-16 h-16 object-cover rounded" />
+                  <button type="button" onClick={() => removeFromCart(item.cartItemId)} aria-label="Remove from cart" className="w-16 inline-flex items-center justify-center gap-1 rounded bg-red-600 hover:bg-red-700 text-white text-[11px] font-semibold py-1 transition">
+                    <Trash2 size={12} /> Remove
+                  </button>
+                </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold leading-snug">{item.name}</p>
                   <p className="text-xs text-gray-500 mt-0.5">
@@ -157,8 +163,7 @@ export default function CheckoutView({
                     <span className="text-xs text-gray-500">{formatPrice(item.price)} each</span>
                   </div>
                 </div>
-                <div className="text-right flex flex-col justify-between items-end">
-                  <button type="button" onClick={() => removeFromCart(item.cartItemId)} className="w-6 h-6 rounded-full bg-red-600 text-white text-xs leading-none" title="Remove">&times;</button>
+                <div className="text-right flex flex-col justify-end items-end">
                   <span className="text-sm font-bold">{formatPrice(item.price * item.quantity)}</span>
                 </div>
               </div>
