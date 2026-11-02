@@ -27,7 +27,8 @@ export function askConfirm(message, opts = {}) {
   return new Promise((resolve) => {
     const text = String(message == null ? '' : message);
     const danger = opts.danger !== undefined ? opts.danger : /(delete|remove|permanently|block|cannot be undone|clear|lose money|reject|cancel order)/i.test(text);
-    askQueue.push({ id: askId++, text, danger, yes: opts.confirmText || (danger ? 'Yes, continue' : 'Confirm'), no: opts.cancelText || 'Cancel', resolve });
+    // opts.input: also shows a text box; the answer is then the typed text ('' if empty) or null when cancelled
+    askQueue.push({ id: askId++, text, danger, input: !!opts.input, placeholder: opts.placeholder || '', initial: '', yes: opts.confirmText || (danger ? 'Yes, continue' : 'Confirm'), no: opts.cancelText || 'Cancel', resolve });
     emitAsk();
   });
 }
@@ -124,7 +125,7 @@ export default function AlertCenter({ isDarkMode }) {
               {ask.danger ? <><path d="M12 8v5" /><path d="M12 17h.01" /></> : <><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7" /><path d="M12 17h.01" /></>}
             </svg>
           </div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.25em] mb-2" style={{ color: ring }}>{ask.input ? 'Almost done' : ask.danger ? 'Are you sure?' : 'Please confirm'}</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.25em] mb-2" style={{ color: ring }}>{ask.danger ? 'Are you sure?' : ask.input ? 'Almost done' : 'Please confirm'}</p>
           <p className="text-[15px] leading-relaxed whitespace-pre-line break-words max-h-[40vh] overflow-y-auto">{ask.text}</p>
           {ask.input && (
             <input type="text" autoFocus value={inputVal} placeholder={ask.placeholder}

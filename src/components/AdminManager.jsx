@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { askConfirm } from './AlertCenter';
 import { OWNER_EMAILS, ownerName } from '../adminEmails';
 import { listAdmins, listPrivateDetails, createAdminAccount, updateAdminProfile, changeAdminEmail, setAdminRole, setAdminActive, removeAdmin, sendAdminPasswordReset, ROLES, ROLE_LABELS } from '../adminAuth';
+import { auth } from '../firebase';
 
 const randomPassword = () => {
   const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -242,11 +243,20 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
   };
 
   const handleRemove = async (a) => {
-    if (!(await askConfirm(`Permanently remove ${a.name || a.email} from the team? (To block access temporarily, turn the Access switch OFF instead.)`))) return;
+    // the box is optional: empty note is fine, null means Cancel
+    const note = await askConfirm(`Permanently remove ${a.name || a.email} from the team? (To block access temporarily, turn the Access switch OFF instead.)\n\nThey will get an email about this. You can add an optional note for them below.`, { input: true, danger: true, placeholder: 'Note for them (optional)' });
+    if (note === null) return;
     setMessage(null);
     try {
       await removeAdmin(a.email);
-      setMessage({ type: 'ok', text: `${a.name || a.email} was removed from the team.` });
+      let mailed = false;
+      try {
+        const idToken = await auth.currentUser.getIdToken();
+        const r = await fetch('/api/team-removed-notify', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ email: a.email, name: a.name || '', note }) });
+        const j = await r.json().catch(() => ({}));
+        mailed = !!j.sent;
+      } catch (e) { /* the removal itself already worked */ }
+      setMessage({ type: 'ok', text: `${a.name || a.email} was removed from the team.${mailed ? ' An email was sent to them.' : ' (The email could not be sent.)'}` });
       await load();
     } catch (err) {
       setMessage({ type: 'err', text: friendlyError(err) });
