@@ -176,6 +176,18 @@ export async function removeAdmin(email) {
   try { await deleteDoc(doc(db, "adminPrivate", e)); } catch (err) { /* nothing stored */ }
 }
 
+// Owner only: sets an email + password login for a member whose account was made with Google (removes the Google link),
+// then saves the password in the Owner-only area so it can be looked up later.
+export async function setAdminPasswordByOwner(email, password) {
+  const e = norm(email);
+  const idToken = await auth.currentUser.getIdToken();
+  const r = await fetch("/api/admin-set-password", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ email: e, password }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.ok) throw new Error(j.error || "Could not set the password.");
+  await setDoc(doc(db, "adminPrivate", e), { password }, { merge: true });
+  return j;
+}
+
 // After a reset email the stored password is no longer correct, so it is cleared.
 export async function sendAdminPasswordReset(email) {
   const e = norm(email);

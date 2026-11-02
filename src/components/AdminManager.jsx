@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { askConfirm } from './AlertCenter';
+import { askConfirm, askInput } from './AlertCenter';
 import { OWNER_EMAILS, ownerName } from '../adminEmails';
-import { listAdmins, listPrivateDetails, createAdminAccount, updateAdminProfile, changeAdminEmail, setAdminRole, setAdminActive, removeAdmin, sendAdminPasswordReset, ROLES, ROLE_LABELS } from '../adminAuth';
+import { listAdmins, listPrivateDetails, createAdminAccount, updateAdminProfile, changeAdminEmail, setAdminRole, setAdminActive, removeAdmin, sendAdminPasswordReset, setAdminPasswordByOwner, ROLES, ROLE_LABELS } from '../adminAuth';
 import { auth } from '../firebase';
 
 const randomPassword = () => {
@@ -263,6 +263,20 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
     }
   };
 
+  const handleSetPw = async (a) => {
+    const pw = await askInput(`Set an email + password login for ${a.name || a.email}?\n\nThe Google login of this email is removed, so they log in with email + password only. You can look the password up here later. Type the new password (min 6 characters):`, { placeholder: 'New password', confirmText: 'Set password' });
+    if (pw === null) return;
+    if (pw.length < 6) { setMessage({ type: 'err', text: 'Password must be at least 6 characters.' }); return; }
+    setMessage(null);
+    try {
+      const j = await setAdminPasswordByOwner(a.email, pw);
+      setMessage({ type: 'ok', text: `Password set for ${a.email}.${j.googleRemoved ? ' The Google login was removed.' : ''} They log in with this email and the password you typed. If they were logged in, they will be signed out.` });
+      await load();
+    } catch (err) {
+      setMessage({ type: 'err', text: err.message || friendlyError(err) });
+    }
+  };
+
   const handleReset = async (a) => {
     setMessage(null);
     try {
@@ -475,6 +489,7 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
                       )}
                       <button onClick={() => startEdit(a)} className={chipBtn}>Edit</button>
                       <button onClick={() => handleReset(a)} className={chipBtn}>Reset password</button>
+                      {!isMe && <button onClick={() => handleSetPw(a)} className={chipBtn}>Set password</button>}
                       {!isMe && <button onClick={() => handleRemove(a)} className="px-3 py-1.5 rounded text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition">Remove</button>}
                     </div>
                   ) : (
