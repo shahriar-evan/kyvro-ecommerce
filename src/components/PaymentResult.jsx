@@ -20,7 +20,7 @@ export default function PaymentResult({ result, isDarkMode, setCurrentView }) {
   const copy = async () => {
     try { await navigator.clipboard.writeText(order); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch (e) { /* ignore */ }
   };
-  const wa = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hello Kyvro, I need help with the payment of my order ${order || ''}.`)}`;
+  const wa = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hello Kyvro, I could not complete the online payment${order ? ` for my order ${order}` : ''}. I would like to order through WhatsApp.`)}`;
 
   const title = ok ? (adv ? 'Delivery charge paid' : 'Payment received') : check ? 'We are checking your payment' : status === 'cancel' ? 'Payment cancelled' : 'Payment not completed';
   const titleBn = ok ? (adv ? 'ডেলিভারি চার্জ পরিশোধ হয়েছে' : 'পেমেন্ট সফল হয়েছে') : check ? 'পেমেন্ট যাচাই করা হচ্ছে' : status === 'cancel' ? 'পেমেন্ট বাতিল হয়েছে' : 'পেমেন্ট সম্পন্ন হয়নি';
@@ -38,9 +38,9 @@ export default function PaymentResult({ result, isDarkMode, setCurrentView }) {
   return (
     <div className="flex-1 w-full flex items-center justify-center px-4 py-10 min-h-[70vh]">
       <style>{`@keyframes kvPop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.08);opacity:1}100%{transform:scale(1)}}@keyframes kvRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}@keyframes kvPulse{0%{transform:scale(1);opacity:.55}100%{transform:scale(1.7);opacity:0}}`}</style>
-      <div className={`relative w-full max-w-lg overflow-hidden rounded-2xl border text-center ${dark ? 'bg-[#141414] border-gray-800 shadow-[0_20px_60px_rgba(0,0,0,.6)]' : 'bg-white border-gray-200 shadow-[0_20px_60px_rgba(0,0,0,.10)]'}`} style={{ animation: 'kvRise .5s ease both' }}>
+      <div className={`relative w-full max-w-2xl overflow-hidden rounded-2xl border text-center ${dark ? 'bg-[#141414] border-gray-800 shadow-[0_20px_60px_rgba(0,0,0,.6)]' : 'bg-white border-gray-200 shadow-[0_20px_60px_rgba(0,0,0,.10)]'}`} style={{ animation: 'kvRise .5s ease both' }}>
         <div className="h-1.5 w-full" style={{ background: 'linear-gradient(90deg,#8a6d1f,#D4AF37,#f3dc8b,#D4AF37,#8a6d1f)' }} />
-        <div className="px-6 sm:px-10 pt-9 pb-8 space-y-5">
+        <div className="px-5 sm:px-8 pt-9 pb-8 space-y-5">
           <div className="relative mx-auto h-20 w-20">
             {ok && <span className="absolute inset-0 rounded-full" style={{ background: tone.ring, animation: 'kvPulse 1.8s ease-out 2' }} />}
             <span className="absolute inset-0 rounded-full flex items-center justify-center" style={{ background: tone.soft, border: `2px solid ${tone.ring}`, color: tone.ring, animation: 'kvPop .55s ease both' }}>
@@ -75,25 +75,25 @@ export default function PaymentResult({ result, isDarkMode, setCurrentView }) {
 
           {err && <p className="text-xs p-3 rounded border border-red-500/40 text-red-500 bg-red-500/10">{err}</p>}
 
-          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 justify-center items-stretch pt-2">
             {!ok && !check && order && (
-              <button type="button" disabled={busy} onClick={retry} className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 text-black text-xs font-bold px-7 py-3.5 tracking-widest uppercase rounded-lg shadow-lg shadow-[#D4AF37]/25 hover:-translate-y-0.5 hover:shadow-xl transition disabled:opacity-60" style={{ background: 'linear-gradient(135deg,#f3dc8b,#D4AF37 55%,#b8932a)' }}>
+              <button type="button" disabled={busy} onClick={retry} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-center text-black text-xs font-bold px-5 sm:px-7 py-3.5 tracking-widest uppercase rounded-lg shadow-lg shadow-[#D4AF37]/25 hover:-translate-y-0.5 hover:shadow-xl transition disabled:opacity-60" style={{ background: 'linear-gradient(135deg,#f3dc8b,#D4AF37 55%,#b8932a)' }}>
                 {busy ? 'Please wait...' : (adv ? 'Pay delivery charge again' : (PAY_PROVIDER === 'uddokta' ? 'Pay again (bKash / Nagad)' : 'Pay again (bKash / Card)'))}
               </button>
             )}
             {order && (
-              <button type="button" onClick={() => setCurrentView('tracking')} className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 text-xs font-bold px-7 py-3.5 tracking-widest uppercase rounded-lg hover:-translate-y-0.5 transition ${ok ? 'text-black shadow-lg shadow-[#D4AF37]/25 hover:shadow-xl' : 'border border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10'}`} style={ok ? { background: 'linear-gradient(135deg,#f3dc8b,#D4AF37 55%,#b8932a)' } : undefined}>
+              <button type="button" onClick={() => setCurrentView('tracking')} className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 text-center text-xs font-bold px-5 sm:px-7 py-3.5 tracking-widest uppercase rounded-lg hover:-translate-y-0.5 transition ${ok ? 'text-black shadow-lg shadow-[#D4AF37]/25 hover:shadow-xl' : 'border border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10'}`} style={ok ? { background: 'linear-gradient(135deg,#f3dc8b,#D4AF37 55%,#b8932a)' } : undefined}>
                 <Truck size={16} /> Track Order
               </button>
             )}
-            <button type="button" onClick={() => setCurrentView('shop')} className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 text-xs font-bold px-7 py-3.5 tracking-widest uppercase rounded-lg border hover:-translate-y-0.5 transition ${dark ? 'border-gray-600 hover:border-[#D4AF37] hover:text-[#D4AF37]' : 'border-gray-300 hover:border-[#D4AF37] hover:text-[#8a6d1f]'}`}>
+            <button type="button" onClick={() => setCurrentView('shop')} className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 text-center text-xs font-bold px-5 sm:px-7 py-3.5 tracking-widest uppercase rounded-lg border hover:-translate-y-0.5 transition ${dark ? 'border-gray-600 hover:border-[#D4AF37] hover:text-[#D4AF37]' : 'border-gray-300 hover:border-[#D4AF37] hover:text-[#8a6d1f]'}`}>
               <ShoppingBag size={16} /> Continue Shopping
             </button>
           </div>
 
           {!ok && (
             <a href={wa} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-[#D4AF37] underline underline-offset-2">
-              <MessageCircle size={14} /> Problem? Message us on WhatsApp
+              <MessageCircle size={14} /> অনলাইনে অর্ডার করতে না পারলে WhatsApp-এ মেসেজ দিয়ে অর্ডার করুন
             </a>
           )}
         </div>
