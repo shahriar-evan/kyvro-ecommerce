@@ -1,4 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { askConfirm } from './AlertCenter';
+import { loadStatsResets, resetAdminStats } from '../adminAuth';
 import { toDate, formatDateTime } from '../utils/dates';
 
 // Team performance: who confirmed / delivered / cancelled how many orders, and which products and how much money that was.
@@ -35,6 +37,14 @@ export default function TeamStats({ products = [], startEditProduct, canEditProd
   const [to, setTo] = useState('');
   const [open, setOpen] = useState('');
   const me = keyOf(loggedInUserEmail, adminName);
+  // when the Owner reset a person's numbers (counting starts again from that moment)
+  const [resets, setResets] = useState({});
+  useEffect(() => { loadStatsResets(isOwner, loggedInUserEmail).then(setResets); }, [isOwner, loggedInUserEmail]);
+  const doReset = async (p) => {
+    if (!(await askConfirm(`Reset the stats of ${p.name}?\n\nTheir numbers start again from zero from now. Orders and products are not changed or deleted.`, { danger: true, confirmText: 'Yes, reset' }))) return;
+    try { await resetAdminStats(p.email || p.key); setResets((r) => ({ ...r, [String(p.email || p.key).toLowerCase()]: new Date() })); }
+    catch (err) { alert('Could not reset: ' + (err.code === 'permission-denied' ? 'only the Owner can do this (publish the latest Firestore rules).' : err.message)); }
+  };
 
   const { people, events } = useMemo(() => {
     const ppl = {};
@@ -75,6 +85,8 @@ export default function TeamStats({ products = [], startEditProduct, canEditProd
     const get = (k) => (out[k] = out[k] || { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {} });
     for (const ev of events) {
       if (!inRange(ev.at)) continue;
+      const rt = resets[ev.who];
+      if (rt && (!ev.at || ev.at <= rt)) continue; // before the Owner reset this person's stats
       const s = get(ev.who);
       s[ev.kind].push(ev);
       if (ev.kind === 'confirmed' && ev.order.status !== 'Cancelled') {
@@ -87,7 +99,7 @@ export default function TeamStats({ products = [], startEditProduct, canEditProd
       }
     }
     return out; // eslint-disable-next-line
-  }, [events, preset, from, to]);
+  }, [events, preset, from, to, resets]);
 
   // products each person added (a separate list under their card)
   const addedBy = useMemo(() => {
@@ -163,6 +175,13 @@ export default function TeamStats({ products = [], startEditProduct, canEditProd
                 ))}
               </div>
             </button>
+
+            {(isOwner || resets[String(p.email || p.key).toLowerCase()]) && (
+              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500">
+                <span>{resets[String(p.email || p.key).toLowerCase()] ? `Counting since ${formatDateTime(resets[String(p.email || p.key).toLowerCase()])} (reset by the Owner)` : ''}</span>
+                {isOwner && <button type="button" onClick={() => doReset(p)} className="px-3 py-1.5 rounded text-[11px] font-bold border border-red-500 text-red-500 hover:bg-red-500/10 transition">Reset stats</button>}
+              </div>
+            )}
 
             {isOpen && (
               <div className="space-y-4 border-t pt-4">

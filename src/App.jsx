@@ -242,6 +242,7 @@ export default function App() {
   }, [visitorLocked, currentView]); // eslint-disable-line react-hooks/exhaustive-deps
   const [loggedInUserEmail, setLoggedInUserEmail] = useState('');
   const [adminRole, setAdminRole] = useState(null); // 'owner' | 'manager' | 'admin' | null
+  const [adminEditAll, setAdminEditAll] = useState(false); // the Owner allowed this person to edit every product
   const [adminName, setAdminName] = useState('');
   const [adminTab, setAdminTab] = useState('products');
 
@@ -288,7 +289,7 @@ export default function App() {
   // While logged in, access OFF / removal / role changes by the Owner apply immediately
   useEffect(() => {
     if (!isAdminLoggedIn || !loggedInUserEmail || isOwnerEmail(loggedInUserEmail)) return;
-    const unsubscribe = watchAdminAccess(loggedInUserEmail, ({ role, active, name }) => {
+    const unsubscribe = watchAdminAccess(loggedInUserEmail, ({ role, active, name, editAll }) => {
       if (!role || !active) {
         setIsAdminLoggedIn(false);
         setLoggedInUserEmail('');
@@ -298,6 +299,7 @@ export default function App() {
         alert(!role ? 'Your admin access has been removed.' : 'Your admin access has been turned OFF.');
       } else {
         setAdminRole(role);
+        setAdminEditAll(!!editAll);
         if (name) setAdminName(name);
       }
     });
@@ -999,8 +1001,8 @@ export default function App() {
     setAdminTab('add-product');
   };
 
-  // Only the Owner or the person who added a product can edit it
-  const canEditProduct = (p) => adminRole === 'owner' || (!!p.addedBy && p.addedBy.toLowerCase() === (loggedInUserEmail || '').toLowerCase());
+  // Only the Owner, the person who added the product, or someone the Owner gave "edit all products" can edit it
+  const canEditProduct = (p) => adminRole === 'owner' || adminEditAll || (!!p.addedBy && p.addedBy.toLowerCase() === (loggedInUserEmail || '').toLowerCase());
 
   // Owner can delete everything, Manager only products they added, Admin none
   const canDeleteProduct = (p) => {

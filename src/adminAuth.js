@@ -45,7 +45,7 @@ export function watchAdminAccess(email, callback) {
     (snap) => {
       if (!snap.exists()) return callback({ role: null, active: false, name: "" });
       const data = snap.data();
-      callback({ role: ROLES.includes(data.role) ? data.role : "admin", active: data.active !== false, name: data.name || "" });
+      callback({ role: ROLES.includes(data.role) ? data.role : "admin", active: data.active !== false, name: data.name || "", editAll: data.editAll === true });
     },
     () => {} // ignore network/permission errors
   );
@@ -97,6 +97,7 @@ export async function createAdminAccount(email, password, role = "admin", profil
     addedBy: auth.currentUser?.email || "",
     addedByName: profile.addedByName || "",
     createdAt: serverTimestamp(),
+    editAll: profile.editAll === true,
   });
   // Owner-only extras. The password is only saved when we really created the account
   // (if the account already existed, the password typed here is not its real password).
@@ -164,6 +165,31 @@ export async function updateAdminProfile(email, { name, phone, note }) {
 export async function setAdminRole(email, role) {
   if (!ROLES.includes(role)) throw new Error("Invalid role");
   await updateDoc(doc(db, "admins", norm(email)), { role });
+}
+
+// Owner only: lets a team member edit every product (not only the ones they added)
+export async function setAdminEditAll(email, on) {
+  await updateDoc(doc(db, "admins", norm(email)), { editAll: !!on });
+}
+
+// Stats reset (Owner only): the numbers of that person start again from zero from now on.
+// Orders and products are not touched. Stored in its own small collection so everyone can read only their own.
+export async function resetAdminStats(email) {
+  await setDoc(doc(db, "statsReset", norm(email)), { at: serverTimestamp() });
+}
+export async function loadStatsResets(isOwner, email) {
+  const out = {};
+  try {
+    if (isOwner) {
+      const snap = await getDocs(collection(db, "statsReset"));
+      snap.docs.forEach((d) => { const t = d.data().at; if (t && t.toDate) out[d.id] = t.toDate(); });
+    } else if (email) {
+      const snap = await getDoc(doc(db, "statsReset", norm(email)));
+      const t = snap.exists() && snap.data().at;
+      if (t && t.toDate) out[norm(email)] = t.toDate();
+    }
+  } catch (err) { /* no reset saved or no access */ }
+  return out;
 }
 
 export async function setAdminActive(email, active) {
