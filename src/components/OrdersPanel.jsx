@@ -94,7 +94,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
     list.forEach((g) => { g.delivery = supplierDelivery(o, g.units); });
     const delivery = list.reduce((a, g) => a + g.delivery, 0);
     const total = Number(o.total) || 0;
-    const online = o.paymentMethod === 'Online Payment' || o.paymentMethod === 'Manual bKash / Nagad';
+    const online = o.paymentMethod === 'Online Payment';
     const sellTotal = list.reduce((a, g) => a + g.sell, 0) || 1;
     const adv = !online && (!!advance[o.id] || Number(o.advancePaid) > 0);
     const shipping = Number(o.shipping) || 0;
@@ -182,6 +182,12 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
   const countOf = (s) => orders.filter((o) => o.status === s).length;
 
   const q = search.trim().toLowerCase();
+  // Search matches the order number, name, phone, the payment TrxID / sender number, and the product names
+  const searchBits = (o) => [
+    o.orderNumber, o.customer?.name, o.customer?.phone,
+    o.paymentTranId, o.paymentBankTranId, o.advanceTranId, o.advanceBankTranId,
+    ...(Array.isArray(o.items) ? o.items.map((it) => it && it.name) : []),
+  ];
   // History = finished orders (Delivered / Cancelled), optionally limited to a date range
   const FINISHED = ['Delivered', 'Cancelled'];
   const rangeStart = fromDate ? new Date(`${fromDate}T00:00:00`) : null;
@@ -193,10 +199,10 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
   };
   const historyList = orders.filter((o) => FINISHED.includes(o.status) && inRange(o));
   const visible = orders.filter((o) => {
-    if (filter === 'History') return FINISHED.includes(o.status) && inRange(o) && (!q || [o.orderNumber, o.customer?.name, o.customer?.phone].some((v) => String(v || '').toLowerCase().includes(q)));
+    if (filter === 'History') return FINISHED.includes(o.status) && inRange(o) && (!q || searchBits(o).some((v) => String(v || '').toLowerCase().includes(q)));
     if (filter !== 'All' && o.status !== filter) return false;
     if (!q) return true;
-    return [o.orderNumber, o.customer?.name, o.customer?.phone].some((v) => String(v || '').toLowerCase().includes(q));
+    return searchBits(o).some((v) => String(v || '').toLowerCase().includes(q));
   });
 
   const run = async (orderId, fn) => {
@@ -340,7 +346,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by order number, name or phone..."
+          placeholder="Search by order number, name, phone, TrxID or product..."
           className={`w-full border p-2.5 text-xs rounded focus:outline-none focus:border-[#D4AF37] ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-black'}`}
         />
         {filter === 'History' && (
@@ -468,15 +474,28 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
                 <p className="font-bold text-[11px] uppercase tracking-wider text-gray-500 mb-1">Payment</p>
                 <p>Method: <strong>{o.paymentMethod}</strong></p>
                 <p>Status: <strong className={PAYMENT_STYLE[o.paymentStatus] || ''}>{o.paymentStatus}</strong></p>
-                {o.paymentMethod === 'Manual bKash / Nagad' && o.manualPay && (
-                  <div className="my-1 rounded border border-orange-400/60 bg-orange-500/10 p-2 text-xs">
-                    <p className="font-bold">Customer says they sent {formatPrice(o.total)} via {o.manualPay.wallet}</p>
-                    <p>From number: <strong>{o.manualPay.sender}</strong></p>
-                    <p>TrxID: <strong className="select-all">{o.manualPay.trxId}</strong></p>
-                    <p className="text-gray-500">Check your {o.manualPay.wallet} app/SMS for this exact TrxID and amount, then press Mark payment received.</p>
+                {(o.paymentTranId || o.paymentBankTranId || o.advanceTranId || o.advanceBankTranId) && (
+                  <div className="my-1 rounded border border-green-500/50 bg-green-500/10 p-2 text-xs space-y-0.5">
+                    {(o.paymentTranId || o.paymentBankTranId) && (
+                      <>
+                        <p className="font-bold">Online payment details</p>
+                        {o.paymentTranId && <p>TrxID: <strong className="select-all">{o.paymentTranId}</strong></p>}
+                        {o.paymentBankTranId && <p>Paid from: <strong className="select-all">{o.paymentBankTranId}</strong></p>}
+                        {o.paymentChannel && <p>Channel: {o.paymentChannel}</p>}
+                        {Number(o.paymentAmount) > 0 && <p>Amount: {formatPrice(o.paymentAmount)}</p>}
+                      </>
+                    )}
+                    {(o.advanceTranId || o.advanceBankTranId) && (
+                      <>
+                        <p className="font-bold">Delivery charge payment</p>
+                        {o.advanceTranId && <p>TrxID: <strong className="select-all">{o.advanceTranId}</strong></p>}
+                        {o.advanceBankTranId && <p>Paid from: <strong className="select-all">{o.advanceBankTranId}</strong></p>}
+                        {o.advanceChannel && <p>Channel: {o.advanceChannel}</p>}
+                      </>
+                    )}
                   </div>
                 )}
-                {o.paymentMethod !== 'Online Payment' && o.paymentMethod !== 'Manual bKash / Nagad' && Number(o.shipping) > 0 && <p>Delivery charge advance: <strong className={Number(o.advancePaid) > 0 ? 'text-green-600' : 'text-red-600'}>{Number(o.advancePaid) > 0 ? `Paid ${formatPrice(o.advancePaid)}` : 'Not paid'}</strong></p>}
+                {o.paymentMethod !== 'Online Payment' && Number(o.shipping) > 0 && <p>Delivery charge advance: <strong className={Number(o.advancePaid) > 0 ? 'text-green-600' : 'text-red-600'}>{Number(o.advancePaid) > 0 ? `Paid ${formatPrice(o.advancePaid)}` : 'Not paid'}</strong></p>}
                 <p>Subtotal: {formatPrice(o.subtotal)}</p>
                 {o.discount > 0 && <p className="text-green-600">Discount{o.discountLabel ? ` (${o.discountLabel})` : ''}: - {formatPrice(o.discount)}</p>}
                 <p>Delivery: {o.shipping === 0 ? 'FREE' : formatPrice(o.shipping)}</p>

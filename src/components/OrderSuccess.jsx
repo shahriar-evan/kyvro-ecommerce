@@ -12,7 +12,6 @@ export default function OrderSuccess({ payNotice = '', order, formatPrice, isDar
       </div>
     );
   }
-  const manual = order.paymentMethod === 'Manual bKash / Nagad';
   const online = order.paymentMethod === 'Online Payment';
   const [payBusy, setPayBusy] = useState(false);
   const [payErr, setPayErr] = useState('');
@@ -32,14 +31,7 @@ export default function OrderSuccess({ payNotice = '', order, formatPrice, isDar
         )}
       </div>
 
-      {manual && order.paymentStatus !== 'Paid' && (
-        <div className={`${panel} text-center space-y-1`}>
-          <p className="text-sm font-semibold">আপনার {order.manualPay ? order.manualPay.wallet : ''} পেমেন্টের তথ্য পেয়েছি। আমরা TrxID মিলিয়ে নিশ্চিত করব। / We received your payment details and will verify the TrxID shortly.</p>
-          {order.manualPay && <p className="text-xs text-gray-500">TrxID: {order.manualPay.trxId} · {formatPrice(order.total)}</p>}
-        </div>
-      )}
-
-      {ONLINE_PAY_ON && !manual && (online || Number(order.shipping) > 0) && order.paymentStatus !== 'Paid' && (
+      {ONLINE_PAY_ON && (online || Number(order.shipping) > 0) && order.paymentStatus !== 'Paid' && (
         <div className={`${panel} text-center space-y-3`}>
           <p className="text-sm font-semibold">
             {online
@@ -78,9 +70,7 @@ export default function OrderSuccess({ payNotice = '', order, formatPrice, isDar
         </div>
 
         <p className="text-xs text-gray-500 border-t pt-3">
-          {manual
-            ? 'We will check your bKash / Nagad payment and confirm your order. (আমরা আপনার পেমেন্ট যাচাই করে অর্ডার কনফার্ম করব।)'
-            : online
+          {online
             ? 'Our team will call you to share the payment instructions and confirm your order. (আমাদের প্রতিনিধি আপনাকে ফোন করে পেমেন্টের নির্দেশনা জানাবেন।)'
             : 'Our team will call you to confirm your order. You pay in cash when it is delivered. (ডেলিভারির সময় ক্যাশে পেমেন্ট করবেন।)'}
         </p>

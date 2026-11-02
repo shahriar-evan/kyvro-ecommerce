@@ -10,9 +10,6 @@ export default function StoreSettings({ products = [], settings, isDarkMode, sta
   const [speed, setSpeed] = useState(settings.bannerSpeed || 100);
   const [enabled, setEnabled] = useState(settings.discountEnabled);
   const [rules, setRules] = useState(settings.discountRules.map((r) => ({ ...r })));
-  const [mpOn, setMpOn] = useState(!!settings.manualPayEnabled);
-  const [mpB, setMpB] = useState(settings.manualbKash || '');
-  const [mpN, setMpN] = useState(settings.manualNagad || '');
   const [dIn, setDIn] = useState(String(settings.deliveryInside));
   const [dOut, setDOut] = useState(String(settings.deliveryOutside));
   const [dExtra, setDExtra] = useState(String(settings.deliveryExtraPerItem));
@@ -67,9 +64,6 @@ export default function StoreSettings({ products = [], settings, isDarkMode, sta
     setFreeOn(settings.freeDeliveryEnabled);
     setFreeMin(String(settings.freeDeliveryMin));
     setFreeFor(settings.freeDeliveryFor);
-    setMpOn(!!settings.manualPayEnabled);
-    setMpB(settings.manualbKash || '');
-    setMpN(settings.manualNagad || '');
     setMaintOn(settings.maintenanceMode);
     setMaintMsg(settings.maintenanceMessage || '');
   }, [settings]);
@@ -85,7 +79,7 @@ export default function StoreSettings({ products = [], settings, isDarkMode, sta
   const linkBtn = `text-xs font-medium underline underline-offset-4 decoration-indigo-400/60 hover:decoration-indigo-400 ${accentText}`;
   const subBox = `rounded-xl border p-4 ${isDarkMode ? 'border-white/10 bg-[#0e0e13]' : 'border-slate-200 bg-slate-50'}`;
 
-  const draft = normalizeSettings({ manualPayEnabled: mpOn, manualbKash: mpB, manualNagad: mpN, announcementText: text, bannerSpeed: speed, discountEnabled: enabled, discountRules: rules, deliveryInside: dIn === '' ? 0 : dIn, deliveryOutside: dOut === '' ? 0 : dOut, deliveryExtraPerItem: dExtra === '' ? 0 : dExtra, deliveryIncludedItems: dIncl === '' ? 1 : dIncl, freeDeliveryEnabled: freeOn, freeDeliveryMin: freeMin === '' ? 0 : freeMin, freeDeliveryFor: freeFor, maintenanceMode: maintOn, maintenanceMessage: maintMsg });
+  const draft = normalizeSettings({ announcementText: text, bannerSpeed: speed, discountEnabled: enabled, discountRules: rules, deliveryInside: dIn === '' ? 0 : dIn, deliveryOutside: dOut === '' ? 0 : dOut, deliveryExtraPerItem: dExtra === '' ? 0 : dExtra, deliveryIncludedItems: dIncl === '' ? 1 : dIncl, freeDeliveryEnabled: freeOn, freeDeliveryMin: freeMin === '' ? 0 : freeMin, freeDeliveryFor: freeFor, maintenanceMode: maintOn, maintenanceMessage: maintMsg });
   const t = Number(testTotal) || 0;
   const hit = bestDiscount(t, draft);
   const next = nextReward(t, draft);
@@ -152,7 +146,6 @@ export default function StoreSettings({ products = [], settings, isDarkMode, sta
     if (dIn === '' || dOut === '' || dExtra === '' || !(Number(dIncl) >= 1) || !(Number(dExtra) >= 0) || !(Number(dIn) >= 0) || !(Number(dOut) >= 0)) { setMsg('Error: type both delivery charges (0 or more).'); return; }
     if (freeOn && !(Number(freeMin) > 0)) { setMsg('Error: type the minimum order amount for free delivery (above 0), or switch free delivery OFF.'); return; }
     if (rules.some((r) => r.type === 'percent' && Number(r.value) > 100)) { setMsg('Error: a percent discount cannot be more than 100.'); return; }
-    if (mpOn && !draft.manualbKash && !draft.manualNagad) { setMsg('Error: type your bKash or Nagad number for manual payment, or switch it OFF.'); return; }
     setSaving(true);
     try {
       await saveStoreSettings(draft, staff);
@@ -230,30 +223,6 @@ export default function StoreSettings({ products = [], settings, isDarkMode, sta
               <p className={`text-[11px] mt-1 ${muted}`}>The message is saved when you press the button above, or with "Save Settings".</p>
             </div>
             {maintNote && <p className={`mt-3 ${msgClass(maintNote)}`}>{maintNote}</p>}
-          </>
-        )}
-
-        {section(
-          'Manual bKash / Nagad Payment',
-          'Customers send money to YOUR personal number, then type their own number and the TrxID at checkout. You check the TrxID in your bKash / Nagad app and press "Mark payment received" on the order. The option shows at checkout only when it is ON and you typed a number. Press "Save Settings" below to make it live.',
-          <>
-            <label className="flex items-center gap-2 text-sm mb-3 cursor-pointer">
-              <input type="checkbox" checked={mpOn} onChange={(e) => setMpOn(e.target.checked)} className="accent-indigo-600" />
-              <span>Offer manual bKash / Nagad payment at checkout</span>
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className={label}>Your bKash number</label>
-                <input inputMode="numeric" maxLength={16} value={mpB} onChange={(e) => setMpB(e.target.value)} className={input} placeholder="01XXXXXXXXX" />
-              </div>
-              <div>
-                <label className={label}>Your Nagad number (optional)</label>
-                <input inputMode="numeric" maxLength={16} value={mpN} onChange={(e) => setMpN(e.target.value)} className={input} placeholder="01XXXXXXXXX" />
-              </div>
-            </div>
-            <p className={`text-[11px] mt-2 ${muted}`}>Tip: check every TrxID yourself and never confirm the same TrxID on two orders. Heavy business use of a personal number can get it restricted by bKash / Nagad.</p>
-            <div className="mt-4">{saveButton('manual')}</div>
-            {msg && msgAt === 'manual' && <p className={`mt-3 ${msgClass(msg)}`}>{msg}</p>}
           </>
         )}
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Trash2 } from 'lucide-react';
-import { deliveryAreaFor, DELIVERY_AREAS, DELIVERY_AREA_BN, PAYMENT_METHODS, PAYMENT_METHOD_BN, MANUAL_METHOD, ONLINE_PAY_ON, PAY_PROVIDER, CARD_PAY_ON, manualWallets, toBanglaDigits, deliveryNote, freeDeliveryApplies, freeDeliveryMissing, normalizeSettings } from '../data/shopConfig';
+import { deliveryAreaFor, DELIVERY_AREAS, DELIVERY_AREA_BN, PAYMENT_METHODS, PAYMENT_METHOD_BN, ONLINE_PAY_ON, PAY_PROVIDER, CARD_PAY_ON, toBanglaDigits, deliveryNote, freeDeliveryApplies, freeDeliveryMissing, normalizeSettings } from '../data/shopConfig';
 
 export default function CheckoutView({
   storeSettings, cart, checkoutForm, setCheckoutForm, checkoutError, deliveryCharge, grandTotal, formatPrice,
@@ -25,17 +25,13 @@ export default function CheckoutView({
     next.deliveryArea = deliveryAreaFor(next.district, next.upazila, !!(z && z.m));
     setCheckoutForm(next);
   };
-  const wallets = manualWallets(storeSettings);
-  const methods = PAYMENT_METHODS.filter((m) => (m !== MANUAL_METHOD || wallets.length > 0) && (m !== 'Online Payment' || ONLINE_PAY_ON));
-  const manual = checkoutForm.paymentMethod === MANUAL_METHOD && wallets.length > 0;
-  const wallet = wallets.includes(checkoutForm.manualWallet) ? checkoutForm.manualWallet : (wallets[0] || '');
-  const walletNo = wallet ? normalizeSettings(storeSettings)['manual' + wallet] : '';
+  const methods = PAYMENT_METHODS.filter((m) => m !== 'Online Payment' || ONLINE_PAY_ON);
   const online = ONLINE_PAY_ON && checkoutForm.paymentMethod === 'Online Payment';
   const areaChosen = !!checkoutForm.deliveryArea;
   // what the customer pays online when pressing Place Order: Online Payment = everything, Cash on Delivery = the delivery charge
-  const payNow = !ONLINE_PAY_ON || manual ? 0 : online ? grandTotal : (areaChosen ? deliveryCharge : 0);
+  const payNow = !ONLINE_PAY_ON ? 0 : online ? grandTotal : (areaChosen ? deliveryCharge : 0);
   // UddoktaPay: the pay button is always shown (bKash / Nagad), even before a delivery area is chosen
-  const showPayBtn = payNow > 0 || (PAY_PROVIDER === 'uddokta' && ONLINE_PAY_ON && !manual);
+  const showPayBtn = payNow > 0 || (PAY_PROVIDER === 'uddokta' && ONLINE_PAY_ON);
   const payAmt = payNow > 0 ? ` ${formatPrice(payNow)}` : '';
   const placeLabel = placingOrder ? 'Placing order...' : (payNow > 0 ? `Place Order & Pay ${formatPrice(payNow)}` : 'Place Order');
 
@@ -223,26 +219,6 @@ export default function CheckoutView({
                 </label>
               ))}
             </div>
-
-            {manual && (
-              <div className={`rounded border p-4 space-y-3 text-sm ${isDarkMode ? 'bg-[#121212] border-[#D4AF37]/50' : 'bg-white border-[#D4AF37]/60'}`}>
-                <p className="font-semibold">১) নিচের নম্বরে "Send Money" করুন {formatPrice(grandTotal)} / Send exactly {formatPrice(grandTotal)} to:</p>
-                <div className="flex gap-2">
-                  {wallets.map((w) => (
-                    <button key={w} type="button" onClick={() => set('manualWallet', w)} className={`px-4 py-2 text-xs font-bold rounded border ${wallet === w ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'border-gray-400'}`}>{w}</button>
-                  ))}
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl font-bold tracking-wider select-all">{walletNo}</span>
-                  <button type="button" onClick={() => { try { navigator.clipboard.writeText(walletNo); } catch (e) { /* ignore */ } }} className="text-xs underline">Copy</button>
-                </div>
-                <p className="text-xs text-gray-500">Personal number, so use "Send Money" (not Payment/Cash Out). (সেন্ড মানি করুন)</p>
-                <p className="font-semibold">২) টাকা পাঠানোর পর তথ্য দিন / Then fill in:</p>
-                <input className={input} inputMode="numeric" placeholder={`Your ${wallet} number (যে নম্বর থেকে পাঠিয়েছেন)`} value={checkoutForm.manualSender || ''} onChange={(e) => set('manualSender', e.target.value)} />
-                <input className={input} placeholder="TrxID (e.g. 9H7K2LM3QA)" maxLength={20} value={checkoutForm.manualTrx || ''} onChange={(e) => set('manualTrx', e.target.value.toUpperCase())} />
-                <p className="text-xs text-gray-500">We verify the TrxID and amount before confirming your order. A wrong TrxID delays your order. (ভুল TrxID দিলে অর্ডার কনফার্ম হতে দেরি হবে)</p>
-              </div>
-            )}
 
             <div className={`text-xs leading-relaxed rounded border p-3 ${isDarkMode ? 'border-[#D4AF37]/40 bg-[#D4AF37]/10' : 'border-[#D4AF37]/50 bg-[#D4AF37]/10'}`}>
               <p>{deliveryNote(storeSettings, cart.reduce((n, i) => n + (parseInt(i.quantity, 10) || 0), 0)).bn}</p>

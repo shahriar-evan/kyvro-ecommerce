@@ -11,7 +11,7 @@ import { ensureSubscribed } from './subscribers';
 import PushPrompt from './components/PushPrompt';
 import { watchProducts, watchProductCosts, saveProductCost, removeProductCost, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
 import { watchStoreSettings } from './storeSettings';
-import { cleanPhone, ONLINE_PAY_ON, MANUAL_METHOD, manualWallets, DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
+import { cleanPhone, ONLINE_PAY_ON, DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
 import { INITIAL_PRODUCTS } from './data/products';
 import { CURRENCIES } from './data/currencies';
 import { hasSubCategories, defaultCategoryFor, matchesCollectionPage, hasSizeStock, stockForSize, orderedSizes, hasColorStock, stockFor, variantKey, needsChoice, imageFor } from './data/catalog';
@@ -47,7 +47,7 @@ import { initAnalytics, trackPageView, trackViewContent, trackAddToCart, trackIn
 
 const EMPTY_CHECKOUT = {
   fullName: '', phone: '', address: '', notes: '',
-  district: '', upazila: '', area: '', deliveryArea: '', paymentMethod: 'Cash on Delivery', manualWallet: '', manualSender: '', manualTrx: '', agree: false
+  district: '', upazila: '', area: '', deliveryArea: '', paymentMethod: 'Cash on Delivery', agree: false
 };
 
 const LAST_SHOP_KEY = 'kyvro_last_supplier_shop';
@@ -536,16 +536,6 @@ export default function App() {
       `City: ${checkoutForm.district}`
     ].filter(Boolean).join('\n');
     if (!ONLINE_PAY_ON && checkoutForm.paymentMethod === 'Online Payment') return setCheckoutError('Online payment is not available right now. Please choose another payment method.');
-    const isManual = checkoutForm.paymentMethod === MANUAL_METHOD;
-    const wl = manualWallets(storeSettings);
-    const wallet = wl.includes(checkoutForm.manualWallet) ? checkoutForm.manualWallet : (wl[0] || '');
-    const sender = cleanPhone((checkoutForm.manualSender || '').trim());
-    const trxId = (checkoutForm.manualTrx || '').trim().toUpperCase();
-    if (isManual) {
-      if (!wl.includes(wallet)) return setCheckoutError('Please choose bKash or Nagad. (বিকাশ বা নগদ বেছে নিন)');
-      if (!/^[+]?[0-9]{7,15}$/.test(sender)) return setCheckoutError('Enter the number you sent the money from. (যে নম্বর থেকে টাকা পাঠিয়েছেন সেটি দিন)');
-      if (!/^[A-Z0-9]{6,20}$/.test(trxId)) return setCheckoutError('Enter the correct TrxID from your payment SMS. (পেমেন্টের TrxID দিন)');
-    }
     if (!checkoutForm.agree) return setCheckoutError('Please accept the Terms & Conditions, Privacy Policy and Return & Refund Policy to continue.');
 
     // Make sure everything in the cart is still in stock
@@ -582,7 +572,6 @@ export default function App() {
       total: grandTotal,
       paymentMethod: checkoutForm.paymentMethod,
       paymentStatus: paymentStatusFor(checkoutForm.paymentMethod),
-      ...(isManual ? { manualPay: { wallet, sender, trxId } } : {}),
       status: 'Pending',
       ...(customerUser ? { uid: customerUser.uid } : {}),
       ...(customerUser && customerUser.email ? { email: customerUser.email.toLowerCase() } : {})
@@ -599,7 +588,7 @@ export default function App() {
       // Either way the customer goes straight to the bKash / card payment page.
       // If the payment page cannot be opened, the order is still saved and the thank-you page lets them pay again.
       setPayNotice('');
-      if (ONLINE_PAY_ON && !isManual && (order.paymentMethod === 'Online Payment' || (Number(order.shipping) || 0) > 0)) {
+      if (ONLINE_PAY_ON && (order.paymentMethod === 'Online Payment' || (Number(order.shipping) || 0) > 0)) {
         try {
           const url = await getPaymentUrl(orderNumber, payVia);
           window.location.href = url;

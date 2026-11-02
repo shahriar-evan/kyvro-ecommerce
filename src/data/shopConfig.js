@@ -30,16 +30,8 @@ export const ONLINE_PAY_ON = import.meta.env.VITE_ONLINE_PAY === 'on';
 export const PAY_PROVIDER = import.meta.env.VITE_PAY_PROVIDER === 'uddokta' ? 'uddokta' : 'sslcommerz';
 // With UddoktaPay: shows the separate "Pay with Card" button (set VITE_CARD_PAY=on only after the Stripe gateway is LIVE)
 export const CARD_PAY_ON = PAY_PROVIDER !== 'uddokta' || import.meta.env.VITE_CARD_PAY === 'on';
-export const MANUAL_METHOD = 'Manual bKash / Nagad';
-export const PAYMENT_METHODS = ['Cash on Delivery', 'Online Payment', MANUAL_METHOD];
-export const PAYMENT_METHOD_BN = { 'Cash on Delivery': 'ক্যাশ অন ডেলিভারি', 'Online Payment': 'অনলাইন পেমেন্ট', [MANUAL_METHOD]: 'বিকাশ / নগদে সেন্ড মানি' };
-export const MANUAL_WALLETS = ['bKash', 'Nagad'];
-// Manual payment is offered only when the Owner switched it on AND typed at least one number
-export const manualWallets = (settings) => {
-  const s = normalizeSettings(settings);
-  if (!s.manualPayEnabled) return [];
-  return MANUAL_WALLETS.filter((w) => s['manual' + w]);
-};
+export const PAYMENT_METHODS = ['Cash on Delivery', 'Online Payment'];
+export const PAYMENT_METHOD_BN = { 'Cash on Delivery': 'ক্যাশ অন ডেলিভারি', 'Online Payment': 'অনলাইন পেমেন্ট' };
 
 export const ORDER_STATUSES = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
 
@@ -49,7 +41,7 @@ export const freeDeliveryApplies = (netTotal, method, settings) => {
   if (!s.freeDeliveryEnabled) return false;
   if (!(netTotal >= s.freeDeliveryMin)) return false;
   if (s.freeDeliveryFor === 'both') return true;
-  return s.freeDeliveryFor === 'online' ? (method === 'Online Payment' || method === MANUAL_METHOD) : method === 'Cash on Delivery';
+  return s.freeDeliveryFor === 'online' ? method === 'Online Payment' : method === 'Cash on Delivery';
 };
 
 // Delivery charge for the order. 0 until the customer has chosen the delivery area (checkout shows "Select city & zone").
@@ -83,7 +75,7 @@ export const freeDeliveryMissing = (netTotal, settings) => {
 };
 
 export const paymentStatusFor = (method) =>
-  method === 'Online Payment' ? 'Awaiting payment' : method === MANUAL_METHOD ? 'Awaiting verification' : 'Cash on Delivery';
+  method === 'Online Payment' ? 'Awaiting payment' : 'Cash on Delivery';
 
 export const toBanglaDigits = (n) => String(n).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
 
@@ -99,9 +91,6 @@ export const DEFAULT_STORE_SETTINGS = {
   ...DEFAULT_DELIVERY,
   maintenanceMode: false, // true = visitors see the "under maintenance" page; team members still see the real website
   maintenanceMessage: '',
-  manualPayEnabled: false, // manual bKash / Nagad send-money option at checkout
-  manualbKash: '',
-  manualNagad: '',
 };
 
 const num = (v) => {
@@ -139,9 +128,6 @@ export function normalizeSettings(raw) {
     freeDeliveryFor: FREE_DELIVERY_FOR.includes(raw.freeDeliveryFor) ? raw.freeDeliveryFor : DEFAULT_DELIVERY.freeDeliveryFor,
     maintenanceMode: raw.maintenanceMode === true,
     maintenanceMessage: typeof raw.maintenanceMessage === 'string' ? raw.maintenanceMessage.slice(0, 300) : '',
-    manualPayEnabled: raw.manualPayEnabled === true,
-    manualbKash: typeof raw.manualbKash === 'string' ? raw.manualbKash.replace(/[^0-9+]/g, '').slice(0, 16) : '',
-    manualNagad: typeof raw.manualNagad === 'string' ? raw.manualNagad.replace(/[^0-9+]/g, '').slice(0, 16) : '',
   };
 }
 
