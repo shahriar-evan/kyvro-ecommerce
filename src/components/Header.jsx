@@ -126,7 +126,8 @@ export default function Header({ cart, curr, currencyKey, currentView, isDarkMod
             </div>
 
             <button 
-              onClick={() => setIsCartOpen(true)}
+              data-cart-toggle
+              onClick={() => setIsCartOpen((open) => !open)}
               className={`transition relative flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-full border ${isDarkMode ? 'text-gray-300 bg-[#1a1a1a] border-gray-800' : 'text-gray-800 bg-gray-100 border-gray-300'}`}
             >
               <ShoppingBag size={16} className="text-[#D4AF37]" />

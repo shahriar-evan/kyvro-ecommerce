@@ -1,12 +1,27 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { ShoppingBag, X, ChevronRight, Trash2 } from 'lucide-react';
 import { deliveryNote, freeDeliveryMissing, normalizeSettings } from '../data/shopConfig';
 
 export default function CartDrawer({ storeSettings, cart, formatPrice, isDarkMode, removeFromCart, setCurrentView, setIsCartOpen, subtotal, discount = 0, discountLabel = '', reward = null, updateCartQty }) {
+  const panelRef = useRef(null);
+  // Touching / clicking anywhere outside the cart closes it, and that touch still works on the page underneath
+  // (the dark backdrop does not block clicks, so a menu link, a product, etc. opens straight away).
+  useEffect(() => {
+    const onDown = (e) => {
+      const t = e.target;
+      if (panelRef.current && panelRef.current.contains(t)) return;
+      if (t && t.closest && t.closest('[data-cart-toggle]')) return; // the header cart button toggles it by itself
+      setIsCartOpen(false);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setIsCartOpen(false); };
+    document.addEventListener('pointerdown', onDown, true);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('pointerdown', onDown, true); document.removeEventListener('keydown', onKey); };
+  }, [setIsCartOpen]);
   return (
     <>
-        <div className="fixed inset-0 z-50 bg-black/70 flex justify-end">
-          <div className={`w-full max-w-md h-full p-6 flex flex-col justify-between border-l shadow-2xl ${isDarkMode ? 'bg-[#161616] border-gray-800 text-white' : 'bg-white border-gray-300 text-black'}`}>
+        <div className="fixed inset-0 z-50 bg-black/70 flex justify-end pointer-events-none">
+          <div ref={panelRef} className={`pointer-events-auto w-full max-w-md h-full p-6 flex flex-col justify-between border-l shadow-2xl ${isDarkMode ? 'bg-[#161616] border-gray-800 text-white' : 'bg-white border-gray-300 text-black'}`}>
             <div>
               <div className="flex justify-between items-center pb-4 border-b">
                 <h2 className="text-lg font-serif font-bold flex items-center gap-2">
@@ -33,7 +48,12 @@ export default function CartDrawer({ storeSettings, cart, formatPrice, isDarkMod
                 <div className="py-4 space-y-4 max-h-[55vh] overflow-y-auto pr-2">
                   {cart.map(item => (
                     <div key={item.cartItemId} className={`flex gap-4 p-3 rounded-lg border ${isDarkMode ? 'bg-[#1f1f1f] border-gray-800' : 'bg-gray-100 border-gray-300'}`}>
-                      <img src={item.image} alt={item.name} className="w-20 h-20 object-cover rounded" />
+                      <div className="flex flex-col items-center gap-2 shrink-0">
+                        <img src={item.image} alt={item.name} className="w-20 h-20 object-cover rounded" />
+                        <button type="button" onClick={() => removeFromCart(item.cartItemId)} aria-label="Remove from cart" className="w-20 inline-flex items-center justify-center gap-1 rounded bg-red-600 hover:bg-red-700 text-white text-[11px] font-semibold py-1 transition">
+                          <Trash2 size={12} /> Remove
+                        </button>
+                      </div>
                       <div className="flex-1">
                         <h4 className="text-sm font-medium line-clamp-1">{item.name}</h4>
                         <p className="text-xs text-[#D4AF37] mt-0.5">{formatPrice(item.price)}</p>
@@ -45,9 +65,6 @@ export default function CartDrawer({ storeSettings, cart, formatPrice, isDarkMod
                             <span className="px-2 text-xs">{item.quantity}</span>
                             <button onClick={() => updateCartQty(item.cartItemId, 1)} className="px-2 py-0.5 text-gray-400 hover:text-black">+</button>
                           </div>
-                          <button onClick={() => removeFromCart(item.cartItemId)} className="text-gray-500 hover:text-red-400">
-                            <Trash2 size={16} />
-                          </button>
                         </div>
                       </div>
                     </div>
