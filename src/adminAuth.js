@@ -100,7 +100,7 @@ export async function createAdminAccount(email, password, role = "admin", profil
     editAll: profile.editAll === true,
     addProducts: profile.addProducts === true,
     canApprove: profile.canApprove === true,
-    commission: Math.max(0, Math.min(100, Number(profile.commission) || 0)),
+    commission: Math.max(0, Math.min(MAX_COMMISSION, Number(profile.commission) || 0)),
   });
   // Owner-only extras. The password is only saved when we really created the account
   // (if the account already existed, the password typed here is not its real password).
@@ -186,8 +186,11 @@ export async function setAdminCanApprove(email, on) {
 }
 
 // Owner: commission percent (0-100) this person earns on the profit of the orders they confirm
+// The highest commission % the Owner can set (protects your profit margin). Change this one number to raise or lower the limit.
+export const MAX_COMMISSION = 15;
+
 export async function setAdminCommission(email, pct) {
-  const n = Math.max(0, Math.min(100, Number(pct) || 0));
+  const n = Math.max(0, Math.min(MAX_COMMISSION, Number(pct) || 0));
   await updateDoc(doc(db, "admins", norm(email)), { commission: n });
 }
 

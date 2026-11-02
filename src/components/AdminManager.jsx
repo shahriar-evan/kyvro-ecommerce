@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { askConfirm, askInput } from './AlertCenter';
 import { OWNER_EMAILS, ownerName } from '../adminEmails';
-import { listAdmins, listPrivateDetails, createAdminAccount, updateAdminProfile, changeAdminEmail, setAdminRole, setAdminActive, removeAdmin, sendAdminPasswordReset, setAdminPasswordByOwner, setAdminEditAll, setAdminAddProducts, setAdminCanApprove, setAdminCommission, ROLES, ROLE_LABELS } from '../adminAuth';
+import { listAdmins, listPrivateDetails, createAdminAccount, updateAdminProfile, changeAdminEmail, setAdminRole, setAdminActive, removeAdmin, sendAdminPasswordReset, setAdminPasswordByOwner, setAdminEditAll, setAdminAddProducts, setAdminCanApprove, setAdminCommission, MAX_COMMISSION, ROLES, ROLE_LABELS } from '../adminAuth';
 import { auth } from '../firebase';
 
 const randomPassword = () => {
@@ -319,10 +319,10 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
 
   const handleCommission = async (a) => {
     setMessage(null);
-    const v = await askInput(`Commission % for ${a.name || a.email}\n\nThey earn this percent of the profit on the orders they confirm (counted when the order is delivered). Type 0 for none.`, { initial: String(a.commission || 0), placeholder: '0 - 100' });
+    const v = await askInput(`Commission % for ${a.name || a.email}\n\nThey earn this percent of the profit on the orders they confirm (counted when the order is delivered). Type 0 for none.`, { initial: String(a.commission || 0), placeholder: `0 - ${MAX_COMMISSION}` });
     if (v === null || v === undefined) return;
     const n = Number(String(v).trim());
-    if (!isFinite(n) || n < 0 || n > 100) { setMessage({ type: 'err', text: 'Type a number between 0 and 100.' }); return; }
+    if (!isFinite(n) || n < 0 || n > MAX_COMMISSION) { setMessage({ type: 'err', text: `Type a number between 0 and ${MAX_COMMISSION} (the highest commission allowed).` }); return; }
     try {
       await setAdminCommission(a.email, n);
       setMessage({ type: 'ok', text: `Commission for ${a.name || a.email} is now ${n}%.` });
@@ -491,8 +491,8 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
         )}
         {isOwner && (
           <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Commission % (optional)</label>
-            <input type="number" min="0" max="100" step="0.5" value={commissionNew} onChange={(e) => setCommissionNew(e.target.value)} placeholder="e.g. 10" className={inputClass} />
+            <label className="block text-xs font-semibold text-gray-500 mb-1">Commission % (optional, highest {MAX_COMMISSION}%)</label>
+            <input type="number" min="0" max={MAX_COMMISSION} step="0.5" value={commissionNew} onChange={(e) => setCommissionNew(e.target.value)} placeholder="e.g. 10" className={inputClass} />
           </div>
         )}
         <button type="submit" disabled={busy} className="bg-[#D4AF37] text-black font-bold px-6 py-3 rounded text-xs uppercase tracking-widest hover:opacity-90 transition disabled:opacity-50">
