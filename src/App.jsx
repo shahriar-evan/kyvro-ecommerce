@@ -646,6 +646,8 @@ export default function App() {
       paymentStatus: paymentStatusFor(checkoutForm.paymentMethod),
       status: 'Pending',
       ...(shopCtx ? { shop: shopSlug } : {}),
+      // an Admin who places the order while selling: the commission goes to this person
+      ...(isAdminLoggedIn && adminRole === 'admin' && customerUser && customerUser.email && String(customerUser.email).toLowerCase() === String(loggedInUserEmail || '').toLowerCase() ? { soldBy: String(loggedInUserEmail).toLowerCase() } : {}),
       ...(customerUser ? { uid: customerUser.uid } : {}),
       ...(customerUser && customerUser.email ? { email: customerUser.email.toLowerCase() } : {})
     };

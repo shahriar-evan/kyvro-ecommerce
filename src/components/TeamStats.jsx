@@ -102,6 +102,12 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
         const k = person(cEmail, cName);
         if (k) evs.push({ who: k, kind: 'confirmed', at: toDate(conf && conf.at) || toDate(o.updatedAt) || toDate(o.createdAt), order: o });
       }
+      // sold by an Admin (the Admin placed the order): this Admin earns the commission once it is delivered
+      if (o.soldBy && o.status === 'Delivered') {
+        const de = lastEntry(o, 'Delivered');
+        const k = person(o.soldBy, '');
+        if (k) evs.push({ who: k, kind: 'sold', at: toDate(de && de.at) || toDate(o.updatedAt) || toDate(o.createdAt), order: o });
+      }
       // shop orders: the shop owner earns the markup once the order is delivered
       const so = o.shop ? shopOwners[o.shop] : null;
       if (so && o.status === 'Delivered') {
@@ -133,11 +139,11 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
       const rt = resets[ev.who];
       if (rt && (!ev.at || ev.at <= rt)) continue; // before the Owner reset this person's stats
       const s = get(ev.who);
-      s[ev.kind].push(ev);
+      if (ev.kind !== 'sold') s[ev.kind].push(ev);
       if (ev.kind === 'shop') s.shopTotal += markupOf(ev.order);
       const em = String((people[ev.who] || {}).email || '').toLowerCase();
       const role = isOwner ? roles[em] : (ev.who === me ? adminRole : '');
-      if (ev.kind === 'confirmed' && ev.order.status === 'Delivered' && role !== 'manager' && role !== 'owner') { // Admins earn commission, Managers earn the shop markup
+      if (((ev.kind === 'sold') || (ev.kind === 'confirmed' && !ev.order.soldBy)) && ev.order.status === 'Delivered' && role !== 'manager' && role !== 'owner') { // Admins earn commission, Managers earn the shop markup
         const { profit, unknown, commission, lines } = orderProfit(ev.order);
         s.profit += profit; s.unknownCost += unknown; s.commTotal += commission; s.comm.push({ ev, profit, unknown, commission, lines });
       }
