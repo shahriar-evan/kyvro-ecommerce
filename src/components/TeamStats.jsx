@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { askConfirm } from './AlertCenter';
-import { loadStatsResets, resetAdminStats } from '../adminAuth';
+import { loadStatsResets, resetAdminStats, listAdmins } from '../adminAuth';
 import { toDate, formatDateTime } from '../utils/dates';
 
 // Team performance: who confirmed / delivered / cancelled how many orders, and which products and how much money that was.
@@ -31,7 +31,7 @@ const lastEntry = (o, status) => {
 };
 const keyOf = (email, name) => String(email || name || '').trim().toLowerCase();
 
-export default function TeamStats({ productCosts = {}, productCommissions = {}, shopOwners = {}, showProfit = true, products = [], startEditProduct, canEditProduct, orders, isDarkMode, formatPrice, isOwner, loggedInUserEmail, adminName }) {
+export default function TeamStats({ productCosts = {}, productCommissions = {}, shopOwners = {}, adminRole = '', showProfit = true, products = [], startEditProduct, canEditProduct, orders, isDarkMode, formatPrice, isOwner, loggedInUserEmail, adminName }) {
   const [preset, setPreset] = useState('month');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -43,6 +43,12 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
   // a shop's markup on one order = (price the customer paid - store price) x pieces
   const markupOf = (o) => (o.items || []).reduce((n, it) => n + Math.max(0, (Number(it.price) || 0) - (it.basePrice !== undefined ? Number(it.basePrice) || 0 : Number(it.price) || 0)) * (parseInt(it.quantity, 10) || 0), 0);
   const myShopSlugs = Object.entries(shopOwners).filter(([, o]) => String(o.email || '').toLowerCase() === String(loggedInUserEmail || '').toLowerCase()).map(([k]) => k);
+  // Managers earn the shop markup, Admins earn commission: the Owner's view needs everybody's role
+  const [roles, setRoles] = useState({});
+  useEffect(() => {
+    if (!isOwner) return;
+    listAdmins().then((l) => { const m = {}; l.forEach((a) => { m[String(a.email).toLowerCase()] = a.role; }); setRoles(m); }).catch(() => {});
+  }, [isOwner]);
   const anyCommission = Object.keys(productCommissions).length > 0;
   // profit and commission of one order: per item (selling price - supplier price) x pieces, commission = that profit x the product's commission %
   const orderProfit = (o) => {
@@ -57,7 +63,7 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
         const ccs = c.colorCosts || {};
         const ck = Object.keys(ccs).find((k) => k.toLowerCase() === String(it.color || '').trim().toLowerCase());
         const unit = ck !== undefined ? (Number(ccs[ck]) || 0) : (Number(c.supplierCost) || 0);
-        lineProfit = ((Number(it.price) || 0) - unit) * q;
+        lineProfit = ((it.basePrice !== undefined ? Number(it.basePrice) || 0 : Number(it.price) || 0) - unit) * q; // the store price: a shop's markup is not profit to share
       } else if (cm && typeof cm.profit === 'number') {
         // Admins do not get the supplier price: the profit per piece saved with the commission is used instead
         const cps = cm.colorProfit || {};
@@ -129,7 +135,9 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
       const s = get(ev.who);
       s[ev.kind].push(ev);
       if (ev.kind === 'shop') s.shopTotal += markupOf(ev.order);
-      if (ev.kind === 'confirmed' && ev.order.status === 'Delivered' && !ev.order.shop) { // orders from a shop pay the shop owner's markup, no commission
+      const em = String((people[ev.who] || {}).email || '').toLowerCase();
+      const role = isOwner ? roles[em] : (ev.who === me ? adminRole : '');
+      if (ev.kind === 'confirmed' && ev.order.status === 'Delivered' && role !== 'manager' && role !== 'owner') { // Admins earn commission, Managers earn the shop markup
         const { profit, unknown, commission, lines } = orderProfit(ev.order);
         s.profit += profit; s.unknownCost += unknown; s.commTotal += commission; s.comm.push({ ev, profit, unknown, commission, lines });
       }
@@ -161,7 +169,7 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
       seen.forEach((k) => { get(k).mine.orders += 1; });
     }
     return out; // eslint-disable-next-line
-  }, [events, preset, from, to, resets, products, productCosts, productCommissions]);
+  }, [events, preset, from, to, resets, products, productCosts, productCommissions, roles, adminRole]);
 
   // products each person added (a separate list under their card)
   const addedBy = useMemo(() => {
@@ -310,7 +318,7 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
                 {s.shop.length > 0 && (
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wider mb-1">Shop earnings details</p>
-                    <p className="text-[11px] text-gray-500 mb-2">Markup = (price the customer paid &minus; store price) &times; pieces, counted when the order is delivered. The whole markup belongs to the shop owner. Orders from a shop earn no commission.</p>
+                    <p className="text-[11px] text-gray-500 mb-2">Markup = (price the customer paid &minus; store price) &times; pieces, counted when the order is delivered. The whole markup belongs to the Manager who owns the shop. Admins who confirm these orders earn their usual commission on the store profit.</p>
                     <div className="divide-y text-xs">
                       {[...s.shop].sort((a, b) => (b.at || 0) - (a.at || 0)).map((ev) => (
                         <div key={ev.order.orderNumber + 'sh'} className="py-2 space-y-0.5">
@@ -327,7 +335,7 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
                 {anyCommission && (
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wider mb-1">Commission details</p>
-                    <p className="text-[11px] text-gray-500 mb-2">Commission = profit of the product &times; the commission % the Owner set for that product. {showProfit ? 'Profit = (selling price − supplier price) × pieces. ' : ''}Only <strong>Delivered</strong> orders {p.key === me ? 'you' : 'they'} confirmed are counted, cancelled or returned orders earn nothing.</p>
+                    <p className="text-[11px] text-gray-500 mb-2">Commission = profit of the product &times; the commission % the Owner set for that product. {showProfit ? 'Profit = (selling price − supplier price) × pieces. ' : ''}Only <strong>Delivered</strong> orders {p.key === me ? 'you' : 'they'} confirmed are counted (commission is for Admins; Managers earn the shop markup), cancelled or returned orders earn nothing.</p>
                     {s.comm.length === 0 ? <p className="text-xs text-gray-500">No delivered orders in this period yet.</p> : (
                       <div className="divide-y text-xs">
                         {[...s.comm].sort((a, b) => (b.ev.at || 0) - (a.ev.at || 0)).map((c) => (

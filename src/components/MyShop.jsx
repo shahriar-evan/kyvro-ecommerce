@@ -3,10 +3,10 @@ import { auth } from '../firebase';
 import { watchMyShop, watchAllShops, watchShopOwners, createShop, saveShopItems, setShopActive } from '../shops';
 import { maxMarkupFor, shopPriceClamp, SHOP_COLLECTIONS, productInCollection } from '../data/shopConfig';
 
-// "My Shop": every Admin / Manager gets their own link (kyvro.store/?shop=name). They choose which products to show
+// "My Shop": every Manager gets their own link (kyvro.store/?shop=name). They choose which products to show
 // (by collection or one by one) and the price they sell at, up to the limit for that product. The whole markup is theirs.
 // Payments (online, delivery charge, cash on delivery) all stay with the store; the Owner pays the markup out later.
-export default function MyShop({ products, isOwner, isDarkMode, formatPrice, adminName, loggedInUserEmail }) {
+export default function MyShop({ adminRole, products, isOwner, isDarkMode, formatPrice, adminName, loggedInUserEmail }) {
   const [shop, setShop] = useState(undefined); // undefined = loading, null = none yet
   const [draft, setDraft] = useState({}); // productId -> price text (only the products that are in the shop)
   const [name, setName] = useState('');
@@ -23,9 +23,10 @@ export default function MyShop({ products, isOwner, isDarkMode, formatPrice, adm
       const b = watchShopOwners(setOwners, () => {});
       return () => { a(); b(); };
     }
+    if (adminRole === 'admin') return watchAllShops(setAllShops, () => {}); // Admins only see the shop links (read only)
     if (!uid) { setShop(null); return undefined; }
     return watchMyShop(uid, (s) => setShop(s), () => setShop(null));
-  }, [isOwner, uid]);
+  }, [isOwner, adminRole, uid]);
 
   // load the saved shop into the editable draft (once per shop, and again after saving)
   const [loadedFor, setLoadedFor] = useState('');
@@ -104,13 +105,37 @@ export default function MyShop({ products, isOwner, isDarkMode, formatPrice, adm
     );
   }
 
-  // ---------- Admin / Manager ----------
+  // ---------- Admin: only the shop links, nothing to set up ----------
+  if (adminRole === 'admin') {
+    return (
+      <div className={card}>
+        <h3 className="text-lg font-bold">Shops</h3>
+        <p className="text-xs text-gray-500">These are the shop pages the Managers set up. Share them, keep an eye on their orders and confirm them in the Orders tab. Setting up a shop (choosing products and prices) is done by Managers. You earn the commission shown on each product.</p>
+        {msg && <p className={`text-xs ${msg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{msg.text}</p>}
+        {allShops.filter((x) => x.active !== false).length === 0 ? <p className="text-sm text-gray-500">No shops yet.</p> : (
+          <div className="divide-y text-xs">
+            {allShops.filter((x) => x.active !== false).map((x) => (
+              <div key={x.slug} className="py-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-bold">{x.name || x.slug}</p>
+                  <p className="text-gray-500 break-all">{window.location.origin}/?shop={x.slug} · {Object.keys(x.items || {}).length} products</p>
+                </div>
+                <button type="button" onClick={() => copy(`${window.location.origin}/?shop=${x.slug}`)} className="px-3 py-1.5 rounded border border-gray-400 font-semibold">Copy link</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ---------- Manager ----------
   if (shop === undefined) return <p className="text-sm text-gray-500 py-8 text-center">Loading...</p>;
   if (shop === null) {
     return (
       <div className={card}>
         <h3 className="text-lg font-bold">Create my shop</h3>
-        <p className="text-xs text-gray-500">You get your own link. Customers who open it see the same Kyvro store, but only the products you choose, at the price you set (within the allowed limit). Everything above the store price is your earning.</p>
+        <p className="text-xs text-gray-500">You get your own link, and you earn the markup. Customers who open it see the same Kyvro store, but only the products you choose, at the price you set (within the allowed limit). Everything above the store price is your earning. Admins can share your link and confirm its orders; they earn commission, not the markup.</p>
         <div className="flex flex-wrap gap-2 items-center">
           <input className={`${inputCls} w-64`} placeholder="Shop name, e.g. Rahim Fashion" maxLength={60} value={newName} onChange={(e) => setNewName(e.target.value)} />
           <button type="button" disabled={busy} onClick={doCreate} className="bg-[#D4AF37] text-black font-bold px-5 py-2 rounded text-xs uppercase tracking-wider disabled:opacity-50">{busy ? 'Creating...' : 'Create shop'}</button>

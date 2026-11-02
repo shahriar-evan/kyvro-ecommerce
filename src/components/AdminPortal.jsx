@@ -280,7 +280,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                   onClick={() => setAdminTab('my-shop')}
                   className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'my-shop' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
                 >
-                  {isOwner ? 'Team Shops' : 'My Shop'}
+                  {isOwner ? 'Team Shops' : adminRole === 'manager' ? 'My Shop' : 'Shops'}
                 </button>
                 <button
                   onClick={() => setAdminTab('my-products')}
@@ -704,11 +704,11 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                 </div>
               )}
 
-              {adminTab === 'my-shop' && <MyShop products={products} isOwner={isOwner} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} />}
+              {adminTab === 'my-shop' && <MyShop adminRole={adminRole} products={products} isOwner={isOwner} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} />}
 
               {adminTab === 'my-products' && <MyProducts products={products} loggedInUserEmail={loggedInUserEmail} isDarkMode={isDarkMode} formatPrice={formatPrice} startEditProduct={startEditProduct} canEditProduct={canEditProduct} />}
 
-              {adminTab === 'stats' && <TeamStats shopOwners={shopOwners} showProfit={canSeeSupplier} productCosts={productCosts} productCommissions={productCommissions} products={products} startEditProduct={startEditProduct} canEditProduct={canEditProduct} orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} isOwner={isOwner} loggedInUserEmail={loggedInUserEmail} adminName={adminName} />}
+              {adminTab === 'stats' && <TeamStats adminRole={adminRole} shopOwners={shopOwners} showProfit={canSeeSupplier} productCosts={productCosts} productCommissions={productCommissions} products={products} startEditProduct={startEditProduct} canEditProduct={canEditProduct} orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} isOwner={isOwner} loggedInUserEmail={loggedInUserEmail} adminName={adminName} />}
 
               {adminTab === 'orders' && <OrdersPanel orders={orders} productCosts={productCosts} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} canUnblock={adminRole === 'owner' || adminRole === 'manager'} isOwner={adminRole === 'owner'} showSupplier={canSeeSupplier} />}
             </div>
