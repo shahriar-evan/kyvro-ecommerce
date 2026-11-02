@@ -229,8 +229,21 @@ export default function App() {
   // Maintenance mode: visitors can browse everything, but ordering is locked (team members can still test-order)
   const visitorLocked = storeSettings.maintenanceMode === true && !isAdminLoggedIn;
   const lockText = ((storeSettings.maintenanceMessage || '').trim()) || "ওয়েবসাইটে কাজ চলছে, অর্ডার সাময়িক বন্ধ, কিন্তু added to cart করে রাখতে পারবেন। পরবর্তীতে ওয়েবসাইট পুনরায় চালু হলে পেমেন্ট করতে পারবেন অথবা ম্যানুয়ালি অর্ডার করতে WhatsApp এ যোগাযোগ করুন।\n\nMaintenance mode is ON. Ordering is paused for a little while, but you can keep items in your cart and pay when the website opens again, or contact us on WhatsApp to order manually.";
+  // WhatsApp message with everything in the customer's cart (used by the maintenance popup)
+  const cartRef = useRef([]);
+  const cartWhatsAppText = () => {
+    const items = cartRef.current || [];
+    if (!items.length) return 'Hello Kyvro, I want to place an order manually.';
+    const money = (n) => `BDT ${Math.round(Number(n) || 0)}`;
+    const lines = items.slice(0, 30).map((it, i) => {
+      const opts = [it.selectedColor ? `Color: ${it.selectedColor}` : '', it.selectedSize ? `Size: ${it.selectedSize}` : '', `Qty: ${it.quantity}`].filter(Boolean).join(' | ');
+      return `${i + 1}. ${it.name}\n   ${opts}\n   Price: ${money(it.price)} x ${it.quantity} = ${money(it.price * it.quantity)}`;
+    });
+    const total = items.reduce((a, it) => a + (Number(it.price) || 0) * (Number(it.quantity) || 0), 0);
+    return ['Hello Kyvro, I want to order these items:', '', ...lines, '', `Items total: ${money(total)}`, '', 'My name:', 'Phone:', 'Full address:'].join('\n');
+  };
   useEffect(() => {
-    if (visitorLocked && currentView === 'checkout') { setCurrentView('home'); showMaintenance(lockText); }
+    if (visitorLocked && currentView === 'checkout') { setCurrentView('home'); showMaintenance(lockText, cartWhatsAppText); }
   }, [visitorLocked, currentView]); // eslint-disable-line react-hooks/exhaustive-deps
   const [loggedInUserEmail, setLoggedInUserEmail] = useState('');
   const [adminRole, setAdminRole] = useState(null); // 'owner' | 'manager' | 'admin' | null
@@ -323,6 +336,7 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('kyvro_cart', JSON.stringify(cart));
+    cartRef.current = cart;
   }, [cart]);
 
   // Team members see new customer orders live
@@ -444,7 +458,7 @@ export default function App() {
     if (visitorLocked) {
       // Maintenance mode: the item stays in the cart (it is saved on this device), but checkout is closed
       setIsCartOpen(true);
-      showMaintenance(lockText);
+      showMaintenance(lockText, cartWhatsAppText);
       return;
     }
     if (goCheckout) {

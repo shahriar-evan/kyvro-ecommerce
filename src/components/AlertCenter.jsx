@@ -47,12 +47,13 @@ export function showAlert(message) {
   emit();
 }
 
-// Maintenance notice: a calm premium card that stays for 10 seconds (OK closes it right away)
-export const MAINT_MS = 10000;
-export function showMaintenance(message) {
+// Maintenance notice: a calm premium card that stays for 15 seconds (OK closes it right away).
+// getWaText (optional) builds the WhatsApp message (the customer's cart) at the moment the WhatsApp button is pressed.
+export const MAINT_MS = 15000;
+export function showMaintenance(message, getWaText) {
   const text = String(message == null ? '' : message);
   if (!text.trim()) return;
-  queue.push({ id: nextId++, text, kind: 'maint', ms: MAINT_MS });
+  queue.push({ id: nextId++, text, kind: 'maint', ms: MAINT_MS, getWaText });
   emit();
 }
 
@@ -149,7 +150,8 @@ export default function AlertCenter({ isDarkMode }) {
     const parts = cur.text.split(/\n\s*\n/);
     const main = parts[0];
     const rest = parts.slice(1).join('\n\n');
-    const wa = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent('Hello Kyvro, I want to place an order manually.')}`;
+    const waFor = (t) => `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(t)}`;
+    const wa = waFor('Hello Kyvro, I want to place an order manually.');
     const gold = '#D4AF37';
     return (
       <div className="fixed inset-0 z-[300] flex items-center justify-center px-4" role="alertdialog" aria-live="polite" onClick={close}
@@ -182,7 +184,8 @@ export default function AlertCenter({ isDarkMode }) {
               style={{ background: 'linear-gradient(135deg,#F2D675,#D4AF37 55%,#B8932A)', boxShadow: '0 10px 24px rgba(212,175,55,.35)' }}>
               OK
             </button>
-            <a href={wa} target="_blank" rel="noopener noreferrer" onClick={close}
+            <a href={wa} target="_blank" rel="noopener noreferrer"
+              onClick={(e) => { try { const t = cur.getWaText && cur.getWaText(); if (t) e.currentTarget.href = waFor(t); } catch (err) { /* keep the plain link */ } close(); }}
               className={`w-full py-3 rounded-xl text-xs font-bold tracking-[0.12em] border transition active:scale-[.98] inline-flex items-center justify-center gap-2 ${isDarkMode ? 'border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10' : 'border-emerald-500/50 text-emerald-600 hover:bg-emerald-50'}`}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.2 14.2c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.8-1.1-4.5-3.9-4.7-4.1-.1-.2-1.1-1.5-1.1-2.8s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.3.5-.4.4c-.1.1-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.1 1 2 1.3 2.3 1.4.3.1.4.1.6-.1l.8-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.2.1.7-.1 1.3z" /></svg>
               WhatsApp এ অর্ডার করুন
