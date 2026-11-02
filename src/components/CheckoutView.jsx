@@ -254,8 +254,8 @@ export default function CheckoutView({
                 const s = normalizeSettings(storeSettings);
                 const net = subtotal - discount;
                 const miss = freeDeliveryMissing(net, s);
-                if (miss > 0) return <p className="mt-1 font-semibold">আর {toBanglaDigits(miss)} টাকার পণ্য যোগ করলে ডেলিভারি ফ্রি পাবেন।</p>;
-                if (s.freeDeliveryEnabled && !freeDeliveryApplies(net, checkoutForm.paymentMethod, s)) return <p className="mt-1 font-semibold">{toBanglaDigits(s.freeDeliveryMin)} টাকা বা এর বেশি পণ্য কিনলে ফ্রি ডেলিভারি পাবেন। ফ্রি ডেলিভারি পেতে {s.freeDeliveryFor === 'online' ? 'অনলাইন পেমেন্ট' : 'ক্যাশ অন ডেলিভারি'} নির্বাচন করুন।</p>;
+                if (miss > 0) return <p className="mt-1 font-semibold">আর {toBanglaDigits(miss)} টাকার পণ্য যোগ করলে ডেলিভারি চার্জ ফ্রি পাবেন।</p>;
+                if (s.freeDeliveryEnabled && !freeDeliveryApplies(net, checkoutForm.paymentMethod, s)) return <p className="mt-1 font-semibold">{toBanglaDigits(s.freeDeliveryMin)} টাকা বা এর বেশি পণ্য কিনলে ডেলিভারি চার্জ ফ্রি পাবেন। ডেলিভারি চার্জ ফ্রি পেতে {s.freeDeliveryFor === 'online' ? 'অনলাইন পেমেন্ট' : 'ক্যাশ অন ডেলিভারি'} নির্বাচন করুন।</p>;
                 return null;
               })()}
               {reward && reward.missing > 0 && reward.missing <= 1500 && (
@@ -277,8 +277,8 @@ export default function CheckoutView({
                 </>
               ) : !ONLINE_PAY_ON ? null : areaChosen && deliveryCharge > 0 ? (
                 <p className="mt-1 font-semibold">{PAY_PROVIDER === 'uddokta'
-                  ? <>ক্যাশ অন ডেলিভারিতে আগে {formatPrice(deliveryCharge)} ডেলিভারি চার্জ bKash বা Nagad এর মাধ্যমে দিতে হবে। বাকি {formatPrice(grandTotal - deliveryCharge)} পণ্য হাতে পেয়ে দিবেন।<br />Pay the {formatPrice(deliveryCharge)} delivery charge now by bKash or Nagad, the rest {formatPrice(grandTotal - deliveryCharge)} in cash on delivery.</>
-                  : <>ক্যাশ অন ডেলিভারিতে আগে {formatPrice(deliveryCharge)} ডেলিভারি চার্জ bKash বা কার্ডের মাধ্যমে দিতে হবে। বাকি {formatPrice(grandTotal - deliveryCharge)} পণ্য হাতে পেয়ে দিবেন।<br />Pay the {formatPrice(deliveryCharge)} delivery charge now by bKash or card, the rest {formatPrice(grandTotal - deliveryCharge)} in cash on delivery.</>}</p>
+                  ? <>ক্যাশ অন ডেলিভারিতে আগে {formatPrice(deliveryCharge)} ডেলিভারি চার্জ bKash বা Nagad এর মাধ্যমে দিতে হবে। বাকি {formatPrice(grandTotal - deliveryCharge)} পণ্য হাতে পেয়ে দিবেন।</>
+                  : <>ক্যাশ অন ডেলিভারিতে আগে {formatPrice(deliveryCharge)} ডেলিভারি চার্জ bKash বা কার্ডের মাধ্যমে দিতে হবে। বাকি {formatPrice(grandTotal - deliveryCharge)} পণ্য হাতে পেয়ে দিবেন।</>}</p>
               ) : !areaChosen ? (
                 <p className="mt-1 font-semibold">ক্যাশ অন ডেলিভারিতে ডেলিভারি চার্জ আগে অনলাইনে {PAY_PROVIDER === 'uddokta' ? 'bKash বা Nagad' : 'bKash বা কার্ড'} এর মাধ্যমে দিতে হবে | For Cash on Delivery the delivery charge is paid online first.</p>
               ) : null}

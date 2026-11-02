@@ -347,7 +347,7 @@ export default function ProductDetail({ product, products, addToCart, calculateD
                   <Truck size={16} className="mt-0.5 shrink-0 text-[#D4AF37]" />
                   <div>
                     <p>{deliveryNote(st, units).bn}</p>
-                    {miss > 0 && <p className="mt-1 font-semibold">আরও {toBanglaDigits(miss)} টাকার পণ্য যোগ করলে ডেলিভারি ফ্রি পাবেন।</p>}
+                    {miss > 0 && <p className="mt-1 font-semibold">আরও {toBanglaDigits(miss)} টাকার পণ্য যোগ করলে ডেলিভারি চার্জ ফ্রি পাবেন।</p>}
                     {reward && reward.missing > 0 && reward.missing <= 1500 && (
                       <p className="mt-1 font-semibold">আরও {toBanglaDigits(reward.missing)} টাকার পণ্য যোগ করলে {reward.rule.type === 'percent' ? `${toBanglaDigits(reward.rule.value)}% ছাড়` : `${toBanglaDigits(reward.rule.value)} টাকা ছাড়`} পাবেন।</p>
                     )}

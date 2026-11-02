@@ -64,7 +64,7 @@ export const deliveryNote = (settings, units) => {
   const who = { online: ['with Online Payment', 'অনলাইন পেমেন্ট করলে'], cod: ['with Cash on Delivery', 'ক্যাশ অন ডেলিভারিতে'], both: ['on any payment method', 'যেকোনো পেমেন্টে'] }[s.freeDeliveryFor];
   return {
     en: `Delivery charge: ${s.deliveryInside} BDT inside Dhaka, ${s.deliveryOutside} BDT outside Dhaka${showExtra ? `, +${s.deliveryExtraPerItem} BDT for each item after the first ${s.deliveryIncludedItems}` : ''}.${s.freeDeliveryEnabled ? ` Free delivery ${who[0]} when your order is ${s.freeDeliveryMin} BDT or more.` : ''}`,
-    bn: `ডেলিভারি চার্জ: ঢাকার ভিতরে ${toBanglaDigits(s.deliveryInside)} টাকা, ঢাকার বাইরে ${toBanglaDigits(s.deliveryOutside)} টাকা${showExtra ? `, প্রথম ${toBanglaDigits(s.deliveryIncludedItems)}টি পণ্যের পর প্রতিটি পণ্যে +${toBanglaDigits(s.deliveryExtraPerItem)} টাকা` : ''}।${s.freeDeliveryEnabled ? ` ${who[1]} ${toBanglaDigits(s.freeDeliveryMin)} টাকা বা তার বেশির অর্ডারে ডেলিভারি ফ্রি।` : ''}`,
+    bn: `ডেলিভারি চার্জ: ঢাকার ভিতরে ${toBanglaDigits(s.deliveryInside)} টাকা, ঢাকার বাইরে ${toBanglaDigits(s.deliveryOutside)} টাকা${showExtra ? `, প্রথম ${toBanglaDigits(s.deliveryIncludedItems)}টি পণ্যের পর প্রতিটি পণ্যে +${toBanglaDigits(s.deliveryExtraPerItem)} টাকা` : ''}।${s.freeDeliveryEnabled ? ` ${who[1]} ${toBanglaDigits(s.freeDeliveryMin)} টাকা বা তার বেশির অর্ডারে ডেলিভারি চার্জ ফ্রি।` : ''}`,
   };
 };
 
