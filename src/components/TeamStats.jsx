@@ -103,7 +103,7 @@ export default function TeamStats({ productCosts = {}, myCommission = 0, product
 
   const stats = useMemo(() => {
     const out = {};
-    const get = (k) => (out[k] = out[k] || { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {}, profit: 0, unknownCost: 0, mine: { orders: 0, pieces: 0, sales: 0, list: {} } });
+    const get = (k) => (out[k] = out[k] || { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {}, profit: 0, unknownCost: 0, comm: [], mine: { orders: 0, pieces: 0, sales: 0, list: {} } });
     const owner = {}; products.forEach((pr) => { owner[String(pr.id)] = keyOf(pr.addedBy, pr.addedByName); });
     for (const ev of events) {
       if (!inRange(ev.at)) continue;
@@ -113,7 +113,7 @@ export default function TeamStats({ productCosts = {}, myCommission = 0, product
       s[ev.kind].push(ev);
       if (ev.kind === 'confirmed' && ev.order.status === 'Delivered') {
         const { profit, unknown } = orderProfit(ev.order);
-        s.profit += profit; s.unknownCost += unknown;
+        s.profit += profit; s.unknownCost += unknown; s.comm.push({ ev, profit, unknown });
       }
       if (ev.kind === 'confirmed' && ev.order.status !== 'Cancelled') {
         s.sales += Number(ev.order.total) || 0;
@@ -159,9 +159,9 @@ export default function TeamStats({ productCosts = {}, myCommission = 0, product
 
   const visibleKeys = Object.keys(people).filter((k) => isOwner || k === me);
   const rows = visibleKeys
-    .map((k) => ({ ...people[k], s: stats[k] || { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {}, profit: 0, unknownCost: 0, mine: { orders: 0, pieces: 0, sales: 0, list: {} } } }))
+    .map((k) => ({ ...people[k], s: stats[k] || { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {}, profit: 0, unknownCost: 0, comm: [], mine: { orders: 0, pieces: 0, sales: 0, list: {} } } }))
     .sort((a, b) => b.s.confirmed.length - a.s.confirmed.length);
-  const shown = isOwner ? rows : (rows.length ? rows : [{ key: me, name: adminName || loggedInUserEmail || 'You', email: loggedInUserEmail || '', s: { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {}, profit: 0, unknownCost: 0, mine: { orders: 0, pieces: 0, sales: 0, list: {} } } }]);
+  const shown = isOwner ? rows : (rows.length ? rows : [{ key: me, name: adminName || loggedInUserEmail || 'You', email: loggedInUserEmail || '', s: { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {}, profit: 0, unknownCost: 0, comm: [], mine: { orders: 0, pieces: 0, sales: 0, list: {} } } }]);
 
   const card = `p-5 sm:p-6 rounded-lg border space-y-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`;
   const inputCls = `block mt-1 border p-2 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`;
@@ -282,6 +282,23 @@ export default function TeamStats({ productCosts = {}, myCommission = 0, product
                     </div>
                   )}
                 </div>
+                {pctOf(p) > 0 && (
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider mb-1">Commission details ({pctOf(p)}%)</p>
+                    <p className="text-[11px] text-gray-500 mb-2">Commission = profit of the order &times; {pctOf(p)}%. Profit = (selling price &minus; supplier price) &times; pieces. Only <strong>Delivered</strong> orders you confirmed are counted, cancelled or returned orders earn nothing.</p>
+                    {s.comm.length === 0 ? <p className="text-xs text-gray-500">No delivered orders in this period yet.</p> : (
+                      <div className="divide-y text-xs">
+                        {[...s.comm].sort((a, b) => (b.ev.at || 0) - (a.ev.at || 0)).map((c) => (
+                          <div key={c.ev.order.orderNumber + 'c'} className="py-2 flex flex-wrap justify-between gap-x-4 gap-y-1">
+                            <span><strong className="text-[#D4AF37]">{c.ev.order.orderNumber}</strong> · {(c.ev.order.items || []).map((it) => `${it.name} ×${it.quantity}`).join(', ')}{c.unknown > 0 ? ' · (supplier price missing, not counted)' : ''}</span>
+                            <span className="text-gray-500">profit {formatPrice(c.profit)} &times; {pctOf(p)}% = <strong className="text-[#D4AF37]">{formatPrice(Math.round(c.profit * pctOf(p)) / 100)}</strong></span>
+                          </div>
+                        ))}
+                        <div className="py-2 flex justify-between font-bold"><span>Total commission</span><span className="text-[#D4AF37]">{formatPrice(Math.round(s.profit * pctOf(p)) / 100)}</span></div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {[['Confirmed orders', s.confirmed], ['Delivered orders', s.delivered], ['Cancelled orders', s.cancelled]].map(([title, list]) => (
                   list.length > 0 && (
                     <div key={title}>
