@@ -20,12 +20,12 @@ export default async function handler(req, res) {
   const invoice = String(query.invoice_id || body.invoice_id || '');
 
   if (!uddoktaConfigured()) return mode === 'ipn' ? res.status(503).end('not configured') : back(res, 'fail', '', 'full');
-  if (mode === 'cancel') return back(res, 'cancel', '', 'full');
+  if (mode === 'cancel') return back(res, 'cancel', String(query.order || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40), query.kind === 'advance' ? 'advance' : 'full');
   try {
     const r = await confirmUddokta(invoice);
     if (!r.ok) console.warn('UddoktaPay payment not confirmed:', r.reason, r.orderNumber || '');
     if (mode === 'ipn') return res.status(200).end('OK');
-    return back(res, r.ok ? 'ok' : 'fail', r.orderNumber, r.kind, r.ok ? r.amount : 0);
+    return back(res, r.ok ? 'ok' : (r.pending ? 'check' : 'fail'), r.orderNumber, r.kind, r.ok ? r.amount : 0);
   } catch (e) {
     console.error('uddokta-callback', e);
     if (mode === 'ipn') return res.status(500).end('error');

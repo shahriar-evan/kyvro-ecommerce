@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Check, Clock, X, Truck, ShoppingBag, Copy, MessageCircle } from 'lucide-react';
 import { startOnlinePayment } from '../payment';
-import { WHATSAPP_NUMBER, toBanglaDigits } from '../data/shopConfig';
+import { WHATSAPP_NUMBER, toBanglaDigits, PAY_PROVIDER } from '../data/shopConfig';
 
 // Shown when the customer comes back from the SSLCommerz payment page (?pay=ok|fail|cancel|check&order=...)
 export default function PaymentResult({ result, isDarkMode, setCurrentView }) {
@@ -31,6 +31,7 @@ export default function PaymentResult({ result, isDarkMode, setCurrentView }) {
   if (ok && !adv) { bn = 'আপনার পেমেন্ট সফল হয়েছে। আমরা শীঘ্রই আপনার অর্ডারটি কনফার্ম করব।'; en = 'Your order is paid. Our team will confirm it shortly.'; }
   else if (ok) { bn = `আপনার ডেলিভারি চার্জ${amtBn ? ` ${amtBn}` : ''} পরিশোধ হয়েছে। বাকি টাকা পণ্য হাতে পেয়ে ডেলিভারি বয়ের কাছে দিবেন।`; en = `Your delivery charge${amt ? ` (${amt})` : ''} is paid. Pay the rest in cash to the delivery person when the parcel arrives. We will confirm your order shortly.`; }
   else if (check) { bn = 'পেমেন্টটি যাচাই করতে একটু সময় লাগছে। টাকা কেটে গেলে চিন্তা করবেন না, আমরা অর্ডারটি চেক করে নিব।'; en = 'If money was deducted, do not worry. We will verify it and update your order.'; }
+  else if (status === 'cancel') { bn = 'আপনি পেমেন্ট বাতিল করেছেন। চিন্তা নেই, আপনার অর্ডার সেভ করা আছে। পেমেন্ট না করলে অর্ডার কনফার্ম হবে না, তাই নিচের বাটনে আবার পেমেন্ট করুন।'; en = 'You cancelled the payment. Your order is saved, but it will not be confirmed until you pay. Tap the button below to pay again.'; }
   else { bn = 'আপনার অর্ডারটি সেভ করা আছে, কিন্তু পেমেন্ট সম্পন্ন হয়নি। পেমেন্ট না হলে অর্ডার কনফার্ম করা হবে না, তাই আবার পেমেন্ট করুন।'; en = 'Your order is saved, but the payment was not completed. You can try again.'; }
 
   const dark = isDarkMode;
@@ -77,7 +78,7 @@ export default function PaymentResult({ result, isDarkMode, setCurrentView }) {
           <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
             {!ok && !check && order && (
               <button type="button" disabled={busy} onClick={retry} className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 text-black text-xs font-bold px-7 py-3.5 tracking-widest uppercase rounded-lg shadow-lg shadow-[#D4AF37]/25 hover:-translate-y-0.5 hover:shadow-xl transition disabled:opacity-60" style={{ background: 'linear-gradient(135deg,#f3dc8b,#D4AF37 55%,#b8932a)' }}>
-                {busy ? 'Please wait...' : (adv ? 'Pay delivery charge again' : 'Pay again (bKash / Card)')}
+                {busy ? 'Please wait...' : (adv ? 'Pay delivery charge again' : (PAY_PROVIDER === 'uddokta' ? 'Pay again (bKash / Nagad)' : 'Pay again (bKash / Card)'))}
               </button>
             )}
             {order && (

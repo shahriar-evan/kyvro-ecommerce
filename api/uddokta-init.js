@@ -33,7 +33,7 @@ export default async function handler(req, res) {
         metadata: { orderNumber, kind: due.kind },
         redirect_url: `${SITE}/api/uddokta-callback`,
         return_type: 'GET',
-        cancel_url: `${SITE}/api/uddokta-callback?r=cancel`,
+        cancel_url: `${SITE}/api/uddokta-callback?r=cancel&order=${encodeURIComponent(orderNumber)}&kind=${due.kind}`,
         webhook_url: `${SITE}/api/uddokta-callback?r=ipn`,
       }),
     });
