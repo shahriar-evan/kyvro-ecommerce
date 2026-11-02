@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { askConfirm, showMaintenance } from './components/AlertCenter';
+import { waOrderText, waCartLines } from './whatsappOrder';
 import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth, googleProvider } from './firebase';
 import { isOwnerEmail } from './adminEmails';
@@ -231,17 +232,7 @@ export default function App() {
   const lockText = ((storeSettings.maintenanceMessage || '').trim()) || "ওয়েবসাইটে কাজ চলছে, অর্ডার সাময়িক বন্ধ, কিন্তু added to cart করে রাখতে পারবেন। পরবর্তীতে ওয়েবসাইট পুনরায় চালু হলে পেমেন্ট করতে পারবেন অথবা ম্যানুয়ালি অর্ডার করতে WhatsApp এ যোগাযোগ করুন।\n\nMaintenance mode is ON. Ordering is paused for a little while, but you can keep items in your cart and pay when the website opens again, or contact us on WhatsApp to order manually.";
   // WhatsApp message with everything in the customer's cart (used by the maintenance popup)
   const cartRef = useRef([]);
-  const cartWhatsAppText = () => {
-    const items = cartRef.current || [];
-    if (!items.length) return 'Hello Kyvro, I want to place an order manually.';
-    const money = (n) => `BDT ${Math.round(Number(n) || 0)}`;
-    const lines = items.slice(0, 30).map((it, i) => {
-      const opts = [it.selectedColor ? `Color: ${it.selectedColor}` : '', it.selectedSize ? `Size: ${it.selectedSize}` : '', `Qty: ${it.quantity}`].filter(Boolean).join(' | ');
-      return `${i + 1}. ${it.name}\n   ${opts}\n   Price: ${money(it.price)} x ${it.quantity} = ${money(it.price * it.quantity)}`;
-    });
-    const total = items.reduce((a, it) => a + (Number(it.price) || 0) * (Number(it.quantity) || 0), 0);
-    return ['Hello Kyvro, I want to order these items:', '', ...lines, '', `Items total: ${money(total)}`, '', 'My name:', 'Phone:', 'Full address:'].join('\n');
-  };
+  const cartWhatsAppText = () => ((cartRef.current || []).length ? waOrderText(waCartLines(cartRef.current)) : waOrderText(['Hello Kyvro, I want to place an order manually.']));
   useEffect(() => {
     if (visitorLocked && currentView === 'checkout') { setCurrentView('home'); showMaintenance(lockText, cartWhatsAppText); }
   }, [visitorLocked, currentView]); // eslint-disable-line react-hooks/exhaustive-deps

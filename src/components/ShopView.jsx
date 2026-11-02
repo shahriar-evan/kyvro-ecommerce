@@ -2,7 +2,7 @@ import PriceTag, { DiscountBadge } from './PriceTag';
 import React from 'react';
 import { Heart } from 'lucide-react';
 import WhatsAppButton from './WhatsAppButton';
-import { WHATSAPP_NUMBER } from '../data/shopConfig';
+import { waOrderLink, waProductLines } from '../whatsappOrder';
 import StockLabel from './StockLabel';
 import { subLabel, SUB_CATEGORIES, COLLECTION_LABELS, DEFAULT_SUB_LABEL, hasSubCategories, hasSizeStock, totalStock } from '../data/catalog';
 
@@ -162,7 +162,7 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
                         >
                           Buy Now
                         </button>
-                        <WhatsAppButton compact href={`https://wa.me/${WHATSAPP_NUMBER}?text=Hello%20Kyvro,%20I%20want%20to%20order:%0A*%20Name:%20${encodeURIComponent(product.name)}%0A*%20Price:%20${encodeURIComponent(formatPrice(product.price))}`} />
+                        <WhatsAppButton compact href={waOrderLink(waProductLines({ name: product.name, price: product.price }))} />
                       </div>
                     </div>
                   </div>

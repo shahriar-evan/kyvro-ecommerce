@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Heart, ZoomIn, X, Truck, Clock, Wallet, ChevronUp } from 'lucide-react';
 import { deliveryFee, normalizeSettings, deliveryNote, freeDeliveryMissing, toBanglaDigits, bestDiscount, nextReward } from '../data/shopConfig';
 import WhatsAppButton, { WhatsAppIcon } from './WhatsAppButton';
-import { WHATSAPP_NUMBER } from '../data/shopConfig';
+import { waOrderLink, waProductLines } from '../whatsappOrder';
 import StockLabel from './StockLabel';
 import { rankBySales, hasSizeStock, hasColorStock, totalStock, stockForSize, stockFor, stockForColor, productColors, imageFor, orderedSizes } from '../data/catalog';
 
@@ -216,15 +216,7 @@ export default function ProductDetail({ product, products, addToCart, calculateD
   };
 
   // WhatsApp message carries the size / color / quantity the customer picked
-  const waLines = [
-    'Hello Kyvro, I want to order:',
-    `* Name: ${live.name}`,
-    ...(color ? [`* Color: ${color}`] : []),
-    ...(sized && size ? [`* Size: ${size}`] : []),
-    `* Quantity: ${qty}`,
-    `* Price: ${formatPrice(live.price)}`,
-  ];
-  const waLink = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(waLines.join('\n'))}`;
+  const waLink = waOrderLink(waProductLines({ name: live.name, color: color || '', size: sized && size ? size : '', qty, price: live.price }));
   const waNeedsSize = needsSize;
 
   const cardBtn = (active, disabled) =>

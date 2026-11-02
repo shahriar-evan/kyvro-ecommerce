@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { WHATSAPP_NUMBER } from '../data/shopConfig';
+import { waLinkFor, waOrderText } from '../whatsappOrder';
 
 // Replaces the plain browser pop-up (alert) with a premium message in the middle of the page.
 // Every existing alert("...") in the website now shows here automatically - nothing else has to change.
@@ -150,8 +150,8 @@ export default function AlertCenter({ isDarkMode }) {
     const parts = cur.text.split(/\n\s*\n/);
     const main = parts[0];
     const rest = parts.slice(1).join('\n\n');
-    const waFor = (t) => `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(t)}`;
-    const wa = waFor('Hello Kyvro, I want to place an order manually.');
+    const waFor = waLinkFor;
+    const wa = waFor(waOrderText(['Hello Kyvro, I want to place an order manually.']));
     const gold = '#D4AF37';
     return (
       <div className="fixed inset-0 z-[300] flex items-center justify-center px-4" role="alertdialog" aria-live="polite" onClick={close}
