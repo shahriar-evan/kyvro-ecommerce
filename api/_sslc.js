@@ -114,7 +114,7 @@ export async function markPaid(orderNumber, info, kind = 'full') {
         appendMissingElements: { values: [{ mapValue: { fields: {
           status: str(kind === 'advance' ? 'Delivery charge paid online' : 'Payment received'),
           by: str(''),
-          byName: str(`SSLCommerz${channel}`),
+          byName: str(`${info.gateway || 'SSLCommerz'}${channel}`),
           at: str(now),
         } } }] },
       }],

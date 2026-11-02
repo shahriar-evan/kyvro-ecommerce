@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { deliveryAreaFor, DELIVERY_AREAS, DELIVERY_AREA_BN, PAYMENT_METHODS, PAYMENT_METHOD_BN, MANUAL_METHOD, ONLINE_PAY_ON, manualWallets, toBanglaDigits, deliveryNote, freeDeliveryApplies, freeDeliveryMissing, normalizeSettings } from '../data/shopConfig';
+import { deliveryAreaFor, DELIVERY_AREAS, DELIVERY_AREA_BN, PAYMENT_METHODS, PAYMENT_METHOD_BN, MANUAL_METHOD, ONLINE_PAY_ON, PAY_PROVIDER, manualWallets, toBanglaDigits, deliveryNote, freeDeliveryApplies, freeDeliveryMissing, normalizeSettings } from '../data/shopConfig';
 
 export default function CheckoutView({
   storeSettings, cart, checkoutForm, setCheckoutForm, checkoutError, deliveryCharge, grandTotal, formatPrice,
@@ -277,11 +277,11 @@ export default function CheckoutView({
             {payNow > 0 ? (
               <div className="hidden lg:flex flex-col gap-3">
                 <button type="submit" name="payvia" value="bkash" disabled={placingOrder} className="w-full flex items-center justify-center gap-2 bg-[#E2136E] text-white font-bold py-4 rounded text-sm tracking-wider hover:opacity-90 transition disabled:opacity-50">
-                  {placingOrder ? 'Placing order...' : `Pay with bKash ${formatPrice(payNow)}`}
+                  {placingOrder ? 'Placing order...' : `${PAY_PROVIDER === 'uddokta' ? 'Pay with bKash / Nagad / Rocket' : 'Pay with bKash'} ${formatPrice(payNow)}`}
                 </button>
-                <button type="submit" name="payvia" value="card" disabled={placingOrder} className="w-full flex items-center justify-center gap-2 bg-[#D4AF37] text-black font-bold py-4 rounded text-sm tracking-wider hover:opacity-90 transition disabled:opacity-50">
+                {PAY_PROVIDER !== 'uddokta' && <button type="submit" name="payvia" value="card" disabled={placingOrder} className="w-full flex items-center justify-center gap-2 bg-[#D4AF37] text-black font-bold py-4 rounded text-sm tracking-wider hover:opacity-90 transition disabled:opacity-50">
                   {placingOrder ? 'Placing order...' : `Pay with Card / Bank ${formatPrice(payNow)}`}
-                </button>
+                </button>}
               </div>
             ) : (
               <button type="submit" disabled={placingOrder} className="hidden lg:block w-full bg-[#D4AF37] text-black font-bold py-4 rounded text-sm tracking-widest uppercase hover:opacity-90 transition disabled:opacity-50">
@@ -303,11 +303,11 @@ export default function CheckoutView({
           {payNow > 0 ? (
             <div className="flex-1 flex flex-col gap-1.5">
               <button type="submit" name="payvia" value="bkash" form="kyvro-checkout-form" disabled={placingOrder} className="h-10 rounded-lg bg-[#E2136E] text-white font-bold text-xs tracking-wide shadow active:scale-95 transition disabled:opacity-50">
-                {placingOrder ? 'Placing order...' : 'Pay with bKash'}
+                {placingOrder ? 'Placing order...' : (PAY_PROVIDER === 'uddokta' ? 'Pay with bKash / Nagad / Rocket' : 'Pay with bKash')}
               </button>
-              <button type="submit" name="payvia" value="card" form="kyvro-checkout-form" disabled={placingOrder} className="h-10 rounded-lg bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold text-xs tracking-wide shadow active:scale-95 transition disabled:opacity-50">
+              {PAY_PROVIDER !== 'uddokta' && <button type="submit" name="payvia" value="card" form="kyvro-checkout-form" disabled={placingOrder} className="h-10 rounded-lg bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold text-xs tracking-wide shadow active:scale-95 transition disabled:opacity-50">
                 {placingOrder ? 'Placing order...' : 'Pay with Card / Bank'}
-              </button>
+              </button>}
             </div>
           ) : (
             <button
