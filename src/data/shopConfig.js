@@ -28,6 +28,8 @@ export const FREE_DELIVERY_FOR = ['online', 'cod', 'both'];
 export const ONLINE_PAY_ON = import.meta.env.VITE_ONLINE_PAY === 'on';
 // Which gateway takes the online payment: 'sslcommerz' (default) or 'uddokta' (set VITE_PAY_PROVIDER=uddokta)
 export const PAY_PROVIDER = import.meta.env.VITE_PAY_PROVIDER === 'uddokta' ? 'uddokta' : 'sslcommerz';
+// With UddoktaPay: shows the separate "Pay with Card" button (set VITE_CARD_PAY=on only after the Stripe gateway is LIVE)
+export const CARD_PAY_ON = PAY_PROVIDER !== 'uddokta' || import.meta.env.VITE_CARD_PAY === 'on';
 export const MANUAL_METHOD = 'Manual bKash / Nagad';
 export const PAYMENT_METHODS = ['Cash on Delivery', 'Online Payment', MANUAL_METHOD];
 export const PAYMENT_METHOD_BN = { 'Cash on Delivery': 'ক্যাশ অন ডেলিভারি', 'Online Payment': 'অনলাইন পেমেন্ট', [MANUAL_METHOD]: 'বিকাশ / নগদে সেন্ড মানি' };

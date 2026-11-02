@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { deliveryAreaFor, DELIVERY_AREAS, DELIVERY_AREA_BN, PAYMENT_METHODS, PAYMENT_METHOD_BN, MANUAL_METHOD, ONLINE_PAY_ON, PAY_PROVIDER, manualWallets, toBanglaDigits, deliveryNote, freeDeliveryApplies, freeDeliveryMissing, normalizeSettings } from '../data/shopConfig';
+import { deliveryAreaFor, DELIVERY_AREAS, DELIVERY_AREA_BN, PAYMENT_METHODS, PAYMENT_METHOD_BN, MANUAL_METHOD, ONLINE_PAY_ON, PAY_PROVIDER, CARD_PAY_ON, manualWallets, toBanglaDigits, deliveryNote, freeDeliveryApplies, freeDeliveryMissing, normalizeSettings } from '../data/shopConfig';
 
 export default function CheckoutView({
   storeSettings, cart, checkoutForm, setCheckoutForm, checkoutError, deliveryCharge, grandTotal, formatPrice,
@@ -256,8 +256,8 @@ export default function CheckoutView({
                 <>
                   {PAY_PROVIDER === 'uddokta' ? (
                     <>
-                      <p className="mt-1 font-semibold">অনলাইন পেমেন্ট {Number(grandTotal).toFixed(2)} টাকা বিকাশ বা নগদের মাধ্যমে পরিশোধ করতে পারবেন। Pay with bKash / Nagad এ ক্লিক করে পেমেন্ট পেজে নম্বর দিন।</p>
-                      <p className="mt-1 text-gray-600">The full amount is paid now by bKash / Nagad on the secure payment page.</p>
+                      <p className="mt-1 font-semibold">অনলাইন পেমেন্ট {Number(grandTotal).toFixed(2)} টাকা {CARD_PAY_ON ? 'বিকাশ, নগদ বা কার্ডের' : 'বিকাশ বা নগদের'} মাধ্যমে পরিশোধ করতে পারবেন। {CARD_PAY_ON ? 'বিকাশ/নগদে দিতে Pay with bKash / Nagad এবং কার্ডে দিতে Pay with Card এ ক্লিক করুন।' : 'Pay with bKash / Nagad এ ক্লিক করে পেমেন্ট পেজে নম্বর দিন।'}</p>
+                      <p className="mt-1 text-gray-600">The full amount is paid now by {CARD_PAY_ON ? 'bKash / Nagad / card' : 'bKash / Nagad'} on the secure payment page.</p>
                     </>
                   ) : (
                     <>
@@ -293,8 +293,8 @@ export default function CheckoutView({
                 <button type="submit" name="payvia" value="bkash" disabled={placingOrder} className="w-full flex items-center justify-center gap-2 bg-[#E2136E] text-white font-bold py-4 rounded text-sm tracking-wider hover:opacity-90 transition disabled:opacity-50">
                   {placingOrder ? 'Placing order...' : `${PAY_PROVIDER === 'uddokta' ? 'Pay with bKash / Nagad' : 'Pay with bKash'}${payAmt}`}
                 </button>
-                {PAY_PROVIDER !== 'uddokta' && <button type="submit" name="payvia" value="card" disabled={placingOrder} className="w-full flex items-center justify-center gap-2 bg-[#D4AF37] text-black font-bold py-4 rounded text-sm tracking-wider hover:opacity-90 transition disabled:opacity-50">
-                  {placingOrder ? 'Placing order...' : `Pay with Card / Bank${payAmt}`}
+                {CARD_PAY_ON && <button type="submit" name="payvia" value="card" disabled={placingOrder} className="w-full flex items-center justify-center gap-2 bg-[#D4AF37] text-black font-bold py-4 rounded text-sm tracking-wider hover:opacity-90 transition disabled:opacity-50">
+                  {placingOrder ? 'Placing order...' : `${PAY_PROVIDER === 'uddokta' ? 'Pay with Card' : 'Pay with Card / Bank'}${payAmt}`}
                 </button>}
               </div>
             ) : (
@@ -319,8 +319,8 @@ export default function CheckoutView({
               <button type="submit" name="payvia" value="bkash" form="kyvro-checkout-form" disabled={placingOrder} className="h-10 rounded-lg bg-[#E2136E] text-white font-bold text-xs tracking-wide shadow active:scale-95 transition disabled:opacity-50">
                 {placingOrder ? 'Placing order...' : (PAY_PROVIDER === 'uddokta' ? 'Pay with bKash / Nagad' : 'Pay with bKash')}
               </button>
-              {PAY_PROVIDER !== 'uddokta' && <button type="submit" name="payvia" value="card" form="kyvro-checkout-form" disabled={placingOrder} className="h-10 rounded-lg bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold text-xs tracking-wide shadow active:scale-95 transition disabled:opacity-50">
-                {placingOrder ? 'Placing order...' : 'Pay with Card / Bank'}
+              {CARD_PAY_ON && <button type="submit" name="payvia" value="card" form="kyvro-checkout-form" disabled={placingOrder} className="h-10 rounded-lg bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold text-xs tracking-wide shadow active:scale-95 transition disabled:opacity-50">
+                {placingOrder ? 'Placing order...' : (PAY_PROVIDER === 'uddokta' ? 'Pay with Card' : 'Pay with Card / Bank')}
               </button>}
             </div>
           ) : (

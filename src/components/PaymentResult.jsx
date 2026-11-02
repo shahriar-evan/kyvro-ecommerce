@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Check, Clock, X, Truck, ShoppingBag, Copy, MessageCircle } from 'lucide-react';
 import { startOnlinePayment } from '../payment';
-import { WHATSAPP_NUMBER, toBanglaDigits, PAY_PROVIDER } from '../data/shopConfig';
+import { WHATSAPP_NUMBER, toBanglaDigits, PAY_PROVIDER, CARD_PAY_ON } from '../data/shopConfig';
 
 // Shown when the customer comes back from the SSLCommerz payment page (?pay=ok|fail|cancel|check&order=...)
 export default function PaymentResult({ result, isDarkMode, setCurrentView }) {
@@ -78,7 +78,7 @@ export default function PaymentResult({ result, isDarkMode, setCurrentView }) {
           <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 justify-center items-stretch pt-2">
             {!ok && !check && order && (
               <button type="button" disabled={busy} onClick={retry} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-center text-black text-xs font-bold px-5 sm:px-7 py-3.5 tracking-widest uppercase rounded-lg shadow-lg shadow-[#D4AF37]/25 hover:-translate-y-0.5 hover:shadow-xl transition disabled:opacity-60" style={{ background: 'linear-gradient(135deg,#f3dc8b,#D4AF37 55%,#b8932a)' }}>
-                {busy ? 'Please wait...' : (adv ? 'Pay delivery charge again' : (PAY_PROVIDER === 'uddokta' ? 'Pay again (bKash / Nagad)' : 'Pay again (bKash / Card)'))}
+                {busy ? 'Please wait...' : (adv ? 'Pay delivery charge again' : (PAY_PROVIDER === 'uddokta' ? (CARD_PAY_ON ? 'Pay again (bKash / Nagad / Card)' : 'Pay again (bKash / Nagad)') : 'Pay again (bKash / Card)'))}
               </button>
             )}
             {order && (
