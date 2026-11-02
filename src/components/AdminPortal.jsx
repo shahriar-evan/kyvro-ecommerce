@@ -8,11 +8,12 @@ import ColorPhotos from './ColorPhotos';
 import ColorPicker from './ColorPicker';
 import OrdersPanel from './OrdersPanel';
 import TeamStats from './TeamStats';
+import { MAX_COMMISSION } from '../adminAuth';
 import MyProducts from './MyProducts';
 import StoreSettings from './StoreSettings';
 import { subLabel, allPlaces, COLLECTION_LABELS, SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
 
-export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canEditProduct, canAddProduct = true, adminCommission = 0, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, productCosts = {}, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct, clearProductForm, handleDeleteRequest }) {
+export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canEditProduct, canAddProduct = true, productCommissions = {}, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, productCosts = {}, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct, clearProductForm, handleDeleteRequest }) {
   const [productSearch, setProductSearch] = React.useState('');
   const psq = productSearch.trim().toLowerCase();
   const [catFilter, setCatFilter] = React.useState('All');
@@ -124,6 +125,16 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
         <p className={`text-xs font-semibold ${formProfit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
           Selling price {formatPrice(formPriceNum)} − supplier cost {formatPrice(formCostNum)} = {formProfit >= 0 ? 'profit' : 'LOSS'} {formatPrice(Math.abs(formProfit))} per piece
         </p>
+      )}
+      {adminRole === 'owner' && (
+        <div className="rounded border border-green-600/40 bg-green-600/5 p-3 space-y-1">
+          <label className="block text-xs font-semibold text-gray-500">Team commission % (of the profit) · only you see this field</label>
+          <input type="number" min="0" max={MAX_COMMISSION} step="0.5" placeholder={`0 - ${MAX_COMMISSION}`}
+            value={newProductForm.commission ?? ''}
+            onChange={e => setNewProductForm(prev => ({ ...prev, commission: e.target.value }))}
+            className={inputCls} />
+          <p className="text-[11px] text-gray-500">The Admin or Manager who confirms an order with this product earns this % of the profit when the order is delivered. Team members see it on the product list. Customers never see it.{formProfit !== null && parseFloat(newProductForm.commission) > 0 ? ` Now: ${formatPrice(Math.round(formProfit * parseFloat(newProductForm.commission)) / 100)} per piece.` : ''}</p>
+        </div>
       )}
       {!linkPerColor && (
         <div>
@@ -353,6 +364,11 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                               <p className="text-[10px] font-normal text-gray-500 mt-0.5">
                                 Cost {formatPrice(productCosts[String(p.id)].supplierCost)} · <span className={p.price - productCosts[String(p.id)].supplierCost >= 0 ? 'text-green-600' : 'text-red-500'}>Profit {formatPrice(p.price - productCosts[String(p.id)].supplierCost)}</span>
                                 {productCosts[String(p.id)].supplierName ? ` · ${productCosts[String(p.id)].supplierName}` : ''}
+                              </p>
+                            )}
+                            {productCommissions[String(p.id)] && productCommissions[String(p.id)].pct > 0 && (
+                              <p className="text-[10px] font-bold text-green-600 mt-0.5">
+                                Commission {productCommissions[String(p.id)].pct}%{productCosts[String(p.id)] && productCosts[String(p.id)].supplierCost !== undefined && p.price - productCosts[String(p.id)].supplierCost > 0 ? ` (≈ ${formatPrice(Math.round((p.price - productCosts[String(p.id)].supplierCost) * productCommissions[String(p.id)].pct) / 100)} per piece)` : ''}
                               </p>
                             )}
                           </td>
@@ -681,7 +697,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
 
               {adminTab === 'my-products' && <MyProducts products={products} loggedInUserEmail={loggedInUserEmail} isDarkMode={isDarkMode} formatPrice={formatPrice} startEditProduct={startEditProduct} canEditProduct={canEditProduct} />}
 
-              {adminTab === 'stats' && <TeamStats productCosts={productCosts} myCommission={adminCommission} products={products} startEditProduct={startEditProduct} canEditProduct={canEditProduct} orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} isOwner={isOwner} loggedInUserEmail={loggedInUserEmail} adminName={adminName} />}
+              {adminTab === 'stats' && <TeamStats productCosts={productCosts} productCommissions={productCommissions} products={products} startEditProduct={startEditProduct} canEditProduct={canEditProduct} orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} isOwner={isOwner} loggedInUserEmail={loggedInUserEmail} adminName={adminName} />}
 
               {adminTab === 'orders' && <OrdersPanel orders={orders} productCosts={productCosts} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} canUnblock={adminRole === 'owner' || adminRole === 'manager'} isOwner={adminRole === 'owner'} />}
             </div>

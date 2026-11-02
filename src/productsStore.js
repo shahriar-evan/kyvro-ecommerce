@@ -47,6 +47,26 @@ export const removeProduct = async (id) => {
   await deleteDoc(doc(db, "products", String(id)));
   // the private supplier details of this product go too (best effort)
   try { await deleteDoc(doc(db, "productCosts", String(id))); } catch (err) { /* nothing to remove, or not allowed */ }
+  try { await deleteDoc(doc(db, "productCommission", String(id))); } catch (err) { /* nothing to remove, or not allowed */ }
+};
+
+// ---- Team commission per product (percent of the profit): PRIVATE, only the Owner can set it ----
+// Stored in "productCommission" (document id = product id). Team members can read it (to see what they earn), customers never can.
+export function watchProductCommissions(onData, onError) {
+  return onSnapshot(
+    collection(db, "productCommission"),
+    (snap) => {
+      const map = {};
+      snap.docs.forEach((d) => { map[d.id] = d.data(); });
+      onData(map);
+    },
+    (err) => onError && onError(err)
+  );
+}
+export const setProductCommission = (id, pct) => {
+  const n = Number(pct);
+  if (!n || n <= 0) return deleteDoc(doc(db, "productCommission", String(id)));
+  return setDoc(doc(db, "productCommission", String(id)), { pct: n, updatedAt: new Date().toISOString() });
 };
 
 // ---- Supplier details (dropshipping): PRIVATE ----
