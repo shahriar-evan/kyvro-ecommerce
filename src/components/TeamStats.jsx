@@ -144,7 +144,7 @@ export default function TeamStats({ products = [], startEditProduct, canEditProd
                 <div>
                   <p className="font-bold">{p.name}{p.key === me ? ' (you)' : ''}</p>
                   {p.email && <p className="text-[11px] text-gray-500">{p.email}</p>}
-                  <p className="text-[11px] mt-1"><span className="px-2 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] font-bold">{p.key === me ? 'My products' : 'Products added'} ({(addedBy[p.key] || []).length})</span></p>
+                  {p.key !== me && <p className="text-[11px] mt-1"><span className="px-2 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] font-bold">{p.key === me ? 'My products' : 'Products added'} ({(addedBy[p.key] || []).length})</span></p>}
                 </div>
                 {isOwner && <span className="text-[11px] text-[#D4AF37] font-bold uppercase tracking-wider">{isOpen ? 'Hide orders' : 'Show orders'}</span>}
               </div>
@@ -166,7 +166,7 @@ export default function TeamStats({ products = [], startEditProduct, canEditProd
 
             {isOpen && (
               <div className="space-y-4 border-t pt-4">
-                {(() => {
+                {p.key !== me && (() => {
                   const mine = addedBy[p.key] || [];
                   return (
                     <div>

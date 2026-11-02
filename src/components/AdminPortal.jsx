@@ -8,6 +8,7 @@ import ColorPhotos from './ColorPhotos';
 import ColorPicker from './ColorPicker';
 import OrdersPanel from './OrdersPanel';
 import TeamStats from './TeamStats';
+import MyProducts from './MyProducts';
 import StoreSettings from './StoreSettings';
 import { subLabel, allPlaces, COLLECTION_LABELS, SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
 
@@ -260,6 +261,12 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                   className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'stats' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
                 >
                   {isOwner ? 'Team Stats' : 'My Stats'}
+                </button>
+                <button
+                  onClick={() => setAdminTab('my-products')}
+                  className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'my-products' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
+                >
+                  My Products ({products.filter((p) => p.addedBy && String(p.addedBy).toLowerCase() === String(loggedInUserEmail || '').toLowerCase()).length})
                 </button>
                 {isOwner && (
                   <button
@@ -667,6 +674,8 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                 <aside className="hidden lg:block w-80 xl:w-96 shrink-0 lg:sticky lg:top-24">{supplierPanel}</aside>
                 </div>
               )}
+
+              {adminTab === 'my-products' && <MyProducts products={products} loggedInUserEmail={loggedInUserEmail} isDarkMode={isDarkMode} formatPrice={formatPrice} startEditProduct={startEditProduct} canEditProduct={canEditProduct} />}
 
               {adminTab === 'stats' && <TeamStats products={products} startEditProduct={startEditProduct} canEditProduct={canEditProduct} orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} isOwner={isOwner} loggedInUserEmail={loggedInUserEmail} adminName={adminName} />}
 
