@@ -11,7 +11,7 @@ import { ensureSubscribed } from './subscribers';
 import PushPrompt from './components/PushPrompt';
 import { watchProducts, watchProductCosts, saveProductCost, removeProductCost, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
 import { watchStoreSettings } from './storeSettings';
-import { cleanPhone, MANUAL_METHOD, manualWallets, DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
+import { cleanPhone, ONLINE_PAY_ON, MANUAL_METHOD, manualWallets, DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
 import { INITIAL_PRODUCTS } from './data/products';
 import { CURRENCIES } from './data/currencies';
 import { hasSubCategories, defaultCategoryFor, matchesCollectionPage, hasSizeStock, stockForSize, orderedSizes, hasColorStock, stockFor, variantKey, needsChoice, imageFor } from './data/catalog';
@@ -535,6 +535,7 @@ export default function App() {
       `Zone: ${checkoutForm.upazila}`,
       `City: ${checkoutForm.district}`
     ].filter(Boolean).join('\n');
+    if (!ONLINE_PAY_ON && checkoutForm.paymentMethod === 'Online Payment') return setCheckoutError('Online payment is not available right now. Please choose another payment method.');
     const isManual = checkoutForm.paymentMethod === MANUAL_METHOD;
     const wl = manualWallets(storeSettings);
     const wallet = wl.includes(checkoutForm.manualWallet) ? checkoutForm.manualWallet : (wl[0] || '');
@@ -598,7 +599,7 @@ export default function App() {
       // Either way the customer goes straight to the bKash / card payment page.
       // If the payment page cannot be opened, the order is still saved and the thank-you page lets them pay again.
       setPayNotice('');
-      if (!isManual && (order.paymentMethod === 'Online Payment' || (Number(order.shipping) || 0) > 0)) {
+      if (ONLINE_PAY_ON && !isManual && (order.paymentMethod === 'Online Payment' || (Number(order.shipping) || 0) > 0)) {
         try {
           const url = await getPaymentUrl(orderNumber, payVia);
           window.location.href = url;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { deliveryAreaFor, DELIVERY_AREAS, DELIVERY_AREA_BN, PAYMENT_METHODS, PAYMENT_METHOD_BN, MANUAL_METHOD, manualWallets, toBanglaDigits, deliveryNote, freeDeliveryApplies, freeDeliveryMissing, normalizeSettings } from '../data/shopConfig';
+import { deliveryAreaFor, DELIVERY_AREAS, DELIVERY_AREA_BN, PAYMENT_METHODS, PAYMENT_METHOD_BN, MANUAL_METHOD, ONLINE_PAY_ON, manualWallets, toBanglaDigits, deliveryNote, freeDeliveryApplies, freeDeliveryMissing, normalizeSettings } from '../data/shopConfig';
 
 export default function CheckoutView({
   storeSettings, cart, checkoutForm, setCheckoutForm, checkoutError, deliveryCharge, grandTotal, formatPrice,
@@ -25,14 +25,14 @@ export default function CheckoutView({
     setCheckoutForm(next);
   };
   const wallets = manualWallets(storeSettings);
-  const methods = PAYMENT_METHODS.filter((m) => m !== MANUAL_METHOD || wallets.length > 0);
+  const methods = PAYMENT_METHODS.filter((m) => (m !== MANUAL_METHOD || wallets.length > 0) && (m !== 'Online Payment' || ONLINE_PAY_ON));
   const manual = checkoutForm.paymentMethod === MANUAL_METHOD && wallets.length > 0;
   const wallet = wallets.includes(checkoutForm.manualWallet) ? checkoutForm.manualWallet : (wallets[0] || '');
   const walletNo = wallet ? normalizeSettings(storeSettings)['manual' + wallet] : '';
-  const online = checkoutForm.paymentMethod === 'Online Payment';
+  const online = ONLINE_PAY_ON && checkoutForm.paymentMethod === 'Online Payment';
   const areaChosen = !!checkoutForm.deliveryArea;
   // what the customer pays online when pressing Place Order: Online Payment = everything, Cash on Delivery = the delivery charge
-  const payNow = manual ? 0 : online ? grandTotal : (areaChosen ? deliveryCharge : 0);
+  const payNow = !ONLINE_PAY_ON || manual ? 0 : online ? grandTotal : (areaChosen ? deliveryCharge : 0);
   const placeLabel = placingOrder ? 'Placing order...' : (payNow > 0 ? `Place Order & Pay ${formatPrice(payNow)}` : 'Place Order');
 
   const panel = `rounded-lg border p-5 sm:p-7 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-gray-50 border-gray-200'}`;
@@ -254,7 +254,7 @@ export default function CheckoutView({
                   <p className="mt-1 font-semibold">অনলাইন পেমেন্ট {Number(grandTotal).toFixed(2)} টাকা বিকাশ, নগদ বা কার্ডের মাধ্যমে পরিশোধ করতে পারবেন। বিকাশে পেমেন্ট করতে Pay with bKash এ ক্লিক করে নম্বর দিন, আর কার্ড বা ব্যাংকে পেমেন্ট করতে Pay with Card / Bank এ ক্লিক করুন।</p>
                   <p className="mt-1 text-gray-600">The full amount is paid now by bKash / card on the secure payment page.</p>
                 </>
-              ) : areaChosen && deliveryCharge > 0 ? (
+              ) : !ONLINE_PAY_ON ? null : areaChosen && deliveryCharge > 0 ? (
                 <p className="mt-1 font-semibold">ক্যাশ অন ডেলিভারিতে আগে {formatPrice(deliveryCharge)} ডেলিভারি চার্জ bKash / কার্ডে দিতে হবে। বাকি {formatPrice(grandTotal - deliveryCharge)} পণ্য হাতে পেয়ে দিবেন। / Pay the {formatPrice(deliveryCharge)} delivery charge now by bKash / card, the rest {formatPrice(grandTotal - deliveryCharge)} in cash on delivery.</p>
               ) : !areaChosen ? (
                 <p className="mt-1 font-semibold">ক্যাশ অন ডেলিভারিতে ডেলিভারি চার্জ আগে অনলাইনে (bKash / কার্ড) দিতে হবে। এলাকা সিলেক্ট করলে চার্জ দেখাবে। / For Cash on Delivery the delivery charge is paid online first.</p>

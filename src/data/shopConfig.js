@@ -23,6 +23,9 @@ export const deliveryAreaFor = (district, zone, isCityThana) =>
 export const DEFAULT_DELIVERY = { deliveryInside: 100, deliveryOutside: 150, deliveryExtraPerItem: 15, deliveryIncludedItems: 2, freeDeliveryEnabled: true, freeDeliveryMin: 2000, freeDeliveryFor: 'online' };
 export const FREE_DELIVERY_FOR = ['online', 'cod', 'both'];
 
+// SSLCommerz online payment (and the COD delivery-charge advance) is OFF until a live merchant account exists.
+// Switch it on by setting VITE_ONLINE_PAY=on in Vercel (Environment Variables) and redeploying.
+export const ONLINE_PAY_ON = import.meta.env.VITE_ONLINE_PAY === 'on';
 export const MANUAL_METHOD = 'Manual bKash / Nagad';
 export const PAYMENT_METHODS = ['Cash on Delivery', 'Online Payment', MANUAL_METHOD];
 export const PAYMENT_METHOD_BN = { 'Cash on Delivery': 'ক্যাশ অন ডেলিভারি', 'Online Payment': 'অনলাইন পেমেন্ট', [MANUAL_METHOD]: 'বিকাশ / নগদে সেন্ড মানি' };

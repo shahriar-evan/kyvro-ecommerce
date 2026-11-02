@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { startOnlinePayment } from '../payment';
-import { DELIVERY_AREA_BN, WHATSAPP_NUMBER } from '../data/shopConfig';
+import { DELIVERY_AREA_BN, WHATSAPP_NUMBER, ONLINE_PAY_ON } from '../data/shopConfig';
 import { formatDateTime } from '../utils/dates';
 
 export default function OrderSuccess({ payNotice = '', order, formatPrice, isDarkMode, setCurrentView }) {
@@ -39,7 +39,7 @@ export default function OrderSuccess({ payNotice = '', order, formatPrice, isDar
         </div>
       )}
 
-      {!manual && (online || Number(order.shipping) > 0) && order.paymentStatus !== 'Paid' && (
+      {ONLINE_PAY_ON && !manual && (online || Number(order.shipping) > 0) && order.paymentStatus !== 'Paid' && (
         <div className={`${panel} text-center space-y-3`}>
           <p className="text-sm font-semibold">
             {online
