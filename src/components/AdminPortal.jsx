@@ -7,6 +7,7 @@ import SizeStockEditor from './SizeStockEditor';
 import ColorPhotos from './ColorPhotos';
 import ColorPicker from './ColorPicker';
 import OrdersPanel from './OrdersPanel';
+import TeamStats from './TeamStats';
 import StoreSettings from './StoreSettings';
 import { subLabel, allPlaces, COLLECTION_LABELS, SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
 
@@ -253,6 +254,12 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                   {orders.filter(o => o.status === 'Pending').length > 0 && (
                     <span className="ml-2 bg-red-600 text-white rounded-full px-2 py-0.5 text-[10px]">{orders.filter(o => o.status === 'Pending').length} new</span>
                   )}
+                </button>
+                <button
+                  onClick={() => setAdminTab('stats')}
+                  className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'stats' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
+                >
+                  {isOwner ? 'Team Stats' : 'My Stats'}
                 </button>
                 {isOwner && (
                   <button
@@ -658,6 +665,8 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                 <aside className="hidden lg:block w-80 xl:w-96 shrink-0 lg:sticky lg:top-24">{supplierPanel}</aside>
                 </div>
               )}
+
+              {adminTab === 'stats' && <TeamStats orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} isOwner={isOwner} loggedInUserEmail={loggedInUserEmail} adminName={adminName} />}
 
               {adminTab === 'orders' && <OrdersPanel orders={orders} productCosts={productCosts} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} canUnblock={adminRole === 'owner' || adminRole === 'manager'} isOwner={adminRole === 'owner'} />}
             </div>
