@@ -179,7 +179,19 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
   };
 
   const staff = { email: loggedInUserEmail, name: adminName || loggedInUserEmail };
-  const countOf = (s) => orders.filter((o) => o.status === s).length;
+  // Orders where the customer went to the payment page but has not paid (cancelled / closed the page): kept out of the normal list
+  // (only orders placed since online payment started on 3 Nov 2026 count; older ones always show)
+  const GATE = new Date('2026-11-03T00:00:00+08:00');
+  const isUnpaid = (o) => {
+    if (o.status !== 'Pending') return false;
+    const d = toDate(o.createdAt);
+    if (!d || d < GATE) return false;
+    if (o.paymentMethod === 'Online Payment') return o.paymentStatus !== 'Paid';
+    return o.paymentMethod === 'Cash on Delivery' && Number(o.shipping) > 0 && !(Number(o.advancePaid) > 0);
+  };
+  const unpaidList = orders.filter(isUnpaid);
+  const live = orders.filter((o) => !isUnpaid(o));
+  const countOf = (s) => live.filter((o) => o.status === s).length;
 
   const q = search.trim().toLowerCase();
   // Search matches the order number, name, phone, the payment TrxID / sender number, and the product names
@@ -198,7 +210,8 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
     return (!rangeStart || d >= rangeStart) && (!rangeEnd || d <= rangeEnd);
   };
   const historyList = orders.filter((o) => FINISHED.includes(o.status) && inRange(o));
-  const visible = orders.filter((o) => {
+  const visible = (filter === 'Unpaid' ? unpaidList : live).filter((o) => {
+    if (filter === 'Unpaid') return !q || searchBits(o).some((v) => String(v || '').toLowerCase().includes(q));
     if (filter === 'History') return FINISHED.includes(o.status) && inRange(o) && (!q || searchBits(o).some((v) => String(v || '').toLowerCase().includes(q)));
     if (filter !== 'All' && o.status !== filter) return false;
     if (!q) return true;
@@ -332,13 +345,13 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
           <button onClick={exportCSV} className="bg-[#D4AF37] text-black text-xs font-bold px-4 py-2 rounded uppercase tracking-wider">Export Orders to CSV</button>
         </div>
         <div className="flex flex-wrap gap-2">
-          {['All', ...ORDER_STATUSES, 'History'].map((s) => (
+          {['All', ...ORDER_STATUSES, 'History', ...(unpaidList.length ? ['Unpaid'] : [])].map((s) => (
             <button
               key={s}
               onClick={() => setFilter(s)}
               className={`px-3 py-1.5 rounded text-[11px] font-bold uppercase tracking-wider transition ${filter === s ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#222] text-gray-700 dark:text-gray-300'}`}
             >
-              {s} ({s === 'All' ? orders.length : s === 'History' ? orders.filter((o) => FINISHED.includes(o.status)).length : countOf(s)})
+              {s === 'Unpaid' ? 'Unpaid (not paid online)' : s} ({s === 'All' ? live.length : s === 'Unpaid' ? unpaidList.length : s === 'History' ? live.filter((o) => FINISHED.includes(o.status)).length : countOf(s)})
             </button>
           ))}
         </div>

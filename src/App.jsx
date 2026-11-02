@@ -114,6 +114,10 @@ export default function App() {
     return null;
   });
   const [currentView, setCurrentView] = useState(payResult ? 'payment-result' : 'home');
+  // Payment done (or being checked): now the cart can be emptied. Cancelled / failed payments keep the cart.
+  useEffect(() => {
+    if (payResult && (payResult.status === 'ok' || payResult.status === 'check')) { setCart([]); }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (payResult) { try { window.history.replaceState(window.history.state, '', window.location.pathname); } catch (e) { /* ignore */ } }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -582,8 +586,9 @@ export default function App() {
       const { orderNumber } = await placeOrder(order);
       setOrderCompleteData({ ...order, orderNumber, date: new Date().toISOString() });
       trackPurchase({ ...order, orderNumber });
-      setCart([]);
-      setCheckoutForm(EMPTY_CHECKOUT);
+      const goesOnline = ONLINE_PAY_ON && (order.paymentMethod === 'Online Payment' || (Number(order.shipping) || 0) > 0);
+      // Going to the payment page: keep the cart until the payment is done, so a cancelled payment can be tried again
+      if (!goesOnline) { setCart([]); setCheckoutForm(EMPTY_CHECKOUT); }
       // Online Payment: the whole total is paid now. Cash on Delivery: the delivery charge is paid now, the rest at delivery.
       // Either way the customer goes straight to the bKash / card payment page.
       // If the payment page cannot be opened, the order is still saved and the thank-you page lets them pay again.
@@ -595,6 +600,7 @@ export default function App() {
           return;
         } catch (payErr) { console.warn('Payment page not opened:', payErr.message); setPayNotice(payErr.message); }
       }
+      setCart([]); setCheckoutForm(EMPTY_CHECKOUT);
       setCurrentView('order-success');
     } catch (err) {
       console.error('Order failed:', err);
