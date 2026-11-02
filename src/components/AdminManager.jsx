@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { askConfirm, askInput } from './AlertCenter';
 import { OWNER_EMAILS, ownerName } from '../adminEmails';
-import { listAdmins, listPrivateDetails, createAdminAccount, updateAdminProfile, changeAdminEmail, setAdminRole, setAdminActive, removeAdmin, sendAdminPasswordReset, setAdminPasswordByOwner, setAdminEditAll, setAdminAddProducts, setAdminCommission, ROLES, ROLE_LABELS } from '../adminAuth';
+import { listAdmins, listPrivateDetails, createAdminAccount, updateAdminProfile, changeAdminEmail, setAdminRole, setAdminActive, removeAdmin, sendAdminPasswordReset, setAdminPasswordByOwner, setAdminEditAll, setAdminAddProducts, setAdminCanApprove, setAdminCommission, ROLES, ROLE_LABELS } from '../adminAuth';
 import { auth } from '../firebase';
 
 const randomPassword = () => {
@@ -111,6 +111,7 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
   const [password, setPassword] = useState('');
   const [editAllNew, setEditAllNew] = useState(false);
   const [addProductsNew, setAddProductsNew] = useState(false);
+  const [canApproveNew, setCanApproveNew] = useState(false);
   const [commissionNew, setCommissionNew] = useState('');
   const [phone, setPhone] = useState('');
   const [note, setNote] = useState('');
@@ -163,7 +164,7 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
     setBusy(true);
     try {
       const { accountCreated, resetSent } = await createAdminAccount(email, password, newRole, {
-        name, phone, note, addedByName: currentName || currentEmail, editAll: isOwner && newRole !== 'owner' && editAllNew, addProducts: isOwner && newRole !== 'owner' && addProductsNew, commission: isOwner ? commissionNew : 0,
+        name, phone, note, addedByName: currentName || currentEmail, editAll: isOwner && newRole !== 'owner' && editAllNew, addProducts: isOwner && newRole !== 'owner' && addProductsNew, canApprove: isOwner && newRole !== 'owner' && canApproveNew, commission: isOwner ? commissionNew : 0,
       });
       setMessage({
         type: 'ok',
@@ -171,7 +172,7 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
           ? `${name.trim()} (${email.trim()}) was added as ${ROLE_LABELS[newRole]}. Share the email and password with them so they can log in.`
           : `${email.trim()} already had an account (for example they signed in to the shop with Google before), so the password you typed was NOT set. ${name.trim()} was added to the team as ${ROLE_LABELS[newRole]}. They can log in right now with "Continue with Google" using this email.${resetSent ? ' We also emailed them a "set password" link: after they set a password, email + password login works too (check spam).' : ' To make email + password login work, press "Reset password" on their row so they get a set-password email.'}`
       });
-      setName(''); setEmail(''); setPassword(''); setPhone(''); setNote(''); setRole('admin'); setEditAllNew(false); setAddProductsNew(false); setCommissionNew('');
+      setName(''); setEmail(''); setPassword(''); setPhone(''); setNote(''); setRole('admin'); setEditAllNew(false); setAddProductsNew(false); setCanApproveNew(false); setCommissionNew('');
       await load();
     } catch (err) {
       setMessage({ type: 'err', text: friendlyError(err) });
@@ -298,6 +299,18 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
     try {
       await setAdminAddProducts(a.email, next);
       setMessage({ type: 'ok', text: next ? `${a.name || a.email} can now add new products (they wait for your approval).` : `${a.name || a.email} can no longer add new products.` });
+      await load();
+    } catch (err) {
+      setMessage({ type: 'err', text: friendlyError(err) });
+    }
+  };
+
+  const handleCanApprove = async (a) => {
+    setMessage(null);
+    const next = !a.canApprove;
+    try {
+      await setAdminCanApprove(a.email, next);
+      setMessage({ type: 'ok', text: next ? `${a.name || a.email} can now approve pending products (make them live).` : `${a.name || a.email} can no longer approve products.` });
       await load();
     } catch (err) {
       setMessage({ type: 'err', text: friendlyError(err) });
@@ -471,6 +484,12 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
           </label>
         )}
         {isOwner && (
+          <label className="flex items-start gap-2 text-xs cursor-pointer">
+            <input type="checkbox" checked={canApproveNew} onChange={(e) => setCanApproveNew(e.target.checked)} className="mt-0.5 accent-[#D4AF37]" />
+            <span><strong>Approve products:</strong> let this person approve pending products (make them live on the website). Off by default. You can switch it on or off later.</span>
+          </label>
+        )}
+        {isOwner && (
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1">Commission % (optional)</label>
             <input type="number" min="0" max="100" step="0.5" value={commissionNew} onChange={(e) => setCommissionNew(e.target.value)} placeholder="e.g. 10" className={inputClass} />
@@ -554,6 +573,9 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
                       )}
                       {a.role !== 'owner' && (
                         <button type="button" onClick={() => handleAddProducts(a)} title="Let this person add new products" className={`${chipBtn} ${a.addProducts ? '!bg-green-600 !text-white !border-green-600' : ''}`}>Add products: {a.addProducts ? 'ON' : 'OFF'}</button>
+                      )}
+                      {a.role !== 'owner' && (
+                        <button type="button" onClick={() => handleCanApprove(a)} title="Let this person approve pending products" className={`${chipBtn} ${a.canApprove ? '!bg-green-600 !text-white !border-green-600' : ''}`}>Approve products: {a.canApprove ? 'ON' : 'OFF'}</button>
                       )}
                       {a.role !== 'owner' && (
                         <button type="button" onClick={() => handleCommission(a)} title="Commission percent" className={chipBtn}>Commission: {a.commission || 0}%</button>

@@ -243,6 +243,7 @@ export default function App() {
   const [loggedInUserEmail, setLoggedInUserEmail] = useState('');
   const [adminRole, setAdminRole] = useState(null); // 'owner' | 'manager' | 'admin' | null
   const [adminAddProducts, setAdminAddProducts] = useState(false); // the Owner allowed this person to add new products
+  const [adminCanApprove, setAdminCanApprove] = useState(false); // the Owner allowed this person to approve pending products
   const [adminCommission, setAdminCommission] = useState(0); // commission percent set by the Owner
   const [adminEditAll, setAdminEditAll] = useState(false); // the Owner allowed this person to edit every product
   const [adminName, setAdminName] = useState('');
@@ -291,7 +292,7 @@ export default function App() {
   // While logged in, access OFF / removal / role changes by the Owner apply immediately
   useEffect(() => {
     if (!isAdminLoggedIn || !loggedInUserEmail || isOwnerEmail(loggedInUserEmail)) return;
-    const unsubscribe = watchAdminAccess(loggedInUserEmail, ({ role, active, name, editAll, addProducts, commission }) => {
+    const unsubscribe = watchAdminAccess(loggedInUserEmail, ({ role, active, name, editAll, addProducts, canApprove, commission }) => {
       if (!role || !active) {
         setIsAdminLoggedIn(false);
         setLoggedInUserEmail('');
@@ -303,6 +304,7 @@ export default function App() {
         setAdminRole(role);
         setAdminEditAll(!!editAll);
         setAdminAddProducts(!!addProducts);
+        setAdminCanApprove(!!canApprove);
         setAdminCommission(Number(commission) || 0);
         if (name) setAdminName(name);
       }
@@ -1014,12 +1016,12 @@ export default function App() {
     if (adminRole === 'owner') return true;
     const mine = !!p.addedBy && p.addedBy.toLowerCase() === (loggedInUserEmail || '').toLowerCase();
     // Manager: own products, or a pending product from an Admin (rejecting it). Admin: own products only.
-    if (adminRole === 'manager') return mine || !isApproved(p);
+    if (adminRole === 'manager' || adminCanApprove) return mine || !isApproved(p);
     if (adminRole === 'admin') return mine;
     return false;
   };
   const canAddProduct = adminRole === 'owner' || adminAddProducts;
-  const canApproveProduct = (p) => isCloud && !isApproved(p) && adminRole === 'owner';
+  const canApproveProduct = (p) => isCloud && !isApproved(p) && (adminRole === 'owner' || adminCanApprove);
   const handleApproveProduct = async (p) => {
     try {
       await approveProduct(p, { email: loggedInUserEmail, name: adminName });
