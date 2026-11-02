@@ -131,6 +131,7 @@ export async function markPaid(orderNumber, info, kind = 'full') {
 // Returns { kind, amount } or { error }
 export function amountDue(order) {
   if (order.status === 'Cancelled') return { error: 'This order was cancelled.' };
+  if (order.paymentMethod === 'Manual bKash / Nagad') return { error: 'This order is paid by manual bKash / Nagad. The team will verify it.' };
   if (order.paymentMethod === 'Online Payment') {
     if (order.paymentStatus === 'Paid') return { error: 'This order is already paid.' };
     return { kind: 'full', amount: Number(order.total) };
@@ -164,6 +165,7 @@ export async function confirmPayment(valId) {
   if (!['VALID', 'VALIDATED'].includes(v.status)) return { ok: false, orderNumber, kind, reason: `status ${v.status}` };
   const order = await getOrder(orderNumber);
   if (!order) return { ok: false, orderNumber, kind, reason: 'order not found' };
+  if (order.paymentMethod === 'Manual bKash / Nagad') return { ok: false, orderNumber, kind, reason: 'manual payment order' };
   const amount = Number(v.amount);
   // what this order really asks for (never trust the browser or the gateway fields alone)
   const expected = kind === 'advance'

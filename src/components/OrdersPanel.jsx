@@ -17,6 +17,7 @@ const STATUS_STYLE = {
 const PAYMENT_STYLE = {
   Paid: 'text-green-600',
   'Awaiting payment': 'text-yellow-600',
+  'Awaiting verification': 'text-orange-600',
   'Cash on Delivery': 'text-gray-500',
 };
 
@@ -93,7 +94,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
     list.forEach((g) => { g.delivery = supplierDelivery(o, g.units); });
     const delivery = list.reduce((a, g) => a + g.delivery, 0);
     const total = Number(o.total) || 0;
-    const online = o.paymentMethod === 'Online Payment';
+    const online = o.paymentMethod === 'Online Payment' || o.paymentMethod === 'Manual bKash / Nagad';
     const sellTotal = list.reduce((a, g) => a + g.sell, 0) || 1;
     const adv = !online && (!!advance[o.id] || Number(o.advancePaid) > 0);
     const shipping = Number(o.shipping) || 0;
@@ -467,7 +468,15 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
                 <p className="font-bold text-[11px] uppercase tracking-wider text-gray-500 mb-1">Payment</p>
                 <p>Method: <strong>{o.paymentMethod}</strong></p>
                 <p>Status: <strong className={PAYMENT_STYLE[o.paymentStatus] || ''}>{o.paymentStatus}</strong></p>
-                {o.paymentMethod !== 'Online Payment' && Number(o.shipping) > 0 && <p>Delivery charge advance: <strong className={Number(o.advancePaid) > 0 ? 'text-green-600' : 'text-red-600'}>{Number(o.advancePaid) > 0 ? `Paid ${formatPrice(o.advancePaid)}` : 'Not paid'}</strong></p>}
+                {o.paymentMethod === 'Manual bKash / Nagad' && o.manualPay && (
+                  <div className="my-1 rounded border border-orange-400/60 bg-orange-500/10 p-2 text-xs">
+                    <p className="font-bold">Customer says they sent {formatPrice(o.total)} via {o.manualPay.wallet}</p>
+                    <p>From number: <strong>{o.manualPay.sender}</strong></p>
+                    <p>TrxID: <strong className="select-all">{o.manualPay.trxId}</strong></p>
+                    <p className="text-gray-500">Check your {o.manualPay.wallet} app/SMS for this exact TrxID and amount, then press Mark payment received.</p>
+                  </div>
+                )}
+                {o.paymentMethod !== 'Online Payment' && o.paymentMethod !== 'Manual bKash / Nagad' && Number(o.shipping) > 0 && <p>Delivery charge advance: <strong className={Number(o.advancePaid) > 0 ? 'text-green-600' : 'text-red-600'}>{Number(o.advancePaid) > 0 ? `Paid ${formatPrice(o.advancePaid)}` : 'Not paid'}</strong></p>}
                 <p>Subtotal: {formatPrice(o.subtotal)}</p>
                 {o.discount > 0 && <p className="text-green-600">Discount{o.discountLabel ? ` (${o.discountLabel})` : ''}: - {formatPrice(o.discount)}</p>}
                 <p>Delivery: {o.shipping === 0 ? 'FREE' : formatPrice(o.shipping)}</p>
@@ -655,7 +664,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
               {o.status === 'Shipped' && (
                 <button disabled={busy} onClick={() => setStatus(o, 'Delivered')} className={`${btn} bg-green-600 text-white hover:opacity-90`}>Mark as delivered</button>
               )}
-              {o.paymentStatus === 'Awaiting payment' && o.status !== 'Cancelled' && (
+              {(o.paymentStatus === 'Awaiting payment' || o.paymentStatus === 'Awaiting verification') && o.status !== 'Cancelled' && (
                 <button disabled={busy} onClick={() => run(o.id, () => markOrderPaid(o.id, staff))} className={`${btn} bg-[#D4AF37] text-black hover:opacity-90`}>Mark payment received</button>
               )}
               {o.status !== 'Cancelled' && o.status !== 'Delivered' && (isOwner || !isPaidOrder(o)) && (
