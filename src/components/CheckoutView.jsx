@@ -33,6 +33,9 @@ export default function CheckoutView({
   const areaChosen = !!checkoutForm.deliveryArea;
   // what the customer pays online when pressing Place Order: Online Payment = everything, Cash on Delivery = the delivery charge
   const payNow = !ONLINE_PAY_ON || manual ? 0 : online ? grandTotal : (areaChosen ? deliveryCharge : 0);
+  // UddoktaPay: the pay button is always shown (bKash / Nagad), even before a delivery area is chosen
+  const showPayBtn = payNow > 0 || (PAY_PROVIDER === 'uddokta' && ONLINE_PAY_ON && !manual);
+  const payAmt = payNow > 0 ? ` ${formatPrice(payNow)}` : '';
   const placeLabel = placingOrder ? 'Placing order...' : (payNow > 0 ? `Place Order & Pay ${formatPrice(payNow)}` : 'Place Order');
 
   const panel = `rounded-lg border p-5 sm:p-7 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-gray-50 border-gray-200'}`;
@@ -251,13 +254,24 @@ export default function CheckoutView({
               )}
               {online ? (
                 <>
-                  <p className="mt-1 font-semibold">অনলাইন পেমেন্ট {Number(grandTotal).toFixed(2)} টাকা বিকাশ, নগদ বা কার্ডের মাধ্যমে পরিশোধ করতে পারবেন। বিকাশে পেমেন্ট করতে Pay with bKash এ ক্লিক করে নম্বর দিন, আর কার্ড বা ব্যাংকে পেমেন্ট করতে Pay with Card / Bank এ ক্লিক করুন।</p>
-                  <p className="mt-1 text-gray-600">The full amount is paid now by bKash / card on the secure payment page.</p>
+                  {PAY_PROVIDER === 'uddokta' ? (
+                    <>
+                      <p className="mt-1 font-semibold">অনলাইন পেমেন্ট {Number(grandTotal).toFixed(2)} টাকা বিকাশ বা নগদের মাধ্যমে পরিশোধ করতে পারবেন। Pay with bKash / Nagad এ ক্লিক করে পেমেন্ট পেজে নম্বর দিন।</p>
+                      <p className="mt-1 text-gray-600">The full amount is paid now by bKash / Nagad on the secure payment page.</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="mt-1 font-semibold">অনলাইন পেমেন্ট {Number(grandTotal).toFixed(2)} টাকা বিকাশ, নগদ বা কার্ডের মাধ্যমে পরিশোধ করতে পারবেন। বিকাশে পেমেন্ট করতে Pay with bKash এ ক্লিক করে নম্বর দিন, আর কার্ড বা ব্যাংকে পেমেন্ট করতে Pay with Card / Bank এ ক্লিক করুন।</p>
+                      <p className="mt-1 text-gray-600">The full amount is paid now by bKash / card on the secure payment page.</p>
+                    </>
+                  )}
                 </>
               ) : !ONLINE_PAY_ON ? null : areaChosen && deliveryCharge > 0 ? (
-                <p className="mt-1 font-semibold">ক্যাশ অন ডেলিভারিতে আগে {formatPrice(deliveryCharge)} ডেলিভারি চার্জ bKash / কার্ডে দিতে হবে। বাকি {formatPrice(grandTotal - deliveryCharge)} পণ্য হাতে পেয়ে দিবেন। / Pay the {formatPrice(deliveryCharge)} delivery charge now by bKash / card, the rest {formatPrice(grandTotal - deliveryCharge)} in cash on delivery.</p>
+                <p className="mt-1 font-semibold">{PAY_PROVIDER === 'uddokta'
+                  ? <>ক্যাশ অন ডেলিভারিতে আগে {formatPrice(deliveryCharge)} ডেলিভারি চার্জ bKash / Nagad এ দিতে হবে। বাকি {formatPrice(grandTotal - deliveryCharge)} পণ্য হাতে পেয়ে দিবেন। / Pay the {formatPrice(deliveryCharge)} delivery charge now by bKash / Nagad, the rest {formatPrice(grandTotal - deliveryCharge)} in cash on delivery.</>
+                  : <>ক্যাশ অন ডেলিভারিতে আগে {formatPrice(deliveryCharge)} ডেলিভারি চার্জ bKash / কার্ডে দিতে হবে। বাকি {formatPrice(grandTotal - deliveryCharge)} পণ্য হাতে পেয়ে দিবেন। / Pay the {formatPrice(deliveryCharge)} delivery charge now by bKash / card, the rest {formatPrice(grandTotal - deliveryCharge)} in cash on delivery.</>}</p>
               ) : !areaChosen ? (
-                <p className="mt-1 font-semibold">ক্যাশ অন ডেলিভারিতে ডেলিভারি চার্জ আগে অনলাইনে (bKash / কার্ড) দিতে হবে। এলাকা সিলেক্ট করলে চার্জ দেখাবে। / For Cash on Delivery the delivery charge is paid online first.</p>
+                <p className="mt-1 font-semibold">ক্যাশ অন ডেলিভারিতে ডেলিভারি চার্জ আগে অনলাইনে ({PAY_PROVIDER === 'uddokta' ? 'bKash / Nagad' : 'bKash / কার্ড'}) দিতে হবে। এলাকা সিলেক্ট করলে চার্জ দেখাবে। / For Cash on Delivery the delivery charge is paid online first.</p>
               ) : null}
             </div>
 
@@ -274,13 +288,13 @@ export default function CheckoutView({
               <button type="button" onClick={() => setCurrentView('privacy')} className="underline hover:text-[#D4AF37]">Privacy Policy</button> and{' '}
               <button type="button" onClick={() => setCurrentView('refund')} className="underline hover:text-[#D4AF37]">Return &amp; Refund Policy</button>.
             </p>
-            {payNow > 0 ? (
+            {showPayBtn ? (
               <div className="hidden lg:flex flex-col gap-3">
                 <button type="submit" name="payvia" value="bkash" disabled={placingOrder} className="w-full flex items-center justify-center gap-2 bg-[#E2136E] text-white font-bold py-4 rounded text-sm tracking-wider hover:opacity-90 transition disabled:opacity-50">
-                  {placingOrder ? 'Placing order...' : `${PAY_PROVIDER === 'uddokta' ? 'Pay with bKash / Nagad / Rocket' : 'Pay with bKash'} ${formatPrice(payNow)}`}
+                  {placingOrder ? 'Placing order...' : `${PAY_PROVIDER === 'uddokta' ? 'Pay with bKash / Nagad' : 'Pay with bKash'}${payAmt}`}
                 </button>
                 {PAY_PROVIDER !== 'uddokta' && <button type="submit" name="payvia" value="card" disabled={placingOrder} className="w-full flex items-center justify-center gap-2 bg-[#D4AF37] text-black font-bold py-4 rounded text-sm tracking-wider hover:opacity-90 transition disabled:opacity-50">
-                  {placingOrder ? 'Placing order...' : `Pay with Card / Bank ${formatPrice(payNow)}`}
+                  {placingOrder ? 'Placing order...' : `Pay with Card / Bank${payAmt}`}
                 </button>}
               </div>
             ) : (
@@ -300,10 +314,10 @@ export default function CheckoutView({
             <p className="text-[10px] text-gray-500">{areaChosen ? 'Total' : 'Total (+ delivery)'}</p>
             <p className="text-lg font-bold text-[#D4AF37]">{formatPrice(grandTotal)}</p>
           </div>
-          {payNow > 0 ? (
+          {showPayBtn ? (
             <div className="flex-1 flex flex-col gap-1.5">
               <button type="submit" name="payvia" value="bkash" form="kyvro-checkout-form" disabled={placingOrder} className="h-10 rounded-lg bg-[#E2136E] text-white font-bold text-xs tracking-wide shadow active:scale-95 transition disabled:opacity-50">
-                {placingOrder ? 'Placing order...' : (PAY_PROVIDER === 'uddokta' ? 'Pay with bKash / Nagad / Rocket' : 'Pay with bKash')}
+                {placingOrder ? 'Placing order...' : (PAY_PROVIDER === 'uddokta' ? 'Pay with bKash / Nagad' : 'Pay with bKash')}
               </button>
               {PAY_PROVIDER !== 'uddokta' && <button type="submit" name="payvia" value="card" form="kyvro-checkout-form" disabled={placingOrder} className="h-10 rounded-lg bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold text-xs tracking-wide shadow active:scale-95 transition disabled:opacity-50">
                 {placingOrder ? 'Placing order...' : 'Pay with Card / Bank'}
