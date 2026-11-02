@@ -266,12 +266,10 @@ export default function CheckoutView({
                   {PAY_PROVIDER === 'uddokta' ? (
                     <>
                       <p className="mt-1 font-semibold">অনলাইন পেমেন্ট {Number(grandTotal).toFixed(2)} টাকা {CARD_PAY_ON ? 'বিকাশ, নগদ বা কার্ডের' : 'বিকাশ বা নগদের'} মাধ্যমে পরিশোধ করতে পারবেন। {CARD_PAY_ON ? 'বিকাশ/নগদে দিতে Pay with bKash / Nagad এবং কার্ডে দিতে Pay with Card এ ক্লিক করুন।' : 'Pay with bKash / Nagad এ ক্লিক করে পেমেন্ট পেজে নম্বর দিন।'}</p>
-                      <p className="mt-1 text-gray-600">The full amount is paid now by {CARD_PAY_ON ? 'bKash / Nagad / card' : 'bKash / Nagad'} on the secure payment page.</p>
                     </>
                   ) : (
                     <>
                       <p className="mt-1 font-semibold">অনলাইন পেমেন্ট {Number(grandTotal).toFixed(2)} টাকা বিকাশ, নগদ বা কার্ডের মাধ্যমে পরিশোধ করতে পারবেন। বিকাশে পেমেন্ট করতে Pay with bKash এ ক্লিক করে নম্বর দিন, আর কার্ড বা ব্যাংকে পেমেন্ট করতে Pay with Card / Bank এ ক্লিক করুন।</p>
-                      <p className="mt-1 text-gray-600">The full amount is paid now by bKash / card on the secure payment page.</p>
                     </>
                   )}
                 </>
@@ -280,7 +278,7 @@ export default function CheckoutView({
                   ? <>ক্যাশ অন ডেলিভারিতে আগে {formatPrice(deliveryCharge)} ডেলিভারি চার্জ bKash বা Nagad এর মাধ্যমে দিতে হবে। বাকি {formatPrice(grandTotal - deliveryCharge)} পণ্য হাতে পেয়ে দিবেন।</>
                   : <>ক্যাশ অন ডেলিভারিতে আগে {formatPrice(deliveryCharge)} ডেলিভারি চার্জ bKash বা কার্ডের মাধ্যমে দিতে হবে। বাকি {formatPrice(grandTotal - deliveryCharge)} পণ্য হাতে পেয়ে দিবেন।</>}</p>
               ) : !areaChosen ? (
-                <p className="mt-1 font-semibold">ক্যাশ অন ডেলিভারিতে ডেলিভারি চার্জ আগে অনলাইনে {PAY_PROVIDER === 'uddokta' ? 'bKash বা Nagad' : 'bKash বা কার্ড'} এর মাধ্যমে দিতে হবে | For Cash on Delivery the delivery charge is paid online first.</p>
+                <p className="mt-1 font-semibold">ক্যাশ অন ডেলিভারিতে ডেলিভারি চার্জ আগে অনলাইনে {PAY_PROVIDER === 'uddokta' ? 'bKash বা Nagad' : 'bKash বা কার্ড'} এর মাধ্যমে দিতে হবে</p>
               ) : null}
             </div>
           </div>
