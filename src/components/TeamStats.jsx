@@ -144,6 +144,7 @@ export default function TeamStats({ products = [], startEditProduct, canEditProd
                 <div>
                   <p className="font-bold">{p.name}{p.key === me ? ' (you)' : ''}</p>
                   {p.email && <p className="text-[11px] text-gray-500">{p.email}</p>}
+                  <p className="text-[11px] mt-1"><span className="px-2 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] font-bold">{p.key === me ? 'My products' : 'Products added'} ({(addedBy[p.key] || []).length})</span></p>
                 </div>
                 {isOwner && <span className="text-[11px] text-[#D4AF37] font-bold uppercase tracking-wider">{isOpen ? 'Hide orders' : 'Show orders'}</span>}
               </div>
@@ -165,14 +166,6 @@ export default function TeamStats({ products = [], startEditProduct, canEditProd
 
             {isOpen && (
               <div className="space-y-4 border-t pt-4">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider mb-2">Products in confirmed orders</p>
-                  {prods.length === 0 ? <p className="text-xs text-gray-500">None in this period.</p> : (
-                    <div className="divide-y text-sm">
-                      {prods.map(([name, q]) => <div key={name} className="py-1.5 flex justify-between gap-3"><span>{name}</span><span className="font-semibold">&times; {q}</span></div>)}
-                    </div>
-                  )}
-                </div>
                 {(() => {
                   const mine = addedBy[p.key] || [];
                   return (
@@ -199,6 +192,14 @@ export default function TeamStats({ products = [], startEditProduct, canEditProd
                     </div>
                   );
                 })()}
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider mb-2">Products in confirmed orders</p>
+                  {prods.length === 0 ? <p className="text-xs text-gray-500">None in this period.</p> : (
+                    <div className="divide-y text-sm">
+                      {prods.map(([name, q]) => <div key={name} className="py-1.5 flex justify-between gap-3"><span>{name}</span><span className="font-semibold">&times; {q}</span></div>)}
+                    </div>
+                  )}
+                </div>
                 {[['Confirmed orders', s.confirmed], ['Delivered orders', s.delivered], ['Cancelled orders', s.cancelled]].map(([title, list]) => (
                   list.length > 0 && (
                     <div key={title}>

@@ -516,11 +516,31 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
               </div>
             </div>
 
+            {/* items */}
+            <div>
+              <p className="font-bold text-[11px] uppercase tracking-wider text-gray-500 mb-2">Products ordered</p>
+              <div className="divide-y text-xs">
+                {(o.items || []).map((it, i) => (
+                  <div key={i} className="py-2 flex items-center gap-3">
+                    {it.image && <img src={it.image} alt="" className="w-10 h-10 object-cover rounded" />}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold">{it.name}</p>
+                      <p className="text-gray-500">
+                        {it.category ? `${it.category} · ` : ''}{it.size && it.size !== 'Standard' ? `Size ${it.size} · ` : ''}{it.color ? `${it.color} · ` : ''}{formatPrice(it.price)} each
+                      </p>
+                    </div>
+                    <span className="font-bold">&times; {it.quantity}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* supplier / dropshipping (private) */}
             {(() => {
               const sp = supplyInfo(o);
               if (!sp.hasSupplier && sp.missing.length === 0) return null;
               if (!sp.hasSupplier) return null;
+              if (o.status === 'Pending') return null; // the supplier box opens after the order is confirmed
               const finished = o.status === 'Cancelled';
               return (
                 <div className={`rounded border border-[#D4AF37]/50 bg-[#D4AF37]/5 p-3 text-xs space-y-3`}>
@@ -624,25 +644,6 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
               );
             })()}
 
-            {/* items */}
-            <div>
-              <p className="font-bold text-[11px] uppercase tracking-wider text-gray-500 mb-2">Products ordered</p>
-              <div className="divide-y text-xs">
-                {(o.items || []).map((it, i) => (
-                  <div key={i} className="py-2 flex items-center gap-3">
-                    {it.image && <img src={it.image} alt="" className="w-10 h-10 object-cover rounded" />}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold">{it.name}</p>
-                      <p className="text-gray-500">
-                        {it.category ? `${it.category} · ` : ''}{it.size && it.size !== 'Standard' ? `Size ${it.size} · ` : ''}{it.color ? `${it.color} · ` : ''}{formatPrice(it.price)} each
-                      </p>
-                    </div>
-                    <span className="font-bold">&times; {it.quantity}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
             {/* history */}
             <div className="text-[11px] text-gray-500 space-y-0.5">
               <p>• Order placed · {formatDateTime(o.createdAt)}</p>
@@ -687,7 +688,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
               <button type="button" onClick={() => copyOrder(o)} className={`${btn} ${copiedId === o.id ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
                 {copiedId === o.id ? 'Copied ✓' : 'Copy order details'}
               </button>
-              {o.status === 'Pending' && (
+              {o.status === 'Pending' && !isUnpaid(o) && (
                 <button disabled={busy} onClick={() => setStatus(o, 'Processing')} className={`${btn} bg-green-600 text-white hover:opacity-90`}>Confirm &amp; start processing</button>
               )}
               {o.status === 'Processing' && (
@@ -696,7 +697,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
               {o.status === 'Shipped' && (
                 <button disabled={busy} onClick={() => setStatus(o, 'Delivered')} className={`${btn} bg-green-600 text-white hover:opacity-90`}>Mark as delivered</button>
               )}
-              {(o.paymentStatus === 'Awaiting payment' || o.paymentStatus === 'Awaiting verification') && o.status !== 'Cancelled' && (
+              {(o.paymentStatus === 'Awaiting payment' || o.paymentStatus === 'Awaiting verification') && o.status !== 'Cancelled' && (!isUnpaid(o) || isOwner) && (
                 <button disabled={busy} onClick={() => run(o.id, () => markOrderPaid(o.id, staff))} className={`${btn} bg-[#D4AF37] text-black hover:opacity-90`}>Mark payment received</button>
               )}
               {o.status !== 'Cancelled' && o.status !== 'Delivered' && (isOwner || !isPaidOrder(o)) && (
@@ -707,6 +708,12 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
               )}
               {o.status === 'Cancelled' && !isOwner && isPaidOrder(o) && (
                 <span className="text-[11px] text-gray-500 self-center">Paid order: only the Owner can reopen it.</span>
+              )}
+              {isUnpaid(o) && isOwner && (
+                <button disabled={busy} onClick={async () => { if (await askConfirm(`Delete the unpaid order ${o.orderNumber} for good?\n\nThe customer did not pay, so there is nothing to keep. This cannot be undone.`)) run(o.id, () => deleteOrders([o.id])); }} className={`${btn} bg-gray-800 text-white hover:bg-black`}>Delete order</button>
+              )}
+              {isUnpaid(o) && (
+                <span className="text-[11px] text-red-500 self-center font-semibold">Not paid online yet: it cannot be confirmed until the customer pays. You can cancel or delete it.</span>
               )}
               {o.status === 'Cancelled' && (isOwner || !isPaidOrder(o)) && (
                 <button disabled={busy} onClick={() => setStatus(o, 'Pending', `Reopen order ${o.orderNumber} as Pending?`)} className={`${btn} bg-gray-700 text-white hover:bg-gray-800`}>Reopen as pending</button>
