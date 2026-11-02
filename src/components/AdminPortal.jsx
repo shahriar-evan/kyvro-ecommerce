@@ -12,7 +12,7 @@ import MyProducts from './MyProducts';
 import StoreSettings from './StoreSettings';
 import { subLabel, allPlaces, COLLECTION_LABELS, SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
 
-export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canEditProduct, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, productCosts = {}, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct, clearProductForm, handleDeleteRequest }) {
+export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canEditProduct, canAddProduct = true, adminCommission = 0, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, productCosts = {}, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct, clearProductForm, handleDeleteRequest }) {
   const [productSearch, setProductSearch] = React.useState('');
   const psq = productSearch.trim().toLowerCase();
   const [catFilter, setCatFilter] = React.useState('All');
@@ -238,12 +238,12 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                 >
                   Products ({products.length}){pendingCount > 0 && <span className="ml-2 bg-red-600 text-white rounded-full px-2 py-0.5 text-[10px]">{pendingCount} pending</span>}
                 </button>
-                <button 
+                {(canAddProduct || editingProductId) && <button 
                   onClick={() => { setEditingProductId(null); setAdminTab('add-product'); }} 
                   className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'add-product' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
                 >
                   {editingProductId ? 'Edit Product' : '+ Add Product'}
-                </button>
+                </button>}
                 <button 
                   onClick={() => setAdminTab('orders')} 
                   className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'orders' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
@@ -458,7 +458,11 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                 </div>
               )}
 
-              {adminTab === 'add-product' && (
+              {adminTab === 'add-product' && !canAddProduct && !editingProductId && (
+                <p className="text-sm text-gray-500 py-8 text-center">The Owner has not given you permission to add new products.</p>
+              )}
+
+              {adminTab === 'add-product' && (canAddProduct || editingProductId) && (
                 <div className="flex flex-col lg:flex-row lg:items-start gap-6">
                 <datalist id="kyvro-supplier-names">{supplierNames.map(n => <option key={n} value={n} />)}</datalist>
                 <form onSubmit={handleSaveProduct} className={`p-8 rounded-lg border space-y-6 w-full lg:flex-1 min-w-0 max-w-3xl ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
@@ -677,7 +681,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
 
               {adminTab === 'my-products' && <MyProducts products={products} loggedInUserEmail={loggedInUserEmail} isDarkMode={isDarkMode} formatPrice={formatPrice} startEditProduct={startEditProduct} canEditProduct={canEditProduct} />}
 
-              {adminTab === 'stats' && <TeamStats products={products} startEditProduct={startEditProduct} canEditProduct={canEditProduct} orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} isOwner={isOwner} loggedInUserEmail={loggedInUserEmail} adminName={adminName} />}
+              {adminTab === 'stats' && <TeamStats productCosts={productCosts} myCommission={adminCommission} products={products} startEditProduct={startEditProduct} canEditProduct={canEditProduct} orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} isOwner={isOwner} loggedInUserEmail={loggedInUserEmail} adminName={adminName} />}
 
               {adminTab === 'orders' && <OrdersPanel orders={orders} productCosts={productCosts} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} canUnblock={adminRole === 'owner' || adminRole === 'manager'} isOwner={adminRole === 'owner'} />}
             </div>

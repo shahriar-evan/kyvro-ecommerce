@@ -45,7 +45,7 @@ export function watchAdminAccess(email, callback) {
     (snap) => {
       if (!snap.exists()) return callback({ role: null, active: false, name: "" });
       const data = snap.data();
-      callback({ role: ROLES.includes(data.role) ? data.role : "admin", active: data.active !== false, name: data.name || "", editAll: data.editAll === true });
+      callback({ role: ROLES.includes(data.role) ? data.role : "admin", active: data.active !== false, name: data.name || "", editAll: data.editAll === true, addProducts: data.addProducts === true, commission: Number(data.commission) || 0 });
     },
     () => {} // ignore network/permission errors
   );
@@ -98,6 +98,8 @@ export async function createAdminAccount(email, password, role = "admin", profil
     addedByName: profile.addedByName || "",
     createdAt: serverTimestamp(),
     editAll: profile.editAll === true,
+    addProducts: profile.addProducts === true,
+    commission: Math.max(0, Math.min(100, Number(profile.commission) || 0)),
   });
   // Owner-only extras. The password is only saved when we really created the account
   // (if the account already existed, the password typed here is not its real password).
@@ -170,6 +172,17 @@ export async function setAdminRole(email, role) {
 // Owner only: lets a team member edit every product (not only the ones they added)
 export async function setAdminEditAll(email, on) {
   await updateDoc(doc(db, "admins", norm(email)), { editAll: !!on });
+}
+
+// Owner: allow / stop this person from ADDING new products
+export async function setAdminAddProducts(email, on) {
+  await updateDoc(doc(db, "admins", norm(email)), { addProducts: !!on });
+}
+
+// Owner: commission percent (0-100) this person earns on the profit of the orders they confirm
+export async function setAdminCommission(email, pct) {
+  const n = Math.max(0, Math.min(100, Number(pct) || 0));
+  await updateDoc(doc(db, "admins", norm(email)), { commission: n });
 }
 
 // Stats reset (Owner only): the numbers of that person start again from zero from now on.

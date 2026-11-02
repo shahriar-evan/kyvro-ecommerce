@@ -242,6 +242,8 @@ export default function App() {
   }, [visitorLocked, currentView]); // eslint-disable-line react-hooks/exhaustive-deps
   const [loggedInUserEmail, setLoggedInUserEmail] = useState('');
   const [adminRole, setAdminRole] = useState(null); // 'owner' | 'manager' | 'admin' | null
+  const [adminAddProducts, setAdminAddProducts] = useState(false); // the Owner allowed this person to add new products
+  const [adminCommission, setAdminCommission] = useState(0); // commission percent set by the Owner
   const [adminEditAll, setAdminEditAll] = useState(false); // the Owner allowed this person to edit every product
   const [adminName, setAdminName] = useState('');
   const [adminTab, setAdminTab] = useState('products');
@@ -289,7 +291,7 @@ export default function App() {
   // While logged in, access OFF / removal / role changes by the Owner apply immediately
   useEffect(() => {
     if (!isAdminLoggedIn || !loggedInUserEmail || isOwnerEmail(loggedInUserEmail)) return;
-    const unsubscribe = watchAdminAccess(loggedInUserEmail, ({ role, active, name, editAll }) => {
+    const unsubscribe = watchAdminAccess(loggedInUserEmail, ({ role, active, name, editAll, addProducts, commission }) => {
       if (!role || !active) {
         setIsAdminLoggedIn(false);
         setLoggedInUserEmail('');
@@ -300,6 +302,8 @@ export default function App() {
       } else {
         setAdminRole(role);
         setAdminEditAll(!!editAll);
+        setAdminAddProducts(!!addProducts);
+        setAdminCommission(Number(commission) || 0);
         if (name) setAdminName(name);
       }
     });
@@ -734,6 +738,7 @@ export default function App() {
   const handleSaveProduct = async (e) => {
     e.preventDefault();
     const existingProduct = editingProductId ? products.find(p => p.id === editingProductId) : null;
+    if (!existingProduct && isCloud && !canAddProduct) { alert('The Owner has not given you permission to add new products.'); return; }
 
     // Sizes with their own quantity, e.g. { M: 20, L: 15, XL: 10 }
     const formSizes = newProductForm.sizeStock || {};
@@ -907,9 +912,9 @@ export default function App() {
       addedBy: existingProduct ? existingProduct.addedBy : loggedInUserEmail,
       addedByName: existingProduct ? existingProduct.addedByName : (adminName || loggedInUserEmail),
       addedByRole: existingProduct ? existingProduct.addedByRole : adminRole,
-      // New products from an Admin wait for approval; Owner and Manager products go live at once.
+      // New products from an Admin or Manager wait for the Owner's approval; Owner products go live at once.
       // Editing keeps the current status.
-      status: existingProduct ? (existingProduct.status || 'approved') : (isCloud && adminRole === 'admin' ? 'pending' : 'approved'),
+      status: existingProduct ? (existingProduct.status || 'approved') : (isCloud && adminRole !== 'owner' ? 'pending' : 'approved'),
       // pieces sold so far must survive an edit
       ...(existingProduct && existingProduct.sold ? { sold: existingProduct.sold } : {}),
       // a waiting delete request must survive an edit
@@ -1013,7 +1018,8 @@ export default function App() {
     if (adminRole === 'admin') return mine;
     return false;
   };
-  const canApproveProduct = (p) => isCloud && !isApproved(p) && (adminRole === 'owner' || adminRole === 'manager');
+  const canAddProduct = adminRole === 'owner' || adminAddProducts;
+  const canApproveProduct = (p) => isCloud && !isApproved(p) && adminRole === 'owner';
   const handleApproveProduct = async (p) => {
     try {
       await approveProduct(p, { email: loggedInUserEmail, name: adminName });
@@ -1137,7 +1143,7 @@ export default function App() {
       {currentView === 'order-success' && <OrderSuccess payNotice={payNotice} order={orderCompleteData} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
 
       {/* ADMIN PORTAL VIEW (GOOGLE SIGN-IN, WHITELISTED EMAILS ONLY) */}
-      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} canEditProduct={canEditProduct} canApproveProduct={canApproveProduct} handleApproveProduct={handleApproveProduct} pendingCount={pendingCount} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} productCosts={productCosts} products={products} storeSettings={storeSettings} isCloud={isCloud} migrating={migrating} handleMigrateProducts={handleMigrateProducts} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} handleDeleteRequest={handleDeleteRequest} clearProductForm={() => { setEditingProductId(null); setNewProductForm(freshProductForm()); }} />}
+      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} canEditProduct={canEditProduct} canAddProduct={canAddProduct} adminCommission={adminCommission} canApproveProduct={canApproveProduct} handleApproveProduct={handleApproveProduct} pendingCount={pendingCount} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} productCosts={productCosts} products={products} storeSettings={storeSettings} isCloud={isCloud} migrating={migrating} handleMigrateProducts={handleMigrateProducts} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} handleDeleteRequest={handleDeleteRequest} clearProductForm={() => { setEditingProductId(null); setNewProductForm(freshProductForm()); }} />}
 
       {/* FOOTER */}
       <PushPrompt customerUser={customerUser} isDarkMode={isDarkMode} />

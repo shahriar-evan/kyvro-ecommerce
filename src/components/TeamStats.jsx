@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { askConfirm } from './AlertCenter';
-import { loadStatsResets, resetAdminStats } from '../adminAuth';
+import { loadStatsResets, resetAdminStats, listAdmins } from '../adminAuth';
 import { toDate, formatDateTime } from '../utils/dates';
 
 // Team performance: who confirmed / delivered / cancelled how many orders, and which products and how much money that was.
@@ -31,7 +31,7 @@ const lastEntry = (o, status) => {
 };
 const keyOf = (email, name) => String(email || name || '').trim().toLowerCase();
 
-export default function TeamStats({ products = [], startEditProduct, canEditProduct, orders, isDarkMode, formatPrice, isOwner, loggedInUserEmail, adminName }) {
+export default function TeamStats({ productCosts = {}, myCommission = 0, products = [], startEditProduct, canEditProduct, orders, isDarkMode, formatPrice, isOwner, loggedInUserEmail, adminName }) {
   const [preset, setPreset] = useState('month');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -40,6 +40,27 @@ export default function TeamStats({ products = [], startEditProduct, canEditProd
   // when the Owner reset a person's numbers (counting starts again from that moment)
   const [resets, setResets] = useState({});
   useEffect(() => { loadStatsResets(isOwner, loggedInUserEmail).then(setResets); }, [isOwner, loggedInUserEmail]);
+  // commission percent per person (set by the Owner in the Team tab)
+  const [pcts, setPcts] = useState({});
+  useEffect(() => {
+    if (!isOwner) return;
+    listAdmins().then((l) => { const m = {}; l.forEach((a) => { m[String(a.email).toLowerCase()] = Number(a.commission) || 0; }); setPcts(m); }).catch(() => {});
+  }, [isOwner]);
+  const pctOf = (p) => (isOwner ? (pcts[String(p.email || p.key).toLowerCase()] || 0) : (p.key === me ? myCommission : 0));
+  // profit of one order = (selling price - supplier price) x pieces, only for items whose supplier price is known
+  const orderProfit = (o) => {
+    let profit = 0; let unknown = 0;
+    for (const it of o.items || []) {
+      const c = productCosts[String(it.id)];
+      const q = parseInt(it.quantity, 10) || 0;
+      if (!c || c.supplierCost === undefined || c.supplierCost === null || c.supplierCost === '') { unknown += q; continue; }
+      const ccs = c.colorCosts || {};
+      const ck = Object.keys(ccs).find((k) => k.toLowerCase() === String(it.color || '').trim().toLowerCase());
+      const unit = ck !== undefined ? (Number(ccs[ck]) || 0) : (Number(c.supplierCost) || 0);
+      profit += ((Number(it.price) || 0) - unit) * q;
+    }
+    return { profit, unknown };
+  };
   const doReset = async (p) => {
     if (!(await askConfirm(`Reset the stats of ${p.name}?\n\nTheir numbers start again from zero from now. Orders and products are not changed or deleted.`, { danger: true, confirmText: 'Yes, reset' }))) return;
     try { await resetAdminStats(p.email || p.key); setResets((r) => ({ ...r, [String(p.email || p.key).toLowerCase()]: new Date() })); }
@@ -82,13 +103,18 @@ export default function TeamStats({ products = [], startEditProduct, canEditProd
 
   const stats = useMemo(() => {
     const out = {};
-    const get = (k) => (out[k] = out[k] || { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {} });
+    const get = (k) => (out[k] = out[k] || { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {}, profit: 0, unknownCost: 0, mine: { orders: 0, pieces: 0, sales: 0, list: {} } });
+    const owner = {}; products.forEach((pr) => { owner[String(pr.id)] = keyOf(pr.addedBy, pr.addedByName); });
     for (const ev of events) {
       if (!inRange(ev.at)) continue;
       const rt = resets[ev.who];
       if (rt && (!ev.at || ev.at <= rt)) continue; // before the Owner reset this person's stats
       const s = get(ev.who);
       s[ev.kind].push(ev);
+      if (ev.kind === 'confirmed' && ev.order.status === 'Delivered') {
+        const { profit, unknown } = orderProfit(ev.order);
+        s.profit += profit; s.unknownCost += unknown;
+      }
       if (ev.kind === 'confirmed' && ev.order.status !== 'Cancelled') {
         s.sales += Number(ev.order.total) || 0;
         for (const it of ev.order.items || []) {
@@ -98,8 +124,26 @@ export default function TeamStats({ products = [], startEditProduct, canEditProd
         }
       }
     }
+    // "My products sold": orders that contain a product this person added, whoever confirmed the order
+    for (const ev of events) {
+      if (ev.kind !== 'confirmed' || ev.order.status === 'Cancelled' || !inRange(ev.at)) continue;
+      const seen = new Set();
+      for (const it of ev.order.items || []) {
+        const k = owner[String(it.id)];
+        if (!k) continue;
+        const rt = resets[k];
+        if (rt && (!ev.at || ev.at <= rt)) continue;
+        const m = get(k).mine;
+        const q = parseInt(it.quantity, 10) || 0;
+        m.pieces += q;
+        m.sales += (Number(it.price) || 0) * q;
+        m.list[it.name] = (m.list[it.name] || 0) + q;
+        seen.add(k);
+      }
+      seen.forEach((k) => { get(k).mine.orders += 1; });
+    }
     return out; // eslint-disable-next-line
-  }, [events, preset, from, to, resets]);
+  }, [events, preset, from, to, resets, products, productCosts]);
 
   // products each person added (a separate list under their card)
   const addedBy = useMemo(() => {
@@ -115,9 +159,9 @@ export default function TeamStats({ products = [], startEditProduct, canEditProd
 
   const visibleKeys = Object.keys(people).filter((k) => isOwner || k === me);
   const rows = visibleKeys
-    .map((k) => ({ ...people[k], s: stats[k] || { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {} } }))
+    .map((k) => ({ ...people[k], s: stats[k] || { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {}, profit: 0, unknownCost: 0, mine: { orders: 0, pieces: 0, sales: 0, list: {} } } }))
     .sort((a, b) => b.s.confirmed.length - a.s.confirmed.length);
-  const shown = isOwner ? rows : (rows.length ? rows : [{ key: me, name: adminName || loggedInUserEmail || 'You', email: loggedInUserEmail || '', s: { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {} } }]);
+  const shown = isOwner ? rows : (rows.length ? rows : [{ key: me, name: adminName || loggedInUserEmail || 'You', email: loggedInUserEmail || '', s: { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {}, profit: 0, unknownCost: 0, mine: { orders: 0, pieces: 0, sales: 0, list: {} } } }]);
 
   const card = `p-5 sm:p-6 rounded-lg border space-y-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`;
   const inputCls = `block mt-1 border p-2 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`;
@@ -175,6 +219,25 @@ export default function TeamStats({ products = [], startEditProduct, canEditProd
                 ))}
               </div>
             </button>
+
+            {(s.mine.orders > 0 || (addedBy[p.key] || []).length > 0) && (
+              <div className={`rounded border p-3 text-xs ${isDarkMode ? 'border-gray-800 bg-[#121212]' : 'border-gray-200 bg-gray-50'}`}>
+                <p className="font-bold uppercase tracking-wider text-[11px] mb-2">{p.key === me ? 'My products sold' : 'Their products sold'} <span className="font-normal normal-case text-gray-500">(orders with products {p.key === me ? 'you' : 'they'} added, whoever confirmed them)</span></p>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div><p className="text-lg font-bold">{s.mine.orders}</p><p className="text-[10px] uppercase tracking-wider text-gray-500">Orders</p></div>
+                  <div><p className="text-lg font-bold">{s.mine.pieces}</p><p className="text-[10px] uppercase tracking-wider text-gray-500">Pieces</p></div>
+                  <div><p className="text-lg font-bold text-[#D4AF37]">{formatPrice(s.mine.sales)}</p><p className="text-[10px] uppercase tracking-wider text-gray-500">Sales</p></div>
+                </div>
+                {Object.keys(s.mine.list).length > 0 && <p className="mt-2 text-gray-500">{Object.entries(s.mine.list).sort((a, b) => b[1] - a[1]).map(([n, q]) => `${n} ×${q}`).join(' · ')}</p>}
+              </div>
+            )}
+
+            {pctOf(p) > 0 && (
+              <div className={`rounded border p-3 text-xs flex flex-wrap items-center justify-between gap-2 ${isDarkMode ? 'border-gray-800 bg-[#121212]' : 'border-gray-200 bg-gray-50'}`}>
+                <span><strong>Commission {pctOf(p)}%</strong> of the profit on delivered orders {p.key === me ? 'you' : 'they'} confirmed: profit {formatPrice(s.profit)}{s.unknownCost > 0 ? ` (${s.unknownCost} pcs without a supplier price are not counted)` : ''}</span>
+                <strong className="text-[#D4AF37] text-base">{formatPrice(Math.round(s.profit * pctOf(p)) / 100)}</strong>
+              </div>
+            )}
 
             {(isOwner || resets[String(p.email || p.key).toLowerCase()]) && (
               <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500">
