@@ -29,7 +29,7 @@ const lastEntry = (o, status) => {
 };
 const keyOf = (email, name) => String(email || name || '').trim().toLowerCase();
 
-export default function TeamStats({ orders, isDarkMode, formatPrice, isOwner, loggedInUserEmail, adminName }) {
+export default function TeamStats({ products = [], startEditProduct, canEditProduct, orders, isDarkMode, formatPrice, isOwner, loggedInUserEmail, adminName }) {
   const [preset, setPreset] = useState('month');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -88,6 +88,18 @@ export default function TeamStats({ orders, isDarkMode, formatPrice, isOwner, lo
     }
     return out; // eslint-disable-next-line
   }, [events, preset, from, to]);
+
+  // products each person added (a separate list under their card)
+  const addedBy = useMemo(() => {
+    const m = {};
+    for (const p of products) {
+      const k = keyOf(p.addedBy, p.addedByName);
+      if (!k) continue;
+      (m[k] = m[k] || []).push(p);
+      if (!people[k]) people[k] = { key: k, name: p.addedByName || p.addedBy, email: p.addedBy || '' }; // eslint-disable-line react-hooks/exhaustive-deps
+    }
+    return m;
+  }, [products, people]);
 
   const visibleKeys = Object.keys(people).filter((k) => isOwner || k === me);
   const rows = visibleKeys
@@ -161,6 +173,32 @@ export default function TeamStats({ orders, isDarkMode, formatPrice, isOwner, lo
                     </div>
                   )}
                 </div>
+                {(() => {
+                  const mine = addedBy[p.key] || [];
+                  return (
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wider mb-2">{p.key === me ? 'My products' : 'Products added'} ({mine.length})</p>
+                      {mine.length === 0 ? <p className="text-xs text-gray-500">No products added yet.</p> : (
+                        <div className="divide-y text-xs">
+                          {mine.map((pr) => (
+                            <div key={pr.id} className="py-2 flex flex-wrap items-center justify-between gap-2">
+                              <span className="flex items-center gap-2 min-w-0">
+                                {pr.image && <img src={pr.image} alt="" className="w-8 h-8 object-cover rounded border shrink-0" />}
+                                <span className="truncate">{pr.name}</span>
+                              </span>
+                              <span className="flex items-center gap-3 text-gray-500">
+                                <span>{formatPrice(pr.price)}</span>
+                                <span>{pr.status === 'pending' ? 'Waiting for approval' : 'Live'}</span>
+                                <span>Sold {parseInt(pr.sold, 10) || 0}</span>
+                                {canEditProduct && startEditProduct && canEditProduct(pr) && <button type="button" onClick={() => startEditProduct(pr)} className="underline text-[#D4AF37] font-semibold">Edit</button>}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 {[['Confirmed orders', s.confirmed], ['Delivered orders', s.delivered], ['Cancelled orders', s.cancelled]].map(([title, list]) => (
                   list.length > 0 && (
                     <div key={title}>

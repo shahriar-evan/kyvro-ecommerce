@@ -11,7 +11,7 @@ import TeamStats from './TeamStats';
 import StoreSettings from './StoreSettings';
 import { subLabel, allPlaces, COLLECTION_LABELS, SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
 
-export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, productCosts = {}, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct, clearProductForm, handleDeleteRequest }) {
+export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canEditProduct, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, productCosts = {}, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct, clearProductForm, handleDeleteRequest }) {
   const [productSearch, setProductSearch] = React.useState('');
   const psq = productSearch.trim().toLowerCase();
   const [catFilter, setCatFilter] = React.useState('All');
@@ -372,7 +372,9 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                           </td>
                           <td className="p-4 text-right space-x-2">
                             {canApproveProduct(p) && <button onClick={() => handleApproveProduct(p)} className="px-3 py-1.5 rounded text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition">Approve</button>}
-                            <button onClick={() => startEditProduct(p)} className="px-3 py-1.5 rounded text-xs font-semibold border bg-white text-gray-900 border-gray-400 hover:bg-gray-100 dark:bg-gray-700 dark:text-white dark:border-gray-500 dark:hover:bg-gray-600 transition">Edit</button>
+                            {canEditProduct(p)
+                              ? <button onClick={() => startEditProduct(p)} className="px-3 py-1.5 rounded text-xs font-semibold border bg-white text-gray-900 border-gray-400 hover:bg-gray-100 dark:bg-gray-700 dark:text-white dark:border-gray-500 dark:hover:bg-gray-600 transition">Edit</button>
+                              : <span className="text-[10px] text-gray-500 font-semibold" title="Only the Owner or the person who added it can edit">View only</span>}
                             {p.deleteRequested && adminRole === 'owner' && (
                               <>
                                 <button onClick={() => handleDeleteRequest(p, false)} className="px-3 py-1.5 rounded text-xs font-semibold border border-gray-400 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#222] transition">Keep product</button>
@@ -434,7 +436,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                                       </>
                                     ) : <p className="text-gray-500">No supplier saved (own stock).</p>}
                                     <div className="pt-3">
-                                      <button type="button" onClick={() => startEditProduct(p)} className="px-4 py-2 rounded text-xs font-bold uppercase tracking-wider border border-gray-400 hover:bg-gray-100 dark:hover:bg-[#222] transition">Edit this product</button>
+                                      {canEditProduct(p) && <button type="button" onClick={() => startEditProduct(p)} className="px-4 py-2 rounded text-xs font-bold uppercase tracking-wider border border-gray-400 hover:bg-gray-100 dark:hover:bg-[#222] transition">Edit this product</button>}
                                     </div>
                                   </div>
                                 </div>
@@ -666,7 +668,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                 </div>
               )}
 
-              {adminTab === 'stats' && <TeamStats orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} isOwner={isOwner} loggedInUserEmail={loggedInUserEmail} adminName={adminName} />}
+              {adminTab === 'stats' && <TeamStats products={products} startEditProduct={startEditProduct} canEditProduct={canEditProduct} orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} isOwner={isOwner} loggedInUserEmail={loggedInUserEmail} adminName={adminName} />}
 
               {adminTab === 'orders' && <OrdersPanel orders={orders} productCosts={productCosts} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} canUnblock={adminRole === 'owner' || adminRole === 'manager'} isOwner={adminRole === 'owner'} />}
             </div>
