@@ -26,9 +26,9 @@ const JacketIcon = mk(<>
   <path d="M12 5.8V21" />
 </>);
 
-export default function MobileMenu({ isDarkMode, setCurrentView, setIsMobileMenuOpen, setSelectedCategory }) {
+export default function MobileMenu({ navHas = () => true, isDarkMode, setCurrentView, setIsMobileMenuOpen, setSelectedCategory }) {
   const close = () => setIsMobileMenuOpen(false);
-  const items = [
+  const items = ([
     { label: 'Home', sub: 'Back to the front page', icon: Home, go: () => setCurrentView('home') },
     { label: "Men's", sub: 'Shirt, Punjabi, Pants...', icon: ManIcon, go: () => { setCurrentView('shop'); setSelectedCategory('Men'); } },
     { label: "Women's & Girls'", sub: 'Saree, Bags, Three Piece...', icon: WomanIcon, go: () => { setCurrentView('shop'); setSelectedCategory('Women'); } },
@@ -36,7 +36,7 @@ export default function MobileMenu({ isDarkMode, setCurrentView, setIsMobileMenu
     { label: 'Shoes', sub: 'Sneakers & more', icon: Footprints, go: () => { setCurrentView('shop'); setSelectedCategory('Shoes'); } },
     { label: 'Wallets', sub: 'Genuine leather', icon: Wallet, go: () => { setCurrentView('shop'); setSelectedCategory('Wallets'); } },
     { label: 'Watches', sub: 'Classic & modern', icon: Watch, go: () => { setCurrentView('shop'); setSelectedCategory('Watches'); } },
-  ];
+  ]).filter((it) => ({ 'Home': true, "Men's": navHas('Men'), "Women's & Girls'": navHas('Women'), 'Winter': navHas('Winter'), 'Shoes': navHas('Shoes'), 'Wallets': navHas('Wallets'), 'Watches': navHas('Watches') }[it.label]));
   return (
     <>
       <div className="fixed inset-0 z-50 flex kyvro-fade bg-black/70 backdrop-blur-sm">

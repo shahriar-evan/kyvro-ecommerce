@@ -91,6 +91,8 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
       cost += line;
     });
     const revenue = (Number(o.subtotal) || 0) - (Number(o.discount) || 0);
+    // an admin's shop sold this above the store price: that markup belongs to the shop owner
+    const markup = (o.items || []).reduce((n, it) => n + Math.max(0, (Number(it.price) || 0) - (it.basePrice !== undefined ? Number(it.basePrice) || 0 : Number(it.price) || 0)) * (parseInt(it.quantity, 10) || 0), 0);
     const list = Object.values(groups);
     list.forEach((g) => { g.delivery = supplierDelivery(o, g.units); });
     const delivery = list.reduce((a, g) => a + g.delivery, 0);
@@ -115,7 +117,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
     // real profit = what the customer pays in total - supplier cost - supplier delivery (paid upfront)
     // delivery taken at the door (no advance): the supplier's courier fee is charged again and not refunded
     const extra = (!online && !adv && !DELIVERY_REFUNDED) ? delivery : 0;
-    return { groups: list, missing, cost, revenue, delivery, total, online, adv, profit: total - cost - delivery - extra, hasSupplier: list.length > 0 };
+    return { groups: list, missing, cost, revenue, delivery, total, online, adv, markup, profit: total - cost - delivery - extra, hasSupplier: list.length > 0 };
   };
   const placedAt = (o, g) => (supply[o.id] && supply[o.id].placed && supply[o.id].placed[g.key]) || null;
 
@@ -431,7 +433,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
               className={`w-full text-left flex items-center gap-3 p-3 sm:p-4 transition ${isDarkMode ? 'hover:bg-[#1d1d1d]' : 'hover:bg-gray-50'}`}>
               <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-0.5">
                 <div className="min-w-0">
-                  <p className="text-sm font-bold text-[#D4AF37]">{o.orderNumber}</p>
+                  <p className="text-sm font-bold text-[#D4AF37]">{o.orderNumber}{o.shop && showSupplier && <span className="ml-2 align-middle text-[10px] font-bold px-2 py-0.5 rounded bg-[#D4AF37]/20 text-[#D4AF37] uppercase tracking-wider">Shop order</span>}</p>
                   <p className="text-[11px] text-gray-500">{formatDateTime(o.createdAt)}</p>
                 </div>
                 <div className="min-w-0">
@@ -552,6 +554,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
                       Customer pays {formatPrice(sp.total)} − cost {formatPrice(sp.cost)} − supplier delivery {formatPrice(sp.delivery)} = <span className={sp.profit >= 0 ? 'text-green-600' : 'text-red-500'}>{sp.profit >= 0 ? 'profit' : 'LOSS'} {formatPrice(Math.abs(sp.profit))}</span>
                     </p>
                   </div>
+                  {sp.markup > 0 && <p className="p-2 rounded bg-[#D4AF37]/10 text-[#D4AF37] font-semibold">This order came from a shop link. {formatPrice(sp.markup)} of the price is the shop owner's markup, so your own profit is {formatPrice(sp.profit - sp.markup)}.</p>}
                   {sp.missing.length > 0 && <p className="text-amber-600">Supplier price is not set for: {sp.missing.join(', ')}. The profit above does not include these items.</p>}
                   <p className="text-[11px] text-gray-500">Profit includes the delivery charge you collect ({o.shipping === 0 ? 'FREE' : formatPrice(o.shipping)}) and the supplier's delivery fee ({formatPrice(sp.delivery)}: base fee + {formatPrice(SUPPLIER_EXTRA_PER_ITEM)} for each extra item).</p>
                   {!sp.online && Number(o.advancePaid) > 0 && <p className="p-2 rounded bg-green-500/10 text-green-700 font-semibold">Delivery charge {formatPrice(o.advancePaid)} already paid online{o.advanceChannel ? ` (${o.advanceChannel})` : ''}. Collect only {formatPrice(Math.max(0, o.total - o.advancePaid))} on delivery.</p>}

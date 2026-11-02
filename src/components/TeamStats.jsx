@@ -31,7 +31,7 @@ const lastEntry = (o, status) => {
 };
 const keyOf = (email, name) => String(email || name || '').trim().toLowerCase();
 
-export default function TeamStats({ productCosts = {}, productCommissions = {}, showProfit = true, products = [], startEditProduct, canEditProduct, orders, isDarkMode, formatPrice, isOwner, loggedInUserEmail, adminName }) {
+export default function TeamStats({ productCosts = {}, productCommissions = {}, shopOwners = {}, showProfit = true, products = [], startEditProduct, canEditProduct, orders, isDarkMode, formatPrice, isOwner, loggedInUserEmail, adminName }) {
   const [preset, setPreset] = useState('month');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -40,6 +40,9 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
   // when the Owner reset a person's numbers (counting starts again from that moment)
   const [resets, setResets] = useState({});
   useEffect(() => { loadStatsResets(isOwner, loggedInUserEmail).then(setResets); }, [isOwner, loggedInUserEmail]);
+  // a shop's markup on one order = (price the customer paid - store price) x pieces
+  const markupOf = (o) => (o.items || []).reduce((n, it) => n + Math.max(0, (Number(it.price) || 0) - (it.basePrice !== undefined ? Number(it.basePrice) || 0 : Number(it.price) || 0)) * (parseInt(it.quantity, 10) || 0), 0);
+  const myShopSlugs = Object.entries(shopOwners).filter(([, o]) => String(o.email || '').toLowerCase() === String(loggedInUserEmail || '').toLowerCase()).map(([k]) => k);
   const anyCommission = Object.keys(productCommissions).length > 0;
   // profit and commission of one order: per item (selling price - supplier price) x pieces, commission = that profit x the product's commission %
   const orderProfit = (o) => {
@@ -93,6 +96,13 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
         const k = person(cEmail, cName);
         if (k) evs.push({ who: k, kind: 'confirmed', at: toDate(conf && conf.at) || toDate(o.updatedAt) || toDate(o.createdAt), order: o });
       }
+      // shop orders: the shop owner earns the markup once the order is delivered
+      const so = o.shop ? shopOwners[o.shop] : null;
+      if (so && o.status === 'Delivered') {
+        const de = lastEntry(o, 'Delivered');
+        const k = person(so.email, so.name);
+        if (k) evs.push({ who: k, kind: 'shop', at: toDate(de && de.at) || toDate(o.updatedAt) || toDate(o.createdAt), order: o });
+      }
       // delivered / cancelled (the person who pressed it)
       for (const [status, kind] of [['Delivered', 'delivered'], ['Cancelled', 'cancelled']]) {
         const e = o.status === status ? lastEntry(o, status) : null;
@@ -103,14 +113,14 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
       }
     }
     return { people: ppl, events: evs };
-  }, [orders]);
+  }, [orders, shopOwners]);
 
   const [rs, re] = rangeFor(preset, from, to);
   const inRange = (d) => !!d && (!rs || d >= rs) && (!re || d <= re);
 
   const stats = useMemo(() => {
     const out = {};
-    const get = (k) => (out[k] = out[k] || { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {}, profit: 0, unknownCost: 0, commTotal: 0, comm: [], mine: { orders: 0, pieces: 0, sales: 0, list: {} } });
+    const get = (k) => (out[k] = out[k] || { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {}, profit: 0, unknownCost: 0, commTotal: 0, comm: [], shop: [], shopTotal: 0, mine: { orders: 0, pieces: 0, sales: 0, list: {} } });
     const owner = {}; products.forEach((pr) => { owner[String(pr.id)] = keyOf(pr.addedBy, pr.addedByName); });
     for (const ev of events) {
       if (!inRange(ev.at)) continue;
@@ -118,7 +128,8 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
       if (rt && (!ev.at || ev.at <= rt)) continue; // before the Owner reset this person's stats
       const s = get(ev.who);
       s[ev.kind].push(ev);
-      if (ev.kind === 'confirmed' && ev.order.status === 'Delivered') {
+      if (ev.kind === 'shop') s.shopTotal += markupOf(ev.order);
+      if (ev.kind === 'confirmed' && ev.order.status === 'Delivered' && !ev.order.shop) { // orders from a shop pay the shop owner's markup, no commission
         const { profit, unknown, commission, lines } = orderProfit(ev.order);
         s.profit += profit; s.unknownCost += unknown; s.commTotal += commission; s.comm.push({ ev, profit, unknown, commission, lines });
       }
@@ -166,9 +177,9 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
 
   const visibleKeys = Object.keys(people).filter((k) => isOwner || k === me);
   const rows = visibleKeys
-    .map((k) => ({ ...people[k], s: stats[k] || { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {}, profit: 0, unknownCost: 0, commTotal: 0, comm: [], mine: { orders: 0, pieces: 0, sales: 0, list: {} } } }))
+    .map((k) => ({ ...people[k], s: stats[k] || { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {}, profit: 0, unknownCost: 0, commTotal: 0, comm: [], shop: [], shopTotal: 0, mine: { orders: 0, pieces: 0, sales: 0, list: {} } } }))
     .sort((a, b) => b.s.confirmed.length - a.s.confirmed.length);
-  const shown = isOwner ? rows : (rows.length ? rows : [{ key: me, name: adminName || loggedInUserEmail || 'You', email: loggedInUserEmail || '', s: { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {}, profit: 0, unknownCost: 0, commTotal: 0, comm: [], mine: { orders: 0, pieces: 0, sales: 0, list: {} } } }]);
+  const shown = isOwner ? rows : (rows.length ? rows : [{ key: me, name: adminName || loggedInUserEmail || 'You', email: loggedInUserEmail || '', s: { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {}, profit: 0, unknownCost: 0, commTotal: 0, comm: [], shop: [], shopTotal: 0, mine: { orders: 0, pieces: 0, sales: 0, list: {} } } }]);
 
   const card = `p-5 sm:p-6 rounded-lg border space-y-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`;
   const inputCls = `block mt-1 border p-2 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`;
@@ -239,6 +250,13 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
               </div>
             )}
 
+            {(s.shop.length > 0 || Object.entries(shopOwners).some(([, o]) => String(o.email || '').toLowerCase() === String(p.email || '').toLowerCase())) && (
+              <div className={`rounded border p-3 text-xs flex flex-wrap items-center justify-between gap-2 ${isDarkMode ? 'border-gray-800 bg-[#121212]' : 'border-gray-200 bg-gray-50'}`}>
+                <span><strong>Shop earnings</strong> (markup on delivered orders from {p.key === me ? 'your' : 'their'} shop link): {s.shop.length} order(s)</span>
+                <strong className="text-[#D4AF37] text-base">{formatPrice(s.shopTotal)}</strong>
+              </div>
+            )}
+
             {anyCommission && (
               <div className={`rounded border p-3 text-xs flex flex-wrap items-center justify-between gap-2 ${isDarkMode ? 'border-gray-800 bg-[#121212]' : 'border-gray-200 bg-gray-50'}`}>
                 <span><strong>Commission</strong> on delivered orders {p.key === me ? 'you' : 'they'} confirmed{showProfit ? `: profit ${formatPrice(s.profit)}` : ''}{s.unknownCost > 0 ? ` (${s.unknownCost} pcs without a profit figure are not counted)` : ''}</span>
@@ -289,6 +307,23 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
                     </div>
                   )}
                 </div>
+                {s.shop.length > 0 && (
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider mb-1">Shop earnings details</p>
+                    <p className="text-[11px] text-gray-500 mb-2">Markup = (price the customer paid &minus; store price) &times; pieces, counted when the order is delivered. The whole markup belongs to the shop owner. Orders from a shop earn no commission.</p>
+                    <div className="divide-y text-xs">
+                      {[...s.shop].sort((a, b) => (b.at || 0) - (a.at || 0)).map((ev) => (
+                        <div key={ev.order.orderNumber + 'sh'} className="py-2 space-y-0.5">
+                          <div className="flex justify-between gap-3"><strong className="text-[#D4AF37]">{ev.order.orderNumber}</strong><strong className="text-[#D4AF37]">{formatPrice(markupOf(ev.order))}</strong></div>
+                          {(ev.order.items || []).map((it, i) => (
+                            <p key={i} className="text-gray-500">{it.name} &times;{it.quantity}: sold {formatPrice(it.price)}, store price {formatPrice(it.basePrice !== undefined ? it.basePrice : it.price)}</p>
+                          ))}
+                        </div>
+                      ))}
+                      <div className="py-2 flex justify-between font-bold"><span>Total shop earnings</span><span className="text-[#D4AF37]">{formatPrice(s.shopTotal)}</span></div>
+                    </div>
+                  </div>
+                )}
                 {anyCommission && (
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wider mb-1">Commission details</p>

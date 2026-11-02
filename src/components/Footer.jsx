@@ -1,7 +1,7 @@
 import React from 'react';
 import logoImg from '../assets/logo.png';
 
-export default function Footer({ isDarkMode, setCurrentView, setSelectedCategory, customerUser, onSignIn, goAccount }) {
+export default function Footer({ navHas = () => true, isDarkMode, setCurrentView, setSelectedCategory, customerUser, onSignIn, goAccount }) {
   return (
     <>
       <footer className={`border-t pt-12 sm:pt-16 pb-12 mt-auto ${isDarkMode ? 'bg-[#121212] border-gray-800 text-gray-300' : 'bg-white border-gray-200 text-gray-700'}`}>
@@ -39,12 +39,12 @@ export default function Footer({ isDarkMode, setCurrentView, setSelectedCategory
           <div>
             <h4 className={`font-bold uppercase tracking-wider mb-3 sm:mb-4 ${isDarkMode ? 'text-white' : 'text-black'}`}>Categories</h4>
             <ul className="space-y-2">
-              <li><button onClick={() => { setSelectedCategory("Men"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Men's Collection</button></li>
-              <li><button onClick={() => { setSelectedCategory("Women"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Women's &amp; Girls' Fashion</button></li>
-              <li><button onClick={() => { setSelectedCategory("Winter"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Winter Collection</button></li>
-              <li><button onClick={() => { setSelectedCategory("Shoes"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Shoes</button></li>
-              <li><button onClick={() => { setSelectedCategory("Wallets"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Wallets</button></li>
-              <li><button onClick={() => { setSelectedCategory("Watches"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Watches</button></li>
+              {navHas('Men') && <li><button onClick={() => { setSelectedCategory("Men"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Men's Collection</button></li>}
+              {navHas('Women') && <li><button onClick={() => { setSelectedCategory("Women"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Women's &amp; Girls' Fashion</button></li>}
+              {navHas('Winter') && <li><button onClick={() => { setSelectedCategory("Winter"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Winter Collection</button></li>}
+              {navHas('Shoes') && <li><button onClick={() => { setSelectedCategory("Shoes"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Shoes</button></li>}
+              {navHas('Wallets') && <li><button onClick={() => { setSelectedCategory("Wallets"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Wallets</button></li>}
+              {navHas('Watches') && <li><button onClick={() => { setSelectedCategory("Watches"); setCurrentView('shop'); }} className="hover:text-[#D4AF37]">Watches</button></li>}
             </ul>
           </div>
 

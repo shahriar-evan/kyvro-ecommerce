@@ -5,6 +5,8 @@ import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, signOu
 import { auth, googleProvider } from './firebase';
 import { isOwnerEmail } from './adminEmails';
 import { getAdminStatus, watchAdminAccess, MAX_COMMISSION } from './adminAuth';
+import { watchShop, watchMyShop, watchShopOwners, SLUG_RE } from './shops';
+import { shopPriceClamp, productInCollection } from './data/shopConfig';
 import { placeOrder, watchOrders, cancelMyOrder } from './orders';
 import { watchProfile, saveProfile, watchMyOrders } from './customerData';
 import { ensureSubscribed } from './subscribers';
@@ -73,12 +75,54 @@ export default function App() {
   const shopProducts = products.filter(isApproved);
   const pendingCount = products.filter(p => !isApproved(p)).length;
 
+  // ---- Admin shop link: kyvro.store/?shop=name shows only that shop's products, at that shop's prices ----
+  const [shopSlug] = useState(() => {
+    try {
+      const q = String(new URLSearchParams(window.location.search).get('shop') || '').toLowerCase();
+      if (SLUG_RE.test(q)) { sessionStorage.setItem('kyvro_shop', q); return q; }
+      const saved = sessionStorage.getItem('kyvro_shop') || '';
+      return SLUG_RE.test(saved) ? saved : '';
+    } catch (e) { return ''; }
+  });
+  const [shopDoc, setShopDoc] = useState(undefined); // undefined = loading, null = not found or switched off
+  useEffect(() => {
+    if (!shopSlug) return undefined;
+    return watchShop(shopSlug, (d) => setShopDoc(d && d.active !== false ? d : null), () => setShopDoc(null));
+  }, [shopSlug]);
+  const shopCtx = shopSlug && shopDoc ? shopDoc : null; // the active shop (null = the main store)
+  const shopLoading = !!shopSlug && shopDoc === undefined;
+  const storefrontProducts = shopLoading ? [] : shopCtx
+    ? shopProducts.filter((p) => shopCtx.items && shopCtx.items[String(p.id)] !== undefined).map((p) => {
+        const price = shopPriceClamp(p.price, shopCtx.items[String(p.id)]);
+        return { ...p, price, basePrice: p.price, originalPrice: p.originalPrice > price ? p.originalPrice : 0 };
+      })
+    : shopProducts;
+  // does the shop have any product in this collection (menu entries with nothing in them are hidden in a shop)
+  const navHas = (name) => !shopCtx || storefrontProducts.some((p) => productInCollection(p, name));
+  // the product as this visitor buys it (shop price in a shop, store price otherwise); null = not sold in this shop
+  const retail = (p) => {
+    const live = products.find((x) => x.id === p.id) || p;
+    if (!shopCtx) return live;
+    const sp = storefrontProducts.find((x) => x.id === live.id);
+    return sp ? { ...live, price: sp.price, originalPrice: sp.originalPrice, basePrice: live.price } : null;
+  };
+
   const [cart, setCart] = useState(() => {
     const saved = localStorage.getItem('kyvro_cart');
     return saved ? JSON.parse(saved) : [];
   });
+  // A cart made in one shop (or the main store) is emptied when the visitor moves to another one, so prices never get mixed
+  useEffect(() => {
+    if (shopLoading) return;
+    try {
+      const cur = shopCtx ? shopSlug : '';
+      const tag = localStorage.getItem('kyvro_cart_shop') || '';
+      if (tag !== cur) { setCart([]); localStorage.setItem('kyvro_cart_shop', cur); }
+    } catch (e) { /* ignore */ }
+  }, [shopLoading, shopCtx, shopSlug]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [orders, setOrders] = useState([]); // live from Firestore (team members only)
+  const [shopOwners, setShopOwners] = useState({}); // shop slug -> { email, name }: whose shop is whose (Owner sees all, others only their own)
   const [productCommissions, setProductCommissions] = useState({}); // team commission % per product id (Owner sets it, team can read)
   const [productCosts, setProductCosts] = useState({}); // private supplier details per product id (team members only)
 
@@ -152,7 +196,7 @@ export default function App() {
     let id = '';
     try { id = new URLSearchParams(window.location.search).get('product') || ''; } catch (e) { /* ignore */ }
     if (!id) { deepLinkDone.current = true; return; }
-    const found = shopProducts.find((x) => String(x.id) === id);
+    const found = storefrontProducts.find((x) => String(x.id) === id);
     if (!found) return; // not loaded yet (or removed): try again when the product list changes
     deepLinkDone.current = true;
     setSelectedProduct(found); setCurrentView('product-detail');
@@ -357,6 +401,13 @@ export default function App() {
   }, [isAdminLoggedIn, adminRole]);
 
   useEffect(() => {
+    if (!isAdminLoggedIn) { setShopOwners({}); return undefined; }
+    if (adminRole === 'owner') return watchShopOwners(setShopOwners, () => {});
+    const uid = auth.currentUser ? auth.currentUser.uid : '';
+    if (!uid) return undefined;
+    return watchMyShop(uid, (sh) => setShopOwners(sh ? { [sh.slug]: { email: String(loggedInUserEmail || '').toLowerCase(), name: adminName } } : {}), () => {});
+  }, [isAdminLoggedIn, adminRole, loggedInUserEmail, adminName]);
+  useEffect(() => {
     if (!isAdminLoggedIn) { setProductCommissions({}); return; }
     const unsubscribe = watchProductCommissions(setProductCommissions, (err) => console.error('Could not load commissions:', err));
     return () => unsubscribe();
@@ -437,7 +488,8 @@ export default function App() {
   };
 
   const addToCart = (product, selectedColor, selectedSize, quantity = 1, goCheckout = false) => {
-    const live = products.find(p => p.id === product.id) || product;
+    const live = retail(product);
+    if (!live) { alert('This product is not available in this shop.'); return; }
     const size = selectedSize || (live.sizes && live.sizes[0]);
     const color = selectedColor || (live.colors && live.colors[0]);
     const cartItemId = `${product.id}-${color || 'default'}-${size || 'default'}`;
@@ -506,7 +558,8 @@ export default function App() {
   // Add to Cart / Buy Now on the product cards: ask for size / color first when the product has them
   const [quickAdd, setQuickAdd] = useState(null); // { product, goCheckout }
   const requestAdd = (product, goCheckout = false) => {
-    const live = products.find(p => p.id === product.id) || product;
+    const live = retail(product);
+    if (!live) return;
     if (needsChoice(live)) setQuickAdd({ product: live, goCheckout });
     else addToCart(live, undefined, undefined, 1, goCheckout);
   };
@@ -577,6 +630,7 @@ export default function App() {
         name: item.name,
         category: item.category || '',
         price: item.price,
+        basePrice: item.basePrice !== undefined ? item.basePrice : item.price, // the store price (a shop's markup = price - basePrice)
         quantity: item.quantity,
         size: item.selectedSize || '',
         color: item.selectedColor || '',
@@ -591,6 +645,7 @@ export default function App() {
       paymentMethod: checkoutForm.paymentMethod,
       paymentStatus: paymentStatusFor(checkoutForm.paymentMethod),
       status: 'Pending',
+      ...(shopCtx ? { shop: shopSlug } : {}),
       ...(customerUser ? { uid: customerUser.uid } : {}),
       ...(customerUser && customerUser.email ? { email: customerUser.email.toLowerCase() } : {})
     };
@@ -705,7 +760,7 @@ export default function App() {
     }
   };
 
-  const savedProducts = savedIds.map(id => shopProducts.find(p => p.id === id)).filter(Boolean);
+  const savedProducts = savedIds.map(id => storefrontProducts.find(p => p.id === id)).filter(Boolean);
 
   // Owner: move the products from this browser into Firestore (one time)
   const [migrating, setMigrating] = useState(false);
@@ -1090,7 +1145,7 @@ export default function App() {
     }
   };
 
-  const filteredProducts = shopProducts.filter(p => {
+  const filteredProducts = storefrontProducts.filter(p => {
     let matchesCategory = true;
     if (hasSubCategories(selectedCategory)) {
       // Men: Shirt & Punjabi by default, Women: Sharee by default, or the chosen sub-category
@@ -1136,22 +1191,22 @@ export default function App() {
       {currentView !== 'home' && <BackButton onClick={goBack} />}
 
       {/* 2. HEADER */}
-      <Header cart={cart} curr={curr} currencyKey={currencyKey} currentView={currentView} isDarkMode={isDarkMode} setCurrencyKey={setCurrencyKey} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} setIsDarkMode={setIsDarkMode} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} customerUser={customerUser} displayName={displayName} photoURL={photoURL} goAccount={goAccount} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} />
+      <Header cart={cart} curr={curr} currencyKey={currencyKey} currentView={currentView} isDarkMode={isDarkMode} setCurrencyKey={setCurrencyKey} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} setIsDarkMode={setIsDarkMode} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} navHas={navHas} customerUser={customerUser} displayName={displayName} photoURL={photoURL} goAccount={goAccount} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} />
 
       {/* MOBILE MENU DRAWER */}
-      {isMobileMenuOpen && <MobileMenu isDarkMode={isDarkMode} setCurrentView={setCurrentView} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} />}
+      {isMobileMenuOpen && <MobileMenu navHas={navHas} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} />}
 
       {/* CART SLIDE-OVER DRAWER */}
       {quickAdd && <QuickAdd product={quickAdd.product} goCheckout={quickAdd.goCheckout} onConfirm={confirmQuickAdd} onClose={() => setQuickAdd(null)} formatPrice={formatPrice} isDarkMode={isDarkMode} />}
       {isCartOpen && <CartDrawer storeSettings={storeSettings} cart={cart} formatPrice={formatPrice} isDarkMode={isDarkMode} removeFromCart={removeFromCart} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} subtotal={subtotal} discount={discount} discountLabel={discountLabel} reward={reward} updateCartQty={updateCartQty} />}
 
       {/* HOME VIEW */}
-      {currentView === 'home' && <HomeView requestAdd={requestAdd} addToCart={addToCart} banners={banners} calculateDiscountPercent={calculateDiscountPercent} currentBannerIndex={currentBannerIndex} formatPrice={formatPrice} isDarkMode={isDarkMode} products={shopProducts} setCurrentBannerIndex={setCurrentBannerIndex} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} savedIds={savedIds} toggleSaved={toggleSaved} />}
+      {currentView === 'home' && <HomeView requestAdd={requestAdd} addToCart={addToCart} banners={banners} calculateDiscountPercent={calculateDiscountPercent} currentBannerIndex={currentBannerIndex} formatPrice={formatPrice} isDarkMode={isDarkMode} products={storefrontProducts} hideEmptyCategories={!!shopCtx} setCurrentBannerIndex={setCurrentBannerIndex} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} savedIds={savedIds} toggleSaved={toggleSaved} />}
 
       {/* SHOP CATALOG VIEW */}
-      {currentView === 'shop' && <ShopView selectedSubCategory={selectedSubCategory} setSelectedSubCategory={setSelectedSubCategory} requestAdd={requestAdd} addToCart={addToCart} filteredProducts={filteredProducts} formatPrice={formatPrice} isDarkMode={isDarkMode} products={shopProducts} searchQuery={searchQuery} selectedCategory={selectedCategory} setCurrentView={setCurrentView} setSearchQuery={setSearchQuery} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} setSortBy={setSortBy} sortBy={sortBy} savedIds={savedIds} toggleSaved={toggleSaved} />}
+      {currentView === 'shop' && <ShopView selectedSubCategory={selectedSubCategory} setSelectedSubCategory={setSelectedSubCategory} requestAdd={requestAdd} addToCart={addToCart} filteredProducts={filteredProducts} formatPrice={formatPrice} isDarkMode={isDarkMode} products={storefrontProducts} searchQuery={searchQuery} selectedCategory={selectedCategory} setCurrentView={setCurrentView} setSearchQuery={setSearchQuery} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} setSortBy={setSortBy} sortBy={sortBy} savedIds={savedIds} toggleSaved={toggleSaved} />}
 
-      {currentView === 'product-detail' && selectedProduct && <ProductDetail key={selectedProduct.id} product={selectedProduct} products={shopProducts} setSelectedProduct={setSelectedProduct} storeSettings={storeSettings} cartSubtotal={subtotal} cartUnits={cart.reduce((n, i) => n + (parseInt(i.quantity, 10) || 0), 0)} addToCart={addToCart} calculateDiscountPercent={calculateDiscountPercent} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} savedIds={savedIds} toggleSaved={toggleSaved} />}
+      {currentView === 'product-detail' && selectedProduct && <ProductDetail key={selectedProduct.id} product={selectedProduct} products={storefrontProducts} setSelectedProduct={setSelectedProduct} storeSettings={storeSettings} cartSubtotal={subtotal} cartUnits={cart.reduce((n, i) => n + (parseInt(i.quantity, 10) || 0), 0)} addToCart={addToCart} calculateDiscountPercent={calculateDiscountPercent} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} savedIds={savedIds} toggleSaved={toggleSaved} />}
 
       {currentView === 'tracking' && <OrderTracking customerUser={customerUser} onSignIn={handleCustomerSignIn} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
       {currentView === 'account' && <AccountView customerUser={customerUser} displayName={displayName} photoURL={photoURL} activeTab={accountTab} setActiveTab={setAccountTab} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} onSaveProfile={handleSaveProfile} onCancelOrder={handleCancelMyOrder} myOrders={myOrders} savedProducts={savedProducts} toggleSaved={toggleSaved} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedProduct={setSelectedProduct} />}
@@ -1165,7 +1220,7 @@ export default function App() {
       {currentView === 'order-success' && <OrderSuccess payNotice={payNotice} order={orderCompleteData} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
 
       {/* ADMIN PORTAL VIEW (GOOGLE SIGN-IN, WHITELISTED EMAILS ONLY) */}
-      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} canEditProduct={canEditProduct} canAddProduct={canAddProduct} productCommissions={productCommissions} canApproveProduct={canApproveProduct} handleApproveProduct={handleApproveProduct} pendingCount={pendingCount} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} productCosts={productCosts} products={products} storeSettings={storeSettings} isCloud={isCloud} migrating={migrating} handleMigrateProducts={handleMigrateProducts} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} handleDeleteRequest={handleDeleteRequest} clearProductForm={() => { setEditingProductId(null); setNewProductForm(freshProductForm()); }} />}
+      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} canEditProduct={canEditProduct} canAddProduct={canAddProduct} shopOwners={shopOwners} productCommissions={productCommissions} canApproveProduct={canApproveProduct} handleApproveProduct={handleApproveProduct} pendingCount={pendingCount} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} productCosts={productCosts} products={products} storeSettings={storeSettings} isCloud={isCloud} migrating={migrating} handleMigrateProducts={handleMigrateProducts} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} handleDeleteRequest={handleDeleteRequest} clearProductForm={() => { setEditingProductId(null); setNewProductForm(freshProductForm()); }} />}
 
       {/* FOOTER */}
       <PushPrompt customerUser={customerUser} isDarkMode={isDarkMode} />
@@ -1181,7 +1236,7 @@ export default function App() {
           </div>
         </div>
       )}
-      <Footer isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} customerUser={customerUser} onSignIn={handleCustomerSignIn} goAccount={goAccount} />
+      <Footer navHas={navHas} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} customerUser={customerUser} onSignIn={handleCustomerSignIn} goAccount={goAccount} />
 
     </div>
   );

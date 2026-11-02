@@ -17,7 +17,7 @@ import sneakersImg from '../assets/Snekers.png';
 const HERO_IMAGES = [heroBannerImg, heroBanner1Img, heroBanner2Img];
 const HERO_SECONDS = 10;
 
-export default function HomeView({ requestAdd, addToCart, banners, calculateDiscountPercent, currentBannerIndex, formatPrice, isDarkMode, products, setCurrentBannerIndex, setCurrentView, setSelectedCategory, setSelectedProduct, savedIds = [], toggleSaved = () => {} }) {
+export default function HomeView({ hideEmptyCategories = false, requestAdd, addToCart, banners, calculateDiscountPercent, currentBannerIndex, formatPrice, isDarkMode, products, setCurrentBannerIndex, setCurrentView, setSelectedCategory, setSelectedProduct, savedIds = [], toggleSaved = () => {} }) {
   const [heroIdx, setHeroIdx] = useState(0);
   useEffect(() => {
     if (HERO_IMAGES.length < 2) return undefined;
@@ -114,7 +114,7 @@ export default function HomeView({ requestAdd, addToCart, banners, calculateDisc
                   ? String(p.gender === 'Jackets' ? 'Winter' : p.gender || '').toLowerCase() === cat.name.toLowerCase()
                   : (p.category === cat.name || p.gender === cat.name));
                 return { ...cat, image: (top && top.image) || cat.image, hasProduct: !!top };
-              }).map((cat, idx) => (
+              }).filter((cat) => !hideEmptyCategories || cat.hasProduct).map((cat, idx) => (
                 <div 
                   key={idx}
                   onClick={() => { setSelectedCategory(cat.name); setCurrentView('shop'); }}
