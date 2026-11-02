@@ -19,7 +19,7 @@ export async function confirmUddokta(invoiceId) {
   const meta = (v && typeof v.metadata === 'object' && v.metadata) || {};
   const orderNumber = String(meta.orderNumber || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40);
   const kind = meta.kind === 'advance' ? 'advance' : 'full';
-  if (String(v.status || '').toUpperCase() !== 'COMPLETED') return { ok: false, orderNumber, kind, reason: `status ${v.status || r.status}` };
+  if (String(v.status || '').toUpperCase() !== 'COMPLETED') return { ok: false, pending: String(v.status || '').toUpperCase() === 'PENDING', orderNumber, kind, reason: `status ${v.status || r.status}` };
   const order = await getOrder(orderNumber);
   if (!order) return { ok: false, orderNumber, kind, reason: 'order not found' };
   if (order.paymentMethod === 'Manual bKash / Nagad') return { ok: false, orderNumber, kind, reason: 'manual payment order' };
