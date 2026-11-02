@@ -220,6 +220,34 @@ export default function CheckoutView({
               ))}
             </div>
 
+            <label className="flex items-start gap-2 text-xs cursor-pointer">
+              <input type="checkbox" checked={checkoutForm.agree} onChange={(e) => set('agree', e.target.checked)} className="mt-0.5 accent-[#D4AF37]" />
+              <span>I agree to the <strong>Terms &amp; Conditions</strong>, <strong>Privacy Policy</strong> and <strong>Return &amp; Refund Policy</strong></span>
+            </label>
+
+            {checkoutError && <p className="text-xs p-3 rounded border border-red-500/40 text-red-500 bg-red-500/10">{checkoutError}</p>}
+
+            <p className="text-[11px] text-gray-500 text-center">
+              By placing your order you agree to our{' '}
+              <button type="button" onClick={() => setCurrentView('terms')} className="underline hover:text-[#D4AF37]">Terms</button>,{' '}
+              <button type="button" onClick={() => setCurrentView('privacy')} className="underline hover:text-[#D4AF37]">Privacy Policy</button> and{' '}
+              <button type="button" onClick={() => setCurrentView('refund')} className="underline hover:text-[#D4AF37]">Return &amp; Refund Policy</button>.
+            </p>
+            {showPayBtn ? (
+              <div className="hidden lg:flex flex-col gap-3">
+                <button type="submit" name="payvia" value="bkash" disabled={placingOrder} className="w-full flex items-center justify-center gap-2 bg-[#E2136E] text-white font-bold py-4 rounded text-sm tracking-wider hover:opacity-90 transition disabled:opacity-50">
+                  {placingOrder ? 'Placing order...' : `${PAY_PROVIDER === 'uddokta' ? 'Pay with bKash / Nagad' : 'Pay with bKash'}${payAmt}`}
+                </button>
+                {CARD_PAY_ON && <button type="submit" name="payvia" value="card" disabled={placingOrder} className="w-full flex items-center justify-center gap-2 bg-[#D4AF37] text-black font-bold py-4 rounded text-sm tracking-wider hover:opacity-90 transition disabled:opacity-50">
+                  {placingOrder ? 'Placing order...' : `${PAY_PROVIDER === 'uddokta' ? 'Pay with Card' : 'Pay with Card / Bank'}${payAmt}`}
+                </button>}
+              </div>
+            ) : (
+              <button type="submit" disabled={placingOrder} className="hidden lg:block w-full bg-[#D4AF37] text-black font-bold py-4 rounded text-sm tracking-widest uppercase hover:opacity-90 transition disabled:opacity-50">
+                {placeLabel}
+              </button>
+            )}
+
             <div className={`text-xs leading-relaxed rounded border p-3 ${isDarkMode ? 'border-[#D4AF37]/40 bg-[#D4AF37]/10' : 'border-[#D4AF37]/50 bg-[#D4AF37]/10'}`}>
               <p>{deliveryNote(storeSettings, cart.reduce((n, i) => n + (parseInt(i.quantity, 10) || 0), 0)).bn}</p>
               {(() => {
@@ -255,34 +283,6 @@ export default function CheckoutView({
                 <p className="mt-1 font-semibold">ক্যাশ অন ডেলিভারিতে ডেলিভারি চার্জ আগে অনলাইনে {PAY_PROVIDER === 'uddokta' ? 'bKash বা Nagad' : 'bKash বা কার্ড'} এর মাধ্যমে দিতে হবে | For Cash on Delivery the delivery charge is paid online first.</p>
               ) : null}
             </div>
-
-            <label className="flex items-start gap-2 text-xs cursor-pointer">
-              <input type="checkbox" checked={checkoutForm.agree} onChange={(e) => set('agree', e.target.checked)} className="mt-0.5 accent-[#D4AF37]" />
-              <span>I agree to the <strong>Terms &amp; Conditions</strong>, <strong>Privacy Policy</strong> and <strong>Return &amp; Refund Policy</strong></span>
-            </label>
-
-            {checkoutError && <p className="text-xs p-3 rounded border border-red-500/40 text-red-500 bg-red-500/10">{checkoutError}</p>}
-
-            <p className="text-[11px] text-gray-500 text-center">
-              By placing your order you agree to our{' '}
-              <button type="button" onClick={() => setCurrentView('terms')} className="underline hover:text-[#D4AF37]">Terms</button>,{' '}
-              <button type="button" onClick={() => setCurrentView('privacy')} className="underline hover:text-[#D4AF37]">Privacy Policy</button> and{' '}
-              <button type="button" onClick={() => setCurrentView('refund')} className="underline hover:text-[#D4AF37]">Return &amp; Refund Policy</button>.
-            </p>
-            {showPayBtn ? (
-              <div className="hidden lg:flex flex-col gap-3">
-                <button type="submit" name="payvia" value="bkash" disabled={placingOrder} className="w-full flex items-center justify-center gap-2 bg-[#E2136E] text-white font-bold py-4 rounded text-sm tracking-wider hover:opacity-90 transition disabled:opacity-50">
-                  {placingOrder ? 'Placing order...' : `${PAY_PROVIDER === 'uddokta' ? 'Pay with bKash / Nagad' : 'Pay with bKash'}${payAmt}`}
-                </button>
-                {CARD_PAY_ON && <button type="submit" name="payvia" value="card" disabled={placingOrder} className="w-full flex items-center justify-center gap-2 bg-[#D4AF37] text-black font-bold py-4 rounded text-sm tracking-wider hover:opacity-90 transition disabled:opacity-50">
-                  {placingOrder ? 'Placing order...' : `${PAY_PROVIDER === 'uddokta' ? 'Pay with Card' : 'Pay with Card / Bank'}${payAmt}`}
-                </button>}
-              </div>
-            ) : (
-              <button type="submit" disabled={placingOrder} className="hidden lg:block w-full bg-[#D4AF37] text-black font-bold py-4 rounded text-sm tracking-widest uppercase hover:opacity-90 transition disabled:opacity-50">
-                {placeLabel}
-              </button>
-            )}
           </div>
         </div>
       </form>
