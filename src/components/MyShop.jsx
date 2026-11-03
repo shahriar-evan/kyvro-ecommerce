@@ -21,7 +21,8 @@ export default function MyShop({ adminRole, products, isOwner, isDarkMode, forma
     if (isOwner) {
       const a = watchAllShops(setAllShops, () => {});
       const b = watchShopOwners(setOwners, () => {});
-      return () => { a(); b(); };
+      const c = uid ? watchMyShop(uid, (s) => setShop(s), () => setShop(null)) : (setShop(null), () => {}); // the Owner can have a shop too
+      return () => { a(); b(); c(); };
     }
     if (adminRole === 'admin') return watchAllShops(setAllShops, () => {}); // Admins only see the shop links (read only)
     if (!uid) { setShop(null); return undefined; }
@@ -77,12 +78,11 @@ export default function MyShop({ adminRole, products, isOwner, isDarkMode, forma
   const copy = async (text) => { try { await navigator.clipboard.writeText(text); setMsg({ type: 'ok', text: 'Link copied.' }); } catch { setMsg({ type: 'err', text: 'Could not copy. Select the link and copy it.' }); } };
 
   // ---------- Owner: all shops ----------
-  if (isOwner) {
-    return (
+  const top = isOwner ? (
       <div className="space-y-5">
         <div className={card}>
           <h3 className="text-lg font-bold">Team Shops</h3>
-          <p className="text-xs text-gray-500">Every Admin and Manager can open their own shop link from their own "My Shop" tab. Customers who use that link see only the products the member chose, at the member's price. All payments still come to you; the markup is that member's earning (see Team Stats).</p>
+          <p className="text-xs text-gray-500">Managers set up their own shop from their "My Shop" tab (Admins only see and share the links). You can make your own shop too, below. Customers who use that link see only the products the member chose, at the member's price. All payments still come to you; the markup is that member's earning (see Team Stats).</p>
           {msg && <p className={`text-xs ${msg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{msg.text}</p>}
           {allShops.length === 0 ? <p className="text-sm text-gray-500">No shops yet.</p> : (
             <div className="divide-y text-xs">
@@ -102,8 +102,7 @@ export default function MyShop({ adminRole, products, isOwner, isDarkMode, forma
           )}
         </div>
       </div>
-    );
-  }
+  ) : null;
 
   // ---------- Admin: only the shop links, nothing to set up ----------
   if (adminRole === 'admin') {
@@ -130,9 +129,10 @@ export default function MyShop({ adminRole, products, isOwner, isDarkMode, forma
   }
 
   // ---------- Manager ----------
-  if (shop === undefined) return <p className="text-sm text-gray-500 py-8 text-center">Loading...</p>;
+  const wrap = (el) => <div className="space-y-5">{top}{el}</div>;
+  if (shop === undefined) return wrap(<p className="text-sm text-gray-500 py-8 text-center">Loading...</p>);
   if (shop === null) {
-    return (
+    return wrap(
       <div className={card}>
         <h3 className="text-lg font-bold">Create my shop</h3>
         <p className="text-xs text-gray-500">You get your own link, and you earn the markup. Customers who open it see the same Kyvro store, but only the products you choose, at the price you set (within the allowed limit). Everything above the store price is your earning. Admins can share your link and confirm its orders; they earn commission, not the markup.</p>
@@ -146,7 +146,7 @@ export default function MyShop({ adminRole, products, isOwner, isDarkMode, forma
   }
 
   const count = Object.keys(draft).length;
-  return (
+  return wrap(
     <div className="space-y-5">
       <div className={card}>
         <div className="flex flex-wrap items-center justify-between gap-3">
