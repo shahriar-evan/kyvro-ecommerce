@@ -623,6 +623,17 @@ export default function App() {
       }
     }
 
+    // A price may have changed since the item was added: update the cart and let the customer look again
+    // (the payment page refuses an order whose prices do not match the store)
+    const repriced = cart.map((item) => {
+      const live = retail(item);
+      return live ? { ...item, price: live.price, basePrice: live.basePrice !== undefined ? live.basePrice : live.price } : null;
+    });
+    if (repriced.some((it, i) => !it || it.price !== cart[i].price || (cart[i].basePrice !== undefined && it.basePrice !== cart[i].basePrice))) {
+      setCart(repriced.filter(Boolean));
+      return setCheckoutError('Some prices in your cart changed (or an item is no longer sold here). Your cart was updated, please check the total and place the order again.');
+    }
+
     const order = {
       customer: { name, phone, address, notes: checkoutForm.notes.trim() },
       items: cart.map(item => ({

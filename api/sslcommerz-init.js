@@ -1,6 +1,6 @@
 // Vercel serverless function: opens an SSLCommerz payment session (bKash + cards) for an order that is already saved.
 // The amount always comes from the saved order, never from the browser.
-import { SITE, SSL_BASE, sslConfigured, getOrder, amountDue } from './_sslc.js';
+import { SITE, SSL_BASE, sslConfigured, getOrder, amountDue, verifyOrderPrices } from './_sslc.js';
 
 export const config = { maxDuration: 30 };
 
@@ -18,6 +18,11 @@ export default async function handler(req, res) {
     if (due.error) return res.status(409).json({ error: due.error });
     const total = due.amount;
     if (!(total > 0)) return res.status(400).json({ error: 'Invalid order amount.' });
+    const check = await verifyOrderPrices(order);
+    if (!check.ok) {
+      console.warn('Order price check failed', orderNumber, check.problems.join('; '));
+      return res.status(409).json({ error: 'The prices in this order do not match the store. Please empty your cart and order again.' });
+    }
 
     const cb = (r) => `${SITE}/api/sslcommerz-callback?r=${r}`;
     const c = order.customer || {};
