@@ -25,7 +25,7 @@ const PAYMENT_STYLE = {
 
 const csv = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
-export default function OrdersPanel({ orders, products = [], productCosts = {}, isDarkMode, formatPrice, adminName, loggedInUserEmail, canUnblock, isOwner, showSupplier = true }) {
+export default function OrdersPanel({ orders, products = [], productCosts = {}, isDarkMode, formatPrice, adminName, loggedInUserEmail, canUnblock, isOwner, canDeliver = false, showSupplier = true }) {
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState(null);
@@ -716,7 +716,7 @@ export default function OrdersPanel({ orders, products = [], productCosts = {}, 
               {o.status === 'Processing' && (
                 <button disabled={busy} onClick={() => setStatus(o, 'Shipped')} className={`${btn} bg-purple-600 text-white hover:opacity-90`}>Mark as shipped</button>
               )}
-              {o.status === 'Shipped' && (
+              {o.status === 'Shipped' && canDeliver && (
                 <button disabled={busy} onClick={() => setStatus(o, 'Delivered')} className={`${btn} bg-green-600 text-white hover:opacity-90`}>Mark as delivered</button>
               )}
               {o.status === 'Delivered' && showSupplier && !o.returned && (
@@ -728,7 +728,7 @@ export default function OrdersPanel({ orders, products = [], productCosts = {}, 
                 }} className={`${btn} border border-red-500 text-red-500 hover:bg-red-500/10`}>Mark as returned</button>
               )}
               {o.returned && <span className="text-[11px] text-red-500 self-center font-semibold">Returned{o.returned.loss > 0 ? ` · loss ${formatPrice(o.returned.loss)}` : ''}{o.returned.note ? ` · ${o.returned.note}` : ''}. No commission or markup is paid on it.</span>}
-              {(o.paymentStatus === 'Awaiting payment' || o.paymentStatus === 'Awaiting verification') && o.status !== 'Cancelled' && (!isUnpaid(o) || isOwner) && (
+              {(o.paymentStatus === 'Awaiting payment' || o.paymentStatus === 'Awaiting verification') && o.status !== 'Cancelled' && isOwner && (
                 <button disabled={busy} onClick={() => run(o.id, () => markOrderPaid(o.id, staff))} className={`${btn} bg-[#D4AF37] text-black hover:opacity-90`}>Mark payment received</button>
               )}
               {o.status !== 'Cancelled' && o.status !== 'Delivered' && (isOwner || !isPaidOrder(o)) && (

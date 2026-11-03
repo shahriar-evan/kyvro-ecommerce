@@ -985,7 +985,7 @@ export default function App() {
       isFeatured: newProductForm.isFeatured,
       isBestSeller: newProductForm.isBestSeller,
       // Who added this product (stays the same when edited)
-      addedBy: existingProduct ? existingProduct.addedBy : loggedInUserEmail,
+      addedBy: existingProduct ? existingProduct.addedBy : String(loggedInUserEmail || '').toLowerCase(), // the rules check it is your own email
       addedByName: existingProduct ? existingProduct.addedByName : (adminName || loggedInUserEmail),
       addedByRole: existingProduct ? existingProduct.addedByRole : adminRole,
       // New products from an Admin or Manager wait for the Owner's approval; Owner products go live at once.

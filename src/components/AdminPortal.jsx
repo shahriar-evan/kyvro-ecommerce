@@ -712,7 +712,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
 
               {adminTab === 'stats' && <TeamStats adminRole={adminRole} shopOwners={shopOwners} showProfit={canSeeSupplier} productCosts={productCosts} productCommissions={productCommissions} products={products} startEditProduct={startEditProduct} canEditProduct={canEditProduct} orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} isOwner={isOwner} loggedInUserEmail={loggedInUserEmail} adminName={adminName} />}
 
-              {adminTab === 'orders' && <OrdersPanel orders={orders} products={products} productCosts={productCosts} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} canUnblock={adminRole === 'owner' || adminRole === 'manager'} isOwner={adminRole === 'owner'} showSupplier={canSeeSupplier} />}
+              {adminTab === 'orders' && <OrdersPanel orders={orders} products={products} productCosts={productCosts} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} canUnblock={adminRole === 'owner' || adminRole === 'manager'} isOwner={adminRole === 'owner'} canDeliver={adminRole === 'owner' || adminRole === 'manager'} showSupplier={canSeeSupplier} />}
             </div>
           )}
         </div>
