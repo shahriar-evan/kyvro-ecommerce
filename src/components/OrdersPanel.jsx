@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { askConfirm, askInput } from './AlertCenter';
 import { ORDER_STATUSES, DELIVERY_AREA_BN } from '../data/shopConfig';
-import { updateOrderStatus, isPaidOrder, requestCancelOrder, declineCancelRequest, markOrderPaid, deleteOrders, watchOrderSupply, markSupplierOrdered, unmarkSupplierOrdered, supplierKey } from '../orders';
+import { updateOrderStatus, isPaidOrder, requestCancelOrder, declineCancelRequest, markOrderPaid, markOrderReturned, deleteOrders, watchOrderSupply, markSupplierOrdered, unmarkSupplierOrdered, supplierKey } from '../orders';
 import { formatDateTime, toDate } from '../utils/dates';
 import { phoneKey, emailKey } from '../data/shopConfig';
 import { watchBlocked, blockPhone, blockEmail, unblockPhone, unblockEmail } from '../blocklist';
@@ -446,6 +446,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
               </div>
               <div className="text-right shrink-0">
                 <span className={`inline-block px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${STATUS_STYLE[o.status] || ''}`}>{o.status}</span>
+                {o.returned && <span className="block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-600 text-white">Returned</span>}
                 {o.cancelRequest && o.cancelRequest.status === 'pending' && o.status !== 'Cancelled' && <span className="block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-600 text-white">Cancel request</span>}
                 <p className="text-sm font-bold mt-1">{formatPrice(o.total)}</p>
                 {(() => {
@@ -702,6 +703,15 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
               {o.status === 'Shipped' && (
                 <button disabled={busy} onClick={() => setStatus(o, 'Delivered')} className={`${btn} bg-green-600 text-white hover:opacity-90`}>Mark as delivered</button>
               )}
+              {o.status === 'Delivered' && showSupplier && !o.returned && (
+                <button disabled={busy} onClick={async () => {
+                  const loss = await askInput(`Order ${o.orderNumber} came back (returned / refused)?\n\nWrite how much money the store LOST on it in taka (delivery both ways, supplier fee, anything not refunded). Write 0 if nothing was lost.`, { placeholder: 'e.g. 250' });
+                  if (loss === null || loss === undefined || String(loss).trim() === '' || Number.isNaN(Number(loss)) || Number(loss) < 0) return;
+                  const note = await askInput('Short note (optional):', { placeholder: 'e.g. customer refused at the door' });
+                  run(o.id, () => markOrderReturned(o.id, loss, note || '', staff));
+                }} className={`${btn} border border-red-500 text-red-500 hover:bg-red-500/10`}>Mark as returned</button>
+              )}
+              {o.returned && <span className="text-[11px] text-red-500 self-center font-semibold">Returned{o.returned.loss > 0 ? ` · loss ${formatPrice(o.returned.loss)}` : ''}{o.returned.note ? ` · ${o.returned.note}` : ''}. No commission or markup is paid on it.</span>}
               {(o.paymentStatus === 'Awaiting payment' || o.paymentStatus === 'Awaiting verification') && o.status !== 'Cancelled' && (!isUnpaid(o) || isOwner) && (
                 <button disabled={busy} onClick={() => run(o.id, () => markOrderPaid(o.id, staff))} className={`${btn} bg-[#D4AF37] text-black hover:opacity-90`}>Mark payment received</button>
               )}

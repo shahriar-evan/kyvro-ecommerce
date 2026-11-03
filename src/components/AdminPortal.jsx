@@ -371,8 +371,10 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                             {formatPrice(p.price)}
                             {canSeeSupplier && productCosts[String(p.id)] && productCosts[String(p.id)].supplierCost !== undefined && (
                               <p className="text-[10px] font-normal text-gray-500 mt-0.5">
-                                Cost {formatPrice(productCosts[String(p.id)].supplierCost)} · <span className={p.price - productCosts[String(p.id)].supplierCost >= 0 ? 'text-green-600' : 'text-red-500'}>Profit {formatPrice(p.price - productCosts[String(p.id)].supplierCost)}</span>
+                                Cost {formatPrice(productCosts[String(p.id)].supplierCost)} · <span className={p.price - productCosts[String(p.id)].supplierCost >= 0 ? 'text-green-600' : 'text-red-500'}>Profit {formatPrice(p.price - productCosts[String(p.id)].supplierCost)}{p.price > 0 ? ` (${Math.round(((p.price - productCosts[String(p.id)].supplierCost) / p.price) * 100)}%)` : ''}</span>
                                 {productCosts[String(p.id)].supplierName ? ` · ${productCosts[String(p.id)].supplierName}` : ''}
+                                {p.price > 0 && (p.price - productCosts[String(p.id)].supplierCost) / p.price < 0.2 && <span className="ml-1 font-bold text-red-500">LOW MARGIN</span>}
+                                {productCosts[String(p.id)].supplierLink && <> · <a href={productCosts[String(p.id)].supplierLink} target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] underline font-semibold">Open supplier</a></>}
                               </p>
                             )}
                             {productCommissions[String(p.id)] && productCommissions[String(p.id)].pct > 0 && (

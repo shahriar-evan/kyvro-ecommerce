@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { askConfirm } from './AlertCenter';
 import { loadStatsResets, resetAdminStats, listAdmins } from '../adminAuth';
 import { toDate, formatDateTime } from '../utils/dates';
+import { askInput } from './AlertCenter';
+import { watchPayouts, addPayout, deletePayout } from '../payouts';
 
 // Team performance: who confirmed / delivered / cancelled how many orders, and which products and how much money that was.
 // Everything is read from the orders themselves (confirmedBy + the status history), so old orders count too.
@@ -49,6 +51,9 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
     if (!isOwner) return;
     listAdmins().then((l) => { const m = {}; l.forEach((a) => { m[String(a.email).toLowerCase()] = a.role; }); setRoles(m); }).catch(() => {});
   }, [isOwner]);
+  // what the Owner already paid out (a Manager's markup / an Admin's commission)
+  const [payouts, setPayouts] = useState([]);
+  useEffect(() => watchPayouts(isOwner, loggedInUserEmail, setPayouts, () => {}), [isOwner, loggedInUserEmail]);
   const anyCommission = Object.keys(productCommissions).length > 0;
   // profit and commission of one order: per item (selling price - supplier price) x pieces, commission = that profit x the product's commission %
   const orderProfit = (o) => {
@@ -103,14 +108,14 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
         if (k) evs.push({ who: k, kind: 'confirmed', at: toDate(conf && conf.at) || toDate(o.updatedAt) || toDate(o.createdAt), order: o });
       }
       // sold by an Admin (the Admin placed the order): this Admin earns the commission once it is delivered
-      if (o.soldBy && o.status === 'Delivered') {
+      if (o.soldBy && o.status === 'Delivered' && !o.returned) {
         const de = lastEntry(o, 'Delivered');
         const k = person(o.soldBy, '');
         if (k) evs.push({ who: k, kind: 'sold', at: toDate(de && de.at) || toDate(o.updatedAt) || toDate(o.createdAt), order: o });
       }
       // shop orders: the shop owner earns the markup once the order is delivered
       const so = o.shop ? shopOwners[o.shop] : null;
-      if (so && o.status === 'Delivered') {
+      if (so && o.status === 'Delivered' && !o.returned) {
         const de = lastEntry(o, 'Delivered');
         const k = person(so.email, so.name);
         if (k) evs.push({ who: k, kind: 'shop', at: toDate(de && de.at) || toDate(o.updatedAt) || toDate(o.createdAt), order: o });
@@ -143,7 +148,7 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
       if (ev.kind === 'shop') s.shopTotal += markupOf(ev.order);
       const em = String((people[ev.who] || {}).email || '').toLowerCase();
       const role = isOwner ? roles[em] : (ev.who === me ? adminRole : '');
-      if (((ev.kind === 'sold') || (ev.kind === 'confirmed' && !ev.order.soldBy)) && ev.order.status === 'Delivered' && role !== 'manager' && role !== 'owner') { // Admins earn commission, Managers earn the shop markup
+      if (((ev.kind === 'sold') || (ev.kind === 'confirmed' && !ev.order.soldBy)) && ev.order.status === 'Delivered' && !ev.order.returned && role !== 'manager' && role !== 'owner') { // Admins earn commission, Managers earn the shop markup
         const { profit, unknown, commission, lines } = orderProfit(ev.order);
         s.profit += profit; s.unknownCost += unknown; s.commTotal += commission; s.comm.push({ ev, profit, unknown, commission, lines });
       }
@@ -189,6 +194,21 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
     return m;
   }, [products, people]);
 
+  // returned orders (a delivered order that came back): the money the store lost on them
+  const returnedList = useMemo(() => orders.filter((o) => o.returned && inRange(toDate(o.returned.at))).sort((a, b) => (toDate(b.returned.at) || 0) - (toDate(a.returned.at) || 0)), [orders, preset, from, to]);
+  const returnLoss = returnedList.reduce((n, o) => n + (Number(o.returned.loss) || 0), 0);
+  const paidOf = (p) => {
+    const em = String(p.email || p.key).toLowerCase();
+    const rt = resets[em];
+    return payouts.filter((x) => String(x.email).toLowerCase() === em && inRange(toDate(x.at)) && !(rt && toDate(x.at) <= rt));
+  };
+  const doPay = async (p, due) => {
+    const a = await askInput(`Paid ${p.name}? Write the amount you paid them in taka (due now: ${formatPrice(Math.max(0, due))}).`, { placeholder: 'e.g. 500', initial: due > 0 ? String(Math.round(due)) : '' });
+    if (a === null || a === undefined || String(a).trim() === '' || !(Number(a) > 0)) return;
+    const note = await askInput('Note (optional, e.g. bKash TrxID):', { placeholder: 'e.g. bKash 01XXXXXXXXX' });
+    try { await addPayout(p.email || p.key, p.name, Number(a), note || '', { email: loggedInUserEmail }); }
+    catch (err) { alert('Could not save: ' + (err.code === 'permission-denied' ? 'publish the latest Firestore rules first.' : err.message)); }
+  };
   const visibleKeys = Object.keys(people).filter((k) => isOwner || k === me);
   const rows = visibleKeys
     .map((k) => ({ ...people[k], s: stats[k] || { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {}, profit: 0, unknownCost: 0, commTotal: 0, comm: [], shop: [], shopTotal: 0, mine: { orders: 0, pieces: 0, sales: 0, list: {} } } }))
@@ -221,8 +241,27 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
         </div>
       </div>
 
+      {showProfit && (returnedList.length > 0) && (
+        <div className={card}>
+          <h3 className="text-lg font-bold">Returned orders <span className="text-sm font-normal text-red-500">· loss {formatPrice(returnLoss)}</span></h3>
+          <p className="text-[11px] text-gray-500">Delivered orders that came back in this period. They earn no commission or markup. The loss is what you typed when you marked the order as returned.</p>
+          <div className="divide-y text-xs">
+            {returnedList.map((o) => (
+              <div key={o.orderNumber + 'r'} className="py-2 flex flex-wrap justify-between gap-x-4 gap-y-1">
+                <span><strong className="text-[#D4AF37]">{o.orderNumber}</strong> · {o.customer && o.customer.name} · {(o.items || []).map((it) => `${it.name} ×${it.quantity}`).join(', ')}{o.returned.note ? ` · ${o.returned.note}` : ''}</span>
+                <span className="text-gray-500">{formatDateTime(o.returned.at)} · <strong className="text-red-500">loss {formatPrice(o.returned.loss || 0)}</strong></span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {shown.map((p) => {
         const s = p.s;
+        const earned = s.commTotal + s.shopTotal;
+        const paidList = paidOf(p);
+        const paid = paidList.reduce((n, x) => n + (Number(x.amount) || 0), 0);
+        const due = earned - paid;
         const isOpen = open === p.key || !isOwner;
         const prods = Object.entries(s.products).sort((a, b) => b[1] - a[1]);
         return (
@@ -275,6 +314,27 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
               <div className={`rounded border p-3 text-xs flex flex-wrap items-center justify-between gap-2 ${isDarkMode ? 'border-gray-800 bg-[#121212]' : 'border-gray-200 bg-gray-50'}`}>
                 <span><strong>Commission</strong> on delivered orders {p.key === me ? 'you' : 'they'} confirmed{showProfit ? `: profit ${formatPrice(s.profit)}` : ''}{s.unknownCost > 0 ? ` (${s.unknownCost} pcs without a profit figure are not counted)` : ''}</span>
                 <strong className="text-[#D4AF37] text-base">{formatPrice(s.commTotal)}</strong>
+              </div>
+            )}
+
+            {(earned > 0 || paid > 0) && (
+              <div className={`rounded border p-3 text-xs space-y-2 ${isDarkMode ? 'border-gray-800 bg-[#121212]' : 'border-gray-200 bg-gray-50'}`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span><strong>Earnings</strong> (commission + shop markup) in this period</span>
+                  <span>Earned <strong className="text-[#D4AF37]">{formatPrice(earned)}</strong> · Paid <strong className="text-green-600">{formatPrice(paid)}</strong> · {due >= 0 ? 'Due' : 'Overpaid'} <strong className={due > 0 ? 'text-red-500' : 'text-green-600'}>{formatPrice(Math.abs(due))}</strong></span>
+                </div>
+                {paidList.length > 0 && (
+                  <div className="divide-y text-[11px] text-gray-500">
+                    {[...paidList].sort((a, b) => (toDate(b.at) || 0) - (toDate(a.at) || 0)).map((x) => (
+                      <div key={x.id} className="py-1 flex flex-wrap justify-between gap-2">
+                        <span>{formatDateTime(x.at)} · paid {formatPrice(x.amount)}{x.note ? ` · ${x.note}` : ''}</span>
+                        {isOwner && <button type="button" onClick={async () => { if (await askConfirm('Delete this payment record?', { danger: true })) deletePayout(x.id).catch((e) => alert(e.message)); }} className="underline text-red-500">Delete</button>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {isOwner && <button type="button" onClick={() => doPay(p, due)} className="px-3 py-1.5 rounded text-[11px] font-bold bg-green-600 text-white hover:opacity-90">Mark as paid</button>}
+                <p className="text-[10px] text-gray-500">Earned and paid both follow the period you picked above. Choose "All time" to see the full balance.</p>
               </div>
             )}
 

@@ -207,6 +207,16 @@ export async function markOrderPaid(orderId, staff) {
   });
 }
 
+// A delivered order that came back (customer refused / returned it). Owner and Manager only (the rules check it too).
+// loss = what the return cost the store (delivery both ways, supplier fee ...), entered by hand.
+export async function markOrderReturned(orderId, loss, note, staff) {
+  await updateDoc(doc(db, "orders", orderId), {
+    returned: { at: new Date().toISOString(), by: staff.email || "", byName: staff.name || staff.email || "", loss: Math.max(0, Number(loss) || 0), note: String(note || "").slice(0, 300) },
+    updatedAt: serverTimestamp(),
+    history: arrayUnion(historyEntry("Returned", staff)),
+  });
+}
+
 // ---- Supplier orders (dropshipping): PRIVATE ----
 // "orderSupply/{orderId}" remembers which supplier shops this order was already placed at. Only team members can read it
 // (never the customer, who can read the order itself). placed = { <shopKey>: { supplierName, orderNo, cost, at, by, byName } }
