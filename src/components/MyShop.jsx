@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { auth } from '../firebase';
-import { watchMyShop, watchAllShops, watchShopOwners, createShop, saveShopItems, setShopActive, isPendingShop, acceptShop, rejectShop } from '../shops';
+import { watchMyShop, watchAllShops, watchShopOwners, createShop, saveShopItems, saveShopName, shopNameTaken, setShopActive, isPendingShop, acceptShop, rejectShop } from '../shops';
 import { askConfirm } from './AlertCenter';
 import { maxMarkupFor, shopPriceClamp, SHOP_COLLECTIONS, productInCollection } from '../data/shopConfig';
 import { flatSubCategories, subLabel } from '../data/catalog';
@@ -9,7 +9,7 @@ import { normalizePlans, toMillis, SHOP_MAX_ITEMS, effectiveTier, TIER_LABEL } f
 import PlanCards from './PlanCards';
 import ShopExtrasEditor from './ShopExtrasEditor';
 import { shopExtrasOf, httpsLinkOk, contactOk, cleanContact, effectiveFeatures, FEATURES } from '../data/shopBrand';
-import { watchSellerRules, sellerNameBlocked } from '../sellers';
+import { watchSellerRules, sellerNameBlocked, normalizeSellerRules } from '../sellers';
 
 const shopUrl = (slug) => `${window.location.origin}/?shop=${slug}`;
 
@@ -87,11 +87,10 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
     }
   }, [shop, loadedFor]);
 
-  // unsaved = the ticks, prices or name differ from what is saved in Firestore
+  // unsaved = the ticks, prices or extras differ from what is saved in Firestore (the name has its own Save button)
   const savedItems = (shop && shop.items) || {};
   const dirty = !!shop && (
-    name !== (shop.name || '')
-    || JSON.stringify(extras) !== JSON.stringify(shopExtrasOf(shop))
+    JSON.stringify(extras) !== JSON.stringify(shopExtrasOf(shop))
     || Object.keys(draft).length !== Object.keys(savedItems).length
     || Object.entries(draft).some(([id, v]) => savedItems[id] === undefined || Number(v) !== Number(savedItems[id]))
   );
@@ -111,7 +110,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   const tier = isOwner ? 'premium' : effectiveTier(sub); // free / pro / premium right now
   // shop page extras: Pro / Premium (tagline, contact, about, social links, share kit), Premium only (brand color,
   // announcement, pinned products). The rules check the tier the server wrote on the shop.
-  const feat = isOwner ? Object.fromEntries(FEATURES.map((f) => [f.key, true])) : effectiveFeatures(shop, shop ? effectiveTier(shop) : 'free');
+  const feat = isOwner ? Object.fromEntries(FEATURES.map((f) => [f.key, true])) : effectiveFeatures(shop, shop ? effectiveTier(shop) : 'free', plans.tierFeatures);
   const extrasAllowed = feat.tagline || feat.about || feat.social || feat.shareKit;
   // "All products": the paid plan, or the Owner's / a Manager's override for this shop
   const allOverride = shop && shop.features && typeof shop.features.allProducts === 'boolean' ? shop.features.allProducts : null;
@@ -121,6 +120,12 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   const daysLeft = paidUntil ? Math.ceil((paidUntil - Date.now()) / 86400000) : null;
   const fmtDate = (ms) => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   const limitMsg = () => setMsg({ type: 'err', text: `The Free plan shows up to ${plans.freeLimit} products. Upgrade to add all products.` });
+  // Free plan: products from at most plans.freeCategoryLimit categories (Pro / Premium / "All products": every category)
+  const catLimit = planLimit === SHOP_MAX_ITEMS ? Infinity : plans.freeCategoryLimit;
+  const catOf = (p) => (SHOP_COLLECTIONS.find((c) => productInCollection(p, c.name)) || {}).name || 'Other';
+  const catsOf = (ids) => new Set(ids.map((id) => live.find((x) => String(x.id) === String(id))).filter(Boolean).map(catOf));
+  const catMsg = () => setMsg({ type: 'err', text: `The Free plan sells from up to ${plans.freeCategoryLimit} categories. Upgrade to Pro / Premium for all categories.` });
+  const catsOk = (ids) => catsOf(ids).size <= catLimit;
   // the plan end date is copied onto the shop for the storefront; a shop made after paying gets it here
   const [synced, setSynced] = useState(false);
   useEffect(() => {
@@ -177,11 +182,13 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
 
   const toggle = (p) => {
     if (draft[p.id] === undefined && Object.keys(draft).length >= cap) { limitMsg(); return; }
+    if (draft[p.id] === undefined && !catsOk([...Object.keys(draft), p.id])) { catMsg(); return; }
     setDraft((d) => { const n = { ...d }; if (n[p.id] !== undefined) delete n[p.id]; else n[p.id] = String(p.price); return n; });
   };
   const selectAll = (list) => {
     const free = cap - Object.keys(draft).length;
     const add = list.filter((p) => draft[p.id] === undefined);
+    if (add.length && !catsOk([...Object.keys(draft), ...add.map((p) => p.id)])) { catMsg(); return; }
     if (add.length > free) limitMsg();
     setDraft((d) => { const n = { ...d }; add.slice(0, Math.max(0, free)).forEach((p) => { n[p.id] = String(p.price); }); return n; });
   };
@@ -200,6 +207,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
       items[String(p.id)] = shopPriceClamp(p.price, w);
     }
     if (Object.keys(items).length > cap) { limitMsg(); return; }
+    if (!catsOk(Object.keys(items)) && catsOf(Object.keys(items)).size > catsOf(Object.keys(savedItems)).size) { catMsg(); return; }
     const ex = { ...extras, contactUrl: cleanContact(extras.contactUrl), tagline: extras.tagline.trim().slice(0, 80), about: extras.about.trim().slice(0, 300), announcement: extras.announcement.trim().slice(0, 100),
       socialLinks: Object.fromEntries(Object.entries(extras.socialLinks).map(([k, v]) => [k, String(v || '').trim()])),
       pinnedItems: extras.pinnedItems.filter((id) => items[id] !== undefined).slice(0, 3) };
@@ -208,13 +216,6 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
       const badSocial = Object.entries(ex.socialLinks).find(([, v]) => !httpsLinkOk(v));
       if (badSocial) { setMsg({ type: 'err', text: `${badSocial[0]}: the link must start with https://` }); return; }
     }
-    // shop name: changes at once (feature "Shop name change"), the link stays the same; blocked words are refused
-    const nameChanged = name.trim() !== String(shop.name || '').trim();
-    if (nameChanged) {
-      if (!feat.shopName) { setMsg({ type: 'err', text: 'Changing the shop name is not on for your plan.' }); return; }
-      if (name.trim().length < 2) { setMsg({ type: 'err', text: 'The shop name needs at least 2 letters.' }); return; }
-      if (!isOwner) { const bad = sellerNameBlocked(name, '', sellerRules); if (bad) { setMsg({ type: 'err', text: `The shop name cannot contain "${bad}".` }); return; } }
-    }
     setBusy(true);
     try {
       // only the extras this plan may change (the rules refuse the others)
@@ -222,13 +223,37 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
       const FIELD_FEATURE = { tagline: 'tagline', contactUrl: 'tagline', about: 'about', socialLinks: 'social', brandColor: 'brandColor', announcement: 'announcement', pinnedItems: 'pinned' };
       const keys = Object.keys(FIELD_FEATURE).filter((k) => feat[FIELD_FEATURE[k]]);
       const changes = Object.fromEntries(keys.filter((k) => JSON.stringify(ex[k]) !== JSON.stringify(before[k])).map((k) => [k, ex[k]]));
-      await saveShopItems(shop.slug, nameChanged ? name : null, items, { ...(isOwner ? { planExempt: true } : {}), ...changes });
+      await saveShopItems(shop.slug, null, items, { ...(isOwner ? { planExempt: true } : {}), ...changes });
       setExtras(ex);
       setDraft(draftFrom({ items })); // what was really saved (products no longer for sale drop out)
       setMsg({ type: 'ok', text: 'Saved. Your shop link now shows these products and prices.' });
     }
     catch (err) { setMsg({ type: 'err', text: err.code === 'permission-denied' ? 'Could not save: publish the latest Firestore rules first.' : err.message }); }
     setBusy(false);
+  };
+  // shop name: its own Save. Checks the plan, the blocked words and that no other shop uses the name, then saves at once.
+  const [nameMsg, setNameMsg] = useState(null);
+  const [nameBusy, setNameBusy] = useState(false);
+  const saveName = async () => {
+    setNameMsg(null);
+    const n = name.trim();
+    if (n === String(shop.name || '').trim()) return;
+    const shopTier = isOwner ? 'premium' : effectiveTier(shop);
+    if (!feat.shopName) {
+      setNameMsg({ type: 'err', text: shopTier === 'free' ? 'Upgrade to Pro / Premium to change your shop name.' : 'Name change is part of Premium. Upgrade to Premium (or ask Kyvro to switch it on for your shop).' });
+      return;
+    }
+    if (n.length < 2) { setNameMsg({ type: 'err', text: 'The shop name needs at least 2 letters.' }); return; }
+    if (!isOwner) {
+      const bad = sellerNameBlocked(n, '', sellerRules);
+      if (bad) { setNameMsg({ type: 'err', text: `Not available: "${bad}" cannot be used. Words not allowed in a shop name: ${normalizeSellerRules(sellerRules).blockedWords.join(', ')}.` }); return; }
+    }
+    setNameBusy(true);
+    try {
+      if (await shopNameTaken(n, shop.slug)) { setNameMsg({ type: 'err', text: `Not available: another shop is already called "${n}". Try another name.` }); }
+      else { await saveShopName(shop.slug, n); setName(n); setNameMsg({ type: 'ok', text: `Saved: your shop is now "${n}". The link stays the same.` }); }
+    } catch (err) { setNameMsg({ type: 'err', text: err.code === 'permission-denied' ? 'Could not save the name (plan or blocked word).' : err.message }); }
+    setNameBusy(false);
   };
   const discard = async () => {
     if (!(await askConfirm('Discard your unsaved changes?', { danger: true, confirmText: 'Discard' }))) return;
@@ -356,10 +381,16 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
           </div>
           <div className="flex flex-wrap gap-2">{linkButtons(shop.slug, goldBtn)}</div>
         </div>
-        <label className="block text-xs font-semibold text-gray-500">Shop name
-          <input className={`${inputCls} block mt-1 w-full sm:w-72 disabled:opacity-60`} maxLength={60} value={name} disabled={!feat.shopName} onChange={(e) => setName(e.target.value)} />
-          <span className="block mt-1 text-[11px] font-normal">{feat.shopName ? 'The new name shows at once. Your shop link never changes.' : '🔒 Changing the name is a Premium feature (Pro: Kyvro can switch it on). Your shop link never changes.'}</span>
-        </label>
+        <div>
+          <label htmlFor="shop-name" className="block text-xs font-semibold text-gray-500">Shop name</label>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <input id="shop-name" className={`${inputCls} w-full sm:w-72`} maxLength={60} value={name} onChange={(e) => { setName(e.target.value); setNameMsg(null); }} />
+            <button type="button" disabled={nameBusy || name.trim() === String(shop.name || '').trim()} onClick={saveName} className="px-4 py-2 rounded bg-[#D4AF37] text-black text-xs font-bold uppercase tracking-wider disabled:opacity-40">{nameBusy ? 'Checking...' : 'Save name'}</button>
+          </div>
+          {nameMsg
+            ? <p className={`mt-1 text-[11px] ${nameMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{nameMsg.text}</p>
+            : <p className="mt-1 text-[11px] text-gray-500">{feat.shopName ? 'The new name shows at once. Your shop link never changes.' : '🔒 Name change: Premium (Pro if Kyvro switches it on). Your shop link never changes.'}</p>}
+        </div>
         <ShopExtrasEditor extras={extras} setExtras={setExtras} feat={feat} shop={shop} tier={isOwner ? 'premium' : effectiveTier(shop)} shopName={name} link={link}
           pinChoices={live.filter((p) => draft[p.id] !== undefined)} isDarkMode={isDarkMode} inputCls={inputCls} />
         <p className="text-[11px] text-gray-500">Customers who open your link see only the products you tick below, at the price you type. The price can be higher than the store price by the limit shown for each product. Everything above the store price is yours when the order is delivered. Payments and delivery stay with the store.</p>
@@ -379,7 +410,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
               <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">My plan</p>
               <p className="text-xl font-bold">{tier === 'free' ? 'Free' : <span className="text-[#D4AF37]">{TIER_LABEL[tier]}</span>}</p>
             </div>
-            <p className="text-xs text-gray-500">{paid ? `All products · paid until ${fmtDate(paidUntil)}` : `${count} / ${plans.freeLimit} products`}</p>
+            <p className="text-xs text-gray-500">{paid ? `All products · paid until ${fmtDate(paidUntil)}` : `${count} / ${plans.freeLimit} products · ${catsOf(Object.keys(draft)).size} / ${plans.freeCategoryLimit} categories`}</p>
           </div>
           <PlanCards plans={plans} formatPrice={formatPrice} isDarkMode={isDarkMode} mode="upgrade" currentTier={tier} busy={paying} onChoose={(t) => t !== 'free' && buyPlan(t)} />
           {tier !== 'free' && <p className="text-[11px] text-gray-500 text-center">Renewing or upgrading adds {plans.periodDays} days to your current end date.</p>}

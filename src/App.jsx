@@ -100,7 +100,7 @@ export default function App() {
   // the shop's plan right now (the Owner's own shop has every extra) and the header brand (Premium: wordmark)
   const shopTier = shopCtx ? (shopCtx.planExempt ? 'premium' : effectiveTier(shopCtx)) : 'free';
   // what the shop may show right now: tier defaults, or the Owner's / a Manager's ON / OFF for this shop
-  const shopFeat = shopCtx ? (shopCtx.planExempt ? Object.fromEntries(FEATURES.map((f) => [f.key, true])) : effectiveFeatures(shopCtx, shopTier)) : {};
+  const shopFeat = shopCtx ? (shopCtx.planExempt ? Object.fromEntries(FEATURES.map((f) => [f.key, true])) : effectiveFeatures(shopCtx, shopTier, plans.tierFeatures)) : {};
   const shopBrand = shopCtx ? { name: shopCtx.name, wordmark: shopTier === 'premium', color: shopFeat.brandColor ? brandHex(shopCtx.brandColor) : '#D4AF37', logo: shopFeat.logo && shopCtx.logo ? shopCtx.logo : '' } : null;
   const storefrontProducts = shopLoading ? [] : shopCtx
     ? shopProducts.filter((p) => shopCtx.items && shopCtx.items[String(p.id)] !== undefined && (!shopVisible || shopVisible.has(String(p.id)))).map((p) => {
@@ -169,7 +169,9 @@ export default function App() {
     } catch (e) { /* ignore */ }
     return null;
   });
-  const [currentView, setCurrentView] = useState(payResult ? 'payment-result' : 'home');
+  // kyvro.store/Admin (any case) opens the team login / admin panel; the site itself has no Admin link
+  const isAdminPath = /^\/admin\/?$/i.test(window.location.pathname);
+  const [currentView, setCurrentView] = useState(payResult ? 'payment-result' : isAdminPath ? 'admin' : 'home');
   // Payment done (or being checked): now the cart can be emptied. Cancelled / failed payments keep the cart.
   useEffect(() => {
     if (payResult && (payResult.status === 'ok' || payResult.status === 'check')) { setCart([]); }
@@ -247,7 +249,8 @@ export default function App() {
       n.snaps = n.snaps.slice(0, n.idx + 1);
       n.snaps.push(snap);
       n.idx = n.snaps.length - 1;
-      window.history.pushState({ kv: n.idx }, '', window.location.pathname);
+      // the admin panel lives at /Admin; every other page at the normal address
+      window.history.pushState({ kv: n.idx }, '', currentView === 'admin' ? '/Admin' : (/^\/admin\/?$/i.test(window.location.pathname) ? '/' : window.location.pathname));
     } catch (e) { /* ignore */ }
   }, [currentView, selectedCategory, selectedSubCategory, selectedProduct]);
   useEffect(() => {

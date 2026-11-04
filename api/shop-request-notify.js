@@ -48,18 +48,20 @@ async function sellerApplied(req, res) {
   const title = `Seller application: ${shopName}`;
   const text = `${person} wants to sell on Kyvro (${String(app.district || '')}). Admin Portal -> Sellers -> Pending applications.`;
   const pushed = await pushToOwners(token, owners, title, text);
+  const sl = app.socialLinks || {};
+  const socials = [['Facebook', sl.facebook], ['Instagram', sl.instagram], ['TikTok', sl.tiktok]].filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(' · ') || String(app.pageLink || '');
   const row = (k, v) => (v ? `<tr><td style="padding:4px 12px 4px 0;color:#888">${esc(k)}</td><td style="padding:4px 0">${esc(v)}</td></tr>` : '');
   const html = `<!doctype html><html><body style="margin:0;background:#f3f3f3;font-family:Arial,Helvetica,sans-serif;color:#111">
 <div style="max-width:560px;margin:0 auto;background:#fff">
   <div style="background:#0b0b0b;padding:20px 24px;color:#D4AF37;font-size:20px;letter-spacing:3px;font-weight:bold">KYVRO</div>
   <div style="padding:24px;font-size:15px;line-height:1.7">
     <p>A new seller applied: <strong>${esc(shopName)}</strong>. The shop stays off until you approve it.</p>
-    <table style="font-size:14px">${row('Name', app.name)}${row('Email', app.email)}${row('WhatsApp', app.whatsapp)}${row('District', app.district)}${row('Area', app.area)}${row('Page', app.pageLink)}${row('Categories', Array.isArray(app.categories) ? app.categories.join(', ') : '')}${row('Note', app.productNote)}</table>
+    <table style="font-size:14px">${row('Name', app.name)}${row('Email', app.email)}${row('WhatsApp', app.whatsapp)}${row('District', app.district)}${row('Area', app.area)}${row('Social', socials)}${row('Categories', Array.isArray(app.categories) ? app.categories.join(', ') : '')}${row('Sub-categories', Array.isArray(app.subCategories) ? app.subCategories.join(', ') : '')}${row('Note', app.productNote)}</table>
     <p>Open the Admin Portal, go to <strong>Sellers</strong> and press <strong>Approve</strong> or <strong>Reject</strong>.</p>
     <p><a href="${esc(SITE)}" style="display:inline-block;background:#D4AF37;color:#000;padding:10px 18px;text-decoration:none;font-weight:bold;border-radius:4px">Open Kyvro</a></p>
   </div>
 </div></body></html>`;
-  const plain = `A new seller applied: ${shopName}\nName: ${app.name || ''}\nEmail: ${app.email || ''}\nWhatsApp: ${app.whatsapp || ''}\nDistrict: ${app.district || ''}, ${app.area || ''}\nPage: ${app.pageLink || ''}\nCategories: ${Array.isArray(app.categories) ? app.categories.join(', ') : ''}\nNote: ${app.productNote || ''}\n\nAdmin Portal -> Sellers -> Approve / Reject.\n${SITE}`;
+  const plain = `A new seller applied: ${shopName}\nName: ${app.name || ''}\nEmail: ${app.email || ''}\nWhatsApp: ${app.whatsapp || ''}\nDistrict: ${app.district || ''}, ${app.area || ''}\nSocial: ${socials}\nCategories: ${Array.isArray(app.categories) ? app.categories.join(', ') : ''}\nSub-categories: ${Array.isArray(app.subCategories) ? app.subCategories.join(', ') : ''}\nNote: ${app.productNote || ''}\n\nAdmin Portal -> Sellers -> Approve / Reject.\n${SITE}`;
   const emailed = await emailOwners(owners, title, html, plain);
   return res.status(200).json({ sent: pushed, emailed });
 }

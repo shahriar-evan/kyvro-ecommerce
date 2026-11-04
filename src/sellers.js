@@ -58,6 +58,10 @@ export const normalizeWhatsapp = (v) => {
   return /^(\+?8801[3-9][0-9]{8}|01[3-9][0-9]{8}|\+[1-9][0-9]{7,14})$/.test(t) ? t : "";
 };
 
+const cleanSellerSocials = (s) => Object.fromEntries(["facebook", "instagram", "tiktok"].map((k) => [k, String((s && s[k]) || "").trim().slice(0, 200)]));
+// "Men's › Shirt" (category › sub-category)
+const cleanSubs = (list) => (Array.isArray(list) ? list : []).map((c) => String(c).slice(0, 80)).slice(0, 60);
+
 // Apply to sell: one batch writes the shop (OFF, 'pending') and the application (sellers/{uid}, 'pending').
 // The rules allow it once per account, and again only after the Owner rejected the last application.
 export async function applyAsSeller({ uid, email, shopName, details }) {
@@ -82,8 +86,10 @@ export async function applyAsSeller({ uid, email, shopName, details }) {
     district: String(details.district || "").trim().slice(0, 40),
     area: String(details.area || "").trim().slice(0, 60),
     address: String(details.address || "").trim().slice(0, 300),
-    pageLink: String(details.pageLink || "").trim().slice(0, 300),
+    // social media links (any of Facebook / Instagram / TikTok, https only, all optional)
+    socialLinks: cleanSellerSocials(details.socialLinks),
     categories: (Array.isArray(details.categories) ? details.categories : []).map((c) => String(c).slice(0, 60)).slice(0, 20),
+    subCategories: cleanSubs(details.subCategories),
     productNote: String(details.productNote || "").trim().slice(0, 300),
     agreed: details.agreed === true,
     status: "pending",
@@ -119,8 +125,8 @@ export function watchSubscriptions(onData) {
   return onSnapshot(collection(db, "subscriptions"), (snap) => { const m = {}; snap.docs.forEach((d) => { m[d.id] = d.data(); }); onData(m); }, () => onData({}));
 }
 // while the application waits: change the categories I want to sell
-export const updateSellerCategories = (uid, categories) =>
-  updateDoc(doc(db, "sellers", uid), { categories: categories.map((c) => String(c).slice(0, 60)).slice(0, 20) });
+export const updateSellerCategories = (uid, categories, subCategories = []) =>
+  updateDoc(doc(db, "sellers", uid), { categories: categories.map((c) => String(c).slice(0, 60)).slice(0, 20), subCategories: cleanSubs(subCategories) });
 
 // Owner: approve an application (the shop goes live) or reject it (the shop is removed, the seller can apply again)
 export async function approveSeller(seller, staff) {

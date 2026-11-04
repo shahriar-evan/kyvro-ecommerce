@@ -67,11 +67,17 @@ export const FEATURES = [
   { key: 'salesStats', label: 'Sales stats', pro: false },
   { key: 'earningsCsv', label: 'Monthly earnings CSV', pro: false },
 ];
-export const featureDefault = (key, tier) => tier === 'premium' || (tier === 'pro' && !!(FEATURES.find((f) => f.key === key) || {}).pro);
+// the built-in default of a tier (used when the Owner did not switch the feature for that plan)
+export const builtInDefault = (key, tier) => tier === 'premium' || (tier === 'pro' && !!(FEATURES.find((f) => f.key === key) || {}).pro);
+// tierFeatures = settings/plans.tierFeatures (normalizePlans), the Owner's per-plan switches
+export const featureDefault = (key, tier, tierFeatures) => {
+  const m = (tierFeatures && tierFeatures[tier]) || {};
+  return typeof m[key] === 'boolean' ? m[key] : builtInDefault(key, tier);
+};
 // a paid-only feature is always off on the Free plan, whatever the override says
 export const featureLockedFree = (key, tier) => tier === 'free' && !!(FEATURES.find((f) => f.key === key) || {}).paid;
 // { key: true/false } for a shop: override first, else the tier default. tier = 'free' | 'pro' | 'premium'.
-export const effectiveFeatures = (shop, tier) => {
+export const effectiveFeatures = (shop, tier, tierFeatures) => {
   const o = (shop && shop.features) || {};
-  return Object.fromEntries(FEATURES.map((f) => [f.key, featureLockedFree(f.key, tier) ? false : typeof o[f.key] === 'boolean' ? o[f.key] : featureDefault(f.key, tier)]));
+  return Object.fromEntries(FEATURES.map((f) => [f.key, featureLockedFree(f.key, tier) ? false : typeof o[f.key] === 'boolean' ? o[f.key] : featureDefault(f.key, tier, tierFeatures)]));
 };
