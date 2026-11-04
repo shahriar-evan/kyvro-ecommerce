@@ -263,7 +263,7 @@ service cloud.firestore {
       allow update, delete: if isOwner();
     }
 
-    // A team member's shop plan (paidUntil). Only the server (api/plan-callback.js, Admin access) writes it after a
+    // A team member's shop plan (paidUntil). Only the server (api/plan.js, Admin access) writes it after a
     // payment that UddoktaPay confirmed. A browser can only read its own; nobody can write it from the website.
     match /subscriptions/{uid} {
       allow read: if (signedIn() && request.auth.uid == uid) || isOwner();

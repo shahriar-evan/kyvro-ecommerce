@@ -1,12 +1,12 @@
-// Vercel serverless function: opens an UddoktaPay payment page for a shop plan (Paid = all products for periodDays).
+// /api/plan?action=init (see api/plan.js): opens an UddoktaPay payment page for a shop plan (Paid = all products for periodDays).
 // The caller must be a signed-in Manager / Admin (Firebase login token). The amount always comes from settings/plans
 // on the server, never from the browser. The API key stays here on the server.
 //
 // Environment variables: UDDOKTAPAY_BASE_URL, UDDOKTAPAY_API_KEY, FIREBASE_SERVICE_ACCOUNT (all already used for orders)
-import { SITE, accessToken } from './_sslc.js';
-import { uddoktaConfigured, UDDOKTA_BASE, UDDOKTA_KEY } from './_uddokta.js';
-import { readPlans, planCaller } from './_plans.js';
-import { planPrice } from '../src/data/priceCheck.js';
+import { SITE, accessToken } from '../_sslc.js';
+import { uddoktaConfigured, UDDOKTA_BASE, UDDOKTA_KEY } from '../_uddokta.js';
+import { readPlans, planCaller } from '../_plans.js';
+import { planPrice } from '../../src/data/priceCheck.js';
 
 export const config = { maxDuration: 30 };
 
@@ -31,10 +31,10 @@ export default async function handler(req, res) {
         amount: amount.toFixed(2),
         // checked again when UddoktaPay confirms the payment (api/_plans.js)
         metadata: { kind: 'plan', uid: me.uid, email: me.email, name: String(me.name || '').slice(0, 80), amount: String(amount), days: String(plans.periodDays) },
-        redirect_url: `${SITE}/api/plan-callback`,
+        redirect_url: `${SITE}/api/plan?action=callback`,
         return_type: 'GET',
-        cancel_url: `${SITE}/api/plan-callback?r=cancel`,
-        webhook_url: `${SITE}/api/plan-callback?r=ipn`,
+        cancel_url: `${SITE}/api/plan?action=callback&r=cancel`,
+        webhook_url: `${SITE}/api/plan?action=callback&r=ipn`,
       }),
     });
     const j = await r.json().catch(() => ({}));

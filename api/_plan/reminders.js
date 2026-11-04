@@ -1,13 +1,13 @@
-// Vercel serverless function, meant to run once a day (Vercel Cron): emails shop owners whose paid plan ends within
+// /api/plan?action=reminders (see api/plan.js), meant to run once a day (Vercel Cron): emails shop owners whose paid plan ends within
 // reminderDays (settings/plans), and once more when it has ended, with a "Renew" link. Each email is sent once per
 // plan end date (remindedBefore / remindedExpired on subscriptions/{uid}).
 //
 // Environment variables: CRON_SECRET (Vercel sends it as "Authorization: Bearer <CRON_SECRET>" to cron jobs),
 // RESEND_API_KEY + MAIL_FROM (email), FIREBASE_SERVICE_ACCOUNT
-import { PROJECT, SITE, FS, accessToken, val } from './_sslc.js';
-import { emailOwners } from './_owners.js';
-import { readPlans } from './_plans.js';
-import { toMillis, planPrice } from '../src/data/priceCheck.js';
+import { PROJECT, SITE, FS, accessToken, val } from '../_sslc.js';
+import { emailOwners } from '../_owners.js';
+import { readPlans } from '../_plans.js';
+import { toMillis, planPrice } from '../../src/data/priceCheck.js';
 
 export const config = { maxDuration: 60 };
 

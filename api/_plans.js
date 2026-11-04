@@ -1,7 +1,7 @@
 // Shared helpers for the shop plan (subscription) payment. Files starting with "_" are not public endpoints.
 //
 // The price ALWAYS comes from settings/plans on the server, never from the browser. subscriptions/{uid} is written only
-// here (service account), and every UddoktaPay invoice can extend a plan only once (subscriptionPayments/{invoiceId}).
+// here (service account, api/plan.js), and every UddoktaPay invoice can extend a plan only once (subscriptionPayments/{invoiceId}).
 //
 // UddoktaPay has no recurring / automatic charge API (only create charge, verify, webhook, refund), so a plan is renewed
 // by hand: the shop owner presses "Renew" and pays again. Each payment adds periodDays.

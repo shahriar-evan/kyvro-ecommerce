@@ -109,13 +109,13 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
   useEffect(() => {
     if (isOwner || synced || !shop || !paidUntil || toMillis(shop.paidUntil) === paidUntil || !auth.currentUser) return;
     setSynced(true);
-    auth.currentUser.getIdToken().then((t) => fetch('/api/plan-sync', { method: 'POST', headers: { Authorization: `Bearer ${t}` } })).catch(() => {});
+    auth.currentUser.getIdToken().then((t) => fetch('/api/plan?action=sync', { method: 'POST', headers: { Authorization: `Bearer ${t}` } })).catch(() => {});
   }, [isOwner, synced, shop, paidUntil]);
   const buyPlan = async () => {
     setMsg(null); setPaying(true);
     try {
       const t = await auth.currentUser.getIdToken();
-      const r = await fetch('/api/plan-init', { method: 'POST', headers: { Authorization: `Bearer ${t}` } });
+      const r = await fetch('/api/plan?action=init', { method: 'POST', headers: { Authorization: `Bearer ${t}` } });
       const j = await r.json().catch(() => ({}));
       if (j.url) { window.location.href = j.url; return; }
       setMsg({ type: 'err', text: j.error || 'The payment page could not be opened. Please try again.' });

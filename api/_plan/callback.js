@@ -1,8 +1,8 @@
-// Vercel serverless function: UddoktaPay sends the browser back here after a shop plan payment (?invoice_id=...)
+// /api/plan?action=callback (see api/plan.js): UddoktaPay sends the browser back here after a shop plan payment (?invoice_id=...)
 // and also calls it as a webhook (?r=ipn). The plan is only extended after UddoktaPay's verify API confirms the payment.
-import { SITE } from './_sslc.js';
-import { uddoktaConfigured } from './_uddokta.js';
-import { confirmPlanPayment } from './_plans.js';
+import { SITE } from '../_sslc.js';
+import { uddoktaConfigured } from '../_uddokta.js';
+import { confirmPlanPayment } from '../_plans.js';
 
 export const config = { maxDuration: 30 };
 
