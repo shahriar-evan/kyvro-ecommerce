@@ -222,7 +222,10 @@ service cloud.firestore {
     }
     function shopSizeOk() {
       let n = request.resource.data.items.size();
-      return !plansOn() || n <= (hasPaid() ? 300 : freeLimit()) || n <= resource.data.items.size();
+      // the Owner / a Manager can switch "All products" on or off for a shop (features.allProducts)
+      let f = resource.data.get('features', {});
+      let all = ('allProducts' in f) ? f.allProducts == true : hasPaid();
+      return !plansOn() || n <= (all ? 300 : freeLimit()) || n <= resource.data.items.size();
     }
 
     // ---- Public sellers ("Sell on Kyvro"): any signed-in customer who is NOT on the team can open ONE shop ----
@@ -233,6 +236,50 @@ service cloud.firestore {
     function blockedRe() { return exists(sellerRulesPath()) ? get(sellerRulesPath()).data.get('blockedRegex', '.*(kyvro|official|admin|owner|support).*') : '.*(kyvro|official|admin|owner|support).*'; }
     function sellerNameOk(name, slug) { return !name.lower().matches(blockedRe()) && !slug.matches(blockedRe()); }
     function sellerPath(uid) { return /databases/$(database)/documents/sellers/$(uid); }
+
+    // Pro / Premium shop extras, shown on the storefront. Allowed only while the shop's paid plan runs; tier and paidUntil
+    // on the shop are written by the server only, so a client cannot fake them.
+    //   Pro + Premium: tagline (80), contactUrl (WhatsApp number or https link), about (300),
+    //                  socialLinks {facebook, instagram, tiktok, youtube} (https links only)
+    //   Premium only : brandColor (one of the presets), announcement (100), pinnedItems (up to 3 product ids)
+    // Every link must start with https:// (so javascript: and data: links are impossible).
+    function shopPaidNow() {
+      return resource.data.get('tier', '') in ['pro', 'premium'] && resource.data.get('paidUntil', null) is timestamp && resource.data.paidUntil > request.time;
+    }
+    function shopPremiumNow() { return shopPaidNow() && resource.data.tier == 'premium'; }
+    // a feature of the shop right now: the Owner's / a Manager's override (features.<key>), else the tier's default
+    function featOn(k, onPro) {
+      let f = resource.data.get('features', {});
+      return (k in f) ? f[k] == true : (shopPremiumNow() || (onPro && shopPaidNow()));
+    }
+    function httpsOk(v) { return v is string && v.size() <= 200 && (v == '' || v.matches('^https://[^ <>"]+$')); }
+    function shopExtrasOk() {
+      let d = request.resource.data;
+      let changed = d.diff(resource.data).affectedKeys();
+      return (!changed.hasAny(['tagline', 'contactUrl'])
+          || (featOn('tagline', true)
+              && d.get('tagline', '') is string && d.get('tagline', '').size() <= 80
+              && d.get('contactUrl', '') is string && d.get('contactUrl', '').size() <= 200
+              && (d.get('contactUrl', '') == '' || d.get('contactUrl', '').matches('^(https://[^ <>"]+|[+]?[0-9]{8,15})$'))))
+        && (!changed.hasAny(['about']) || (featOn('about', true) && d.get('about', '') is string && d.get('about', '').size() <= 300))
+        && (!changed.hasAny(['socialLinks'])
+          || (featOn('social', true)
+              && d.get('socialLinks', {}) is map && d.get('socialLinks', {}).keys().hasOnly(['facebook', 'instagram', 'tiktok', 'youtube'])
+              && httpsOk(d.get('socialLinks', {}).get('facebook', '')) && httpsOk(d.get('socialLinks', {}).get('instagram', ''))
+              && httpsOk(d.get('socialLinks', {}).get('tiktok', '')) && httpsOk(d.get('socialLinks', {}).get('youtube', ''))))
+        && (!changed.hasAny(['brandColor']) || (featOn('brandColor', false) && d.get('brandColor', '') in ['', 'gold', 'blue', 'green', 'red', 'purple', 'teal']))
+        && (!changed.hasAny(['announcement']) || (featOn('announcement', false) && d.get('announcement', '') is string && d.get('announcement', '').size() <= 100))
+        && (!changed.hasAny(['pinnedItems']) || (featOn('pinned', false) && d.get('pinnedItems', []) is list && d.get('pinnedItems', []).size() <= 3))
+        // logo: a Pro shop may ask for permission; with the logo feature on, upload one that waits for approval
+        && (!changed.hasAny(['logoRequest'])
+          || (!('logoRequest' in d) || (shopPaidNow() && !featOn('logo', false) && d.logoRequest is map && d.logoRequest.keys().hasOnly(['at']) && d.logoRequest.at is string && d.logoRequest.at.size() <= 40)))
+        && (!changed.hasAny(['logoPending', 'logoPendingAt', 'logoReject'])
+          || (featOn('logo', false)
+              && !('logoReject' in d)
+              && d.get('logoPending', '') is string && d.get('logoPending', '').size() <= 200000
+              && (d.get('logoPending', '') == '' || d.get('logoPending', '').matches('^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$'))
+              && d.get('logoPendingAt', '') is string && d.get('logoPendingAt', '').size() <= 40));
+    }
 
     // Team shops (kyvro.store/?shop=name). Everyone can read a shop (customers open the link).
     // A Manager (or the Owner) creates a shop that is live at once. An Admin with "Shop create" ON can create one too,
@@ -263,17 +310,28 @@ service cloud.firestore {
       allow update: if request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 60
         && request.resource.data.items is map && request.resource.data.items.size() <= 300
         // the Owner: everything, also the seller kill switch (killed: the seller can never switch the shop on again)
-        && ((isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'active', 'status', 'updatedAt', 'planExempt', 'killed', 'killNote'])
+        && ((isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'active', 'status', 'updatedAt', 'planExempt', 'killed', 'killNote', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'features', 'logo', 'logoPending', 'logoPendingAt', 'logoReject', 'logoRequest'])
                 && request.resource.data.get('status', 'approved') in ['pending', 'approved'])
             || ((isManager() || canShopNow())
                 && resource.data.ownerUid == request.auth.uid
-                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt'])
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'logoRequest', 'logoPending', 'logoPendingAt', 'logoReject'])
+                && shopExtrasOk()
                 && shopSizeOk())
+            // a Manager (Plan Members): feature ON / OFF, logo grant / approve / reject and shop ON / OFF on other people's
+            // shops. Not their own shop (no self-upgrade), and never switching on a killed or a waiting (pending) shop.
+            || (isManager() && resource.data.ownerUid != request.auth.uid
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['features', 'logo', 'logoPending', 'logoPendingAt', 'logoReject', 'logoRequest', 'active', 'updatedAt'])
+                && request.resource.data.get('features', {}) is map && request.resource.data.get('features', {}).keys().hasOnly(['allProducts', 'priorityApproval', 'tagline', 'social', 'about', 'shareKit', 'brandColor', 'announcement', 'pinned', 'verified', 'weeklyPayout', 'prioritySupport', 'logo'])
+                && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['logo'])
+                    || request.resource.data.get('logo', '') == '' || request.resource.data.get('logo', '') == resource.data.get('logoPending', ''))
+                && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['active'])
+                    || (resource.data.get('killed', false) != true && resource.data.get('status', 'approved') == 'approved')))
             // a public seller: only their own shop's name and products, not after the Owner switched it off for good
             || (signedIn() && !isStaff() && resource.data.get('kind', '') == 'seller'
                 && resource.data.ownerUid == request.auth.uid
                 && resource.data.get('killed', false) != true
-                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt'])
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'logoRequest', 'logoPending', 'logoPendingAt', 'logoReject'])
+                && shopExtrasOk()
                 && shopSizeOk()
                 && sellerNameOk(request.resource.data.name, slug)));
       // the Owner deletes a shop (also what "Reject" does with a request)
@@ -377,6 +435,11 @@ service cloud.firestore {
     // Store settings (top banner text + automatic discount rules). Everyone can read them (the website needs
     // them), only the Owner can change them. maxPercent / maxFixed are the highest discounts among the rules.
     match /settings/{docId} {
+      function tierOk(t) {
+        return t is map && t.keys().hasOnly(['price', 'discount'])
+          && t.price is number && t.price >= 1 && t.price <= 1000000
+          && t.discount is number && t.discount >= 0 && t.discount <= 90;
+      }
       allow read: if true;
       // Public sellers: open (new sellers allowed) and the blocked shop names (Owner only)
       allow create, update: if docId == 'sellerRules' && isOwner()
@@ -386,10 +449,12 @@ service cloud.firestore {
         && request.resource.data.blockedRegex is string && request.resource.data.blockedRegex.size() <= 3000;
       // Shop plans (Free limit, paid price, period, reminder days). Only the Owner. Must match normalizePlans() in src/data/priceCheck.js
       allow create, update: if docId == 'plans' && isOwner()
-        && request.resource.data.keys().hasOnly(['enabled', 'originalPrice', 'discountPercent', 'freeLimit', 'periodDays', 'reminderDays', 'updatedAt', 'updatedByName'])
+        && request.resource.data.keys().hasOnly(['enabled', 'originalPrice', 'discountPercent', 'freeLimit', 'periodDays', 'reminderDays', 'pro', 'premium', 'supportWhatsapp', 'updatedAt', 'updatedByName'])
         && request.resource.data.enabled is bool
-        && request.resource.data.originalPrice is number && request.resource.data.originalPrice >= 1 && request.resource.data.originalPrice <= 1000000
-        && request.resource.data.discountPercent is number && request.resource.data.discountPercent >= 0 && request.resource.data.discountPercent <= 90
+        // Pro and Premium: price and discount % each (originalPrice / discountPercent are the old single paid plan = Pro)
+        && tierOk(request.resource.data.pro) && tierOk(request.resource.data.premium)
+        && request.resource.data.get('originalPrice', 1) is number && request.resource.data.get('discountPercent', 0) is number
+        && request.resource.data.get('supportWhatsapp', '') is string && request.resource.data.get('supportWhatsapp', '').size() <= 20
         && request.resource.data.freeLimit is int && request.resource.data.freeLimit >= 1 && request.resource.data.freeLimit <= 300
         && request.resource.data.periodDays is int && request.resource.data.periodDays >= 1 && request.resource.data.periodDays <= 366
         && request.resource.data.reminderDays is int && request.resource.data.reminderDays >= 0 && request.resource.data.reminderDays <= 30;

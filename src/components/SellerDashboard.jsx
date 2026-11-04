@@ -7,7 +7,13 @@ import { getAdminStatus } from '../adminAuth';
 import { isOwnerEmail } from '../adminEmails';
 import { SHOP_COLLECTIONS, productInCollection } from '../data/shopConfig';
 import { watchPlans } from '../storeSettings';
-import { normalizePlans, planPrice } from '../data/priceCheck';
+import { normalizePlans, effectiveTier, TIER_LABEL } from '../data/priceCheck';
+import PlanCards from './PlanCards';
+import { PlanCompare, PlanFaq } from './PlanCompareFaq';
+import { PLAN_TEXT, BN_FONT } from '../data/planText';
+import { watchMySubscription } from '../storeSettings';
+import { watchShop } from '../shops';
+import { effectiveFeatures } from '../data/shopBrand';
 
 // "Sell on Kyvro": a signed-in customer's own shop. The shop editor is the same as the team's (My Shop, plan,
 // markup cap). Earnings come from the server without any customer details; payouts are what the Owner already paid.
@@ -27,17 +33,28 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
   useEffect(() => watchSellerRules(setRules), []);
   // first the plan page (Free / Paid), then the form. The plan is only a choice here: a Paid seller pays after approval.
   const [plan, setPlan] = useState('');
+  // plan page language: remembered on this device; first time, Bangla when the browser is in Bangla
+  const [lang, setLangState] = useState(() => {
+    try { const v = localStorage.getItem('kyvro_plan_lang'); if (v === 'en' || v === 'bn') return v; } catch (e) { /* no storage */ }
+    return /^bn/i.test((typeof navigator !== 'undefined' && navigator.language) || '') ? 'bn' : 'en';
+  });
+  const setLang = (v) => { setLangState(v); try { localStorage.setItem('kyvro_plan_lang', v); } catch (e) { /* no storage */ } };
   const [plans, setPlans] = useState(() => normalizePlans(null));
   useEffect(() => watchPlans(setPlans), []);
   // the store's categories the seller wants to sell (saved as text in productNote; products are picked later in My Shop)
   const [cats, setCats] = useState([]);
   const [catMsg, setCatMsg] = useState(null);
+  // my plan (for the Premium priority support link)
+  const [mySub, setMySub] = useState(null);
   const catList = SHOP_COLLECTIONS.filter((c) => products.some((p) => (p.status || 'approved') === 'approved' && productInCollection(p, c.name)));
   const catLabels = (catList.length ? catList : SHOP_COLLECTIONS).map((c) => c.label);
   const uid = customerUser ? customerUser.uid : '';
   const email = customerUser && customerUser.email ? customerUser.email.toLowerCase() : '';
 
   useEffect(() => watchMySeller(uid, setSeller), [uid]);
+  useEffect(() => watchMySubscription(uid, setMySub), [uid]);
+  const [myShop, setMyShop] = useState(null);
+  useEffect(() => (seller && seller.slug ? watchShop(seller.slug, setMyShop, () => setMyShop(null)) : undefined), [seller && seller.slug]); // eslint-disable-line react-hooks/exhaustive-deps
   // a team member (Owner / Manager / Admin) signed in with their team email cannot become a seller
   const [teamMember, setTeamMember] = useState(false);
   useEffect(() => {
@@ -96,7 +113,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
     if (!cats.length) return setFormMsg('Tick at least one category you want to sell.');
     if (!f.agreed) return setFormMsg('Please tick the box to confirm you are an independent seller.');
     setApplying(true);
-    try { await applyAsSeller({ uid, email, shopName: f.shopName, details: { ...f, categories: cats, productNote: plan === 'paid' ? 'Chose the Paid plan' : '' } }); }
+    try { await applyAsSeller({ uid, email, shopName: f.shopName, details: { ...f, categories: cats, productNote: plan === 'pro' || plan === 'premium' ? `Chose the ${TIER_LABEL[plan]} plan` : '' } }); }
     catch (e) { setFormMsg(e.code === 'permission-denied' ? 'Could not send the application. You may already have a shop, the name may not be allowed, or new sellers are paused.' : e.message); }
     setApplying(false);
   };
@@ -135,37 +152,23 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
 
   // ---- never applied: choose a plan first (like a pricing page) ----
   if (!seller && !plan) {
-    const price = planPrice(plans);
-    const tick = (t) => <li key={t} className="flex items-start gap-2"><span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#D4AF37] text-black text-[10px] font-bold">✓</span><span>{t}</span></li>;
-    const freeFeatures = [`${plans.freeLimit} products`, 'Your own shop link', 'Earn markup on every delivered order', 'Kyvro handles payment and delivery'];
+    const T = PLAN_TEXT[lang];
     return (
-      <div className="space-y-6">
-        <div className="text-center">
-          <h3 className="text-2xl sm:text-3xl font-bold">Start your own business with <span className="text-[#D4AF37]">Kyvro</span></h3>
-          <p className="text-sm text-gray-500 mt-2">No investment. Pick Kyvro products, set your price, earn the markup. Choose a plan to apply.</p>
-        </div>
-        <div className="grid md:grid-cols-2 gap-5 max-w-4xl mx-auto">
-          <div className={`rounded-2xl border p-6 sm:p-8 flex flex-col ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
-            <p className="text-xl font-bold">Free</p>
-            <p className="text-xs text-gray-500 mt-1">Start selling today.</p>
-            <p className="mt-5"><span className="text-4xl font-bold">{formatPrice(0)}</span></p>
-            <button type="button" onClick={() => setPlan('free')} className="mt-6 w-full py-3 rounded-full border-2 border-[#D4AF37] text-[#D4AF37] font-bold text-xs uppercase tracking-widest hover:bg-[#D4AF37] hover:text-black transition">Get started</button>
-            <ul className={`mt-6 pt-6 border-t space-y-3 text-sm ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>{freeFeatures.map(tick)}</ul>
-          </div>
-          <div className="relative rounded-2xl border-2 border-[#D4AF37] p-6 sm:p-8 flex flex-col bg-[#0d0d0d] text-white shadow-[0_0_40px_-12px_rgba(212,175,55,0.6)]">
-            <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-[#D4AF37] text-black text-[10px] font-bold uppercase tracking-widest">Most popular</span>
-            <p className="text-xl font-bold text-[#D4AF37]">Paid</p>
-            <p className="text-xs text-gray-400 mt-1">For growing sellers.</p>
-            <p className="mt-5 flex flex-wrap items-center gap-2">
-              {plans.discountPercent > 0 && <span className="text-lg text-gray-500 line-through">{formatPrice(plans.originalPrice)}</span>}
-              <span className="text-4xl font-bold">{formatPrice(price)}</span>
-              {plans.discountPercent > 0 && <span className="px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold">{plans.discountPercent}% OFF</span>}
-            </p>
-            <p className="text-xs text-gray-400 mt-1">per {plans.periodDays} days</p>
-            <button type="button" onClick={() => setPlan('paid')} className="mt-6 w-full py-3 rounded-full bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold text-xs uppercase tracking-widest shadow hover:opacity-90 transition">Get started</button>
-            <ul className="mt-6 pt-6 border-t border-gray-800 space-y-3 text-sm">{['All products', ...freeFeatures.slice(1), 'Priority approval'].map(tick)}</ul>
+      <div className="space-y-12" lang={lang} style={lang === 'bn' ? { fontFamily: BN_FONT, lineHeight: 1.7 } : undefined}>
+        <div className="flex justify-end">
+          <div className={`inline-flex rounded-full border p-0.5 text-xs font-semibold ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`} role="group" aria-label="Language">
+            {[['en', 'EN'], ['bn', 'বাংলা']].map(([k, l]) => (
+              <button key={k} type="button" aria-pressed={lang === k} onClick={() => setLang(k)} className={`px-3 py-1 rounded-full transition ${lang === k ? 'bg-[#D4AF37] text-black' : 'text-gray-500'}`}>{l}</button>
+            ))}
           </div>
         </div>
+        <div className="text-center -mt-8">
+          <h3 className="text-2xl sm:text-3xl font-bold">{T.heading} <span className="text-[#D4AF37]">{T.headingBrand}</span>{T.headingEnd}</h3>
+          <p className="text-sm text-gray-500 mt-2">{T.subtitle}</p>
+        </div>
+        <PlanCards plans={plans} formatPrice={formatPrice} isDarkMode={isDarkMode} mode="apply" onChoose={setPlan} lang={lang} />
+        <PlanCompare lang={lang} isDarkMode={isDarkMode} freeLimit={plans.freeLimit} />
+        <PlanFaq lang={lang} isDarkMode={isDarkMode} />
       </div>
     );
   }
@@ -184,11 +187,11 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
         )}
         {!seller && (
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-            <span>Plan: <strong className="text-[#D4AF37]">{plan === 'paid' ? 'Paid' : 'Free'}</strong></span>
+            <span>Plan: <strong className="text-[#D4AF37]">{TIER_LABEL[plan] || 'Free'}</strong></span>
             <button type="button" onClick={() => setPlan('')} className="underline text-gray-500">Change plan</button>
           </div>
         )}
-        {plan === 'paid' && !seller && <p className="text-xs p-3 rounded border border-[#D4AF37]/50 text-[#D4AF37] bg-[#D4AF37]/10 font-semibold">Paid plan: you pay after your shop is approved (Sell on Kyvro → Upgrade). Until then your shop is on the Free plan.</p>}
+        {(plan === 'pro' || plan === 'premium') && !seller && <p className="text-xs p-3 rounded border border-[#D4AF37]/50 text-[#D4AF37] bg-[#D4AF37]/10 font-semibold">{TIER_LABEL[plan]} plan: you pay after your shop is approved (Sell on Kyvro → plan card). Until then your shop is on the Free plan.</p>}
         <p className="text-xs text-gray-500">Open your own shop link with Kyvro products, set your price (within the limit) and earn the markup on delivered orders. Kyvro takes the payment and delivers every order. Your shop goes live after Kyvro approves your application. We never ask for NID, passport or bank details.</p>
         <div className="grid sm:grid-cols-2 gap-3">
           {field('shopName', 'Shop name *', { maxLength: 60, placeholder: 'e.g. Rahim Fashion' })}
@@ -274,6 +277,16 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
               </div>
             ))}
           </div>
+
+          {effectiveFeatures(myShop, myShop ? effectiveTier(myShop) : effectiveTier(mySub)).prioritySupport && (
+            <div className={`${card} border-[#D4AF37]/60`}>
+              <h3 className="text-lg font-bold flex items-center gap-2">Priority support <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#D4AF37] text-black font-bold uppercase">Premium</span></h3>
+              {plans.supportWhatsapp
+                ? <a href={`https://wa.me/${plans.supportWhatsapp.replace(/^\+/, '').replace(/^0/, '880')}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-green-600 text-white font-bold px-5 py-2 rounded text-xs uppercase tracking-wider">Chat on WhatsApp</a>
+                : <p className="text-xs text-gray-500">Email kyvrofashion@gmail.com and write "Premium" in the subject.</p>}
+              <p className="text-[11px] text-gray-500">Premium sellers get a weekly payout and are answered first.</p>
+            </div>
+          )}
 
           <div className={card}>
             <h3 className="text-lg font-bold">Payout</h3>

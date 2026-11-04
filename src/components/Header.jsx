@@ -3,7 +3,7 @@ import { ShoppingBag, Search, User, Menu, Sun, Moon, Truck } from 'lucide-react'
 import logoImg from '../assets/logo.png';
 import { CURRENCIES } from '../data/currencies';
 
-export default function Header({ onStartSelling, cart, curr, currencyKey, currentView, isDarkMode, setCurrencyKey, setCurrentView, setIsCartOpen, setIsDarkMode, setIsMobileMenuOpen, setSelectedCategory, navHas = () => true, customerUser, displayName, photoURL, goAccount, onSignIn, onSignOut }) {
+export default function Header({ shopBrand = null, onStartSelling, cart, curr, currencyKey, currentView, isDarkMode, setCurrencyKey, setCurrentView, setIsCartOpen, setIsDarkMode, setIsMobileMenuOpen, setSelectedCategory, navHas = () => true, customerUser, displayName, photoURL, goAccount, onSignIn, onSignOut }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
@@ -35,11 +35,20 @@ export default function Header({ onStartSelling, cart, curr, currencyKey, curren
               onClick={() => { setCurrentView('home'); setSelectedCategory('All'); }}
               className="cursor-pointer flex items-center gap-2 sm:gap-3"
             >
-              <img src={logoImg} alt="Kyvro Logo" className="h-8 sm:h-10 w-auto object-contain" />
-              <div className="flex flex-col items-start">
-                <span className={`text-lg sm:text-2xl font-serif font-bold tracking-widest ${isDarkMode ? 'text-white' : 'text-black'}`}>KYVRO</span>
-                <span className={`hidden sm:block text-[9px] tracking-[0.3em] font-sans -mt-1 ${isDarkMode ? 'text-[#D4AF37]' : 'text-black font-semibold'}`}>কাইভ্রো &bull; WEAR YOUR STORY</span>
-              </div>
+              {/* the Kyvro logo is always there; a Premium shop shows its own name as a wordmark next to it */}
+              {shopBrand && shopBrand.logo && <img src={shopBrand.logo} alt="" className="h-9 w-9 sm:h-11 sm:w-11 rounded object-cover border border-gray-300/40" />}
+              <img src={logoImg} alt="Kyvro Logo" className={`${shopBrand && shopBrand.wordmark ? 'h-6 sm:h-7' : 'h-8 sm:h-10'} w-auto object-contain`} />
+              {shopBrand && shopBrand.wordmark ? (
+                <div className="flex flex-col items-start min-w-0">
+                  <span className="text-lg sm:text-2xl font-serif font-bold tracking-wide truncate max-w-[9rem] sm:max-w-[16rem]" style={{ color: shopBrand.color }}>{shopBrand.name}</span>
+                  <span className="text-[9px] tracking-[0.2em] font-sans -mt-0.5 text-gray-500">POWERED BY KYVRO</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-start">
+                  <span className={`text-lg sm:text-2xl font-serif font-bold tracking-widest ${isDarkMode ? 'text-white' : 'text-black'}`}>KYVRO</span>
+                  <span className={`hidden sm:block text-[9px] tracking-[0.3em] font-sans -mt-1 ${isDarkMode ? 'text-[#D4AF37]' : 'text-black font-semibold'}`}>{shopBrand ? 'POWERED BY KYVRO' : <>কাইভ্রো &bull; WEAR YOUR STORY</>}</span>
+                </div>
+              )}
             </div>
           </div>
 

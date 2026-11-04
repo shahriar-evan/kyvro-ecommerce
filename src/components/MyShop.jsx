@@ -5,7 +5,10 @@ import { askConfirm } from './AlertCenter';
 import { maxMarkupFor, shopPriceClamp, SHOP_COLLECTIONS, productInCollection } from '../data/shopConfig';
 import { flatSubCategories, subLabel } from '../data/catalog';
 import { watchPlans, watchMySubscription } from '../storeSettings';
-import { normalizePlans, planPrice, toMillis, SHOP_MAX_ITEMS } from '../data/priceCheck';
+import { normalizePlans, toMillis, SHOP_MAX_ITEMS, effectiveTier, TIER_LABEL } from '../data/priceCheck';
+import PlanCards from './PlanCards';
+import ShopExtrasEditor from './ShopExtrasEditor';
+import { shopExtrasOf, httpsLinkOk, contactOk, cleanContact, effectiveFeatures, FEATURES } from '../data/shopBrand';
 import { watchSellerRules, sellerNameBlocked } from '../sellers';
 
 const shopUrl = (slug) => `${window.location.origin}/?shop=${slug}`;
@@ -47,7 +50,9 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   const [openCat, setOpenCat] = useState(''); // the one category that is open in the product picker
   const [plans, setPlans] = useState(() => normalizePlans(null));
   const [sub, setSub] = useState(null); // my plan (subscriptions/{uid}), written only by the server
-  const [paying, setPaying] = useState(false);
+  const [paying, setPaying] = useState(''); // the tier whose payment page is opening
+  // Pro / Premium shop extras shown on the storefront
+  const [extras, setExtras] = useState(() => shopExtrasOf(null));
   // public seller ("Sell on Kyvro"): blocked shop names (the application itself is in SellerDashboard)
   const [sellerRules, setSellerRules] = useState(null);
   useEffect(() => (sellerMode ? watchSellerRules(setSellerRules) : undefined), [sellerMode]);
@@ -78,7 +83,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   const [loadedFor, setLoadedFor] = useState('');
   useEffect(() => {
     if (shop && loadedFor !== shop.slug) {
-      setDraft(draftFrom(shop)); setName(shop.name || ''); setLoadedFor(shop.slug);
+      setDraft(draftFrom(shop)); setName(shop.name || ''); setExtras(shopExtrasOf(shop)); setLoadedFor(shop.slug);
     }
   }, [shop, loadedFor]);
 
@@ -86,6 +91,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   const savedItems = (shop && shop.items) || {};
   const dirty = !!shop && (
     name !== (shop.name || '')
+    || JSON.stringify(extras) !== JSON.stringify(shopExtrasOf(shop))
     || Object.keys(draft).length !== Object.keys(savedItems).length
     || Object.entries(draft).some(([id, v]) => savedItems[id] === undefined || Number(v) !== Number(savedItems[id]))
   );
@@ -102,7 +108,14 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   // ---- shop plan: Free = plans.freeLimit products, Paid = all (the Owner has no limit; also checked in firestore.rules) ----
   const paidUntil = toMillis(sub && sub.paidUntil);
   const paid = paidUntil > Date.now();
-  const planLimit = isOwner || !plans.enabled || paid ? SHOP_MAX_ITEMS : plans.freeLimit;
+  const tier = isOwner ? 'premium' : effectiveTier(sub); // free / pro / premium right now
+  // shop page extras: Pro / Premium (tagline, contact, about, social links, share kit), Premium only (brand color,
+  // announcement, pinned products). The rules check the tier the server wrote on the shop.
+  const feat = isOwner ? Object.fromEntries(FEATURES.map((f) => [f.key, true])) : effectiveFeatures(shop, shop ? effectiveTier(shop) : 'free');
+  const extrasAllowed = feat.tagline || feat.about || feat.social || feat.shareKit;
+  // "All products": the paid plan, or the Owner's / a Manager's override for this shop
+  const allOverride = shop && shop.features && typeof shop.features.allProducts === 'boolean' ? shop.features.allProducts : null;
+  const planLimit = isOwner || !plans.enabled || (allOverride === null ? paid : allOverride) ? SHOP_MAX_ITEMS : plans.freeLimit;
   // a shop whose plan ran out may keep (or reduce) what it already has, but not add more
   const cap = Math.max(planLimit, Object.keys(savedItems).length);
   const daysLeft = paidUntil ? Math.ceil((paidUntil - Date.now()) / 86400000) : null;
@@ -111,20 +124,21 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   // the plan end date is copied onto the shop for the storefront; a shop made after paying gets it here
   const [synced, setSynced] = useState(false);
   useEffect(() => {
-    if (isOwner || synced || !shop || !paidUntil || toMillis(shop.paidUntil) === paidUntil || !auth.currentUser) return;
+    if (isOwner || synced || !shop || !paidUntil || (toMillis(shop.paidUntil) === paidUntil && (shop.tier || 'pro') === (sub.tier || 'pro')) || !auth.currentUser) return;
     setSynced(true);
     auth.currentUser.getIdToken().then((t) => fetch('/api/plan?action=sync', { method: 'POST', headers: { Authorization: `Bearer ${t}` } })).catch(() => {});
   }, [isOwner, synced, shop, paidUntil]);
-  const buyPlan = async () => {
-    setMsg(null); setPaying(true);
+  const buyPlan = async (want) => {
+    const buy = want === 'premium' ? 'premium' : 'pro';
+    setMsg(null); setPaying(buy);
     try {
       const t = await auth.currentUser.getIdToken();
-      const r = await fetch('/api/plan?action=init', { method: 'POST', headers: { Authorization: `Bearer ${t}` } });
+      const r = await fetch('/api/plan?action=init', { method: 'POST', headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ tier: buy }) });
       const j = await r.json().catch(() => ({}));
       if (j.url) { window.location.href = j.url; return; }
       setMsg({ type: 'err', text: j.error || 'The payment page could not be opened. Please try again.' });
     } catch (err) { setMsg({ type: 'err', text: 'The payment page could not be opened. Please try again.' }); }
-    setPaying(false);
+    setPaying('');
   };
 
   const live = useMemo(() => products.filter((p) => (p.status || 'approved') === 'approved'), [products]);
@@ -186,10 +200,24 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
       items[String(p.id)] = shopPriceClamp(p.price, w);
     }
     if (Object.keys(items).length > cap) { limitMsg(); return; }
+    const ex = { ...extras, contactUrl: cleanContact(extras.contactUrl), tagline: extras.tagline.trim().slice(0, 80), about: extras.about.trim().slice(0, 300), announcement: extras.announcement.trim().slice(0, 100),
+      socialLinks: Object.fromEntries(Object.entries(extras.socialLinks).map(([k, v]) => [k, String(v || '').trim()])),
+      pinnedItems: extras.pinnedItems.filter((id) => items[id] !== undefined).slice(0, 3) };
+    if (extrasAllowed) {
+      if (!contactOk(ex.contactUrl)) { setMsg({ type: 'err', text: 'Contact: a WhatsApp number (e.g. 01712345678) or a link starting with https://' }); return; }
+      const badSocial = Object.entries(ex.socialLinks).find(([, v]) => !httpsLinkOk(v));
+      if (badSocial) { setMsg({ type: 'err', text: `${badSocial[0]}: the link must start with https://` }); return; }
+    }
     if (sellerMode) { const bad = sellerNameBlocked(name, shop.slug, sellerRules); if (bad) { setMsg({ type: 'err', text: `The shop name cannot contain "${bad}".` }); return; } }
     setBusy(true);
     try {
-      await saveShopItems(shop.slug, name, items, isOwner ? { planExempt: true } : {});
+      // only the extras this plan may change (the rules refuse the others)
+      const before = shopExtrasOf(shop);
+      const FIELD_FEATURE = { tagline: 'tagline', contactUrl: 'tagline', about: 'about', socialLinks: 'social', brandColor: 'brandColor', announcement: 'announcement', pinnedItems: 'pinned' };
+      const keys = Object.keys(FIELD_FEATURE).filter((k) => feat[FIELD_FEATURE[k]]);
+      const changes = Object.fromEntries(keys.filter((k) => JSON.stringify(ex[k]) !== JSON.stringify(before[k])).map((k) => [k, ex[k]]));
+      await saveShopItems(shop.slug, name, items, { ...(isOwner ? { planExempt: true } : {}), ...changes });
+      setExtras(ex);
       setDraft(draftFrom({ items })); // what was really saved (products no longer for sale drop out)
       setMsg({ type: 'ok', text: 'Saved. Your shop link now shows these products and prices.' });
     }
@@ -198,7 +226,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   };
   const discard = async () => {
     if (!(await askConfirm('Discard your unsaved changes?', { danger: true, confirmText: 'Discard' }))) return;
-    setDraft(draftFrom(shop)); setName(shop.name || ''); setMsg(null);
+    setDraft(draftFrom(shop)); setName(shop.name || ''); setExtras(shopExtrasOf(shop)); setMsg(null);
   };
 
   const copy = async (text) => { try { await navigator.clipboard.writeText(text); setMsg({ type: 'ok', text: 'Link copied.' }); } catch { setMsg({ type: 'err', text: 'Could not copy. Select the link and copy it.' }); } };
@@ -325,6 +353,8 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
         <label className="block text-xs font-semibold text-gray-500">Shop name
           <input className={`${inputCls} block mt-1 w-full sm:w-72`} maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
         </label>
+        <ShopExtrasEditor extras={extras} setExtras={setExtras} feat={feat} shop={shop} tier={isOwner ? 'premium' : effectiveTier(shop)} shopName={name} link={link}
+          pinChoices={live.filter((p) => draft[p.id] !== undefined)} isDarkMode={isDarkMode} inputCls={inputCls} />
         <p className="text-[11px] text-gray-500">Customers who open your link see only the products you tick below, at the price you type. The price can be higher than the store price by the limit shown for each product. Everything above the store price is yours when the order is delivered. Payments and delivery stay with the store.</p>
       </div>
 
@@ -334,26 +364,18 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
           {paidUntil > 0 && (daysLeft <= 0 || daysLeft <= plans.reminderDays) && (
             <div className={`rounded border p-3 text-xs flex flex-wrap items-center justify-between gap-2 ${daysLeft <= 0 ? 'border-red-500/50 bg-red-500/10 text-red-500' : 'border-amber-500/50 bg-amber-500/10 text-amber-600'}`}>
               <span className="font-semibold">{daysLeft <= 0 ? `Your paid plan ended on ${fmtDate(paidUntil)}. Your shop now shows only its ${plans.freeLimit} best sellers; the others are hidden, not deleted.` : `Your paid plan ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'} (${fmtDate(paidUntil)}).`}</span>
-              <button type="button" disabled={paying} onClick={buyPlan} className="px-4 py-1.5 rounded bg-[#D4AF37] text-black font-bold uppercase tracking-wider disabled:opacity-50">{paying ? 'Opening...' : 'Renew'}</button>
+              <button type="button" disabled={!!paying} onClick={() => buyPlan(sub && sub.tier === 'premium' ? 'premium' : 'pro')} className="px-4 py-1.5 rounded bg-[#D4AF37] text-black font-bold uppercase tracking-wider disabled:opacity-50">{paying ? 'Opening...' : 'Renew'}</button>
             </div>
           )}
-          <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
               <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">My plan</p>
-              <p className="text-xl font-bold">{paid ? <span className="text-[#D4AF37]">Paid</span> : 'Free'}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{paid ? `All products · paid until ${fmtDate(paidUntil)}` : `${count} / ${plans.freeLimit} products`}</p>
+              <p className="text-xl font-bold">{tier === 'free' ? 'Free' : <span className="text-[#D4AF37]">{TIER_LABEL[tier]}</span>}</p>
             </div>
-            <div className="text-right">
-              <p className="flex flex-wrap items-center justify-end gap-2">
-                {plans.discountPercent > 0 && <span className="text-sm text-gray-500 line-through">{formatPrice(plans.originalPrice)}</span>}
-                <span className="text-xl font-bold text-[#D4AF37]">{formatPrice(planPrice(plans))}</span>
-                {plans.discountPercent > 0 && <span className="px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold">{plans.discountPercent}% OFF</span>}
-              </p>
-              <p className="text-[11px] text-gray-500">All products for {plans.periodDays} days{paid ? ', added to your current plan' : ''}</p>
-              <button type="button" disabled={paying} onClick={buyPlan} className="mt-2 bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold px-5 py-2 rounded text-xs uppercase tracking-widest shadow disabled:opacity-50">{paying ? 'Opening...' : paid ? 'Renew' : 'Upgrade'}</button>
-            </div>
+            <p className="text-xs text-gray-500">{paid ? `All products · paid until ${fmtDate(paidUntil)}` : `${count} / ${plans.freeLimit} products`}</p>
           </div>
-          <p className="text-[11px] text-gray-500">Payment by bKash / Nagad. There is no automatic monthly charge: press Renew before the end date to keep all products showing.</p>
+          <PlanCards plans={plans} formatPrice={formatPrice} isDarkMode={isDarkMode} mode="upgrade" currentTier={tier} busy={paying} onChoose={(t) => t !== 'free' && buyPlan(t)} />
+          {tier !== 'free' && <p className="text-[11px] text-gray-500 text-center">Renewing or upgrading adds {plans.periodDays} days to your current end date.</p>}
         </div>
       )}
 

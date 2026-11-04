@@ -23,7 +23,6 @@ export default async function handler(req, res) {
     const token = await accessToken();
     const plans = await readPlans(token);
     if (!plans.enabled) return res.status(200).json({ sent: 0, reason: 'plans off' });
-    const price = planPrice(plans);
     const now = Date.now();
     let sent = 0;
     let pageToken = '';
@@ -47,6 +46,7 @@ export default async function handler(req, res) {
         const line = kind === 'before'
           ? `Your paid shop plan ends on <strong>${esc(date)}</strong>. After that your shop shows only its ${plans.freeLimit} best-selling products until you renew.`
           : `Your paid shop plan ended on <strong>${esc(date)}</strong>. Your shop now shows only its ${plans.freeLimit} best-selling products. The others are hidden, not deleted: renew and they come back.`;
+        const price = planPrice(plans, f.tier === 'premium' ? 'premium' : 'pro');
         const hi = f.name ? `Hi ${String(f.name).split(' ')[0]},` : 'Hello,';
         const html = `<!doctype html><html><body style="margin:0;background:#f3f3f3;font-family:Arial,Helvetica,sans-serif;color:#111">
 <div style="max-width:560px;margin:0 auto;background:#fff">
