@@ -54,12 +54,12 @@ async function sellerApplied(req, res) {
   <div style="background:#0b0b0b;padding:20px 24px;color:#D4AF37;font-size:20px;letter-spacing:3px;font-weight:bold">KYVRO</div>
   <div style="padding:24px;font-size:15px;line-height:1.7">
     <p>A new seller applied: <strong>${esc(shopName)}</strong>. The shop stays off until you approve it.</p>
-    <table style="font-size:14px">${row('Name', app.name)}${row('Email', app.email)}${row('WhatsApp', app.whatsapp)}${row('District', app.district)}${row('Area', app.area)}${row('Page', app.pageLink)}${row('Products', app.productNote)}</table>
+    <table style="font-size:14px">${row('Name', app.name)}${row('Email', app.email)}${row('WhatsApp', app.whatsapp)}${row('District', app.district)}${row('Area', app.area)}${row('Page', app.pageLink)}${row('Categories', Array.isArray(app.categories) ? app.categories.join(', ') : '')}${row('Note', app.productNote)}</table>
     <p>Open the Admin Portal, go to <strong>Sellers</strong> and press <strong>Approve</strong> or <strong>Reject</strong>.</p>
     <p><a href="${esc(SITE)}" style="display:inline-block;background:#D4AF37;color:#000;padding:10px 18px;text-decoration:none;font-weight:bold;border-radius:4px">Open Kyvro</a></p>
   </div>
 </div></body></html>`;
-  const plain = `A new seller applied: ${shopName}\nName: ${app.name || ''}\nEmail: ${app.email || ''}\nWhatsApp: ${app.whatsapp || ''}\nDistrict: ${app.district || ''}, ${app.area || ''}\nPage: ${app.pageLink || ''}\nProducts: ${app.productNote || ''}\n\nAdmin Portal -> Sellers -> Approve / Reject.\n${SITE}`;
+  const plain = `A new seller applied: ${shopName}\nName: ${app.name || ''}\nEmail: ${app.email || ''}\nWhatsApp: ${app.whatsapp || ''}\nDistrict: ${app.district || ''}, ${app.area || ''}\nPage: ${app.pageLink || ''}\nCategories: ${Array.isArray(app.categories) ? app.categories.join(', ') : ''}\nNote: ${app.productNote || ''}\n\nAdmin Portal -> Sellers -> Approve / Reject.\n${SITE}`;
   const emailed = await emailOwners(owners, title, html, plain);
   return res.status(200).json({ sent: pushed, emailed });
 }

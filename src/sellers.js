@@ -83,6 +83,7 @@ export async function applyAsSeller({ uid, email, shopName, details }) {
     area: String(details.area || "").trim().slice(0, 60),
     address: String(details.address || "").trim().slice(0, 300),
     pageLink: String(details.pageLink || "").trim().slice(0, 300),
+    categories: (Array.isArray(details.categories) ? details.categories : []).map((c) => String(c).slice(0, 60)).slice(0, 20),
     productNote: String(details.productNote || "").trim().slice(0, 300),
     agreed: details.agreed === true,
     status: "pending",
@@ -117,6 +118,10 @@ export function watchSellerPayouts(onData) {
 export function watchSubscriptions(onData) {
   return onSnapshot(collection(db, "subscriptions"), (snap) => { const m = {}; snap.docs.forEach((d) => { m[d.id] = d.data(); }); onData(m); }, () => onData({}));
 }
+// while the application waits: change the categories I want to sell
+export const updateSellerCategories = (uid, categories) =>
+  updateDoc(doc(db, "sellers", uid), { categories: categories.map((c) => String(c).slice(0, 60)).slice(0, 20) });
+
 // Owner: approve an application (the shop goes live) or reject it (the shop is removed, the seller can apply again)
 export async function approveSeller(seller, staff) {
   const b = writeBatch(db);

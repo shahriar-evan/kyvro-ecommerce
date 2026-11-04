@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import MyShop from './MyShop';
-import { watchMySeller, saveSellerBkash, loadSellerEarnings, applyAsSeller, sellerStatus, normalizeWhatsapp, watchSellerRules, sellerNameBlocked } from '../sellers';
+import { updateSellerCategories, watchMySeller, saveSellerBkash, loadSellerEarnings, applyAsSeller, sellerStatus, normalizeWhatsapp, watchSellerRules, sellerNameBlocked } from '../sellers';
 import { watchPayouts } from '../payouts';
 import { formatDateTime, toDate } from '../utils/dates';
 import { getAdminStatus } from '../adminAuth';
 import { isOwnerEmail } from '../adminEmails';
+import { SHOP_COLLECTIONS, productInCollection } from '../data/shopConfig';
+import { watchPlans } from '../storeSettings';
+import { normalizePlans, planPrice } from '../data/priceCheck';
 
 // "Sell on Kyvro": a signed-in customer's own shop. The shop editor is the same as the team's (My Shop, plan,
 // markup cap). Earnings come from the server without any customer details; payouts are what the Owner already paid.
@@ -22,6 +25,15 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
   const [applying, setApplying] = useState(false);
   const [rules, setRules] = useState(null);
   useEffect(() => watchSellerRules(setRules), []);
+  // first the plan page (Free / Paid), then the form. The plan is only a choice here: a Paid seller pays after approval.
+  const [plan, setPlan] = useState('');
+  const [plans, setPlans] = useState(() => normalizePlans(null));
+  useEffect(() => watchPlans(setPlans), []);
+  // the store's categories the seller wants to sell (saved as text in productNote; products are picked later in My Shop)
+  const [cats, setCats] = useState([]);
+  const [catMsg, setCatMsg] = useState(null);
+  const catList = SHOP_COLLECTIONS.filter((c) => products.some((p) => (p.status || 'approved') === 'approved' && productInCollection(p, c.name)));
+  const catLabels = (catList.length ? catList : SHOP_COLLECTIONS).map((c) => c.label);
   const uid = customerUser ? customerUser.uid : '';
   const email = customerUser && customerUser.email ? customerUser.email.toLowerCase() : '';
 
@@ -42,6 +54,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
   useEffect(() => { if (approved && customerUser) refresh(); }, [approved, seller && seller.slug]); // eslint-disable-line react-hooks/exhaustive-deps
   // a rejected seller applies again with their last details filled in
   useEffect(() => {
+    if (seller && status !== 'approved') setCats((c) => (c.length ? c : (Array.isArray(seller.categories) ? seller.categories : [])));
     if (seller && status === 'rejected') setForm((f) => (f.name ? f : { ...f, name: seller.name || '', whatsapp: seller.whatsapp || '', district: seller.district || '', area: seller.area || '', address: seller.address || '', pageLink: seller.pageLink || '', productNote: seller.productNote || '' }));
     else if (customerUser && !seller) setForm((f) => (f.name ? f : { ...f, name: customerUser.displayName || '' }));
   }, [seller, status]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -80,10 +93,10 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
     if (!normalizeWhatsapp(f.whatsapp)) return setFormMsg('Write a valid WhatsApp number: 01XXXXXXXXX, +8801XXXXXXXXX or an international number starting with +.');
     if (f.district.trim().length < 2 || f.area.trim().length < 2) return setFormMsg('Write your district and area.');
     if (f.pageLink.trim() && !/^https?:\/\/\S+$/.test(f.pageLink.trim())) return setFormMsg('The page link must start with https://');
-    if (f.productNote.trim().length < 3) return setFormMsg('Write what kind of products you will sell.');
+    if (!cats.length) return setFormMsg('Tick at least one category you want to sell.');
     if (!f.agreed) return setFormMsg('Please tick the box to confirm you are an independent seller.');
     setApplying(true);
-    try { await applyAsSeller({ uid, email, shopName: f.shopName, details: f }); }
+    try { await applyAsSeller({ uid, email, shopName: f.shopName, details: { ...f, categories: cats, productNote: plan === 'paid' ? 'Chose the Paid plan' : '' } }); }
     catch (e) { setFormMsg(e.code === 'permission-denied' ? 'Could not send the application. You may already have a shop, the name may not be allowed, or new sellers are paused.' : e.message); }
     setApplying(false);
   };
@@ -98,6 +111,65 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
       </div>
     );
   }
+  // the store's categories as tick boxes (same list as the shop's category picker)
+  const toggleCat = (l) => setCats((c) => (c.includes(l) ? c.filter((x) => x !== l) : [...c, l]));
+  const catPicker = (
+    <div className="mt-2 flex flex-wrap gap-2">
+      {catLabels.map((l) => {
+        const on = cats.includes(l);
+        return (
+          <button key={l} type="button" aria-pressed={on} onClick={() => toggleCat(l)}
+            className={`inline-flex items-center gap-2 px-3 py-2 rounded-full border text-xs font-semibold transition ${on ? 'border-[#D4AF37] bg-[#D4AF37] text-black' : isDarkMode ? 'border-gray-700 text-gray-300' : 'border-gray-300 text-gray-700'}`}>
+            <span className={`inline-flex h-4 w-4 items-center justify-center rounded border text-[10px] ${on ? 'border-black bg-black text-[#D4AF37]' : 'border-current'}`}>{on ? '✓' : ''}</span>{l}
+          </button>
+        );
+      })}
+    </div>
+  );
+  const saveCats = async () => {
+    setCatMsg(null);
+    if (!cats.length) { setCatMsg({ type: 'err', text: 'Tick at least one category.' }); return; }
+    try { await updateSellerCategories(uid, cats); setCatMsg({ type: 'ok', text: 'Categories saved.' }); }
+    catch (e) { setCatMsg({ type: 'err', text: e.code === 'permission-denied' ? 'Could not save (publish the latest Firestore rules).' : e.message }); }
+  };
+
+  // ---- never applied: choose a plan first (like a pricing page) ----
+  if (!seller && !plan) {
+    const price = planPrice(plans);
+    const tick = (t) => <li key={t} className="flex items-start gap-2"><span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#D4AF37] text-black text-[10px] font-bold">✓</span><span>{t}</span></li>;
+    const freeFeatures = [`${plans.freeLimit} products`, 'Your own shop link', 'Earn markup on every delivered order', 'Kyvro handles payment and delivery'];
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h3 className="text-2xl sm:text-3xl font-bold">Start your own business with <span className="text-[#D4AF37]">Kyvro</span></h3>
+          <p className="text-sm text-gray-500 mt-2">No investment. Pick Kyvro products, set your price, earn the markup. Choose a plan to apply.</p>
+        </div>
+        <div className="grid md:grid-cols-2 gap-5 max-w-4xl mx-auto">
+          <div className={`rounded-2xl border p-6 sm:p-8 flex flex-col ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
+            <p className="text-xl font-bold">Free</p>
+            <p className="text-xs text-gray-500 mt-1">Start selling today.</p>
+            <p className="mt-5"><span className="text-4xl font-bold">{formatPrice(0)}</span></p>
+            <button type="button" onClick={() => setPlan('free')} className="mt-6 w-full py-3 rounded-full border-2 border-[#D4AF37] text-[#D4AF37] font-bold text-xs uppercase tracking-widest hover:bg-[#D4AF37] hover:text-black transition">Get started</button>
+            <ul className={`mt-6 pt-6 border-t space-y-3 text-sm ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>{freeFeatures.map(tick)}</ul>
+          </div>
+          <div className="relative rounded-2xl border-2 border-[#D4AF37] p-6 sm:p-8 flex flex-col bg-[#0d0d0d] text-white shadow-[0_0_40px_-12px_rgba(212,175,55,0.6)]">
+            <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-[#D4AF37] text-black text-[10px] font-bold uppercase tracking-widest">Most popular</span>
+            <p className="text-xl font-bold text-[#D4AF37]">Paid</p>
+            <p className="text-xs text-gray-400 mt-1">For growing sellers.</p>
+            <p className="mt-5 flex flex-wrap items-center gap-2">
+              {plans.discountPercent > 0 && <span className="text-lg text-gray-500 line-through">{formatPrice(plans.originalPrice)}</span>}
+              <span className="text-4xl font-bold">{formatPrice(price)}</span>
+              {plans.discountPercent > 0 && <span className="px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold">{plans.discountPercent}% OFF</span>}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">per {plans.periodDays} days</p>
+            <button type="button" onClick={() => setPlan('paid')} className="mt-6 w-full py-3 rounded-full bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold text-xs uppercase tracking-widest shadow hover:opacity-90 transition">Get started</button>
+            <ul className="mt-6 pt-6 border-t border-gray-800 space-y-3 text-sm">{['All products', ...freeFeatures.slice(1), 'Priority approval'].map(tick)}</ul>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!seller || status === 'rejected') {
     const field = (k, label, props = {}) => (
       <label className="block text-xs font-semibold text-gray-500">{label}
@@ -110,6 +182,13 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
         {status === 'rejected' && (
           <p className="text-xs p-3 rounded border border-red-500/40 text-red-500 bg-red-500/10"><strong>Rejected</strong>{seller.rejectNote ? `: ${seller.rejectNote}` : ''}. You can fix it and apply again below.</p>
         )}
+        {!seller && (
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span>Plan: <strong className="text-[#D4AF37]">{plan === 'paid' ? 'Paid' : 'Free'}</strong></span>
+            <button type="button" onClick={() => setPlan('')} className="underline text-gray-500">Change plan</button>
+          </div>
+        )}
+        {plan === 'paid' && !seller && <p className="text-xs p-3 rounded border border-[#D4AF37]/50 text-[#D4AF37] bg-[#D4AF37]/10 font-semibold">Paid plan: you pay after your shop is approved (Sell on Kyvro → Upgrade). Until then your shop is on the Free plan.</p>}
         <p className="text-xs text-gray-500">Open your own shop link with Kyvro products, set your price (within the limit) and earn the markup on delivered orders. Kyvro takes the payment and delivers every order. Your shop goes live after Kyvro approves your application. We never ask for NID, passport or bank details.</p>
         <div className="grid sm:grid-cols-2 gap-3">
           {field('shopName', 'Shop name *', { maxLength: 60, placeholder: 'e.g. Rahim Fashion' })}
@@ -122,9 +201,10 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
           {field('area', 'Area *', { maxLength: 60, placeholder: 'e.g. Mirpur' })}
           <div className="sm:col-span-2">{field('address', 'Full address (optional)', { maxLength: 300 })}</div>
           <div className="sm:col-span-2">{field('pageLink', 'Facebook / Instagram page link (optional)', { maxLength: 300, placeholder: 'https://facebook.com/...' })}</div>
-          <label className="block text-xs font-semibold text-gray-500 sm:col-span-2">What kind of products will you sell? *
-            <textarea className={`${inputCls} block mt-1 w-full`} rows={2} maxLength={300} value={form.productNote} onChange={(e) => set('productNote', e.target.value)} placeholder="e.g. men's shirts and punjabi for my Facebook followers" />
-          </label>
+          <div className="sm:col-span-2">
+            <p className="text-xs font-semibold text-gray-500">Which categories will you sell? * <span className="font-normal">(you choose the exact products after approval, and can change them any time in My Shop)</span></p>
+            {catPicker}
+          </div>
         </div>
         <label className="flex items-start gap-2 text-xs cursor-pointer">
           <input type="checkbox" checked={form.agreed} onChange={(e) => set('agreed', e.target.checked)} className="mt-0.5 accent-[#D4AF37]" />
@@ -154,6 +234,16 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
         <span className="font-bold uppercase tracking-wider">{approved ? 'Approved' : 'Pending approval'}</span>
         <span>{approved ? 'Your shop is approved. Free plan: 10 products, upgrade any time for all.' : 'Kyvro is checking your application. You can already choose products; your link starts working after approval.'}</span>
       </div>
+      {!approved && (
+        <div className={card}>
+          <p className="text-xs font-semibold text-gray-500">Categories you want to sell * <span className="font-normal">(you can change them while Kyvro checks your application)</span></p>
+          {catPicker}
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" onClick={saveCats} className="bg-[#D4AF37] text-black font-bold px-5 py-2 rounded text-xs uppercase tracking-wider">Save categories</button>
+            {catMsg && <span className={`text-xs ${catMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{catMsg.text}</span>}
+          </div>
+        </div>
+      )}
       <MyShop sellerMode showPlan={approved} adminRole="seller" isOwner={false} products={products} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={customerUser.displayName || email} loggedInUserEmail={email} />
 
       {approved && (
