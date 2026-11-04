@@ -6,7 +6,7 @@ import { maxMarkupFor, shopPriceClamp, SHOP_COLLECTIONS, productInCollection } f
 import { flatSubCategories, subLabel } from '../data/catalog';
 import { watchPlans, watchMySubscription } from '../storeSettings';
 import { normalizePlans, planPrice, toMillis, SHOP_MAX_ITEMS } from '../data/priceCheck';
-import { createSellerShop, watchSellerRules, sellerNameBlocked } from '../sellers';
+import { watchSellerRules, sellerNameBlocked } from '../sellers';
 
 const shopUrl = (slug) => `${window.location.origin}/?shop=${slug}`;
 
@@ -34,7 +34,7 @@ function ShopSwitch({ on, busy, onToggle, isDarkMode, label }) {
 // (by collection or one by one) and the price they sell at, up to the limit for that product. The whole markup is theirs.
 // An Admin the Owner switched "Shop create" ON for can make one too: it stays switched off until the Owner accepts it.
 // Payments (online, delivery charge, cash on delivery) all stay with the store; the Owner pays the markup out later.
-export default function MyShop({ sellerMode = false, canCreateShop = false, adminRole, products, isOwner, isDarkMode, formatPrice, adminName, loggedInUserEmail, onDirtyChange }) {
+export default function MyShop({ sellerMode = false, showPlan = true, canCreateShop = false, adminRole, products, isOwner, isDarkMode, formatPrice, adminName, loggedInUserEmail, onDirtyChange }) {
   const [shop, setShop] = useState(undefined); // undefined = loading, null = none yet
   const [draft, setDraft] = useState({}); // productId -> price text (only the products that are in the shop)
   const [name, setName] = useState('');
@@ -48,9 +48,8 @@ export default function MyShop({ sellerMode = false, canCreateShop = false, admi
   const [plans, setPlans] = useState(() => normalizePlans(null));
   const [sub, setSub] = useState(null); // my plan (subscriptions/{uid}), written only by the server
   const [paying, setPaying] = useState(false);
-  // public seller ("Sell on Kyvro"): blocked shop names + the promise they must accept
+  // public seller ("Sell on Kyvro"): blocked shop names (the application itself is in SellerDashboard)
   const [sellerRules, setSellerRules] = useState(null);
-  const [agree, setAgree] = useState(false);
   useEffect(() => (sellerMode ? watchSellerRules(setSellerRules) : undefined), [sellerMode]);
 
   const uid = auth.currentUser ? auth.currentUser.uid : '';
@@ -156,18 +155,9 @@ export default function MyShop({ sellerMode = false, canCreateShop = false, admi
   const doCreate = async () => {
     setMsg(null);
     if (newName.trim().length < 2) { setMsg({ type: 'err', text: 'Write a name for your shop (at least 2 letters).' }); return; }
-    if (sellerMode) {
-      if (sellerRules && !sellerRules.open) { setMsg({ type: 'err', text: 'Kyvro is not taking new sellers right now. Please try again later.' }); return; }
-      const bad = sellerNameBlocked(newName, '', sellerRules);
-      if (bad) { setMsg({ type: 'err', text: `The shop name cannot contain "${bad}". Please choose another name.` }); return; }
-      if (!agree) { setMsg({ type: 'err', text: 'Please accept the seller terms first.' }); return; }
-    }
     setBusy(true);
-    try {
-      if (sellerMode) await createSellerShop({ uid, email: loggedInUserEmail, name: newName, sellerName: adminName });
-      else await createShop({ uid, email: loggedInUserEmail, name: newName, ownerName: adminName, pending: !isOwner && adminRole === 'admin' });
-    }
-    catch (err) { setMsg({ type: 'err', text: err.code === 'permission-denied' ? (sellerMode ? 'Could not open the shop. You may already have a shop, the name may not be allowed, or new sellers are paused.' : 'Could not create the shop: publish the latest Firestore rules first.') : err.message }); }
+    try { await createShop({ uid, email: loggedInUserEmail, name: newName, ownerName: adminName, pending: !isOwner && adminRole === 'admin' }); }
+    catch (err) { setMsg({ type: 'err', text: err.code === 'permission-denied' ? 'Could not create the shop: publish the latest Firestore rules first.' : err.message }); }
     setBusy(false);
   };
 
@@ -227,18 +217,20 @@ export default function MyShop({ sellerMode = false, canCreateShop = false, admi
   };
 
   // ---------- Owner: all shops ----------
+  // an Admin's shop request (a seller's application is approved in the Sellers tab instead)
+  const teamPending = (x) => isPendingShop(x) && x.kind !== 'seller';
   const top = isOwner ? (
       <div className="space-y-5">
         <div className={card}>
           <h3 className="text-lg font-bold">Team Shops</h3>
           <p className="text-xs text-gray-500">Managers set up their own shop from their "My Shop" tab. An Admin can ask for one if you switch "Shop create" ON for them in Manage Admins; you accept or reject it here. You can make your own shop too, below. Customers who use that link see only the products the member chose, at the member's price. All payments still come to you; the markup is that member's earning (see Team Stats).</p>
           {msg && <p className={`text-xs ${msg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{msg.text}</p>}
-          {allShops.some(isPendingShop) && (
+          {allShops.some(teamPending) && (
             <div className="rounded border border-red-500/40 bg-red-500/5 p-3 space-y-2">
-              <p className="text-xs font-bold uppercase tracking-wider text-red-500">Shop requests ({allShops.filter(isPendingShop).length})</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-red-500">Shop requests ({allShops.filter(teamPending).length})</p>
               <p className="text-[11px] text-gray-500">An Admin made their own shop. It stays switched off until you accept it. Reject removes it.</p>
               <div className="divide-y text-xs">
-                {allShops.filter(isPendingShop).map((s) => (
+                {allShops.filter(teamPending).map((s) => (
                   <div key={s.slug} className="py-2 flex flex-wrap items-center justify-between gap-2">
                     <div className="min-w-0">
                       <p className="font-bold">{s.name || s.slug} <span className="font-normal text-gray-500">· {owners[s.slug] ? (owners[s.slug].name || owners[s.slug].email) : ''}</span></p>
@@ -301,16 +293,11 @@ export default function MyShop({ sellerMode = false, canCreateShop = false, admi
   const wrap = (el) => <div className="space-y-5">{top}{el}{links}</div>;
   if (shop === undefined) return wrap(<p className="text-sm text-gray-500 py-8 text-center">Loading...</p>);
   if (shop === null) {
+    if (sellerMode) return null; // a seller applies in SellerDashboard
     return wrap(
       <div className={card}>
         <h3 className="text-lg font-bold">Create my shop</h3>
-        <p className="text-xs text-gray-500">You get your own link, and you earn the markup. Customers who open it see the same Kyvro store, but only the products you choose, at the price you set (within the allowed limit). Everything above the store price is your earning.{sellerMode ? ' Kyvro takes the payment, delivers the order and pays your markup to your bKash after the order is delivered. You do not handle orders or customers.' : !isOwner && adminRole === 'admin' ? ' Orders from your own shop earn the markup, not commission. Your shop starts switched off: the Owner gets a notification and turns it on when they accept it.' : ' Admins can share your link and confirm its orders; they earn commission, not the markup.'}</p>
-        {sellerMode && (
-          <label className="flex items-start gap-2 text-xs cursor-pointer">
-            <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 accent-[#D4AF37]" />
-            <span>I am an independent seller, not Kyvro. I will not pretend to be Kyvro or use names like {(sellerRules ? sellerRules.blockedWords : ['kyvro', 'official']).slice(0, 5).map((w) => `"${w}"`).join(', ')}. Kyvro can switch my shop off at any time.</span>
-          </label>
-        )}
+        <p className="text-xs text-gray-500">You get your own link, and you earn the markup. Customers who open it see the same Kyvro store, but only the products you choose, at the price you set (within the allowed limit). Everything above the store price is your earning.{!isOwner && adminRole === 'admin' ? ' Orders from your own shop earn the markup, not commission. Your shop starts switched off: the Owner gets a notification and turns it on when they accept it.' : ' Admins can share your link and confirm its orders; they earn commission, not the markup.'}</p>
         <div className="flex flex-wrap gap-2 items-center">
           <input className={`${inputCls} w-64`} placeholder="Shop name, e.g. Rahim Fashion" maxLength={60} value={newName} onChange={(e) => setNewName(e.target.value)} />
           <button type="button" disabled={busy} onClick={doCreate} className="bg-[#D4AF37] text-black font-bold px-5 py-2 rounded text-xs uppercase tracking-wider disabled:opacity-50">{busy ? 'Creating...' : 'Create shop'}</button>
@@ -341,7 +328,7 @@ export default function MyShop({ sellerMode = false, canCreateShop = false, admi
         <p className="text-[11px] text-gray-500">Customers who open your link see only the products you tick below, at the price you type. The price can be higher than the store price by the limit shown for each product. Everything above the store price is yours when the order is delivered. Payments and delivery stay with the store.</p>
       </div>
 
-      {!isOwner && plans.enabled && (
+      {!isOwner && showPlan && plans.enabled && (
         <div className={`${card} relative overflow-hidden`}>
           <span className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-[#B8921F] via-[#E9CB6B] to-[#B8921F]" />
           {paidUntil > 0 && (daysLeft <= 0 || daysLeft <= plans.reminderDays) && (

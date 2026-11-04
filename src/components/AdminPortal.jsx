@@ -37,7 +37,12 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
   };
   // Owner: Admins' shop requests that wait for Accept / Reject (red badge on the Team Shops tab)
   const [pendingShops, setPendingShops] = React.useState(0);
-  React.useEffect(() => (isOwner ? watchAllShops((list) => setPendingShops(list.filter(isPendingShop).length), () => {}) : undefined), [isOwner]);
+  // and sellers' applications (red badge on the Sellers tab)
+  const [pendingSellers, setPendingSellers] = React.useState(0);
+  React.useEffect(() => (isOwner ? watchAllShops((list) => {
+    setPendingShops(list.filter((x) => isPendingShop(x) && x.kind !== 'seller').length);
+    setPendingSellers(list.filter((x) => isPendingShop(x) && x.kind === 'seller').length);
+  }, () => {}) : undefined), [isOwner]);
   const canManageTeam = adminRole === 'owner' || adminRole === 'manager';
   // Supplier name, price, link and profit are private to the Owner and Managers. Admins never see them.
   const canSeeSupplier = adminRole === 'owner' || adminRole === 'manager';
@@ -317,6 +322,7 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                     className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'sellers' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
                   >
                     Sellers
+                    {pendingSellers > 0 && <span className="ml-2 px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[10px]">{pendingSellers}</span>}
                   </button>
                 )}
                 {canManageTeam && (

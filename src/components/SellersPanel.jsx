@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { askConfirm, askInput } from './AlertCenter';
 import { watchAllShops } from '../shops';
-import { watchSellers, watchSellerPayouts, watchSubscriptions, killSellerShop, reviveSellerShop, removeSeller, watchSellerRules, saveSellerRules } from '../sellers';
+import { watchSellers, watchSellerPayouts, watchSubscriptions, killSellerShop, reviveSellerShop, removeSeller, watchSellerRules, saveSellerRules, sellerStatus, approveSeller, rejectSeller } from '../sellers';
+import { formatDateTime } from '../utils/dates';
 import { watchPayouts, addPayout } from '../payouts';
 import { toMillis } from '../data/priceCheck';
 
@@ -28,7 +29,9 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
   useEffect(() => watchPayouts(true, loggedInUserEmail, setPayouts, () => {}), [loggedInUserEmail]);
   useEffect(() => watchSellerRules((r) => { setRules(r); setWords((w) => w || r.blockedWords.join(', ')); }), []);
 
-  const rows = useMemo(() => sellers.map((s) => {
+  const pending = sellers.filter((s) => sellerStatus(s) === 'pending');
+  const rejectedCount = sellers.filter((s) => sellerStatus(s) === 'rejected').length;
+  const rows = useMemo(() => sellers.filter((s) => sellerStatus(s) === 'approved').map((s) => {
     const shop = shops[s.slug] || null;
     const mine = orders.filter((o) => o.shop === s.slug);
     const earned = mine.filter((o) => o.status === 'Delivered' && !o.returned).reduce((n, o) => n + markupOf(o), 0);
@@ -56,6 +59,16 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
     if (!(await askConfirm(`Remove the seller ${r.email} and their shop? Their orders stay. The account could open a new shop later.`, { danger: true, confirmText: 'Remove' }))) return;
     act(r.uid, () => removeSeller(r), 'Seller removed.');
   };
+  const staff = { email: loggedInUserEmail, name: adminName };
+  const approve = async (s) => {
+    if (!(await askConfirm(`Approve "${shops[s.slug] ? shops[s.slug].name : s.slug}" by ${s.name || s.email}? The shop goes live on the Free plan.`))) return;
+    act(s.uid, () => approveSeller(s, staff), 'Seller approved: the shop is live.');
+  };
+  const reject = async (s) => {
+    const note = await askInput(`Reject the application of ${s.name || s.email}? Write the reason (the seller sees it and can apply again):`, { placeholder: 'e.g. please add your Facebook page link' });
+    if (note === null || note === undefined) return;
+    act(s.uid, () => rejectSeller(s, note, staff), 'Application rejected.');
+  };
   const saveRules = (open) => act('rules', () => saveSellerRules({ open: open === undefined ? rules.open : open, blockedWords: words.split(',') }, { email: loggedInUserEmail, name: adminName }), 'Seller settings saved.');
 
   return (
@@ -82,8 +95,41 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
         {msg && <p className={`text-xs ${msg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{msg.text}</p>}
       </div>
 
+      {pending.length > 0 && (
+        <div className={`${card} border-[#D4AF37]/60`}>
+          <h3 className="text-lg font-bold">Pending applications <span className="ml-1 px-2 py-0.5 rounded-full bg-red-600 text-white text-xs align-middle">{pending.length}</span></h3>
+          <p className="text-xs text-gray-500">These shops are switched off until you approve them. Reject removes the shop; the person sees your note and can apply again.</p>
+          <div className="divide-y text-xs">
+            {pending.map((s) => {
+              const row = (k, v, link) => (v ? <p><span className="text-gray-500">{k}:</span> {link ? <a href={v} target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] underline break-all">{v}</a> : <span className="break-words">{v}</span>}</p> : null);
+              return (
+                <div key={s.uid} className="py-3 space-y-2">
+                  <p className="font-bold text-sm">{shops[s.slug] ? shops[s.slug].name : s.slug} <span className="font-normal text-xs text-gray-500">· applied {formatDateTime(s.createdAt)}</span></p>
+                  <div className="grid sm:grid-cols-2 gap-x-4 gap-y-1">
+                    {row('Full name', s.name)}
+                    {row('Email', s.email)}
+                    {row('WhatsApp', s.whatsapp)}
+                    {row('District / area', [s.district, s.area].filter(Boolean).join(', '))}
+                    {row('Address', s.address)}
+                    {row('Page', s.pageLink, true)}
+                    <div className="sm:col-span-2">{row('Products', s.productNote)}</div>
+                    {row('Independent seller confirmed', s.agreed ? 'Yes' : 'No')}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <a href={`${window.location.origin}/?shop=${s.slug}`} target="_blank" rel="noopener noreferrer" className={`${btn} border border-gray-400`}>Open link</a>
+                    <button type="button" disabled={busy === s.uid} onClick={() => approve(s)} className={`${btn} bg-green-600 text-white disabled:opacity-50`}>Approve</button>
+                    <button type="button" disabled={busy === s.uid} onClick={() => reject(s)} className={`${btn} border border-red-500 text-red-500 disabled:opacity-50`}>Reject</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className={card}>
-        {rows.length === 0 ? <p className="text-sm text-gray-500">No sellers yet.</p> : (
+        {rejectedCount > 0 && <p className="text-[11px] text-gray-500">{rejectedCount} rejected application(s) waiting for the person to apply again.</p>}
+        {rows.length === 0 ? <p className="text-sm text-gray-500">No approved sellers yet.</p> : (
           <div className="divide-y text-xs">
             {rows.map((r) => {
               const on = r.shop && r.shop.active !== false;

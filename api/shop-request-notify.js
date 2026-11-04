@@ -1,4 +1,5 @@
-// Vercel serverless function: tells the Owner(s) that an Admin made their own shop and it waits for Accept / Reject
+// Vercel serverless function: tells the Owner(s) that an Admin made their own shop and it waits for Accept / Reject,
+// or (?action=seller) that a customer applied to sell on Kyvro
 // (phone / browser notification + email). The shop itself is saved by the website, protected by Firestore rules.
 //
 // Safe to call without a login: the text always comes from the saved shop (never from the caller), it only
@@ -20,8 +21,54 @@ async function readDoc(token, path) {
   return Object.fromEntries(Object.entries(d.fields || {}).map(([k, v]) => [k, val(v)]));
 }
 
+// ?action=seller: a customer applied to sell on Kyvro (sellers/{uid} status 'pending'). Same safety: the text comes
+// from the saved application, only for a waiting one, once per application (notified is cleared when they apply again).
+async function sellerApplied(req, res) {
+  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  const uid = String(body.uid || '');
+  if (!/^[A-Za-z0-9]{10,128}$/.test(uid)) return res.status(400).json({ error: 'Bad seller.' });
+  const token = await accessToken();
+  const app = await readDoc(token, `sellers/${uid}`);
+  if (!app || app.status !== 'pending') return res.status(200).json({ sent: 0, reason: 'no waiting application' });
+  if (app.notified) return res.status(200).json({ sent: 0, reason: 'already notified' });
+  const mark = await fetch(`${FS}/documents:commit`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ writes: [{
+      update: { name: `projects/${PROJECT}/databases/(default)/documents/sellers/${uid}`, fields: { notified: { booleanValue: true } } },
+      updateMask: { fieldPaths: ['notified'] },
+      currentDocument: { exists: true },
+    }] }),
+  });
+  if (!mark.ok) return res.status(200).json({ sent: 0, reason: 'could not mark' });
+  const shop = (await readDoc(token, `shops/${app.slug}`)) || {};
+  const owners = await ownerEmails(token);
+  const shopName = String(shop.name || app.slug || '').slice(0, 60);
+  const person = String(app.name || app.email || 'Someone').slice(0, 80);
+  const title = `Seller application: ${shopName}`;
+  const text = `${person} wants to sell on Kyvro (${String(app.district || '')}). Admin Portal -> Sellers -> Pending applications.`;
+  const pushed = await pushToOwners(token, owners, title, text);
+  const row = (k, v) => (v ? `<tr><td style="padding:4px 12px 4px 0;color:#888">${esc(k)}</td><td style="padding:4px 0">${esc(v)}</td></tr>` : '');
+  const html = `<!doctype html><html><body style="margin:0;background:#f3f3f3;font-family:Arial,Helvetica,sans-serif;color:#111">
+<div style="max-width:560px;margin:0 auto;background:#fff">
+  <div style="background:#0b0b0b;padding:20px 24px;color:#D4AF37;font-size:20px;letter-spacing:3px;font-weight:bold">KYVRO</div>
+  <div style="padding:24px;font-size:15px;line-height:1.7">
+    <p>A new seller applied: <strong>${esc(shopName)}</strong>. The shop stays off until you approve it.</p>
+    <table style="font-size:14px">${row('Name', app.name)}${row('Email', app.email)}${row('WhatsApp', app.whatsapp)}${row('District', app.district)}${row('Area', app.area)}${row('Page', app.pageLink)}${row('Products', app.productNote)}</table>
+    <p>Open the Admin Portal, go to <strong>Sellers</strong> and press <strong>Approve</strong> or <strong>Reject</strong>.</p>
+    <p><a href="${esc(SITE)}" style="display:inline-block;background:#D4AF37;color:#000;padding:10px 18px;text-decoration:none;font-weight:bold;border-radius:4px">Open Kyvro</a></p>
+  </div>
+</div></body></html>`;
+  const plain = `A new seller applied: ${shopName}\nName: ${app.name || ''}\nEmail: ${app.email || ''}\nWhatsApp: ${app.whatsapp || ''}\nDistrict: ${app.district || ''}, ${app.area || ''}\nPage: ${app.pageLink || ''}\nProducts: ${app.productNote || ''}\n\nAdmin Portal -> Sellers -> Approve / Reject.\n${SITE}`;
+  const emailed = await emailOwners(owners, title, html, plain);
+  return res.status(200).json({ sent: pushed, emailed });
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only.' });
+  if (String((req.query && req.query.action) || '') === 'seller') {
+    try { return await sellerApplied(req, res); } catch (err) { return res.status(200).json({ sent: 0, error: err.message || 'failed' }); }
+  }
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
     const slug = String(body.slug || '');

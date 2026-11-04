@@ -49,17 +49,27 @@ export function watchMySeller(uid, onData) {
 
 const slugify = (s) => String(s || "shop").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 28) || "shop";
 const rand = () => Math.random().toString(36).slice(2, 6).replace(/[^a-z0-9]/g, "x");
-// one batch: the shop and my seller entry (the rules allow it only once per account)
-export async function createSellerShop({ uid, email, name, sellerName }) {
-  const shopName = String(name || "").trim().slice(0, 60);
-  const slug = `${slugify(shopName)}-${rand()}`;
+// a seller's status: entries from before approvals have none and count as approved
+export const sellerStatus = (seller) => (!seller ? "" : seller.status || "approved");
+
+// WhatsApp: a Bangladeshi mobile (01XXXXXXXXX or +8801XXXXXXXXX) or an international number (+...). Same check as the rules.
+export const normalizeWhatsapp = (v) => {
+  const t = String(v || "").replace(/[\s()-]/g, "");
+  return /^(\+?8801[3-9][0-9]{8}|01[3-9][0-9]{8}|\+[1-9][0-9]{7,14})$/.test(t) ? t : "";
+};
+
+// Apply to sell: one batch writes the shop (OFF, 'pending') and the application (sellers/{uid}, 'pending').
+// The rules allow it once per account, and again only after the Owner rejected the last application.
+export async function applyAsSeller({ uid, email, shopName, details }) {
+  const name = String(shopName || "").trim().slice(0, 60);
+  const slug = `${slugify(name)}-${rand()}`;
   const b = writeBatch(db);
   b.set(doc(db, "shops", slug), {
-    name: shopName,
+    name,
     ownerUid: uid,
     kind: "seller",
-    active: true,
-    status: "approved",
+    active: false,
+    status: "pending",
     items: {},
     createdAt: serverTimestamp(),
     updatedAt: new Date().toISOString(),
@@ -67,10 +77,20 @@ export async function createSellerShop({ uid, email, name, sellerName }) {
   b.set(doc(db, "sellers", uid), {
     slug,
     email: String(email || "").toLowerCase(),
-    name: String(sellerName || "").slice(0, 80),
+    name: String(details.name || "").trim().slice(0, 80),
+    whatsapp: normalizeWhatsapp(details.whatsapp),
+    district: String(details.district || "").trim().slice(0, 40),
+    area: String(details.area || "").trim().slice(0, 60),
+    address: String(details.address || "").trim().slice(0, 300),
+    pageLink: String(details.pageLink || "").trim().slice(0, 300),
+    productNote: String(details.productNote || "").trim().slice(0, 300),
+    agreed: details.agreed === true,
+    status: "pending",
     createdAt: serverTimestamp(),
   });
   await b.commit();
+  // phone notification + email to the Owner (best effort; the application also shows in the Owner's Sellers tab)
+  try { await fetch("/api/shop-request-notify?action=seller", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uid }) }); } catch (e) { /* ignore */ }
   return slug;
 }
 
@@ -97,6 +117,20 @@ export function watchSellerPayouts(onData) {
 export function watchSubscriptions(onData) {
   return onSnapshot(collection(db, "subscriptions"), (snap) => { const m = {}; snap.docs.forEach((d) => { m[d.id] = d.data(); }); onData(m); }, () => onData({}));
 }
+// Owner: approve an application (the shop goes live) or reject it (the shop is removed, the seller can apply again)
+export async function approveSeller(seller, staff) {
+  const b = writeBatch(db);
+  b.update(doc(db, "shops", seller.slug), { status: "approved", active: true, updatedAt: new Date().toISOString() });
+  b.update(doc(db, "sellers", seller.uid), { status: "approved", rejectNote: "", decidedAt: new Date().toISOString(), decidedBy: (staff && staff.email) || "" });
+  await b.commit();
+}
+export async function rejectSeller(seller, note, staff) {
+  const b = writeBatch(db);
+  b.delete(doc(db, "shops", seller.slug));
+  b.update(doc(db, "sellers", seller.uid), { status: "rejected", rejectNote: String(note || "").slice(0, 300), decidedAt: new Date().toISOString(), decidedBy: (staff && staff.email) || "" });
+  await b.commit();
+}
+
 // kill switch: the shop goes off and the seller can never switch it on again (only the Owner can revive it)
 export const killSellerShop = (slug, note) => updateDoc(doc(db, "shops", slug), { active: false, killed: true, killNote: String(note || "").slice(0, 200), updatedAt: new Date().toISOString() });
 export const reviveSellerShop = (slug) => updateDoc(doc(db, "shops", slug), { active: true, killed: false, killNote: "", updatedAt: new Date().toISOString() });
