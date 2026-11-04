@@ -7,6 +7,8 @@ import { flatSubCategories, subLabel } from '../data/catalog';
 import { watchPlans, watchMySubscription } from '../storeSettings';
 import { normalizePlans, toMillis, SHOP_MAX_ITEMS, effectiveTier, TIER_LABEL } from '../data/priceCheck';
 import PlanCards from './PlanCards';
+import ShopExtrasEditor from './ShopExtrasEditor';
+import { shopExtrasOf, PRO_EXTRAS, PREMIUM_EXTRAS, httpsLinkOk, contactOk, cleanContact } from '../data/shopBrand';
 import { watchSellerRules, sellerNameBlocked } from '../sellers';
 
 const shopUrl = (slug) => `${window.location.origin}/?shop=${slug}`;
@@ -50,8 +52,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   const [sub, setSub] = useState(null); // my plan (subscriptions/{uid}), written only by the server
   const [paying, setPaying] = useState(''); // the tier whose payment page is opening
   // Pro / Premium shop extras shown on the storefront
-  const [tagline, setTagline] = useState('');
-  const [contactUrl, setContactUrl] = useState('');
+  const [extras, setExtras] = useState(() => shopExtrasOf(null));
   // public seller ("Sell on Kyvro"): blocked shop names (the application itself is in SellerDashboard)
   const [sellerRules, setSellerRules] = useState(null);
   useEffect(() => (sellerMode ? watchSellerRules(setSellerRules) : undefined), [sellerMode]);
@@ -82,7 +83,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   const [loadedFor, setLoadedFor] = useState('');
   useEffect(() => {
     if (shop && loadedFor !== shop.slug) {
-      setDraft(draftFrom(shop)); setName(shop.name || ''); setTagline(shop.tagline || ''); setContactUrl(shop.contactUrl || ''); setLoadedFor(shop.slug);
+      setDraft(draftFrom(shop)); setName(shop.name || ''); setExtras(shopExtrasOf(shop)); setLoadedFor(shop.slug);
     }
   }, [shop, loadedFor]);
 
@@ -90,7 +91,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   const savedItems = (shop && shop.items) || {};
   const dirty = !!shop && (
     name !== (shop.name || '')
-    || tagline !== (shop.tagline || '') || contactUrl !== (shop.contactUrl || '')
+    || JSON.stringify(extras) !== JSON.stringify(shopExtrasOf(shop))
     || Object.keys(draft).length !== Object.keys(savedItems).length
     || Object.entries(draft).some(([id, v]) => savedItems[id] === undefined || Number(v) !== Number(savedItems[id]))
   );
@@ -108,8 +109,10 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   const paidUntil = toMillis(sub && sub.paidUntil);
   const paid = paidUntil > Date.now();
   const tier = isOwner ? 'premium' : effectiveTier(sub); // free / pro / premium right now
-  // tagline + contact button: Pro / Premium shops (the rules check the tier written on the shop by the server)
+  // shop page extras: Pro / Premium (tagline, contact, about, social links, share kit), Premium only (brand color,
+  // announcement, pinned products). The rules check the tier the server wrote on the shop.
   const extrasAllowed = isOwner || (shop ? effectiveTier(shop) !== 'free' : false);
+  const premiumAllowed = isOwner || (shop ? effectiveTier(shop) === 'premium' : false);
   const planLimit = isOwner || !plans.enabled || paid ? SHOP_MAX_ITEMS : plans.freeLimit;
   // a shop whose plan ran out may keep (or reduce) what it already has, but not add more
   const cap = Math.max(planLimit, Object.keys(savedItems).length);
@@ -195,12 +198,23 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
       items[String(p.id)] = shopPriceClamp(p.price, w);
     }
     if (Object.keys(items).length > cap) { limitMsg(); return; }
-    if (extrasAllowed && contactUrl.trim() && !/^(https?:\/\/\S+|\+?[0-9]{8,15})$/.test(contactUrl.trim().replace(/[\s-]/g, ''))) { setMsg({ type: 'err', text: 'Contact: a WhatsApp number (e.g. 01712345678) or a link starting with https://' }); return; }
+    const ex = { ...extras, contactUrl: cleanContact(extras.contactUrl), tagline: extras.tagline.trim().slice(0, 80), about: extras.about.trim().slice(0, 300), announcement: extras.announcement.trim().slice(0, 100),
+      socialLinks: Object.fromEntries(Object.entries(extras.socialLinks).map(([k, v]) => [k, String(v || '').trim()])),
+      pinnedItems: extras.pinnedItems.filter((id) => items[id] !== undefined).slice(0, 3) };
+    if (extrasAllowed) {
+      if (!contactOk(ex.contactUrl)) { setMsg({ type: 'err', text: 'Contact: a WhatsApp number (e.g. 01712345678) or a link starting with https://' }); return; }
+      const badSocial = Object.entries(ex.socialLinks).find(([, v]) => !httpsLinkOk(v));
+      if (badSocial) { setMsg({ type: 'err', text: `${badSocial[0]}: the link must start with https://` }); return; }
+    }
     if (sellerMode) { const bad = sellerNameBlocked(name, shop.slug, sellerRules); if (bad) { setMsg({ type: 'err', text: `The shop name cannot contain "${bad}".` }); return; } }
     setBusy(true);
     try {
-      const extras = extrasAllowed && (tagline !== (shop.tagline || '') || contactUrl !== (shop.contactUrl || '')) ? { tagline: tagline.trim().slice(0, 80), contactUrl: /^https?:/.test(contactUrl.trim()) ? contactUrl.trim() : contactUrl.trim().replace(/[\s-]/g, '') } : {};
-      await saveShopItems(shop.slug, name, items, { ...(isOwner ? { planExempt: true } : {}), ...extras });
+      // only the extras this plan may change (the rules refuse the others)
+      const before = shopExtrasOf(shop);
+      const keys = [...(extrasAllowed ? PRO_EXTRAS : []), ...(premiumAllowed ? PREMIUM_EXTRAS : [])];
+      const changes = Object.fromEntries(keys.filter((k) => JSON.stringify(ex[k]) !== JSON.stringify(before[k])).map((k) => [k, ex[k]]));
+      await saveShopItems(shop.slug, name, items, { ...(isOwner ? { planExempt: true } : {}), ...changes });
+      setExtras(ex);
       setDraft(draftFrom({ items })); // what was really saved (products no longer for sale drop out)
       setMsg({ type: 'ok', text: 'Saved. Your shop link now shows these products and prices.' });
     }
@@ -209,7 +223,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   };
   const discard = async () => {
     if (!(await askConfirm('Discard your unsaved changes?', { danger: true, confirmText: 'Discard' }))) return;
-    setDraft(draftFrom(shop)); setName(shop.name || ''); setTagline(shop.tagline || ''); setContactUrl(shop.contactUrl || ''); setMsg(null);
+    setDraft(draftFrom(shop)); setName(shop.name || ''); setExtras(shopExtrasOf(shop)); setMsg(null);
   };
 
   const copy = async (text) => { try { await navigator.clipboard.writeText(text); setMsg({ type: 'ok', text: 'Link copied.' }); } catch { setMsg({ type: 'err', text: 'Could not copy. Select the link and copy it.' }); } };
@@ -336,18 +350,8 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
         <label className="block text-xs font-semibold text-gray-500">Shop name
           <input className={`${inputCls} block mt-1 w-full sm:w-72`} maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
         </label>
-        {extrasAllowed ? (
-          <div className="grid sm:grid-cols-2 gap-3">
-            <label className="block text-xs font-semibold text-gray-500">Tagline <span className="font-normal">(max 80, shown on your shop)</span>
-              <input className={`${inputCls} block mt-1 w-full`} maxLength={80} value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="e.g. Trendy panjabi at the best price" />
-            </label>
-            <label className="block text-xs font-semibold text-gray-500">Contact button <span className="font-normal">(WhatsApp number or Facebook link)</span>
-              <input className={`${inputCls} block mt-1 w-full`} maxLength={200} value={contactUrl} onChange={(e) => setContactUrl(e.target.value)} placeholder="01712345678 or https://facebook.com/..." />
-            </label>
-          </div>
-        ) : (
-          <p className="text-[11px] text-gray-500">🔒 Pro / Premium: add a shop tagline and a WhatsApp / Facebook button to your shop.</p>
-        )}
+        <ShopExtrasEditor extras={extras} setExtras={setExtras} proOn={extrasAllowed} premiumOn={premiumAllowed} shopName={name} link={link}
+          pinChoices={live.filter((p) => draft[p.id] !== undefined)} isDarkMode={isDarkMode} inputCls={inputCls} />
         <p className="text-[11px] text-gray-500">Customers who open your link see only the products you tick below, at the price you type. The price can be higher than the store price by the limit shown for each product. Everything above the store price is yours when the order is delivered. Payments and delivery stay with the store.</p>
       </div>
 

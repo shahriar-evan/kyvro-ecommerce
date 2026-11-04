@@ -14,6 +14,7 @@ import PushPrompt from './components/PushPrompt';
 import { watchProducts, watchProductCosts, watchProductCommissions, setProductCommission, saveProductCost, removeProductCost, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
 import { watchStoreSettings, watchPlans } from './storeSettings';
 import { visibleShopIds, normalizePlans, effectiveTier } from './data/priceCheck';
+import { shopExtrasOf, brandHex, SOCIALS, httpsLinkOk, contactOk, contactHref, contactLabel } from './data/shopBrand';
 import { cleanPhone, ONLINE_PAY_ON, DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
 import { INITIAL_PRODUCTS } from './data/products';
 import { CURRENCIES } from './data/currencies';
@@ -96,6 +97,9 @@ export default function App() {
   const [plans, setPlans] = useState(() => normalizePlans(null));
   useEffect(() => (shopSlug ? watchPlans(setPlans) : undefined), [shopSlug]);
   const shopVisible = shopCtx ? visibleShopIds(shopCtx, Object.fromEntries(products.map((p) => [String(p.id), p])), plans) : null;
+  // the shop's plan right now (the Owner's own shop has every extra) and the header brand (Premium: wordmark)
+  const shopTier = shopCtx ? (shopCtx.planExempt ? 'premium' : effectiveTier(shopCtx)) : 'free';
+  const shopBrand = shopCtx ? { name: shopCtx.name, wordmark: shopTier === 'premium', color: shopTier === 'premium' ? brandHex(shopCtx.brandColor) : '#D4AF37' } : null;
   const storefrontProducts = shopLoading ? [] : shopCtx
     ? shopProducts.filter((p) => shopCtx.items && shopCtx.items[String(p.id)] !== undefined && (!shopVisible || shopVisible.has(String(p.id)))).map((p) => {
         const price = shopPriceClamp(p.price, shopCtx.items[String(p.id)]);
@@ -1239,29 +1243,53 @@ export default function App() {
       {currentView !== 'home' && <BackButton onClick={goBack} />}
 
       {/* 2. HEADER */}
-      <Header onStartSelling={startSelling} cart={cart} curr={curr} currencyKey={currencyKey} currentView={currentView} isDarkMode={isDarkMode} setCurrencyKey={setCurrencyKey} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} setIsDarkMode={setIsDarkMode} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} navHas={navHas} customerUser={customerUser} displayName={displayName} photoURL={photoURL} goAccount={goAccount} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} />
-      {/* a shop link: who sells it (a public seller is not Kyvro itself), Verified for Premium, and the Pro / Premium tagline + contact */}
+      <Header shopBrand={shopBrand} onStartSelling={startSelling} cart={cart} curr={curr} currencyKey={currencyKey} currentView={currentView} isDarkMode={isDarkMode} setCurrencyKey={setCurrencyKey} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} setIsDarkMode={setIsDarkMode} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} navHas={navHas} customerUser={customerUser} displayName={displayName} photoURL={photoURL} goAccount={goAccount} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} />
+      {/* a shop link: who sells it (a public seller is not Kyvro itself), Verified for Premium, the Pro / Premium page
+          extras (tagline, contact, about, social links) and the Premium ones (announcement, brand color, top picks) */}
       {shopCtx && currentView !== 'admin' && (() => {
-        const tier = shopCtx.planExempt ? 'premium' : effectiveTier(shopCtx);
-        const extras = tier !== 'free' && (shopCtx.tagline || shopCtx.contactUrl);
+        const tier = shopTier;
+        const ex = shopExtrasOf(shopCtx);
+        const pro = tier !== 'free';
+        const premium = tier === 'premium';
+        const accent = premium ? brandHex(ex.brandColor) : '#D4AF37';
         const seller = shopCtx.kind === 'seller';
-        if (!seller && !extras) return null;
-        const c = String(shopCtx.contactUrl || '');
-        const href = /^https?:/.test(c) ? c : `https://wa.me/${c.replace(/^\+/, '').replace(/^0/, '880')}`;
+        const socials = pro ? SOCIALS.filter((x) => httpsLinkOk(ex.socialLinks[x.key]) && ex.socialLinks[x.key]) : [];
+        const showContact = pro && ex.contactUrl && contactOk(ex.contactUrl);
+        const picks = premium ? ex.pinnedItems.map((id) => storefrontProducts.find((x) => String(x.id) === id)).filter(Boolean) : [];
+        if (!seller && !pro) return null;
         return (
-          <div className={`border-b px-4 py-2 text-center text-xs space-y-1 ${isDarkMode ? 'bg-[#121212] border-gray-800 text-gray-300' : 'bg-[#D4AF37]/10 border-[#D4AF37]/30 text-gray-700'}`}>
-            <p>
-              {seller ? 'Sold by ' : ''}<strong className="text-[#D4AF37]">{shopCtx.name}</strong>
-              {seller && tier === 'premium' && !shopCtx.planExempt && <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full bg-[#D4AF37] text-black text-[10px] font-bold align-middle">✓ Verified</span>}
-              {seller && <span className="text-gray-500"> · Independent seller, not official Kyvro. Kyvro delivers the order and takes the payment.</span>}
-            </p>
-            {extras && (
-              <p className="flex flex-wrap items-center justify-center gap-2">
-                {shopCtx.tagline && <span className="italic">{shopCtx.tagline}</span>}
-                {c && <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-3 py-1 rounded-full bg-green-600 text-white font-semibold">{/^https?:/.test(c) ? (/facebook|fb\.com/i.test(c) ? 'Facebook' : 'Contact') : 'WhatsApp'}</a>}
+          <>
+            {premium && ex.announcement && <div className="px-4 py-2 text-center text-xs font-semibold text-white" style={{ background: accent }}>{ex.announcement}</div>}
+            <div className={`border-b px-4 py-3 text-center text-xs space-y-1.5 ${isDarkMode ? 'bg-[#121212] border-gray-800 text-gray-300' : 'bg-[#D4AF37]/10 border-[#D4AF37]/30 text-gray-700'}`}>
+              <p>
+                {seller ? 'Sold by ' : ''}<strong style={{ color: accent }}>{shopCtx.name}</strong>
+                {seller && premium && !shopCtx.planExempt && <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-white text-[10px] font-bold align-middle" style={{ background: accent }}>✓ Verified</span>}
+                {seller && <span className="text-gray-500"> · Independent seller, not official Kyvro. Kyvro delivers the order and takes the payment.</span>}
               </p>
-            )}
-          </div>
+              {pro && ex.tagline && <p className="italic">{ex.tagline}</p>}
+              {pro && ex.about && <p className="max-w-2xl mx-auto text-gray-500">{ex.about}</p>}
+              {(showContact || socials.length > 0) && (
+                <p className="flex flex-wrap items-center justify-center gap-2">
+                  {showContact && <a href={contactHref(ex.contactUrl)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-3 py-1 rounded-full text-white font-semibold" style={{ background: accent }}>{contactLabel(ex.contactUrl)}</a>}
+                  {socials.map((x) => <a key={x.key} href={ex.socialLinks[x.key]} target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-3 py-1 rounded-full border font-semibold" style={{ borderColor: accent, color: accent }}>{x.label}</a>)}
+                </p>
+              )}
+              {picks.length > 0 && (
+                <div className="pt-1">
+                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: accent }}>Top picks</p>
+                  <div className="mt-1.5 flex justify-center gap-3 overflow-x-auto">
+                    {picks.map((p) => (
+                      <button key={p.id} type="button" onClick={() => { setSelectedProduct(p); setCurrentView('product-detail'); window.scrollTo(0, 0); }} className="w-24 shrink-0 text-left">
+                        {p.image && <img src={p.image} alt="" className="w-24 h-24 object-cover rounded border" style={{ borderColor: accent }} />}
+                        <span className="block mt-1 text-[11px] font-semibold truncate">{p.name}</span>
+                        <span className="block text-[11px]" style={{ color: accent }}>{formatPrice(p.price)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
         );
       })()}
 

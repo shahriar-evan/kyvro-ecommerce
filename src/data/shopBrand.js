@@ -1,0 +1,45 @@
+// Shop page extras (Pro / Premium): brand color presets, link checks and the contact link.
+// The same limits are checked in firestore.rules (shopExtrasOk).
+
+// Premium: one accent color for the shop (wordmark, buttons, badges). '' = Kyvro gold.
+export const BRAND_COLORS = [
+  { key: 'gold', label: 'Gold', hex: '#D4AF37' },
+  { key: 'blue', label: 'Blue', hex: '#2563EB' },
+  { key: 'green', label: 'Green', hex: '#16A34A' },
+  { key: 'red', label: 'Red', hex: '#DC2626' },
+  { key: 'purple', label: 'Purple', hex: '#7C3AED' },
+  { key: 'teal', label: 'Teal', hex: '#0D9488' },
+];
+export const brandHex = (key) => (BRAND_COLORS.find((c) => c.key === key) || BRAND_COLORS[0]).hex;
+
+export const SOCIALS = [
+  { key: 'facebook', label: 'Facebook', placeholder: 'https://facebook.com/yourpage' },
+  { key: 'instagram', label: 'Instagram', placeholder: 'https://instagram.com/yourname' },
+  { key: 'tiktok', label: 'TikTok', placeholder: 'https://tiktok.com/@yourname' },
+  { key: 'youtube', label: 'YouTube', placeholder: 'https://youtube.com/@yourchannel' },
+];
+
+// only https:// links (no javascript:, data:, http: or spaces); '' = not set
+export const httpsLinkOk = (v) => v === '' || (/^https:\/\/[^ <>"]+$/.test(v) && v.length <= 200);
+// contact: a WhatsApp number (01..., +880...) or an https link
+export const contactOk = (v) => v === '' || httpsLinkOk(v) || /^\+?[0-9]{8,15}$/.test(v);
+export const cleanContact = (v) => { const t = String(v || '').trim(); return /^https:/.test(t) ? t : t.replace(/[\s()-]/g, ''); };
+export const contactHref = (v) => (/^https:\/\//.test(v) ? v : `https://wa.me/${String(v).replace(/^\+/, '').replace(/^0/, '880')}`);
+export const contactLabel = (v) => (/^https:\/\//.test(v) ? (/facebook\.com|fb\.com|m\.me/i.test(v) ? 'Facebook' : 'Contact') : 'WhatsApp');
+
+// the extras as saved on a shop, with defaults
+export const shopExtrasOf = (shop) => {
+  const s = shop || {};
+  const sl = s.socialLinks || {};
+  return {
+    tagline: s.tagline || '',
+    contactUrl: s.contactUrl || '',
+    about: s.about || '',
+    socialLinks: { facebook: sl.facebook || '', instagram: sl.instagram || '', tiktok: sl.tiktok || '', youtube: sl.youtube || '' },
+    brandColor: s.brandColor || '',
+    announcement: s.announcement || '',
+    pinnedItems: Array.isArray(s.pinnedItems) ? s.pinnedItems.slice(0, 3).map(String) : [],
+  };
+};
+export const PRO_EXTRAS = ['tagline', 'contactUrl', 'about', 'socialLinks'];
+export const PREMIUM_EXTRAS = ['brandColor', 'announcement', 'pinnedItems'];
