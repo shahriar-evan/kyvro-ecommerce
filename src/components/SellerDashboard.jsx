@@ -10,6 +10,8 @@ import { watchPlans } from '../storeSettings';
 import { normalizePlans, effectiveTier, TIER_LABEL } from '../data/priceCheck';
 import PlanCards from './PlanCards';
 import { watchMySubscription } from '../storeSettings';
+import { watchShop } from '../shops';
+import { effectiveFeatures } from '../data/shopBrand';
 
 // "Sell on Kyvro": a signed-in customer's own shop. The shop editor is the same as the team's (My Shop, plan,
 // markup cap). Earnings come from the server without any customer details; payouts are what the Owner already paid.
@@ -43,6 +45,8 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
 
   useEffect(() => watchMySeller(uid, setSeller), [uid]);
   useEffect(() => watchMySubscription(uid, setMySub), [uid]);
+  const [myShop, setMyShop] = useState(null);
+  useEffect(() => (seller && seller.slug ? watchShop(seller.slug, setMyShop, () => setMyShop(null)) : undefined), [seller && seller.slug]); // eslint-disable-line react-hooks/exhaustive-deps
   // a team member (Owner / Manager / Admin) signed in with their team email cannot become a seller
   const [teamMember, setTeamMember] = useState(false);
   useEffect(() => {
@@ -256,7 +260,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
             ))}
           </div>
 
-          {effectiveTier(mySub) === 'premium' && (
+          {effectiveFeatures(myShop, myShop ? effectiveTier(myShop) : effectiveTier(mySub)).prioritySupport && (
             <div className={`${card} border-[#D4AF37]/60`}>
               <h3 className="text-lg font-bold flex items-center gap-2">Priority support <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#D4AF37] text-black font-bold uppercase">Premium</span></h3>
               {plans.supportWhatsapp

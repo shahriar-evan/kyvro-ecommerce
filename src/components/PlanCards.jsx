@@ -11,9 +11,9 @@ export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mo
   const free = [`${plans.freeLimit} products`, 'Your own shop link', 'Earn markup on every delivered order', 'Kyvro handles payment and delivery'];
   const tiers = [
     { key: 'free', name: 'Free', icon: Zap, blurb: 'Start selling today.', features: free },
-    { key: 'pro', name: 'Pro', icon: Rocket, blurb: 'For growing sellers.', badge: 'Most Popular', features: ['All products', 'Priority approval', 'Shop tagline + WhatsApp / Facebook button', 'Social links (Facebook, Instagram, TikTok, YouTube)', 'About section', 'Share kit (QR code + caption)', 'Everything in Free'] },
-    { key: 'premium', name: 'Premium', icon: Gem, blurb: 'For serious sellers.', badge: 'Best Value', features: ['Everything in Pro', 'Shop name wordmark in the header', 'Brand color', 'Announcement strip', 'Pin top 3 products', 'Verified seller badge', 'Weekly payout', 'Priority support'],
-      soon: ['Custom logo + banner upload (Owner approved)', 'Custom domain', 'Featured on Kyvro', 'Sales stats', 'Shop coupon codes', 'Order email notification', 'Monthly earnings CSV'] },
+    { key: 'pro', name: 'Pro', icon: Rocket, blurb: 'For growing sellers.', badge: 'Most Popular', features: ['All products', 'Priority approval', 'Shop tagline + WhatsApp / Facebook button', 'Social links (Facebook, Instagram, TikTok, YouTube)', 'About section', 'Share kit (QR code + caption)', 'Logo upload (on request)', 'Everything in Free'] },
+    { key: 'premium', name: 'Premium', icon: Gem, blurb: 'For serious sellers.', badge: 'Best Value', features: ['Everything in Pro', 'Shop name wordmark in the header', 'Brand color', 'Announcement strip', 'Pin top 3 products', 'Logo upload (Owner approved)', 'Verified seller badge', 'Weekly payout', 'Priority support'],
+      soon: ['Custom banner upload', 'Custom domain', 'Featured on Kyvro', 'Sales stats', 'Shop coupon codes', 'Order email notification', 'Monthly earnings CSV'] },
   ];
 
   const button = (t) => {

@@ -1,5 +1,5 @@
 import { getApp } from "firebase/app";
-import { getFirestore, doc, collection, query, where, onSnapshot, setDoc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { getFirestore, doc, collection, query, where, onSnapshot, setDoc, updateDoc, deleteDoc, deleteField, serverTimestamp } from "firebase/firestore";
 import "./firebase"; // makes sure the default Firebase app exists
 
 const db = getFirestore(getApp());
@@ -81,3 +81,18 @@ export const saveShopItems = (slug, name, items, extra = {}) =>
 
 // Owner only: switch a shop on / off
 export const setShopActive = (slug, on) => updateDoc(doc(db, "shops", slug), { active: !!on });
+
+// ---- Shop logo: a Pro shop asks for permission; with the logo feature on, the owner uploads one that waits for the
+// Owner / a Manager to approve. The picture is a small data URL inside the shop document (same way product photos are kept).
+export const requestLogo = (slug) => updateDoc(doc(db, "shops", slug), { logoRequest: { at: new Date().toISOString() }, updatedAt: new Date().toISOString() });
+export async function uploadLogo(slug, dataUrl) {
+  await updateDoc(doc(db, "shops", slug), { logoPending: dataUrl, logoPendingAt: new Date().toISOString(), logoReject: deleteField(), updatedAt: new Date().toISOString() });
+  try { await fetch("/api/shop-request-notify?action=logo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug }) }); } catch (e) { /* ignore */ }
+}
+// Owner / Manager (Plan Members)
+export const setShopFeatures = (slug, features) => updateDoc(doc(db, "shops", slug), { features, updatedAt: new Date().toISOString() });
+export const grantLogo = (slug, features) => updateDoc(doc(db, "shops", slug), { features: { ...(features || {}), logo: true }, logoRequest: deleteField(), updatedAt: new Date().toISOString() });
+export const denyLogoRequest = (slug, note) => updateDoc(doc(db, "shops", slug), { logoRequest: deleteField(), logoReject: { note: String(note || "").slice(0, 200), at: new Date().toISOString(), kind: "request" }, updatedAt: new Date().toISOString() });
+export const approveLogo = (shop) => updateDoc(doc(db, "shops", shop.slug), { logo: shop.logoPending, logoPending: deleteField(), logoPendingAt: deleteField(), updatedAt: new Date().toISOString() });
+export const rejectLogo = (slug, note) => updateDoc(doc(db, "shops", slug), { logoPending: deleteField(), logoPendingAt: deleteField(), logoReject: { note: String(note || "").slice(0, 200), at: new Date().toISOString(), kind: "logo" }, updatedAt: new Date().toISOString() });
+export const setShopOn = (slug, on) => updateDoc(doc(db, "shops", slug), { active: !!on, updatedAt: new Date().toISOString() });

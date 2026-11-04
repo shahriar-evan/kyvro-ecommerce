@@ -87,7 +87,8 @@ export const effectiveTier = (x, now = Date.now()) => (toMillis(x && x.paidUntil
 // hidden, not deleted, and come back when the plan is renewed. The Owner's own shop has no limit.
 export function visibleShopIds(shop, productsById, plans, now = Date.now()) {
   const p = normalizePlans(plans);
-  if (!shop || !p.enabled || shop.planExempt === true || shopIsPaid(shop, now)) return null;
+  const all = shop && shop.features && typeof shop.features.allProducts === 'boolean' ? shop.features.allProducts : shopIsPaid(shop, now);
+  if (!shop || !p.enabled || shop.planExempt === true || all) return null;
   const ids = Object.keys(shop.items || {});
   if (ids.length <= p.freeLimit) return null;
   const sold = (id) => { const pr = productsById[String(id)]; return pr ? (parseInt(pr.sold, 10) || 0) : -1; };

@@ -43,3 +43,27 @@ export const shopExtrasOf = (shop) => {
 };
 export const PRO_EXTRAS = ['tagline', 'contactUrl', 'about', 'socialLinks'];
 export const PREMIUM_EXTRAS = ['brandColor', 'announcement', 'pinnedItems'];
+
+// ---- Plan features: what each tier gets by default; the Owner / a Manager can switch any of them ON or OFF for a
+// shop (shops/{slug}.features). firestore.rules uses the same defaults (featOn). ----
+export const FEATURES = [
+  { key: 'allProducts', label: 'All products', pro: true },
+  { key: 'priorityApproval', label: 'Priority approval', pro: true },
+  { key: 'tagline', label: 'Tagline + contact button', pro: true },
+  { key: 'social', label: 'Social links', pro: true },
+  { key: 'about', label: 'About section', pro: true },
+  { key: 'shareKit', label: 'Share kit (QR + caption)', pro: true },
+  { key: 'brandColor', label: 'Brand color', pro: false },
+  { key: 'announcement', label: 'Announcement strip', pro: false },
+  { key: 'pinned', label: 'Pinned products', pro: false },
+  { key: 'verified', label: 'Verified badge', pro: false },
+  { key: 'weeklyPayout', label: 'Weekly payout', pro: false },
+  { key: 'prioritySupport', label: 'Priority support', pro: false },
+  { key: 'logo', label: 'Logo upload', pro: false },
+];
+export const featureDefault = (key, tier) => tier === 'premium' || (tier === 'pro' && !!(FEATURES.find((f) => f.key === key) || {}).pro);
+// { key: true/false } for a shop: override first, else the tier default. tier = 'free' | 'pro' | 'premium'.
+export const effectiveFeatures = (shop, tier) => {
+  const o = (shop && shop.features) || {};
+  return Object.fromEntries(FEATURES.map((f) => [f.key, typeof o[f.key] === 'boolean' ? o[f.key] : featureDefault(f.key, tier)]));
+};

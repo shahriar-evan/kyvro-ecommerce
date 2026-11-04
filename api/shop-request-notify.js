@@ -64,8 +64,42 @@ async function sellerApplied(req, res) {
   return res.status(200).json({ sent: pushed, emailed });
 }
 
+// ?action=logo: a shop uploaded a logo that waits for approval. Once per upload (logoNotifiedAt = logoPendingAt).
+async function logoPending(req, res) {
+  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  const slug = String(body.slug || '');
+  if (!/^[a-z0-9-]{3,40}$/.test(slug)) return res.status(400).json({ error: 'Bad shop.' });
+  const token = await accessToken();
+  const shop = await readDoc(token, `shops/${slug}`);
+  if (!shop || !shop.logoPending || !shop.logoPendingAt) return res.status(200).json({ sent: 0, reason: 'no waiting logo' });
+  if (shop.logoNotifiedAt === shop.logoPendingAt) return res.status(200).json({ sent: 0, reason: 'already notified' });
+  const mark = await fetch(`${FS}/documents:commit`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ writes: [{
+      update: { name: `projects/${PROJECT}/databases/(default)/documents/shops/${slug}`, fields: { logoNotifiedAt: { stringValue: String(shop.logoPendingAt) } } },
+      updateMask: { fieldPaths: ['logoNotifiedAt'] },
+      currentDocument: { exists: true },
+    }] }),
+  });
+  if (!mark.ok) return res.status(200).json({ sent: 0, reason: 'could not mark' });
+  const owners = await ownerEmails(token);
+  const shopName = String(shop.name || slug).slice(0, 60);
+  const title = `Logo to approve: ${shopName}`;
+  const text = `${shopName} uploaded a logo. Admin Portal -> Plan Members -> Approve or Reject.`;
+  const pushed = await pushToOwners(token, owners, title, text);
+  const html = `<!doctype html><html><body style="font-family:Arial,Helvetica,sans-serif;color:#111"><div style="max-width:560px;margin:0 auto;padding:24px;line-height:1.7">
+    <p><strong>${esc(shopName)}</strong> uploaded a new logo. It stays hidden until you approve it.</p>
+    <p>Admin Portal &rarr; <strong>Plan Members</strong> &rarr; Approve or Reject.</p><p><a href="${esc(SITE)}">${esc(SITE)}</a></p></div></body></html>`;
+  const emailed = await emailOwners(owners, title, html, `${text}\n${SITE}`);
+  return res.status(200).json({ sent: pushed, emailed });
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only.' });
+  if (String((req.query && req.query.action) || '') === 'logo') {
+    try { return await logoPending(req, res); } catch (err) { return res.status(200).json({ sent: 0, error: err.message || 'failed' }); }
+  }
   if (String((req.query && req.query.action) || '') === 'seller') {
     try { return await sellerApplied(req, res); } catch (err) { return res.status(200).json({ sent: 0, error: err.message || 'failed' }); }
   }

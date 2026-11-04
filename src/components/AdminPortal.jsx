@@ -15,6 +15,7 @@ import MyProducts from './MyProducts';
 import StoreSettings from './StoreSettings';
 import PlanSettings from './PlanSettings';
 import SellersPanel from './SellersPanel';
+import PlanMembers from './PlanMembers';
 import { subLabel, allPlaces, COLLECTION_LABELS, SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
 
 export default function AdminPortal({ adminCanCreateShop = false, adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canEditProduct, canAddProduct = true, shopOwners = {}, productCommissions = {}, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, productCosts = {}, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct, clearProductForm, handleDeleteRequest }) {
@@ -316,6 +317,14 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                     Banner &amp; Discount
                   </button>
                 )}
+                {canManageTeam && (
+                  <button
+                    onClick={() => goTab('plan-members')}
+                    className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'plan-members' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
+                  >
+                    Plan Members
+                  </button>
+                )}
                 {isOwner && (
                   <button
                     onClick={() => goTab('sellers')}
@@ -335,6 +344,7 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                 )}
               </div>
 
+              {adminTab === 'plan-members' && canManageTeam && <PlanMembers isOwner={isOwner} isDarkMode={isDarkMode} />}
               {adminTab === 'sellers' && isOwner && <SellersPanel orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} loggedInUserEmail={loggedInUserEmail} adminName={adminName} />}
               {adminTab === 'settings' && isOwner && <StoreSettings products={products} settings={storeSettings} isDarkMode={isDarkMode} formatPrice={formatPrice} staff={{ email: loggedInUserEmail, name: adminName }} />}
               {adminTab === 'settings' && isOwner && <div className="mt-5"><PlanSettings isDarkMode={isDarkMode} formatPrice={formatPrice} staff={{ email: loggedInUserEmail, name: adminName }} /></div>}

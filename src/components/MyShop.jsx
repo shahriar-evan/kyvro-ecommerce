@@ -8,7 +8,7 @@ import { watchPlans, watchMySubscription } from '../storeSettings';
 import { normalizePlans, toMillis, SHOP_MAX_ITEMS, effectiveTier, TIER_LABEL } from '../data/priceCheck';
 import PlanCards from './PlanCards';
 import ShopExtrasEditor from './ShopExtrasEditor';
-import { shopExtrasOf, PRO_EXTRAS, PREMIUM_EXTRAS, httpsLinkOk, contactOk, cleanContact } from '../data/shopBrand';
+import { shopExtrasOf, httpsLinkOk, contactOk, cleanContact, effectiveFeatures, FEATURES } from '../data/shopBrand';
 import { watchSellerRules, sellerNameBlocked } from '../sellers';
 
 const shopUrl = (slug) => `${window.location.origin}/?shop=${slug}`;
@@ -111,9 +111,11 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   const tier = isOwner ? 'premium' : effectiveTier(sub); // free / pro / premium right now
   // shop page extras: Pro / Premium (tagline, contact, about, social links, share kit), Premium only (brand color,
   // announcement, pinned products). The rules check the tier the server wrote on the shop.
-  const extrasAllowed = isOwner || (shop ? effectiveTier(shop) !== 'free' : false);
-  const premiumAllowed = isOwner || (shop ? effectiveTier(shop) === 'premium' : false);
-  const planLimit = isOwner || !plans.enabled || paid ? SHOP_MAX_ITEMS : plans.freeLimit;
+  const feat = isOwner ? Object.fromEntries(FEATURES.map((f) => [f.key, true])) : effectiveFeatures(shop, shop ? effectiveTier(shop) : 'free');
+  const extrasAllowed = feat.tagline || feat.about || feat.social || feat.shareKit;
+  // "All products": the paid plan, or the Owner's / a Manager's override for this shop
+  const allOverride = shop && shop.features && typeof shop.features.allProducts === 'boolean' ? shop.features.allProducts : null;
+  const planLimit = isOwner || !plans.enabled || (allOverride === null ? paid : allOverride) ? SHOP_MAX_ITEMS : plans.freeLimit;
   // a shop whose plan ran out may keep (or reduce) what it already has, but not add more
   const cap = Math.max(planLimit, Object.keys(savedItems).length);
   const daysLeft = paidUntil ? Math.ceil((paidUntil - Date.now()) / 86400000) : null;
@@ -211,7 +213,8 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
     try {
       // only the extras this plan may change (the rules refuse the others)
       const before = shopExtrasOf(shop);
-      const keys = [...(extrasAllowed ? PRO_EXTRAS : []), ...(premiumAllowed ? PREMIUM_EXTRAS : [])];
+      const FIELD_FEATURE = { tagline: 'tagline', contactUrl: 'tagline', about: 'about', socialLinks: 'social', brandColor: 'brandColor', announcement: 'announcement', pinnedItems: 'pinned' };
+      const keys = Object.keys(FIELD_FEATURE).filter((k) => feat[FIELD_FEATURE[k]]);
       const changes = Object.fromEntries(keys.filter((k) => JSON.stringify(ex[k]) !== JSON.stringify(before[k])).map((k) => [k, ex[k]]));
       await saveShopItems(shop.slug, name, items, { ...(isOwner ? { planExempt: true } : {}), ...changes });
       setExtras(ex);
@@ -350,7 +353,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
         <label className="block text-xs font-semibold text-gray-500">Shop name
           <input className={`${inputCls} block mt-1 w-full sm:w-72`} maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
         </label>
-        <ShopExtrasEditor extras={extras} setExtras={setExtras} proOn={extrasAllowed} premiumOn={premiumAllowed} shopName={name} link={link}
+        <ShopExtrasEditor extras={extras} setExtras={setExtras} feat={feat} shop={shop} tier={isOwner ? 'premium' : effectiveTier(shop)} shopName={name} link={link}
           pinChoices={live.filter((p) => draft[p.id] !== undefined)} isDarkMode={isDarkMode} inputCls={inputCls} />
         <p className="text-[11px] text-gray-500">Customers who open your link see only the products you tick below, at the price you type. The price can be higher than the store price by the limit shown for each product. Everything above the store price is yours when the order is delivered. Payments and delivery stay with the store.</p>
       </div>
