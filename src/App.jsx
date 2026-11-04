@@ -1259,9 +1259,11 @@ export default function App() {
         const showTagline = f.tagline && ex.tagline;
         const showAbout = f.about && ex.about;
         const showAnn = f.announcement && ex.announcement;
-        if (!seller && !showTagline && !showAbout && !showContact && !socials.length && !picks.length && !showAnn) return null;
+        const showBanner = f.banner && shopCtx.banner;
+        if (!seller && !showTagline && !showAbout && !showContact && !socials.length && !picks.length && !showAnn && !showBanner) return null;
         return (
           <>
+            {showBanner && <img src={shopCtx.banner} alt={`${shopCtx.name} banner`} className="w-full max-h-56 sm:max-h-72 object-cover" />}
             {showAnn && <div className="px-4 py-2 text-center text-xs font-semibold text-white" style={{ background: accent }}>{ex.announcement}</div>}
             <div className={`border-b px-4 py-3 text-center text-xs space-y-1.5 ${isDarkMode ? 'bg-[#121212] border-gray-800 text-gray-300' : 'bg-[#D4AF37]/10 border-[#D4AF37]/30 text-gray-700'}`}>
               <p>

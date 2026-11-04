@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { auth } from '../firebase';
 import { askConfirm, askInput } from './AlertCenter';
-import { watchAllShops, watchShopOwners, setShopFeatures, grantLogo, denyLogoRequest, approveLogo, rejectLogo, setShopOn } from '../shops';
+import { watchAllShops, watchShopOwners, setShopFeatures, grantLogo, denyLogoRequest, approveLogo, rejectLogo, setShopOn, approveBanner, rejectBanner } from '../shops';
 import { watchSellers, killSellerShop, reviveSellerShop } from '../sellers';
 import { effectiveTier, toMillis, TIER_LABEL } from '../data/priceCheck';
 import { FEATURES, featureDefault } from '../data/shopBrand';
@@ -42,7 +42,7 @@ export default function PlanMembers({ isOwner, isDarkMode }) {
     if (filter === 'Expired' && !r.expired) return false;
     const t = q.trim().toLowerCase();
     return !t || [r.name, r.member, r.slug].some((v) => String(v || '').toLowerCase().includes(t));
-  }).sort((a, b) => ((b.logoPending ? 2 : 0) + (b.logoRequest ? 1 : 0)) - ((a.logoPending ? 2 : 0) + (a.logoRequest ? 1 : 0)) || String(a.name).localeCompare(String(b.name)));
+  }).sort((a, b) => ((b.logoPending || b.bannerPending ? 2 : 0) + (b.logoRequest ? 1 : 0)) - ((a.logoPending || a.bannerPending ? 2 : 0) + (a.logoRequest ? 1 : 0)) || String(a.name).localeCompare(String(b.name)));
 
   const cur = rows.find((r) => r.slug === open) || null;
   useEffect(() => { if (cur) setDraft({ ...(cur.features || {}) }); setMsg(null); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -87,6 +87,7 @@ export default function PlanMembers({ isOwner, isDarkMode }) {
                 <span className="min-w-0">
                   <span className="font-bold">{r.name || r.slug}</span> <span className="text-gray-500">· {r.member || '-'}{r.kind === 'seller' ? ' (seller)' : ''}</span>
                   {r.logoPending && <span className="ml-2 px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold">Logo to approve</span>}
+                  {r.bannerPending && <span className="ml-2 px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold">Banner to approve</span>}
                   {r.logoRequest && <span className="ml-2 px-2 py-0.5 rounded-full bg-amber-500 text-black text-[10px] font-bold">Logo request</span>}
                 </span>
                 <span className="flex items-center gap-2">
@@ -152,6 +153,23 @@ export default function PlanMembers({ isOwner, isDarkMode }) {
                 </div>
               )}
               {cur.logo && <div className="flex items-center gap-3"><img src={cur.logo} alt="" className="w-10 h-10 rounded object-cover border" /><span className="text-green-600">Approved logo</span></div>}
+            </div>
+          )}
+
+          {/* banner */}
+          {(cur.banner || cur.bannerPending) && (
+            <div className={`rounded border p-3 space-y-2 text-xs ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
+              <p className="font-bold uppercase tracking-wider">Banner</p>
+              {cur.bannerPending && (
+                <div className="space-y-2">
+                  <img src={cur.bannerPending} alt="" className="w-full max-h-40 object-cover rounded border" />
+                  <div className="flex gap-2">
+                    <button type="button" disabled={ownShop || busy} onClick={() => act(() => approveBanner(cur), 'Banner approved.')} className="px-3 py-1 rounded bg-green-600 text-white font-bold disabled:opacity-50">Approve</button>
+                    <button type="button" disabled={ownShop || busy} onClick={async () => { const n = await askInput('Why is the banner rejected? (the shop sees it)'); if (n === null || n === undefined) return; act(() => rejectBanner(cur.slug, n), 'Banner rejected.'); }} className="px-3 py-1 rounded border border-red-500 text-red-500 font-bold disabled:opacity-50">Reject</button>
+                  </div>
+                </div>
+              )}
+              {cur.banner && <div className="space-y-1"><img src={cur.banner} alt="" className="w-full max-h-24 object-cover rounded border" /><span className="text-green-600">Approved banner</span></div>}
             </div>
           )}
 

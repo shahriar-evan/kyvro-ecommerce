@@ -60,6 +60,9 @@ export const FEATURES = [
   { key: 'weeklyPayout', label: 'Weekly payout', pro: false },
   { key: 'prioritySupport', label: 'Priority support', pro: false },
   { key: 'logo', label: 'Logo upload', pro: false },
+  { key: 'banner', label: 'Banner upload', pro: false },
+  { key: 'salesStats', label: 'Sales stats', pro: false },
+  { key: 'earningsCsv', label: 'Monthly earnings CSV', pro: false },
 ];
 export const featureDefault = (key, tier) => tier === 'premium' || (tier === 'pro' && !!(FEATURES.find((f) => f.key === key) || {}).pro);
 // { key: true/false } for a shop: override first, else the tier default. tier = 'free' | 'pro' | 'premium'.

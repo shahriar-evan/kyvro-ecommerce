@@ -96,3 +96,11 @@ export const denyLogoRequest = (slug, note) => updateDoc(doc(db, "shops", slug),
 export const approveLogo = (shop) => updateDoc(doc(db, "shops", shop.slug), { logo: shop.logoPending, logoPending: deleteField(), logoPendingAt: deleteField(), updatedAt: new Date().toISOString() });
 export const rejectLogo = (slug, note) => updateDoc(doc(db, "shops", slug), { logoPending: deleteField(), logoPendingAt: deleteField(), logoReject: { note: String(note || "").slice(0, 200), at: new Date().toISOString(), kind: "logo" }, updatedAt: new Date().toISOString() });
 export const setShopOn = (slug, on) => updateDoc(doc(db, "shops", slug), { active: !!on, updatedAt: new Date().toISOString() });
+
+// ---- Shop banner (Premium): uploaded banners wait for the Owner / a Manager like the logo ----
+export async function uploadBanner(slug, dataUrl) {
+  await updateDoc(doc(db, "shops", slug), { bannerPending: dataUrl, bannerPendingAt: new Date().toISOString(), bannerReject: deleteField(), updatedAt: new Date().toISOString() });
+  try { await fetch("/api/shop-request-notify?action=logo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug, kind: "banner" }) }); } catch (e) { /* ignore */ }
+}
+export const approveBanner = (shop) => updateDoc(doc(db, "shops", shop.slug), { banner: shop.bannerPending, bannerPending: deleteField(), bannerPendingAt: deleteField(), updatedAt: new Date().toISOString() });
+export const rejectBanner = (slug, note) => updateDoc(doc(db, "shops", slug), { bannerPending: deleteField(), bannerPendingAt: deleteField(), bannerReject: { note: String(note || "").slice(0, 200), at: new Date().toISOString() }, updatedAt: new Date().toISOString() });

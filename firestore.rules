@@ -278,7 +278,14 @@ service cloud.firestore {
               && !('logoReject' in d)
               && d.get('logoPending', '') is string && d.get('logoPending', '').size() <= 200000
               && (d.get('logoPending', '') == '' || d.get('logoPending', '').matches('^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$'))
-              && d.get('logoPendingAt', '') is string && d.get('logoPendingAt', '').size() <= 40));
+              && d.get('logoPendingAt', '') is string && d.get('logoPendingAt', '').size() <= 40))
+        // banner: Premium (or switched on); uploaded banners wait for approval like the logo
+        && (!changed.hasAny(['bannerPending', 'bannerPendingAt', 'bannerReject'])
+          || (featOn('banner', false)
+              && !('bannerReject' in d)
+              && d.get('bannerPending', '') is string && d.get('bannerPending', '').size() <= 300000
+              && (d.get('bannerPending', '') == '' || d.get('bannerPending', '').matches('^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$'))
+              && d.get('bannerPendingAt', '') is string && d.get('bannerPendingAt', '').size() <= 40));
     }
 
     // Team shops (kyvro.store/?shop=name). Everyone can read a shop (customers open the link).
@@ -310,27 +317,29 @@ service cloud.firestore {
       allow update: if request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 60
         && request.resource.data.items is map && request.resource.data.items.size() <= 300
         // the Owner: everything, also the seller kill switch (killed: the seller can never switch the shop on again)
-        && ((isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'active', 'status', 'updatedAt', 'planExempt', 'killed', 'killNote', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'features', 'logo', 'logoPending', 'logoPendingAt', 'logoReject', 'logoRequest'])
+        && ((isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'active', 'status', 'updatedAt', 'planExempt', 'killed', 'killNote', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'features', 'logo', 'logoPending', 'logoPendingAt', 'logoReject', 'logoRequest', 'banner', 'bannerPending', 'bannerPendingAt', 'bannerReject'])
                 && request.resource.data.get('status', 'approved') in ['pending', 'approved'])
             || ((isManager() || canShopNow())
                 && resource.data.ownerUid == request.auth.uid
-                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'logoRequest', 'logoPending', 'logoPendingAt', 'logoReject'])
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'logoRequest', 'logoPending', 'logoPendingAt', 'logoReject', 'bannerPending', 'bannerPendingAt', 'bannerReject'])
                 && shopExtrasOk()
                 && shopSizeOk())
             // a Manager (Plan Members): feature ON / OFF, logo grant / approve / reject and shop ON / OFF on other people's
             // shops. Not their own shop (no self-upgrade), and never switching on a killed or a waiting (pending) shop.
             || (isManager() && resource.data.ownerUid != request.auth.uid
-                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['features', 'logo', 'logoPending', 'logoPendingAt', 'logoReject', 'logoRequest', 'active', 'updatedAt'])
-                && request.resource.data.get('features', {}) is map && request.resource.data.get('features', {}).keys().hasOnly(['allProducts', 'priorityApproval', 'tagline', 'social', 'about', 'shareKit', 'brandColor', 'announcement', 'pinned', 'verified', 'weeklyPayout', 'prioritySupport', 'logo'])
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['features', 'logo', 'logoPending', 'logoPendingAt', 'logoReject', 'logoRequest', 'banner', 'bannerPending', 'bannerPendingAt', 'bannerReject', 'active', 'updatedAt'])
+                && request.resource.data.get('features', {}) is map && request.resource.data.get('features', {}).keys().hasOnly(['allProducts', 'priorityApproval', 'tagline', 'social', 'about', 'shareKit', 'brandColor', 'announcement', 'pinned', 'verified', 'weeklyPayout', 'prioritySupport', 'logo', 'banner', 'salesStats', 'earningsCsv'])
                 && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['logo'])
                     || request.resource.data.get('logo', '') == '' || request.resource.data.get('logo', '') == resource.data.get('logoPending', ''))
+                && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['banner'])
+                    || request.resource.data.get('banner', '') == '' || request.resource.data.get('banner', '') == resource.data.get('bannerPending', ''))
                 && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['active'])
                     || (resource.data.get('killed', false) != true && resource.data.get('status', 'approved') == 'approved')))
             // a public seller: only their own shop's name and products, not after the Owner switched it off for good
             || (signedIn() && !isStaff() && resource.data.get('kind', '') == 'seller'
                 && resource.data.ownerUid == request.auth.uid
                 && resource.data.get('killed', false) != true
-                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'logoRequest', 'logoPending', 'logoPendingAt', 'logoReject'])
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'logoRequest', 'logoPending', 'logoPendingAt', 'logoReject', 'bannerPending', 'bannerPendingAt', 'bannerReject'])
                 && shopExtrasOk()
                 && shopSizeOk()
                 && sellerNameOk(request.resource.data.name, slug)));

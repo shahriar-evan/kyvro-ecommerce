@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import qrcode from 'qrcode-generator';
 import { BRAND_COLORS, SOCIALS } from '../data/shopBrand';
 import { imageFileToDataURL } from '../utils/imageUpload';
-import { requestLogo, uploadLogo } from '../shops';
+import { requestLogo, uploadLogo, uploadBanner } from '../shops';
 
 // My Shop: the shop page extras. Pro + Premium: tagline, contact button, about, social links and the share kit
 // (link, QR code, ready caption). Premium only: brand color, announcement strip, pinned products.
@@ -26,6 +26,24 @@ export default function ShopExtrasEditor({ extras, setExtras, feat, shop, tier =
       setLogoMsg({ type: 'ok', text: 'Logo sent. It shows on your shop after Kyvro approves it.' });
     } catch (e) { setLogoMsg({ type: 'err', text: e.code === 'permission-denied' ? 'Logo upload is not on for your shop.' : e.message }); }
     setLogoBusy(false);
+  };
+  // banner: PNG / JPG / WebP up to 2 MB, made into a wide picture (max 1200 px) that waits for approval
+  const [bannerMsg, setBannerMsg] = useState(null);
+  const [bannerBusy, setBannerBusy] = useState(false);
+  const pickBanner = async (file) => {
+    setBannerMsg(null);
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) { setBannerMsg({ type: 'err', text: 'Choose a PNG, JPG or WebP image.' }); return; }
+    if (file.size > 2 * 1024 * 1024) { setBannerMsg({ type: 'err', text: 'The banner can be at most 2 MB.' }); return; }
+    setBannerBusy(true);
+    try {
+      let url = await imageFileToDataURL(file, { maxSize: 1200, quality: 0.78 });
+      if (url.length > 300000) url = await imageFileToDataURL(file, { maxSize: 900, quality: 0.65 });
+      if (url.length > 300000) throw new Error('This picture is too detailed. Try a simpler or smaller one.');
+      await uploadBanner(shop.slug, url);
+      setBannerMsg({ type: 'ok', text: 'Banner sent. It shows on your shop after Kyvro approves it.' });
+    } catch (e) { setBannerMsg({ type: 'err', text: e.code === 'permission-denied' ? 'Banner upload is not on for your shop.' : e.message }); }
+    setBannerBusy(false);
   };
   const askLogo = async () => { setLogoMsg(null); try { await requestLogo(shop.slug); setLogoMsg({ type: 'ok', text: 'Request sent to Kyvro.' }); } catch (e) { setLogoMsg({ type: 'err', text: e.message }); } };
   const set = (k, v) => setExtras((e) => ({ ...e, [k]: v }));
@@ -134,6 +152,23 @@ export default function ShopExtrasEditor({ extras, setExtras, feat, shop, tier =
               : <button type="button" onClick={askLogo} className="px-3 py-1.5 rounded border border-[#D4AF37] text-[#D4AF37] text-xs font-bold">Request logo permission</button>
           ) : <p className="text-[11px] text-gray-500">Logo upload is switched off for your shop.</p>}
           {logoMsg && <p className={`text-xs ${logoMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{logoMsg.text}</p>}
+        </div>
+      )}
+
+      {shop && (
+        <div className={`${box} ${feat.banner ? '' : 'opacity-60'}`}>
+          <p className="text-xs font-bold uppercase tracking-wider">Shop banner {feat.banner ? '' : lock('Premium')}</p>
+          {shop.banner && <div className="space-y-1 text-xs"><img src={shop.banner} alt="" className="w-full max-h-32 object-cover rounded border" /><span className="text-green-600 font-semibold">Approved banner (shown on top of your shop)</span></div>}
+          {shop.bannerPending && <div className="space-y-1 text-xs"><img src={shop.bannerPending} alt="" className="w-full max-h-32 object-cover rounded border" /><span className="text-amber-600 font-semibold">Waiting for Kyvro's approval</span></div>}
+          {shop.bannerReject && <p className="text-xs text-red-500">Banner rejected{shop.bannerReject.note ? `: ${shop.bannerReject.note}` : ''}</p>}
+          {feat.banner ? (
+            <label className="inline-flex flex-wrap items-center gap-2 text-xs font-semibold cursor-pointer">
+              <span className="px-3 py-1.5 rounded bg-[#D4AF37] text-black font-bold">{bannerBusy ? 'Uploading...' : shop.banner || shop.bannerPending ? 'Upload a new banner' : 'Upload banner'}</span>
+              <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={bannerBusy} onChange={(e) => { pickBanner(e.target.files && e.target.files[0]); e.target.value = ''; }} />
+              <span className="font-normal text-gray-500">Wide picture (about 3:1), PNG / JPG / WebP, max 2 MB</span>
+            </label>
+          ) : <p className="text-[11px] text-gray-500">A wide picture on top of your shop.</p>}
+          {bannerMsg && <p className={`text-xs ${bannerMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{bannerMsg.text}</p>}
         </div>
       )}
 
