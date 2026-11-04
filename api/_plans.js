@@ -43,6 +43,8 @@ export async function planCaller(req) {
     const sr = await fetch(`${FS}/documents/sellers/${encodeURIComponent(uid)}`, { headers: { Authorization: `Bearer ${idToken}` } });
     if (!sr.ok) return { error: 'Open your shop first (Sell on Kyvro).', status: 403 };
     const sd = fields(await sr.json());
+    // a seller's shop waits for the Owner first (no status = from before approvals = approved)
+    if ((sd.status || 'approved') !== 'approved') return { error: 'Your shop is waiting for approval.', status: 403 };
     return { uid, email, name: String(sd.name || ''), seller: true, slug: String(sd.slug || '') };
   }
   if (!r.ok) return { error: 'Please sign in again.', status: 401 };
