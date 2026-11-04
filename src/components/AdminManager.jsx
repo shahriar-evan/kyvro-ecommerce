@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { askConfirm, askInput } from './AlertCenter';
 import { OWNER_EMAILS, ownerName } from '../adminEmails';
-import { listAdmins, listPrivateDetails, createAdminAccount, updateAdminProfile, changeAdminEmail, setAdminRole, setAdminActive, removeAdmin, sendAdminPasswordReset, setAdminPasswordByOwner, setAdminEditAll, setAdminAddProducts, setAdminCanApprove, ROLES, ROLE_LABELS } from '../adminAuth';
+import { listAdmins, listPrivateDetails, createAdminAccount, updateAdminProfile, changeAdminEmail, setAdminRole, setAdminActive, removeAdmin, sendAdminPasswordReset, setAdminPasswordByOwner, setAdminEditAll, setAdminAddProducts, setAdminCanApprove, setAdminCanCreateShop, ROLES, ROLE_LABELS } from '../adminAuth';
 import { auth } from '../firebase';
 
 const randomPassword = () => {
@@ -112,6 +112,7 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
   const [editAllNew, setEditAllNew] = useState(false);
   const [addProductsNew, setAddProductsNew] = useState(false);
   const [canApproveNew, setCanApproveNew] = useState(false);
+  const [canCreateShopNew, setCanCreateShopNew] = useState(false);
   const [phone, setPhone] = useState('');
   const [note, setNote] = useState('');
   const [role, setRole] = useState('admin');
@@ -163,7 +164,7 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
     setBusy(true);
     try {
       const { accountCreated, resetSent } = await createAdminAccount(email, password, newRole, {
-        name, phone, note, addedByName: currentName || currentEmail, editAll: isOwner && newRole !== 'owner' && editAllNew, addProducts: isOwner && newRole !== 'owner' && addProductsNew, canApprove: isOwner && newRole !== 'owner' && canApproveNew,
+        name, phone, note, addedByName: currentName || currentEmail, editAll: isOwner && newRole !== 'owner' && editAllNew, addProducts: isOwner && newRole !== 'owner' && addProductsNew, canApprove: isOwner && newRole !== 'owner' && canApproveNew, canCreateShop: isOwner && newRole === 'admin' && canCreateShopNew,
       });
       setMessage({
         type: 'ok',
@@ -171,7 +172,7 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
           ? `${name.trim()} (${email.trim()}) was added as ${ROLE_LABELS[newRole]}. Share the email and password with them so they can log in.`
           : `${email.trim()} already had an account (for example they signed in to the shop with Google before), so the password you typed was NOT set. ${name.trim()} was added to the team as ${ROLE_LABELS[newRole]}. They can log in right now with "Continue with Google" using this email.${resetSent ? ' We also emailed them a "set password" link: after they set a password, email + password login works too (check spam).' : ' To make email + password login work, press "Reset password" on their row so they get a set-password email.'}`
       });
-      setName(''); setEmail(''); setPassword(''); setPhone(''); setNote(''); setRole('admin'); setEditAllNew(false); setAddProductsNew(false); setCanApproveNew(false);
+      setName(''); setEmail(''); setPassword(''); setPhone(''); setNote(''); setRole('admin'); setEditAllNew(false); setAddProductsNew(false); setCanApproveNew(false); setCanCreateShopNew(false);
       await load();
     } catch (err) {
       setMessage({ type: 'err', text: friendlyError(err) });
@@ -310,6 +311,18 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
     try {
       await setAdminCanApprove(a.email, next);
       setMessage({ type: 'ok', text: next ? `${a.name || a.email} can now approve pending products (make them live).` : `${a.name || a.email} can no longer approve products.` });
+      await load();
+    } catch (err) {
+      setMessage({ type: 'err', text: friendlyError(err) });
+    }
+  };
+
+  const handleCanCreateShop = async (a) => {
+    setMessage(null);
+    const next = !a.canCreateShop;
+    try {
+      await setAdminCanCreateShop(a.email, next);
+      setMessage({ type: 'ok', text: next ? `${a.name || a.email} can now create their own shop (you accept it in Team Shops).` : `${a.name || a.email} can no longer create or edit a shop.` });
       await load();
     } catch (err) {
       setMessage({ type: 'err', text: friendlyError(err) });
@@ -473,6 +486,12 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
             <span><strong>Approve products:</strong> let this person approve pending products (make them live on the website). Off by default. You can switch it on or off later.</span>
           </label>
         )}
+        {isOwner && role === 'admin' && (
+          <label className="flex items-start gap-2 text-xs cursor-pointer">
+            <input type="checkbox" checked={canCreateShopNew} onChange={(e) => setCanCreateShopNew(e.target.checked)} className="mt-0.5 accent-[#D4AF37]" />
+            <span><strong>Shop create:</strong> let this Admin create their own shop. It stays off until you accept it in Team Shops. Off by default.</span>
+          </label>
+        )}
         <button type="submit" disabled={busy} className="bg-[#D4AF37] text-black font-bold px-6 py-3 rounded text-xs uppercase tracking-widest hover:opacity-90 transition disabled:opacity-50">
           {busy ? 'Adding...' : (isOwner ? 'Add Member' : 'Add Admin')}
         </button>
@@ -554,6 +573,9 @@ export default function AdminManager({ isDarkMode, currentEmail, currentName, ad
                       )}
                       {a.role !== 'owner' && (
                         <button type="button" onClick={() => handleCanApprove(a)} title="Let this person approve pending products" className={`${chipBtn} ${a.canApprove ? '!bg-green-600 !text-white !border-green-600' : ''}`}>Approve products: {a.canApprove ? 'ON' : 'OFF'}</button>
+                      )}
+                      {a.role === 'admin' && (
+                        <button type="button" onClick={() => handleCanCreateShop(a)} title="Let this Admin create their own shop (you accept it in Team Shops)" className={`${chipBtn} ${a.canCreateShop ? '!bg-green-600 !text-white !border-green-600' : ''}`}>Shop create: {a.canCreateShop ? 'ON' : 'OFF'}</button>
                       )}
                       <button onClick={() => handleReset(a)} className={chipBtn}>Reset password</button>
                       {!isMe && <button onClick={() => handleSetPw(a)} className={chipBtn}>Set password</button>}

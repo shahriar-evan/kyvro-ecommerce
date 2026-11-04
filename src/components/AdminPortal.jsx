@@ -9,12 +9,13 @@ import ColorPicker from './ColorPicker';
 import OrdersPanel from './OrdersPanel';
 import TeamStats from './TeamStats';
 import MyShop from './MyShop';
+import { watchAllShops, isPendingShop } from '../shops';
 import { MAX_COMMISSION } from '../adminAuth';
 import MyProducts from './MyProducts';
 import StoreSettings from './StoreSettings';
 import { subLabel, allPlaces, COLLECTION_LABELS, SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
 
-export default function AdminPortal({ adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canEditProduct, canAddProduct = true, shopOwners = {}, productCommissions = {}, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, productCosts = {}, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct, clearProductForm, handleDeleteRequest }) {
+export default function AdminPortal({ adminCanCreateShop = false, adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canEditProduct, canAddProduct = true, shopOwners = {}, productCommissions = {}, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, productCosts = {}, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct, clearProductForm, handleDeleteRequest }) {
   const [productSearch, setProductSearch] = React.useState('');
   const psq = productSearch.trim().toLowerCase();
   const [catFilter, setCatFilter] = React.useState('All');
@@ -24,6 +25,9 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
   const searched = psq ? products.filter((p) => [p.name, p.category, p.gender, p.brand, p.id, p.supplierName].some((v) => String(v || '').toLowerCase().includes(psq))) : products;
   const shownProducts = catFilter === 'All' ? searched : searched.filter((p) => catLabel(p) === catFilter);
   const isOwner = adminRole === 'owner';
+  // Owner: Admins' shop requests that wait for Accept / Reject (red badge on the Team Shops tab)
+  const [pendingShops, setPendingShops] = React.useState(0);
+  React.useEffect(() => (isOwner ? watchAllShops((list) => setPendingShops(list.filter(isPendingShop).length), () => {}) : undefined), [isOwner]);
   const canManageTeam = adminRole === 'owner' || adminRole === 'manager';
   // Supplier name, price, link and profit are private to the Owner and Managers. Admins never see them.
   const canSeeSupplier = adminRole === 'owner' || adminRole === 'manager';
@@ -280,7 +284,8 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                   onClick={() => setAdminTab('my-shop')}
                   className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'my-shop' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
                 >
-                  {isOwner ? 'Team Shops' : adminRole === 'manager' ? 'My Shop' : 'Shops'}
+                  {isOwner ? 'Team Shops' : adminRole === 'manager' || adminCanCreateShop ? 'My Shop' : 'Shops'}
+                  {isOwner && pendingShops > 0 && <span className="ml-2 px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[10px]">{pendingShops}</span>}
                 </button>
                 <button
                   onClick={() => setAdminTab('my-products')}
@@ -706,7 +711,7 @@ export default function AdminPortal({ adminTab, deleteProduct, editingProductId,
                 </div>
               )}
 
-              {adminTab === 'my-shop' && <MyShop adminRole={adminRole} products={products} isOwner={isOwner} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} />}
+              {adminTab === 'my-shop' && <MyShop canCreateShop={adminCanCreateShop} adminRole={adminRole} products={products} isOwner={isOwner} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} />}
 
               {adminTab === 'my-products' && <MyProducts products={products} loggedInUserEmail={loggedInUserEmail} isDarkMode={isDarkMode} formatPrice={formatPrice} startEditProduct={startEditProduct} canEditProduct={canEditProduct} />}
 

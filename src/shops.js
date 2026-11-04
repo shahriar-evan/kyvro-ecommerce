@@ -1,5 +1,5 @@
 import { getApp } from "firebase/app";
-import { getFirestore, doc, collection, query, where, onSnapshot, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { getFirestore, doc, collection, query, where, onSnapshot, setDoc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import "./firebase"; // makes sure the default Firebase app exists
 
 const db = getFirestore(getApp());
@@ -44,19 +44,35 @@ export function watchShopOwners(onData, onError) {
   );
 }
 
-export async function createShop({ uid, email, name, ownerName }) {
+// pending = an Admin's shop: it starts switched off until the Owner accepts it (the Owner gets a notification)
+export async function createShop({ uid, email, name, ownerName, pending = false }) {
   const shopName = String(name || "").trim().slice(0, 60);
   const slug = `${slugify(shopName)}-${rand()}`;
   await setDoc(doc(db, "shops", slug), {
     name: shopName,
     ownerUid: uid,
-    active: true,
+    active: !pending,
+    status: pending ? "pending" : "approved",
     items: {},
     createdAt: serverTimestamp(),
     updatedAt: new Date().toISOString(),
   });
   await setDoc(doc(db, "shopOwners", slug), { email: String(email || "").toLowerCase(), name: String(ownerName || "").slice(0, 80) });
+  if (pending) {
+    // phone notification + email to the Owner (best effort: the request also shows in the Owner's My Shop tab)
+    try { await fetch("/api/shop-request-notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug }) }); } catch (err) { /* ignore */ }
+  }
   return slug;
+}
+
+// a shop that waits for the Owner (older shops have no status: they were made by Managers and are approved)
+export const isPendingShop = (s) => !!s && s.status === "pending";
+
+// Owner: accept an Admin's shop request (it goes live) or reject it (the shop is removed)
+export const acceptShop = (slug) => updateDoc(doc(db, "shops", slug), { status: "approved", active: true, updatedAt: new Date().toISOString() });
+export async function rejectShop(slug) {
+  await deleteDoc(doc(db, "shops", slug));
+  try { await deleteDoc(doc(db, "shopOwners", slug)); } catch (err) { /* nothing stored */ }
 }
 
 export const saveShopItems = (slug, name, items) =>

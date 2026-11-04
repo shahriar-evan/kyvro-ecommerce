@@ -289,6 +289,7 @@ export default function App() {
   const [adminRole, setAdminRole] = useState(null); // 'owner' | 'manager' | 'admin' | null
   const [adminAddProducts, setAdminAddProducts] = useState(false); // the Owner allowed this person to add new products
   const [adminCanApprove, setAdminCanApprove] = useState(false); // the Owner allowed this person to approve pending products
+  const [adminCanCreateShop, setAdminCanCreateShop] = useState(false); // the Owner allowed this Admin to create their own shop
   const [adminEditAll, setAdminEditAll] = useState(false); // the Owner allowed this person to edit every product
   const [adminName, setAdminName] = useState('');
   const [adminTab, setAdminTab] = useState('products');
@@ -336,7 +337,7 @@ export default function App() {
   // While logged in, access OFF / removal / role changes by the Owner apply immediately
   useEffect(() => {
     if (!isAdminLoggedIn || !loggedInUserEmail || isOwnerEmail(loggedInUserEmail)) return;
-    const unsubscribe = watchAdminAccess(loggedInUserEmail, ({ role, active, name, editAll, addProducts, canApprove, commission }) => {
+    const unsubscribe = watchAdminAccess(loggedInUserEmail, ({ role, active, name, editAll, addProducts, canApprove, canCreateShop, commission }) => {
       if (!role || !active) {
         setIsAdminLoggedIn(false);
         setLoggedInUserEmail('');
@@ -349,6 +350,7 @@ export default function App() {
         setAdminEditAll(!!editAll);
         setAdminAddProducts(!!addProducts);
         setAdminCanApprove(!!canApprove);
+        setAdminCanCreateShop(!!canCreateShop);
         if (name) setAdminName(name);
       }
     });
@@ -402,7 +404,8 @@ export default function App() {
 
   useEffect(() => {
     if (!isAdminLoggedIn) { setShopOwners({}); return undefined; }
-    if (adminRole === 'owner') return watchShopOwners(setShopOwners, () => {});
+    // the Owner and Managers see every shop's owner (Managers see the Admins' shop earnings in Team Stats)
+    if (adminRole === 'owner' || adminRole === 'manager') return watchShopOwners(setShopOwners, () => {});
     const uid = auth.currentUser ? auth.currentUser.uid : '';
     if (!uid) return undefined;
     return watchMyShop(uid, (sh) => setShopOwners(sh ? { [sh.slug]: { email: String(loggedInUserEmail || '').toLowerCase(), name: adminName } } : {}), () => {});
@@ -1233,7 +1236,7 @@ export default function App() {
       {currentView === 'order-success' && <OrderSuccess payNotice={payNotice} order={orderCompleteData} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
 
       {/* ADMIN PORTAL VIEW (GOOGLE SIGN-IN, WHITELISTED EMAILS ONLY) */}
-      {currentView === 'admin' && <AdminPortal adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} canEditProduct={canEditProduct} canAddProduct={canAddProduct} shopOwners={shopOwners} productCommissions={productCommissions} canApproveProduct={canApproveProduct} handleApproveProduct={handleApproveProduct} pendingCount={pendingCount} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} productCosts={productCosts} products={products} storeSettings={storeSettings} isCloud={isCloud} migrating={migrating} handleMigrateProducts={handleMigrateProducts} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} handleDeleteRequest={handleDeleteRequest} clearProductForm={() => { setEditingProductId(null); setNewProductForm(freshProductForm()); }} />}
+      {currentView === 'admin' && <AdminPortal adminCanCreateShop={adminCanCreateShop} adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} canEditProduct={canEditProduct} canAddProduct={canAddProduct} shopOwners={shopOwners} productCommissions={productCommissions} canApproveProduct={canApproveProduct} handleApproveProduct={handleApproveProduct} pendingCount={pendingCount} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} productCosts={productCosts} products={products} storeSettings={storeSettings} isCloud={isCloud} migrating={migrating} handleMigrateProducts={handleMigrateProducts} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} handleDeleteRequest={handleDeleteRequest} clearProductForm={() => { setEditingProductId(null); setNewProductForm(freshProductForm()); }} />}
 
       {/* FOOTER */}
       <PushPrompt customerUser={customerUser} isDarkMode={isDarkMode} />
