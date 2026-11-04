@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import MyShop from './MyShop';
-import { watchMySeller, saveSellerBkash, loadSellerEarnings, applyAsSeller, sellerStatus, normalizeWhatsapp, watchSellerRules, sellerNameBlocked } from '../sellers';
+import { updateSellerCategories, watchMySeller, saveSellerBkash, loadSellerEarnings, applyAsSeller, sellerStatus, normalizeWhatsapp, watchSellerRules, sellerNameBlocked } from '../sellers';
 import { watchPayouts } from '../payouts';
 import { formatDateTime, toDate } from '../utils/dates';
 import { getAdminStatus } from '../adminAuth';
@@ -31,6 +31,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
   useEffect(() => watchPlans(setPlans), []);
   // the store's categories the seller wants to sell (saved as text in productNote; products are picked later in My Shop)
   const [cats, setCats] = useState([]);
+  const [catMsg, setCatMsg] = useState(null);
   const catList = SHOP_COLLECTIONS.filter((c) => products.some((p) => (p.status || 'approved') === 'approved' && productInCollection(p, c.name)));
   const catLabels = (catList.length ? catList : SHOP_COLLECTIONS).map((c) => c.label);
   const uid = customerUser ? customerUser.uid : '';
@@ -53,7 +54,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
   useEffect(() => { if (approved && customerUser) refresh(); }, [approved, seller && seller.slug]); // eslint-disable-line react-hooks/exhaustive-deps
   // a rejected seller applies again with their last details filled in
   useEffect(() => {
-    if (seller && status === 'rejected') setCats((c) => (c.length ? c : String(seller.productNote || '').replace(/^\[Paid plan\] /, '').split(', ').filter((x) => SHOP_COLLECTIONS.some((k) => k.label === x))));
+    if (seller && status !== 'approved') setCats((c) => (c.length ? c : (Array.isArray(seller.categories) ? seller.categories : [])));
     if (seller && status === 'rejected') setForm((f) => (f.name ? f : { ...f, name: seller.name || '', whatsapp: seller.whatsapp || '', district: seller.district || '', area: seller.area || '', address: seller.address || '', pageLink: seller.pageLink || '', productNote: seller.productNote || '' }));
     else if (customerUser && !seller) setForm((f) => (f.name ? f : { ...f, name: customerUser.displayName || '' }));
   }, [seller, status]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -95,7 +96,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
     if (!cats.length) return setFormMsg('Tick at least one category you want to sell.');
     if (!f.agreed) return setFormMsg('Please tick the box to confirm you are an independent seller.');
     setApplying(true);
-    try { await applyAsSeller({ uid, email, shopName: f.shopName, details: { ...f, productNote: `${plan === 'paid' ? '[Paid plan] ' : ''}${cats.join(', ')}` } }); }
+    try { await applyAsSeller({ uid, email, shopName: f.shopName, details: { ...f, categories: cats, productNote: plan === 'paid' ? 'Chose the Paid plan' : '' } }); }
     catch (e) { setFormMsg(e.code === 'permission-denied' ? 'Could not send the application. You may already have a shop, the name may not be allowed, or new sellers are paused.' : e.message); }
     setApplying(false);
   };
@@ -110,6 +111,28 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
       </div>
     );
   }
+  // the store's categories as tick boxes (same list as the shop's category picker)
+  const toggleCat = (l) => setCats((c) => (c.includes(l) ? c.filter((x) => x !== l) : [...c, l]));
+  const catPicker = (
+    <div className="mt-2 flex flex-wrap gap-2">
+      {catLabels.map((l) => {
+        const on = cats.includes(l);
+        return (
+          <button key={l} type="button" aria-pressed={on} onClick={() => toggleCat(l)}
+            className={`inline-flex items-center gap-2 px-3 py-2 rounded-full border text-xs font-semibold transition ${on ? 'border-[#D4AF37] bg-[#D4AF37] text-black' : isDarkMode ? 'border-gray-700 text-gray-300' : 'border-gray-300 text-gray-700'}`}>
+            <span className={`inline-flex h-4 w-4 items-center justify-center rounded border text-[10px] ${on ? 'border-black bg-black text-[#D4AF37]' : 'border-current'}`}>{on ? '✓' : ''}</span>{l}
+          </button>
+        );
+      })}
+    </div>
+  );
+  const saveCats = async () => {
+    setCatMsg(null);
+    if (!cats.length) { setCatMsg({ type: 'err', text: 'Tick at least one category.' }); return; }
+    try { await updateSellerCategories(uid, cats); setCatMsg({ type: 'ok', text: 'Categories saved.' }); }
+    catch (e) { setCatMsg({ type: 'err', text: e.code === 'permission-denied' ? 'Could not save (publish the latest Firestore rules).' : e.message }); }
+  };
+
   // ---- never applied: choose a plan first (like a pricing page) ----
   if (!seller && !plan) {
     const price = planPrice(plans);
@@ -180,17 +203,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
           <div className="sm:col-span-2">{field('pageLink', 'Facebook / Instagram page link (optional)', { maxLength: 300, placeholder: 'https://facebook.com/...' })}</div>
           <div className="sm:col-span-2">
             <p className="text-xs font-semibold text-gray-500">Which categories will you sell? * <span className="font-normal">(you choose the exact products after approval, and can change them any time in My Shop)</span></p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {catLabels.map((l) => {
-                const on = cats.includes(l);
-                return (
-                  <button key={l} type="button" aria-pressed={on} onClick={() => setCats((c) => (on ? c.filter((x) => x !== l) : [...c, l]))}
-                    className={`inline-flex items-center gap-2 px-3 py-2 rounded-full border text-xs font-semibold transition ${on ? 'border-[#D4AF37] bg-[#D4AF37] text-black' : isDarkMode ? 'border-gray-700 text-gray-300' : 'border-gray-300 text-gray-700'}`}>
-                    <span className={`inline-flex h-4 w-4 items-center justify-center rounded border text-[10px] ${on ? 'border-black bg-black text-[#D4AF37]' : 'border-current'}`}>{on ? '✓' : ''}</span>{l}
-                  </button>
-                );
-              })}
-            </div>
+            {catPicker}
           </div>
         </div>
         <label className="flex items-start gap-2 text-xs cursor-pointer">
@@ -221,6 +234,16 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
         <span className="font-bold uppercase tracking-wider">{approved ? 'Approved' : 'Pending approval'}</span>
         <span>{approved ? 'Your shop is approved. Free plan: 10 products, upgrade any time for all.' : 'Kyvro is checking your application. You can already choose products; your link starts working after approval.'}</span>
       </div>
+      {!approved && (
+        <div className={card}>
+          <p className="text-xs font-semibold text-gray-500">Categories you want to sell * <span className="font-normal">(you can change them while Kyvro checks your application)</span></p>
+          {catPicker}
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" onClick={saveCats} className="bg-[#D4AF37] text-black font-bold px-5 py-2 rounded text-xs uppercase tracking-wider">Save categories</button>
+            {catMsg && <span className={`text-xs ${catMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{catMsg.text}</span>}
+          </div>
+        </div>
+      )}
       <MyShop sellerMode showPlan={approved} adminRole="seller" isOwner={false} products={products} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={customerUser.displayName || email} loggedInUserEmail={email} />
 
       {approved && (

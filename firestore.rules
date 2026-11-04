@@ -284,9 +284,12 @@ service cloud.firestore {
     // (never Managers or Admins). No NID, passport, bank or bKash here. status: pending -> approved / rejected (Owner).
     // Entries from before approvals have no status and count as approved.
     match /sellers/{uid} {
+      function categoriesOk(d) {
+        return d.categories is list && d.categories.size() >= 1 && d.categories.size() <= 20;
+      }
       function applicationOk() {
         let d = request.resource.data;
-        return d.keys().hasOnly(['slug', 'email', 'name', 'whatsapp', 'district', 'area', 'address', 'pageLink', 'productNote', 'agreed', 'status', 'createdAt'])
+        return d.keys().hasOnly(['slug', 'email', 'name', 'whatsapp', 'district', 'area', 'address', 'pageLink', 'productNote', 'categories', 'agreed', 'status', 'createdAt'])
           && d.email == myEmail()
           && d.name is string && d.name.size() >= 2 && d.name.size() <= 80
           && d.whatsapp is string && d.whatsapp.matches('^(\\+?8801[3-9][0-9]{8}|01[3-9][0-9]{8}|\\+[1-9][0-9]{7,14})$')
@@ -295,7 +298,9 @@ service cloud.firestore {
           && d.get('address', '') is string && d.get('address', '').size() <= 300
           && d.get('pageLink', '') is string && d.get('pageLink', '').size() <= 300
           && (d.get('pageLink', '') == '' || d.get('pageLink', '').matches('^https?://[^ ]+$'))
-          && d.productNote is string && d.productNote.size() >= 3 && d.productNote.size() <= 300
+          // the store categories the seller wants to sell (at least one); productNote is an optional short note
+          && categoriesOk(d)
+          && d.get('productNote', '') is string && d.get('productNote', '').size() <= 300
           && d.agreed == true
           && d.status == 'pending'
           && d.createdAt == request.time
@@ -310,6 +315,11 @@ service cloud.firestore {
       // apply again after a rejection (the old shop was removed when it was rejected)
       allow update: if (signedIn() && request.auth.uid == uid && !isStaff()
                         && resource.data.get('status', 'approved') == 'rejected' && applicationOk())
+                    // while the application waits, the seller can change the categories they chose
+                    || (signedIn() && request.auth.uid == uid && !isStaff()
+                        && resource.data.get('status', 'approved') == 'pending'
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['categories'])
+                        && categoriesOk(request.resource.data))
                     // the Owner decides
                     || (isOwner()
                         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'rejectNote', 'decidedAt', 'decidedBy'])

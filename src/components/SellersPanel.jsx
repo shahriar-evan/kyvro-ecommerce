@@ -112,7 +112,8 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
                     {row('District / area', [s.district, s.area].filter(Boolean).join(', '))}
                     {row('Address', s.address)}
                     {row('Page', s.pageLink, true)}
-                    <div className="sm:col-span-2">{row('Products', s.productNote)}</div>
+                    <div className="sm:col-span-2">{row('Categories', Array.isArray(s.categories) && s.categories.length ? s.categories.join(', ') : '')}</div>
+                    <div className="sm:col-span-2">{row('Note', s.productNote)}</div>
                     {row('Independent seller confirmed', s.agreed ? 'Yes' : 'No')}
                   </div>
                   <div className="flex flex-wrap gap-2">
