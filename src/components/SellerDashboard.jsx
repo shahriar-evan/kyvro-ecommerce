@@ -9,6 +9,7 @@ import { SHOP_COLLECTIONS, productInCollection } from '../data/shopConfig';
 import { watchPlans } from '../storeSettings';
 import { normalizePlans, effectiveTier, TIER_LABEL } from '../data/priceCheck';
 import PlanCards from './PlanCards';
+import SellerStats from './SellerStats';
 import { PlanCompare, PlanFaq } from './PlanCompareFaq';
 import { PLAN_TEXT, BN_FONT } from '../data/planText';
 import { watchMySubscription } from '../storeSettings';
@@ -266,6 +267,10 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
             </div>
             <p className="text-[11px] text-gray-500">You earn the markup (your price − the store price) when an order is delivered. Returned and cancelled orders earn nothing. Kyvro confirms and delivers every order.</p>
             {earnErr && <p className="text-xs text-red-500">{earnErr}</p>}
+            {earn && (() => {
+              const f = effectiveFeatures(myShop, myShop ? effectiveTier(myShop) : effectiveTier(mySub));
+              return <SellerStats orders={earn.orders} formatPrice={formatPrice} isDarkMode={isDarkMode} statsOn={f.salesStats} csvOn={f.earningsCsv} />;
+            })()}
             {earn && (earn.orders.length === 0 ? <p className="text-sm text-gray-500">No orders from your shop yet.</p> : (
               <div className="divide-y text-xs">
                 {earn.orders.map((o) => (
