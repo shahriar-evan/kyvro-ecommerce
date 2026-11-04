@@ -10,7 +10,7 @@
 //   SITE_URL                   optional, default https://kyvro.store
 
 import crypto from 'node:crypto';
-import { checkOrderPrices } from '../src/data/priceCheck.js';
+import { checkOrderPrices, normalizePlans, visibleShopIds, shopIsPaid } from '../src/data/priceCheck.js';
 
 export const PROJECT = process.env.FIREBASE_PROJECT_ID || 'kyvro-admin-auth';
 export const SITE = (process.env.SITE_URL || 'https://kyvro.store').replace(/\/$/, '');
@@ -62,6 +62,7 @@ export const val = (f) => {
   if ('integerValue' in f) return Number(f.integerValue);
   if ('doubleValue' in f) return Number(f.doubleValue);
   if ('booleanValue' in f) return f.booleanValue;
+  if ('timestampValue' in f) return f.timestampValue; // ISO text
   if ('mapValue' in f) return Object.fromEntries(Object.entries(f.mapValue.fields || {}).map(([k, v]) => [k, val(v)]));
   if ('arrayValue' in f) return (f.arrayValue.values || []).map(val);
   return undefined;
@@ -97,7 +98,19 @@ export async function verifyOrderPrices(order) {
   const list = await Promise.all(ids.map((id) => getDocument(`products/${id}`)));
   const productsById = Object.fromEntries(ids.map((id, i) => [id, list[i]]).filter(([, p]) => p));
   const shop = order.shop && /^[a-z0-9-]{3,40}$/.test(String(order.shop)) ? await getDocument(`shops/${order.shop}`) : null;
-  return checkOrderPrices(order, productsById, shop);
+  // a shop whose paid plan ran out sells only its best sellers (the same products the storefront still shows)
+  let visible = null;
+  if (shop && !shopIsPaid(shop) && shop.planExempt !== true) {
+    const plans = normalizePlans(await getDocument('settings/plans'));
+    const all = Object.keys(shop.items || {});
+    if (plans.enabled && all.length > plans.freeLimit) {
+      const extra = all.filter((id) => !productsById[id] && /^[A-Za-z0-9_-]{1,60}$/.test(id));
+      const more = await Promise.all(extra.map((id) => getDocument(`products/${id}`)));
+      const everyone = { ...productsById, ...Object.fromEntries(extra.map((id, i) => [id, more[i]]).filter(([, p]) => p)) };
+      visible = visibleShopIds(shop, everyone, plans);
+    }
+  }
+  return checkOrderPrices(order, productsById, shop, visible);
 }
 
 // Writes the payment result into the order (+ a line in the activity trail). Only called after SSLCommerz confirmed it.

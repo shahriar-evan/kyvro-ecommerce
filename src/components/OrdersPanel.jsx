@@ -5,7 +5,8 @@ import { updateOrderStatus, isPaidOrder, requestCancelOrder, declineCancelReques
 import { formatDateTime, toDate } from '../utils/dates';
 import { phoneKey, emailKey } from '../data/shopConfig';
 import { watchBlocked, blockPhone, blockEmail, unblockPhone, unblockEmail } from '../blocklist';
-import { checkOrderPrices } from '../data/priceCheck';
+import { checkOrderPrices, visibleShopIds } from '../data/priceCheck';
+import { watchPlans } from '../storeSettings';
 import { watchAllShops } from '../shops';
 
 const STATUS_STYLE = {
@@ -60,8 +61,14 @@ export default function OrdersPanel({ orders, products = [], productCosts = {}, 
   // (only Pending orders: later the store price may change on purpose)
   const [shops, setShops] = useState({});
   useEffect(() => watchAllShops((list) => setShops(Object.fromEntries(list.map((s) => [s.slug, s]))), () => {}), []);
+  const [plans, setPlans] = useState(null);
+  useEffect(() => watchPlans(setPlans), []);
   const productsById = Object.fromEntries(products.map((p) => [String(p.id), p]));
-  const priceCheck = (o) => (o.status === 'Pending' && products.length ? checkOrderPrices(o, productsById, o.shop ? shops[o.shop] : null) : { ok: true, problems: [] });
+  const priceCheck = (o) => {
+    if (o.status !== 'Pending' || !products.length) return { ok: true, problems: [] };
+    const shop = o.shop ? shops[o.shop] : null;
+    return checkOrderPrices(o, productsById, shop, shop ? visibleShopIds(shop, productsById, plans) : null);
+  };
 
   // ---- Dropshipping: cost, profit and the text to paste into the supplier's site ----
   // Supplier's own delivery fee per supplier order (same for every area for now)

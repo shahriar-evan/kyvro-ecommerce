@@ -75,8 +75,9 @@ export async function rejectShop(slug) {
   try { await deleteDoc(doc(db, "shopOwners", slug)); } catch (err) { /* nothing stored */ }
 }
 
-export const saveShopItems = (slug, name, items) =>
-  updateDoc(doc(db, "shops", slug), { name: String(name || "").trim().slice(0, 60), items, updatedAt: new Date().toISOString() });
+// extra: { planExempt: true } for the Owner's own shop (no plan limit; the rules allow it only for the Owner)
+export const saveShopItems = (slug, name, items, extra = {}) =>
+  updateDoc(doc(db, "shops", slug), { name: String(name || "").trim().slice(0, 60), items, ...extra, updatedAt: new Date().toISOString() });
 
 // Owner only: switch a shop on / off
 export const setShopActive = (slug, on) => updateDoc(doc(db, "shops", slug), { active: !!on });

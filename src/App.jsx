@@ -12,7 +12,8 @@ import { watchProfile, saveProfile, watchMyOrders } from './customerData';
 import { ensureSubscribed } from './subscribers';
 import PushPrompt from './components/PushPrompt';
 import { watchProducts, watchProductCosts, watchProductCommissions, setProductCommission, saveProductCost, removeProductCost, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
-import { watchStoreSettings } from './storeSettings';
+import { watchStoreSettings, watchPlans } from './storeSettings';
+import { visibleShopIds, normalizePlans } from './data/priceCheck';
 import { cleanPhone, ONLINE_PAY_ON, DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
 import { INITIAL_PRODUCTS } from './data/products';
 import { CURRENCIES } from './data/currencies';
@@ -91,8 +92,12 @@ export default function App() {
   }, [shopSlug]);
   const shopCtx = shopSlug && shopDoc ? shopDoc : null; // the active shop (null = the main store)
   const shopLoading = !!shopSlug && shopDoc === undefined;
+  // shop plans: a shop whose paid plan ran out shows only its best sellers (the rest are hidden, not deleted)
+  const [plans, setPlans] = useState(() => normalizePlans(null));
+  useEffect(() => (shopSlug ? watchPlans(setPlans) : undefined), [shopSlug]);
+  const shopVisible = shopCtx ? visibleShopIds(shopCtx, Object.fromEntries(products.map((p) => [String(p.id), p])), plans) : null;
   const storefrontProducts = shopLoading ? [] : shopCtx
-    ? shopProducts.filter((p) => shopCtx.items && shopCtx.items[String(p.id)] !== undefined).map((p) => {
+    ? shopProducts.filter((p) => shopCtx.items && shopCtx.items[String(p.id)] !== undefined && (!shopVisible || shopVisible.has(String(p.id)))).map((p) => {
         const price = shopPriceClamp(p.price, shopCtx.items[String(p.id)]);
         return { ...p, price, basePrice: p.price, originalPrice: p.originalPrice > price ? p.originalPrice : 0 };
       })
@@ -166,6 +171,21 @@ export default function App() {
   useEffect(() => {
     if (payResult) { try { window.history.replaceState(window.history.state, '', window.location.pathname); } catch (e) { /* ignore */ } }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // coming back from a shop plan payment: /?plan=ok|fail|cancel|check
+  useEffect(() => {
+    try {
+      const st = new URLSearchParams(window.location.search).get('plan');
+      if (!st) return;
+      window.history.replaceState(window.history.state, '', window.location.pathname);
+      const text = {
+        ok: 'Payment received. Your shop plan is extended: all your shop products show again. (Admin Portal -> My Shop)',
+        check: 'We could not confirm the payment yet. If money was taken, your plan is extended within a few minutes.',
+        cancel: 'The plan payment was cancelled. Nothing was charged.',
+        fail: 'The plan payment did not go through. Please try again from Admin Portal -> My Shop.',
+      }[st];
+      if (text) setTimeout(() => alert(text), 300);
+    } catch (e) { /* ignore */ }
+  }, []);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedSubCategory, setSelectedSubCategory] = useState(null); // null = default view of the collection
   const [selectedProduct, setSelectedProduct] = useState(null);

@@ -4,6 +4,8 @@ import { watchMyShop, watchAllShops, watchShopOwners, createShop, saveShopItems,
 import { askConfirm } from './AlertCenter';
 import { maxMarkupFor, shopPriceClamp, SHOP_COLLECTIONS, productInCollection } from '../data/shopConfig';
 import { flatSubCategories, subLabel } from '../data/catalog';
+import { watchPlans, watchMySubscription } from '../storeSettings';
+import { normalizePlans, planPrice, toMillis, SHOP_MAX_ITEMS } from '../data/priceCheck';
 
 const shopUrl = (slug) => `${window.location.origin}/?shop=${slug}`;
 
@@ -42,6 +44,9 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
   const [owners, setOwners] = useState({});
   const [switching, setSwitching] = useState(''); // slug of the shop whose ON / OFF is being saved
   const [openCat, setOpenCat] = useState(''); // the one category that is open in the product picker
+  const [plans, setPlans] = useState(() => normalizePlans(null));
+  const [sub, setSub] = useState(null); // my plan (subscriptions/{uid}), written only by the server
+  const [paying, setPaying] = useState(false);
 
   const uid = auth.currentUser ? auth.currentUser.uid : '';
   useEffect(() => {
@@ -60,6 +65,9 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
     if (!uid) { setShop(null); return undefined; }
     return watchMyShop(uid, (s) => setShop(s), () => setShop(null));
   }, [isOwner, adminRole, uid, canCreateShop]);
+
+  useEffect(() => watchPlans(setPlans), []);
+  useEffect(() => (isOwner ? undefined : watchMySubscription(uid, setSub)), [uid, isOwner]);
 
   // the saved shop as an editable draft: loaded once per shop, again after Discard
   const draftFrom = (s) => { const d = {}; Object.entries((s && s.items) || {}).forEach(([id, p]) => { d[id] = String(p); }); return d; };
@@ -86,6 +94,34 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
+
+  // ---- shop plan: Free = plans.freeLimit products, Paid = all (the Owner has no limit; also checked in firestore.rules) ----
+  const paidUntil = toMillis(sub && sub.paidUntil);
+  const paid = paidUntil > Date.now();
+  const planLimit = isOwner || !plans.enabled || paid ? SHOP_MAX_ITEMS : plans.freeLimit;
+  // a shop whose plan ran out may keep (or reduce) what it already has, but not add more
+  const cap = Math.max(planLimit, Object.keys(savedItems).length);
+  const daysLeft = paidUntil ? Math.ceil((paidUntil - Date.now()) / 86400000) : null;
+  const fmtDate = (ms) => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const limitMsg = () => setMsg({ type: 'err', text: `The Free plan shows up to ${plans.freeLimit} products. Upgrade to add all products.` });
+  // the plan end date is copied onto the shop for the storefront; a shop made after paying gets it here
+  const [synced, setSynced] = useState(false);
+  useEffect(() => {
+    if (isOwner || synced || !shop || !paidUntil || toMillis(shop.paidUntil) === paidUntil || !auth.currentUser) return;
+    setSynced(true);
+    auth.currentUser.getIdToken().then((t) => fetch('/api/plan-sync', { method: 'POST', headers: { Authorization: `Bearer ${t}` } })).catch(() => {});
+  }, [isOwner, synced, shop, paidUntil]);
+  const buyPlan = async () => {
+    setMsg(null); setPaying(true);
+    try {
+      const t = await auth.currentUser.getIdToken();
+      const r = await fetch('/api/plan-init', { method: 'POST', headers: { Authorization: `Bearer ${t}` } });
+      const j = await r.json().catch(() => ({}));
+      if (j.url) { window.location.href = j.url; return; }
+      setMsg({ type: 'err', text: j.error || 'The payment page could not be opened. Please try again.' });
+    } catch (err) { setMsg({ type: 'err', text: 'The payment page could not be opened. Please try again.' }); }
+    setPaying(false);
+  };
 
   const live = useMemo(() => products.filter((p) => (p.status || 'approved') === 'approved'), [products]);
   const link = shop ? shopUrl(shop.slug) : '';
@@ -121,8 +157,16 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
     setBusy(false);
   };
 
-  const toggle = (p) => setDraft((d) => { const n = { ...d }; if (n[p.id] !== undefined) delete n[p.id]; else n[p.id] = String(p.price); return n; });
-  const selectAll = (list) => setDraft((d) => { const n = { ...d }; list.forEach((p) => { if (n[p.id] === undefined) n[p.id] = String(p.price); }); return n; });
+  const toggle = (p) => {
+    if (draft[p.id] === undefined && Object.keys(draft).length >= cap) { limitMsg(); return; }
+    setDraft((d) => { const n = { ...d }; if (n[p.id] !== undefined) delete n[p.id]; else n[p.id] = String(p.price); return n; });
+  };
+  const selectAll = (list) => {
+    const free = cap - Object.keys(draft).length;
+    const add = list.filter((p) => draft[p.id] === undefined);
+    if (add.length > free) limitMsg();
+    setDraft((d) => { const n = { ...d }; add.slice(0, Math.max(0, free)).forEach((p) => { n[p.id] = String(p.price); }); return n; });
+  };
   const clearAll = (list) => setDraft((d) => { const n = { ...d }; list.forEach((p) => { delete n[p.id]; }); return n; });
 
   const save = async () => {
@@ -137,9 +181,10 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
       if (w > p.price + maxMarkupFor(p.price)) { setMsg({ type: 'err', text: `"${p.name}": the highest price allowed is ${formatPrice(p.price + maxMarkupFor(p.price))}.` }); return; }
       items[String(p.id)] = shopPriceClamp(p.price, w);
     }
+    if (Object.keys(items).length > cap) { limitMsg(); return; }
     setBusy(true);
     try {
-      await saveShopItems(shop.slug, name, items);
+      await saveShopItems(shop.slug, name, items, isOwner ? { planExempt: true } : {});
       setDraft(draftFrom({ items })); // what was really saved (products no longer for sale drop out)
       setMsg({ type: 'ok', text: 'Saved. Your shop link now shows these products and prices.' });
     }
@@ -274,6 +319,35 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
         <p className="text-[11px] text-gray-500">Customers who open your link see only the products you tick below, at the price you type. The price can be higher than the store price by the limit shown for each product. Everything above the store price is yours when the order is delivered. Payments and delivery stay with the store.</p>
       </div>
 
+      {!isOwner && plans.enabled && (
+        <div className={`${card} relative overflow-hidden`}>
+          <span className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-[#B8921F] via-[#E9CB6B] to-[#B8921F]" />
+          {paidUntil > 0 && (daysLeft <= 0 || daysLeft <= plans.reminderDays) && (
+            <div className={`rounded border p-3 text-xs flex flex-wrap items-center justify-between gap-2 ${daysLeft <= 0 ? 'border-red-500/50 bg-red-500/10 text-red-500' : 'border-amber-500/50 bg-amber-500/10 text-amber-600'}`}>
+              <span className="font-semibold">{daysLeft <= 0 ? `Your paid plan ended on ${fmtDate(paidUntil)}. Your shop now shows only its ${plans.freeLimit} best sellers; the others are hidden, not deleted.` : `Your paid plan ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'} (${fmtDate(paidUntil)}).`}</span>
+              <button type="button" disabled={paying} onClick={buyPlan} className="px-4 py-1.5 rounded bg-[#D4AF37] text-black font-bold uppercase tracking-wider disabled:opacity-50">{paying ? 'Opening...' : 'Renew'}</button>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">My plan</p>
+              <p className="text-xl font-bold">{paid ? <span className="text-[#D4AF37]">Paid</span> : 'Free'}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{paid ? `All products · paid until ${fmtDate(paidUntil)}` : `${count} / ${plans.freeLimit} products`}</p>
+            </div>
+            <div className="text-right">
+              <p className="flex flex-wrap items-center justify-end gap-2">
+                {plans.discountPercent > 0 && <span className="text-sm text-gray-500 line-through">{formatPrice(plans.originalPrice)}</span>}
+                <span className="text-xl font-bold text-[#D4AF37]">{formatPrice(planPrice(plans))}</span>
+                {plans.discountPercent > 0 && <span className="px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold">{plans.discountPercent}% OFF</span>}
+              </p>
+              <p className="text-[11px] text-gray-500">All products for {plans.periodDays} days{paid ? ', added to your current plan' : ''}</p>
+              <button type="button" disabled={paying} onClick={buyPlan} className="mt-2 bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold px-5 py-2 rounded text-xs uppercase tracking-widest shadow disabled:opacity-50">{paying ? 'Opening...' : paid ? 'Renew' : 'Upgrade'}</button>
+            </div>
+          </div>
+          <p className="text-[11px] text-gray-500">Payment by bKash / Nagad. There is no automatic monthly charge: press Renew before the end date to keep all products showing.</p>
+        </div>
+      )}
+
       <div className={card}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className="text-xs font-bold uppercase tracking-wider">Products in my shop</p>
@@ -350,7 +424,7 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
       {/* stays at the bottom of the screen: nothing is written until Save */}
       <div className={`sticky bottom-3 z-20 rounded-lg border px-4 py-3 flex flex-wrap items-center justify-between gap-3 backdrop-blur shadow-[0_8px_30px_-10px_rgba(0,0,0,0.5)] ${dirty ? 'border-[#D4AF37]' : isDarkMode ? 'border-gray-800' : 'border-gray-200'} ${isDarkMode ? 'bg-[#0d0d0d]/95' : 'bg-white/95'}`}>
         <div className="min-w-0 text-xs">
-          <p className="font-bold">{count} product{count === 1 ? '' : 's'} selected</p>
+          <p className="font-bold">{count} product{count === 1 ? '' : 's'} selected{cap < SHOP_MAX_ITEMS ? ` (max ${cap})` : ''}</p>
           {msg ? <p className={msg.type === 'ok' ? 'text-green-600' : 'text-red-500'}>{msg.text}</p> : <p className="text-gray-500">{dirty ? 'Unsaved changes' : 'All changes saved'}</p>}
         </div>
         <div className="flex gap-2">

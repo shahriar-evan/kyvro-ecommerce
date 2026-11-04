@@ -26,11 +26,56 @@ export const shopPriceClamp = (base, wanted) => {
   return Math.max(b, Math.min(Math.round(w), b + maxMarkupFor(b)));
 };
 
+// ---------------------------------------------------------------------------
+// Shop plans: Free = up to freeLimit products shown, Paid = all of them for periodDays. The Owner edits these numbers
+// (settings/plans). The server always takes the price from that document, never from the browser.
+// ---------------------------------------------------------------------------
+export const DEFAULT_PLANS = { enabled: true, originalPrice: 999, discountPercent: 40, freeLimit: 10, periodDays: 30, reminderDays: 3 };
+// the most products a shop document can hold at all (also checked in firestore.rules)
+export const SHOP_MAX_ITEMS = 300;
+const num = (v, def, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : def; };
+export const normalizePlans = (p) => {
+  const x = p || {};
+  return {
+    enabled: x.enabled !== false,
+    originalPrice: num(x.originalPrice, DEFAULT_PLANS.originalPrice, 1, 1000000),
+    discountPercent: num(x.discountPercent, DEFAULT_PLANS.discountPercent, 0, 90),
+    freeLimit: num(x.freeLimit, DEFAULT_PLANS.freeLimit, 1, SHOP_MAX_ITEMS),
+    periodDays: num(x.periodDays, DEFAULT_PLANS.periodDays, 1, 366),
+    reminderDays: num(x.reminderDays, DEFAULT_PLANS.reminderDays, 0, 30),
+  };
+};
+// what a customer pays for one period, e.g. 999 with 40% off = 599
+export const planPrice = (plans) => { const p = normalizePlans(plans); return Math.round(p.originalPrice * (1 - p.discountPercent / 100)); };
+// a Firestore Timestamp, an ISO text or milliseconds -> milliseconds (0 = none)
+export const toMillis = (v) => {
+  if (!v) return 0;
+  if (typeof v === 'number') return v;
+  if (typeof v.toMillis === 'function') return v.toMillis();
+  if (typeof v.seconds === 'number') return v.seconds * 1000;
+  const t = Date.parse(v);
+  return Number.isFinite(t) ? t : 0;
+};
+export const shopIsPaid = (shop, now = Date.now()) => toMillis(shop && shop.paidUntil) > now;
+// The products a shop may show right now: null = all of them. A shop whose paid plan ran out shows only its
+// freeLimit best sellers (most "sold"; ties and no sales: the product added to the store first). The rest are
+// hidden, not deleted, and come back when the plan is renewed. The Owner's own shop has no limit.
+export function visibleShopIds(shop, productsById, plans, now = Date.now()) {
+  const p = normalizePlans(plans);
+  if (!shop || !p.enabled || shop.planExempt === true || shopIsPaid(shop, now)) return null;
+  const ids = Object.keys(shop.items || {});
+  if (ids.length <= p.freeLimit) return null;
+  const sold = (id) => { const pr = productsById[String(id)]; return pr ? (parseInt(pr.sold, 10) || 0) : -1; };
+  const ranked = ids.sort((a, b) => (sold(b) - sold(a)) || ((Number(a) || 0) - (Number(b) || 0)) || a.localeCompare(b));
+  return new Set(ranked.slice(0, p.freeLimit));
+}
+
 // Checks the prices saved in an order against the live products (and the shop, for a shop-link order).
 // The browser writes the order, so a customer could change the prices before saving it: this catches that.
 //   productsById: { [id]: product }   shop: the shops/{slug} document, or null / undefined when it does not exist
+//   visible: the shop's visibleShopIds() (null = no limit): a product hidden by an expired plan cannot be bought
 // Returns { ok, problems: [text], subtotal } (subtotal = what the items really cost)
-export function checkOrderPrices(order, productsById, shop) {
+export function checkOrderPrices(order, productsById, shop, visible = null) {
   const problems = [];
   let subtotal = 0;
   const inShop = !!order.shop;
@@ -46,6 +91,7 @@ export function checkOrderPrices(order, productsById, shop) {
     if (inShop && shop) {
       const wanted = shop.items && shop.items[String(it.id)];
       if (wanted === undefined) { problems.push(`${name}: not in this shop`); continue; }
+      if (visible && !visible.has(String(it.id))) { problems.push(`${name}: hidden in this shop (its plan ran out)`); continue; }
       expected = shopPriceClamp(base, wanted);
     }
     if (Number(it.price) !== expected) problems.push(`${name}: price ${it.price}, should be ${expected}`);
