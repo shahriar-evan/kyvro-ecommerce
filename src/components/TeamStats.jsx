@@ -151,9 +151,9 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
       if (ev.kind === 'shop') s.shopTotal += markupOf(ev.order);
       const em = String((people[ev.who] || {}).email || '').toLowerCase();
       const role = isOwnerEmail(em) ? 'owner' : teamView ? roles[em] : (ev.who === me ? adminRole : '');
-      // an order from this person's own shop link earns them the markup only, not commission
-      const ownShop = !!ev.order.shop && !!shopOwners[ev.order.shop] && String(shopOwners[ev.order.shop].email || '').toLowerCase() === em;
-      if (((ev.kind === 'sold') || (ev.kind === 'confirmed' && !ev.order.soldBy)) && ev.order.status === 'Delivered' && !ev.order.returned && !ownShop && role !== 'manager' && role !== 'owner') { // Admins earn commission, Managers earn the shop markup
+      // Main store commission: only an Admin's own sale (soldBy) in the main store (no shop link), once delivered.
+      // Shop-link orders earn the shop's owner the markup instead (kind 'shop' above); Managers earn only markup.
+      if (ev.kind === 'sold' && !ev.order.shop && ev.order.status === 'Delivered' && !ev.order.returned && role !== 'manager' && role !== 'owner') { // Admins earn commission, Managers earn the shop markup
         const { profit, unknown, commission, lines } = orderProfit(ev.order);
         s.profit += profit; s.unknownCost += unknown; s.commTotal += commission; s.comm.push({ ev, profit, unknown, commission, lines });
       }
@@ -311,19 +311,43 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
               </div>
             )}
 
-            {(s.shop.length > 0 || Object.entries(shopOwners).some(([, o]) => String(o.email || '').toLowerCase() === String(p.email || '').toLowerCase())) && (
-              <div className={`rounded border p-3 text-xs flex flex-wrap items-center justify-between gap-2 ${isDarkMode ? 'border-gray-800 bg-[#121212]' : 'border-gray-200 bg-gray-50'}`}>
-                <span><strong>Shop earnings</strong> (markup on delivered orders from {p.key === me ? 'your' : 'their'} shop link): {s.shop.length} order(s)</span>
-                <strong className="text-[#D4AF37] text-base">{formatPrice(s.shopTotal)}</strong>
-              </div>
-            )}
-
-            {anyCommission && (
-              <div className={`rounded border p-3 text-xs flex flex-wrap items-center justify-between gap-2 ${isDarkMode ? 'border-gray-800 bg-[#121212]' : 'border-gray-200 bg-gray-50'}`}>
-                <span><strong>Commission</strong> on delivered orders {p.key === me ? 'you' : 'they'} confirmed{showProfit ? `: profit ${formatPrice(s.profit)}` : ''}{s.unknownCost > 0 ? ` (${s.unknownCost} pcs without a profit figure are not counted)` : ''}</span>
-                <strong className="text-[#D4AF37] text-base">{formatPrice(s.commTotal)}</strong>
-              </div>
-            )}
+            {(() => {
+              // an Admin earns two things, shown apart: main store commission and their own shop's markup.
+              // A Manager earns only the shop markup.
+              const em = String(p.email || p.key).toLowerCase();
+              const role = isOwnerEmail(em) ? 'owner' : teamView ? roles[em] : (p.key === me ? adminRole : '');
+              const isAdminRow = role === 'admin';
+              const hasShop = s.shop.length > 0 || Object.values(shopOwners).some((o) => String(o.email || '').toLowerCase() === em);
+              const box = `rounded-lg border p-4 ${isDarkMode ? 'border-gray-800 bg-[#121212]' : 'border-gray-200 bg-gray-50'}`;
+              const your = p.key === me ? 'your' : 'their';
+              if (!isAdminRow && !hasShop) return null;
+              return (
+                <div className="space-y-3">
+                  <div className={`grid gap-3 ${isAdminRow ? 'sm:grid-cols-2' : ''}`}>
+                    {isAdminRow && (
+                      <div className={box}>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Main store commission</p>
+                        <p className="text-2xl font-bold text-[#D4AF37] mt-1">{formatPrice(s.commTotal)}</p>
+                        <p className="text-[11px] text-gray-500 mt-1">{s.comm.length} delivered order(s) {p.key === me ? 'you' : 'they'} sold in the main store (no shop link), by each product's commission %. Returned orders earn nothing.{showProfit ? ` Profit ${formatPrice(s.profit)}.` : ''}{s.unknownCost > 0 ? ` ${s.unknownCost} pcs without a profit figure are not counted.` : ''}</p>
+                      </div>
+                    )}
+                    {(isAdminRow || hasShop) && (
+                      <div className={box}>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">{p.key === me ? 'My shop earnings' : 'Shop earnings'}</p>
+                        <p className="text-2xl font-bold text-[#D4AF37] mt-1">{formatPrice(s.shopTotal)}</p>
+                        <p className="text-[11px] text-gray-500 mt-1">{hasShop ? `Markup on ${s.shop.length} delivered order(s) from ${your} own shop link. Returned orders earn nothing.` : 'No shop yet.'}</p>
+                      </div>
+                    )}
+                  </div>
+                  {isAdminRow && (
+                    <div className={`${box} flex flex-wrap items-center justify-between gap-2 border-[#D4AF37]/50`}>
+                      <span className="text-xs font-bold uppercase tracking-wider">Total earnings</span>
+                      <span className="text-xs text-gray-500">{formatPrice(s.commTotal)} + {formatPrice(s.shopTotal)} = <strong className="text-lg text-[#D4AF37]">{formatPrice(s.commTotal + s.shopTotal)}</strong></span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {showPay && (earned > 0 || paid > 0) && (
               <div className={`rounded border p-3 text-xs space-y-2 ${isDarkMode ? 'border-gray-800 bg-[#121212]' : 'border-gray-200 bg-gray-50'}`}>
@@ -408,8 +432,8 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
                 )}
                 {anyCommission && (
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider mb-1">Commission details</p>
-                    <p className="text-[11px] text-gray-500 mb-2">Commission = profit of the product &times; the commission % the Owner set for that product. {showProfit ? 'Profit = (selling price − supplier price) × pieces. ' : ''}Only <strong>Delivered</strong> orders {p.key === me ? 'you' : 'they'} confirmed are counted (commission is for Admins; Managers earn the shop markup), cancelled or returned orders earn nothing.</p>
+                    <p className="text-xs font-bold uppercase tracking-wider mb-1">Main store commission details</p>
+                    <p className="text-[11px] text-gray-500 mb-2">Commission = profit of the product &times; the commission % the Owner set for that product. {showProfit ? 'Profit = (selling price − supplier price) × pieces. ' : ''}Only <strong>Delivered</strong> main store orders {p.key === me ? 'you' : 'they'} sold (placed for a customer, no shop link) are counted (commission is for Admins; Managers earn the shop markup), cancelled or returned orders earn nothing.</p>
                     {s.comm.length === 0 ? <p className="text-xs text-gray-500">No delivered orders in this period yet.</p> : (
                       <div className="divide-y text-xs">
                         {[...s.comm].sort((a, b) => (b.ev.at || 0) - (a.ev.at || 0)).map((c) => (
