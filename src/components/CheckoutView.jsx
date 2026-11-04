@@ -289,17 +289,26 @@ export default function CheckoutView({
       <div className={`lg:hidden fixed bottom-0 inset-x-0 z-40 border-t px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.35)] backdrop-blur ${isDarkMode ? 'bg-[#121212]/95 border-gray-800' : 'bg-white/95 border-gray-200'}`}>
         {checkoutError && <p className="text-[11px] leading-snug text-red-500 mb-2 line-clamp-2">{checkoutError}</p>}
         <div className="flex items-center gap-3">
-          <div className="leading-tight min-w-[5.5rem]">
-            <p className="text-[10px] text-gray-500">{areaChosen ? 'Total' : 'Total (+ delivery)'}</p>
-            <p className="text-lg font-bold text-[#D4AF37]">{formatPrice(grandTotal)}</p>
-          </div>
+          {/* Cash on Delivery: only the delivery charge is paid now, the rest when the parcel arrives */}
+          {!online && payNow > 0 ? (
+            <div className="leading-tight min-w-[5.5rem]">
+              <p className="text-[10px] text-gray-500">Pay now (delivery)</p>
+              <p className="text-lg font-bold text-[#D4AF37]">{formatPrice(payNow)}</p>
+              <p className="text-[10px] text-gray-500">{formatPrice(grandTotal - payNow)} on delivery</p>
+            </div>
+          ) : (
+            <div className="leading-tight min-w-[5.5rem]">
+              <p className="text-[10px] text-gray-500">{areaChosen ? 'Total' : 'Total (+ delivery)'}</p>
+              <p className="text-lg font-bold text-[#D4AF37]">{formatPrice(grandTotal)}</p>
+            </div>
+          )}
           {showPayBtn ? (
             <div className="flex-1 flex flex-col gap-1.5">
               <button type="submit" name="payvia" value="bkash" form="kyvro-checkout-form" disabled={placingOrder} className="h-10 rounded-lg bg-[#E2136E] text-white font-bold text-xs tracking-wide shadow active:scale-95 transition disabled:opacity-50">
-                {placingOrder ? 'Placing order...' : (PAY_PROVIDER === 'uddokta' ? 'Pay with bKash / Nagad' : 'Pay with bKash')}
+                {placingOrder ? 'Placing order...' : `${PAY_PROVIDER === 'uddokta' ? 'Pay with bKash / Nagad' : 'Pay with bKash'}${payAmt}`}
               </button>
               {CARD_PAY_ON && <button type="submit" name="payvia" value="card" form="kyvro-checkout-form" disabled={placingOrder} className="h-10 rounded-lg bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold text-xs tracking-wide shadow active:scale-95 transition disabled:opacity-50">
-                {placingOrder ? 'Placing order...' : (PAY_PROVIDER === 'uddokta' ? 'Pay with Card' : 'Pay with Card / Bank')}
+                {placingOrder ? 'Placing order...' : `${PAY_PROVIDER === 'uddokta' ? 'Pay with Card' : 'Pay with Card / Bank'}${payAmt}`}
               </button>}
             </div>
           ) : (
