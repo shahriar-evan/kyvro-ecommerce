@@ -58,7 +58,7 @@ export default function Footer({ onStartSelling, navHas = () => true, isDarkMode
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10 sm:mt-12 pt-6 border-t text-center text-gray-500 text-[11px]">
-          &copy; 2026 Kyvro - কাইভ্রো &bull; www.kyvro.store. All rights reserved.
+          &copy; 2026 Kyvro &middot; কাইভ্রো &bull; www.kyvro.store. All rights reserved.
           {/* the team's way in (also kyvro.store/Admin); kept small on purpose */}
           <button type="button" onClick={() => setCurrentView('admin')} className="block mx-auto mt-2 text-[10px] text-gray-400 hover:text-gray-500 hover:underline">Team login</button>
         </div>

@@ -44,6 +44,7 @@ import PolicyPages from './components/PolicyPages';
 import OrderSuccess from './components/OrderSuccess';
 import ProductDetail from './components/ProductDetail';
 import AccountView from './components/AccountView';
+import SellPricing from './components/SellPricing';
 import OrderTracking from './components/OrderTracking';
 import PaymentResult from './components/PaymentResult';
 import { getPaymentUrl } from './payment';
@@ -787,15 +788,23 @@ export default function App() {
   };
 
   const goAccount = (tab) => { setAccountTab(tab); setCurrentView('account'); };
-  // "Start your own business": Google sign-in first (no form without it), then straight to Sell on Kyvro
-  const startSelling = async () => {
+  // "Start selling" / "Start your own business": first the public pricing page (no login needed). Choosing Free / Pro /
+  // Premium asks for Google sign-in, then opens Sell on Kyvro with that plan (application form; Pro / Premium pay after approval).
+  const [sellPlan, setSellPlan] = useState('');
+  const [pricingBusy, setPricingBusy] = useState('');
+  const startSelling = () => { setCurrentView('pricing'); window.scrollTo(0, 0); };
+  const choosePlan = async (tier) => {
     if (!auth.currentUser) {
+      setPricingBusy(tier);
       try { await signInWithPopup(auth, googleProvider); }
       catch (error) {
+        setPricingBusy('');
         if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') alert('Sign-In Error: ' + error.message);
         return;
       }
+      setPricingBusy('');
     }
+    setSellPlan(tier);
     goAccount('sell');
     window.scrollTo(0, 0);
   };
@@ -1317,7 +1326,13 @@ export default function App() {
       {currentView === 'product-detail' && selectedProduct && <ProductDetail key={selectedProduct.id} product={selectedProduct} products={storefrontProducts} setSelectedProduct={setSelectedProduct} storeSettings={storeSettings} cartSubtotal={subtotal} cartUnits={cart.reduce((n, i) => n + (parseInt(i.quantity, 10) || 0), 0)} addToCart={addToCart} calculateDiscountPercent={calculateDiscountPercent} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} savedIds={savedIds} toggleSaved={toggleSaved} />}
 
       {currentView === 'tracking' && <OrderTracking customerUser={customerUser} onSignIn={handleCustomerSignIn} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
-      {currentView === 'account' && <AccountView products={products} isStaff={isAdminLoggedIn} customerUser={customerUser} displayName={displayName} photoURL={photoURL} activeTab={accountTab} setActiveTab={setAccountTab} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} onSaveProfile={handleSaveProfile} onCancelOrder={handleCancelMyOrder} myOrders={myOrders} savedProducts={savedProducts} toggleSaved={toggleSaved} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedProduct={setSelectedProduct} />}
+      {currentView === 'pricing' && (
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+          <SellPricing formatPrice={formatPrice} isDarkMode={isDarkMode} onChoose={choosePlan} busy={pricingBusy} />
+          <p className="mt-8 text-center text-xs text-gray-500">{customerUser ? `Signed in as ${customerUser.email}.` : 'Choose a plan, then sign in with Google to apply.'}</p>
+        </div>
+      )}
+      {currentView === 'account' && <AccountView sellPlan={sellPlan} products={products} isStaff={isAdminLoggedIn} customerUser={customerUser} displayName={displayName} photoURL={photoURL} activeTab={accountTab} setActiveTab={setAccountTab} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} onSaveProfile={handleSaveProfile} onCancelOrder={handleCancelMyOrder} myOrders={myOrders} savedProducts={savedProducts} toggleSaved={toggleSaved} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedProduct={setSelectedProduct} />}
 
       {/* CHECKOUT (guest checkout, no login needed) */}
       {currentView === 'checkout' && <CheckoutView storeSettings={storeSettings} cart={cart} checkoutForm={checkoutForm} setCheckoutForm={setCheckoutForm} checkoutError={checkoutError} deliveryCharge={deliveryCharge} grandTotal={grandTotal} formatPrice={formatPrice} handleCheckoutSubmit={handleCheckoutSubmit} isDarkMode={isDarkMode} placingOrder={placingOrder} removeFromCart={removeFromCart} updateCartQty={updateCartQty} setCurrentView={setCurrentView} subtotal={subtotal} discount={discount} discountLabel={discountLabel} reward={reward} customerUser={customerUser} authReady={authReady} onSignIn={handleCustomerSignIn} />}

@@ -13,7 +13,8 @@ export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mo
   const tiers = [
     { key: 'free', name: T.free, icon: Zap, blurb: T.blurbFree, features: T.featFree.map((f) => fill(f, plans.freeLimit, lang)) },
     { key: 'pro', name: T.pro, icon: Rocket, blurb: T.blurbPro, badge: T.mostPopular, features: T.featPro },
-    { key: 'premium', name: T.premium, icon: Gem, blurb: T.blurbPremium, badge: T.bestValue, features: T.featPremium, soon: T.soonPremium },
+    // "Coming soon" items are shown only in the Compare Plans table (keeps the cards short)
+    { key: 'premium', name: T.premium, icon: Gem, blurb: T.blurbPremium, badge: T.bestValue, features: T.featPremium },
   ];
 
   const button = (t) => {

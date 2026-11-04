@@ -8,10 +8,8 @@ import { isOwnerEmail } from '../adminEmails';
 import { SHOP_COLLECTIONS, productInCollection } from '../data/shopConfig';
 import { watchPlans } from '../storeSettings';
 import { normalizePlans, effectiveTier, TIER_LABEL } from '../data/priceCheck';
-import PlanCards from './PlanCards';
 import SellerStats from './SellerStats';
-import { PlanCompare, PlanFaq } from './PlanCompareFaq';
-import { PLAN_TEXT, BN_FONT } from '../data/planText';
+import SellPricing from './SellPricing';
 import { watchMySubscription } from '../storeSettings';
 import { watchShop } from '../shops';
 import { effectiveFeatures, httpsLinkOk } from '../data/shopBrand';
@@ -27,7 +25,7 @@ const NO_SOCIALS = { facebook: '', instagram: '', tiktok: '' };
 
 // "Sell on Kyvro": a signed-in customer's own shop. The shop editor is the same as the team's (My Shop, plan,
 // markup cap). Earnings come from the server without any customer details; payouts are what the Owner already paid.
-export default function SellerDashboard({ customerUser, isStaff, products, formatPrice, isDarkMode, onSignIn }) {
+export default function SellerDashboard({ customerUser, isStaff, products, formatPrice, isDarkMode, onSignIn, initialPlan = '' }) {
   const [seller, setSeller] = useState(undefined); // undefined = loading, null = no shop yet
   const [earn, setEarn] = useState(null);
   const [earnErr, setEarnErr] = useState('');
@@ -42,13 +40,8 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
   const [rules, setRules] = useState(null);
   useEffect(() => watchSellerRules(setRules), []);
   // first the plan page (Free / Paid), then the form. The plan is only a choice here: a Paid seller pays after approval.
-  const [plan, setPlan] = useState('');
-  // plan page language: remembered on this device; first time, Bangla when the browser is in Bangla
-  const [lang, setLangState] = useState(() => {
-    try { const v = localStorage.getItem('kyvro_plan_lang'); if (v === 'en' || v === 'bn') return v; } catch (e) { /* no storage */ }
-    return /^bn/i.test((typeof navigator !== 'undefined' && navigator.language) || '') ? 'bn' : 'en';
-  });
-  const setLang = (v) => { setLangState(v); try { localStorage.setItem('kyvro_plan_lang', v); } catch (e) { /* no storage */ } };
+  // initialPlan: chosen on the public pricing page ("Start selling") before the Google sign-in
+  const [plan, setPlan] = useState(['free', 'pro', 'premium'].includes(initialPlan) ? initialPlan : '');
   const [plans, setPlans] = useState(() => normalizePlans(null));
   useEffect(() => watchPlans(setPlans), []);
   // the store's categories the seller wants to sell (saved as text in productNote; products are picked later in My Shop)
@@ -194,25 +187,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
 
   // ---- never applied: choose a plan first (like a pricing page) ----
   if (!seller && !plan) {
-    const T = PLAN_TEXT[lang];
-    return (
-      <div className="space-y-12" lang={lang} style={lang === 'bn' ? { fontFamily: BN_FONT, lineHeight: 1.7 } : undefined}>
-        <div className="flex justify-end">
-          <div className={`inline-flex rounded-full border p-0.5 text-xs font-semibold ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`} role="group" aria-label="Language">
-            {[['en', 'EN'], ['bn', 'বাংলা']].map(([k, l]) => (
-              <button key={k} type="button" aria-pressed={lang === k} onClick={() => setLang(k)} className={`px-3 py-1 rounded-full transition ${lang === k ? 'bg-[#D4AF37] text-black' : 'text-gray-500'}`}>{l}</button>
-            ))}
-          </div>
-        </div>
-        <div className="text-center -mt-8">
-          <h3 className="text-2xl sm:text-3xl font-bold">{T.heading} <span className="text-[#D4AF37]">{T.headingBrand}</span>{T.headingEnd}</h3>
-          <p className="text-sm text-gray-500 mt-2">{T.subtitle}</p>
-        </div>
-        <PlanCards plans={plans} formatPrice={formatPrice} isDarkMode={isDarkMode} mode="apply" onChoose={setPlan} lang={lang} />
-        <PlanCompare lang={lang} isDarkMode={isDarkMode} freeLimit={plans.freeLimit} />
-        <PlanFaq lang={lang} isDarkMode={isDarkMode} />
-      </div>
-    );
+    return <SellPricing formatPrice={formatPrice} isDarkMode={isDarkMode} onChoose={setPlan} />;
   }
 
   if (!seller || status === 'rejected') {
