@@ -507,7 +507,34 @@ service cloud.firestore {
       // Manager / Admin can only SEND a cancel request (cancelRequest, status 'pending'); the Owner approves or declines it.
       allow update: if isStaff()
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['status', 'paymentStatus', 'history', 'updatedAt', 'confirmedBy', 'confirmedByName', 'stockDeducted', 'cancelRequest', 'returned'])
+             .hasOnly(['status', 'paymentStatus', 'history', 'updatedAt', 'confirmedBy', 'confirmedByName', 'stockDeducted', 'cancelRequest', 'returned', 'deliveredRequest', 'deliveredReject'])
+        // "Request delivered": an Admin cannot mark an order Delivered, they ask the Owner / a Manager instead.
+        //  - the Admin who sold (soldBy) or confirmed (confirmedBy) the order sets deliveredRequest {at, by, byName},
+        //    only on a Confirmed / Shipped order, only when no request is waiting, without changing the status;
+        //    this also clears an earlier rejection
+        //  - the Owner or a Manager answers: Confirm (status Delivered) or Reject (deliveredReject {at, by, byName, note, requestBy}),
+        //    both remove deliveredRequest
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['deliveredRequest', 'deliveredReject'])
+            || ((isOwner() || isManager())
+                && !('deliveredRequest' in request.resource.data)
+                && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['deliveredReject'])
+                    || !('deliveredReject' in request.resource.data)
+                    || (request.resource.data.deliveredReject is map
+                        && request.resource.data.deliveredReject.keys().hasOnly(['at', 'by', 'byName', 'note', 'requestBy'])
+                        && request.resource.data.deliveredReject.by == myEmail()
+                        && request.resource.data.deliveredReject.get('note', '') is string
+                        && request.resource.data.deliveredReject.get('note', '').size() <= 300)))
+            || ('deliveredRequest' in request.resource.data
+                && !('deliveredRequest' in resource.data)
+                && !('deliveredReject' in request.resource.data)
+                && request.resource.data.deliveredRequest is map
+                && request.resource.data.deliveredRequest.keys().hasOnly(['at', 'by', 'byName'])
+                && request.resource.data.deliveredRequest.by == myEmail()
+                && request.resource.data.deliveredRequest.at is string && request.resource.data.deliveredRequest.at.size() <= 40
+                && request.resource.data.deliveredRequest.byName is string && request.resource.data.deliveredRequest.byName.size() <= 100
+                && (resource.data.get('soldBy', '') == myEmail() || resource.data.get('confirmedBy', '') == myEmail())
+                && resource.data.status in ['Processing', 'Shipped']
+                && request.resource.data.status == resource.data.status))
         // a returned order: only the Owner or a Manager, only on a Delivered order, and it can be set once
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['returned'])
             || ((isOwner() || isManager()) && resource.data.status == 'Delivered' && !('returned' in resource.data)
