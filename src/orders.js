@@ -54,7 +54,8 @@ const historyEntry = (label, staff) => ({
 //   * Cancel after it was confirmed: the stock is put back
 // Everything happens in one transaction, so two people confirming at once cannot double-count.
 // Returns { skipped: [...] } with products whose stock could not be changed (e.g. not in Firestore).
-export async function updateOrderStatus(orderId, status, staff) {
+// extra: more fields to write in the same update (e.g. removing a delivery request when it is confirmed)
+export async function updateOrderStatus(orderId, status, staff, extra = {}) {
   const orderRef = doc(db, "orders", orderId);
   return runTransaction(db, async (tx) => {
     const snap = await tx.get(orderRef);
@@ -137,6 +138,7 @@ export async function updateOrderStatus(orderId, status, staff) {
     for (const [ref, patch] of productWrites) tx.update(ref, patch);
 
     const patch = {
+      ...extra,
       status,
       updatedAt: serverTimestamp(),
       history: arrayUnion(historyEntry(status, staff)),
@@ -204,6 +206,29 @@ export async function markOrderPaid(orderId, staff) {
     paymentStatus: "Paid",
     updatedAt: serverTimestamp(),
     history: arrayUnion(historyEntry("Payment received", staff)),
+  });
+}
+
+// ---- "Request delivered": an Admin cannot mark an order Delivered; they ask, the Owner or a Manager answers ----
+// (Firestore rules: only the Admin who sold or confirmed the order, on a Confirmed / Shipped order, one waiting request)
+export async function requestDelivered(orderId, staff) {
+  await updateDoc(doc(db, "orders", orderId), {
+    deliveredRequest: { at: new Date().toISOString(), by: String(staff.email || "").toLowerCase(), byName: String(staff.name || staff.email || "").slice(0, 100) },
+    deliveredReject: deleteField(), // asking again clears an earlier rejection
+    updatedAt: serverTimestamp(),
+    history: arrayUnion(historyEntry("Delivery requested", staff)),
+  });
+}
+// Owner / Manager: Confirm = mark Delivered (and remove the request)
+export const confirmDelivered = (orderId, staff) => updateOrderStatus(orderId, "Delivered", staff, { deliveredRequest: deleteField() });
+// Owner / Manager: Reject (with an optional note the Admin sees)
+export async function rejectDelivered(orderId, order, note, staff) {
+  const req = (order && order.deliveredRequest) || {};
+  await updateDoc(doc(db, "orders", orderId), {
+    deliveredRequest: deleteField(),
+    deliveredReject: { at: new Date().toISOString(), by: String(staff.email || "").toLowerCase(), byName: String(staff.name || staff.email || "").slice(0, 100), note: String(note || "").slice(0, 300), requestBy: String(req.by || "") },
+    updatedAt: serverTimestamp(),
+    history: arrayUnion(historyEntry("Delivery request rejected", staff)),
   });
 }
 

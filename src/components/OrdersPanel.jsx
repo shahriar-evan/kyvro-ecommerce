@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { askConfirm, askInput } from './AlertCenter';
 import { ORDER_STATUSES, DELIVERY_AREA_BN } from '../data/shopConfig';
+import { requestDelivered, confirmDelivered, rejectDelivered } from '../orders';
 import { updateOrderStatus, isPaidOrder, requestCancelOrder, declineCancelRequest, markOrderPaid, markOrderReturned, deleteOrders, watchOrderSupply, markSupplierOrdered, unmarkSupplierOrdered, supplierKey } from '../orders';
 import { formatDateTime, toDate } from '../utils/dates';
 import { phoneKey, emailKey } from '../data/shopConfig';
@@ -198,6 +199,27 @@ export default function OrdersPanel({ orders, products = [], productCosts = {}, 
   };
 
   const staff = { email: loggedInUserEmail, name: adminName || loggedInUserEmail };
+  const myEmail = String(loggedInUserEmail || '').toLowerCase();
+  // "Request delivered": an Admin who sold or confirmed a Confirmed / Shipped order asks the Owner / a Manager to mark it Delivered
+  const canRequestDelivered = (o) => !canDeliver && ['Processing', 'Shipped'].includes(o.status) && !o.deliveredRequest
+    && (String(o.soldBy || '').toLowerCase() === myEmail || String(o.confirmedBy || '').toLowerCase() === myEmail);
+  const myRejected = (o) => !!o.deliveredReject && String(o.deliveredReject.requestBy || '').toLowerCase() === myEmail;
+  const askDelivered = async (o) => {
+    if (!(await askConfirm(`Ask the Owner / a Manager to mark order ${o.orderNumber} as Delivered?`))) return;
+    run(o.id, () => requestDelivered(o.id, staff));
+  };
+  const doConfirmDelivered = async (o) => {
+    if (!(await askConfirm(`Mark order ${o.orderNumber} as Delivered (requested by ${o.deliveredRequest.byName || o.deliveredRequest.by})?`))) return;
+    run(o.id, async () => {
+      const { skipped } = await confirmDelivered(o.id, staff);
+      if (skipped && skipped.length) alert('The order was updated, but the stock of these items was NOT changed:\n' + skipped.join('\n'));
+    });
+  };
+  const doRejectDelivered = async (o) => {
+    const note = await askInput(`Reject the delivery request for ${o.orderNumber}? Write a short note for ${o.deliveredRequest.byName || 'the Admin'} (optional):`, { placeholder: 'e.g. courier has not delivered it yet' });
+    if (note === null || note === undefined) return;
+    run(o.id, () => rejectDelivered(o.id, o, note, staff));
+  };
   // Orders where the customer went to the payment page but has not paid (cancelled / closed the page): kept out of the normal list
   // (only orders placed since online payment started on 3 Nov 2026 count; older ones always show)
   const GATE = new Date('2026-11-03T00:00:00+08:00');
@@ -401,6 +423,15 @@ export default function OrdersPanel({ orders, products = [], productCosts = {}, 
           </div>
         )}
         {error && <p className="text-xs p-3 rounded border border-red-500/40 text-red-500 bg-red-500/10">{error}</p>}
+        {!canDeliver && orders.some(myRejected) && (
+          <div className="text-xs p-3 rounded border border-red-500/40 text-red-500 bg-red-500/10">
+            <p className="font-bold">Delivery request rejected</p>
+            {orders.filter(myRejected).map((o) => <p key={o.id}>{o.orderNumber}: rejected by {o.deliveredReject.byName || o.deliveredReject.by}{o.deliveredReject.note ? ` · "${o.deliveredReject.note}"` : ''}</p>)}
+          </div>
+        )}
+        {canDeliver && orders.some((o) => o.deliveredRequest) && (
+          <p className="text-xs p-3 rounded border border-[#D4AF37]/50 text-[#D4AF37] bg-[#D4AF37]/10 font-semibold">{orders.filter((o) => o.deliveredRequest).length} order(s) wait for you to confirm delivery: {orders.filter((o) => o.deliveredRequest).map((o) => o.orderNumber).join(', ')}</p>
+        )}
       </div>
 
       {/* blocked customers */}
@@ -464,6 +495,8 @@ export default function OrdersPanel({ orders, products = [], productCosts = {}, 
                 <span className={`inline-block px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${STATUS_STYLE[o.status] || ''}`}>{o.status}</span>
                 {o.returned && <span className="block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-600 text-white">Returned</span>}
                 {!priceCheck(o).ok && <span className="block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-600 text-white">Price mismatch</span>}
+                {o.deliveredRequest && <span className="block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#D4AF37] text-black">{canDeliver ? `Delivery requested by ${o.deliveredRequest.byName || o.deliveredRequest.by}` : 'Delivery requested'}</span>}
+                {!canDeliver && myRejected(o) && <span className="block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-600 text-white">Delivery rejected</span>}
                 {o.cancelRequest && o.cancelRequest.status === 'pending' && o.status !== 'Cancelled' && <span className="block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-600 text-white">Cancel request</span>}
                 <p className="text-sm font-bold mt-1">{formatPrice(o.total)}</p>
                 {(() => {
@@ -723,9 +756,21 @@ export default function OrdersPanel({ orders, products = [], productCosts = {}, 
               {o.status === 'Processing' && (
                 <button disabled={busy} onClick={() => setStatus(o, 'Shipped')} className={`${btn} bg-purple-600 text-white hover:opacity-90`}>Mark as shipped</button>
               )}
-              {o.status === 'Shipped' && canDeliver && (
+              {o.status === 'Shipped' && canDeliver && !o.deliveredRequest && (
                 <button disabled={busy} onClick={() => setStatus(o, 'Delivered')} className={`${btn} bg-green-600 text-white hover:opacity-90`}>Mark as delivered</button>
               )}
+              {canDeliver && o.deliveredRequest && o.status !== 'Delivered' && o.status !== 'Cancelled' && (
+                <>
+                  <span className="self-center text-[11px] font-semibold text-[#D4AF37]">Delivery requested by {o.deliveredRequest.byName || o.deliveredRequest.by}</span>
+                  <button disabled={busy} onClick={() => doConfirmDelivered(o)} className={`${btn} bg-green-600 text-white hover:opacity-90`}>Confirm delivered</button>
+                  <button disabled={busy} onClick={() => doRejectDelivered(o)} className={`${btn} border border-red-500 text-red-500 hover:bg-red-500/10`}>Reject</button>
+                </>
+              )}
+              {canRequestDelivered(o) && (
+                <button disabled={busy} onClick={() => askDelivered(o)} className={`${btn} bg-green-600 text-white hover:opacity-90`}>Request delivered</button>
+              )}
+              {!canDeliver && o.deliveredRequest && <span className="self-center text-[11px] text-gray-500">Waiting for the Owner / a Manager to confirm delivery.</span>}
+              {!canDeliver && myRejected(o) && !o.deliveredRequest && <span className="self-center text-[11px] text-red-500">Delivery request rejected by {o.deliveredReject.byName || o.deliveredReject.by}{o.deliveredReject.note ? `: ${o.deliveredReject.note}` : ''}</span>}
               {o.status === 'Delivered' && showSupplier && !o.returned && (
                 <button disabled={busy} onClick={async () => {
                   const loss = await askInput(`Order ${o.orderNumber} came back (returned / refused)?\n\nWrite how much money the store LOST on it in taka (delivery both ways, supplier fee, anything not refunded). Write 0 if nothing was lost.`, { placeholder: 'e.g. 250' });
