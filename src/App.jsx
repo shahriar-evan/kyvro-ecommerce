@@ -778,6 +778,18 @@ export default function App() {
   };
 
   const goAccount = (tab) => { setAccountTab(tab); setCurrentView('account'); };
+  // "Start your own business": Google sign-in first (no form without it), then straight to Sell on Kyvro
+  const startSelling = async () => {
+    if (!auth.currentUser) {
+      try { await signInWithPopup(auth, googleProvider); }
+      catch (error) {
+        if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') alert('Sign-In Error: ' + error.message);
+        return;
+      }
+    }
+    goAccount('sell');
+    window.scrollTo(0, 0);
+  };
 
   const handleSaveProfile = (patch) => saveProfile(customerUser.uid, patch);
 
@@ -1227,7 +1239,7 @@ export default function App() {
       {currentView !== 'home' && <BackButton onClick={goBack} />}
 
       {/* 2. HEADER */}
-      <Header cart={cart} curr={curr} currencyKey={currencyKey} currentView={currentView} isDarkMode={isDarkMode} setCurrencyKey={setCurrencyKey} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} setIsDarkMode={setIsDarkMode} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} navHas={navHas} customerUser={customerUser} displayName={displayName} photoURL={photoURL} goAccount={goAccount} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} />
+      <Header onStartSelling={startSelling} cart={cart} curr={curr} currencyKey={currencyKey} currentView={currentView} isDarkMode={isDarkMode} setCurrencyKey={setCurrencyKey} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} setIsDarkMode={setIsDarkMode} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} navHas={navHas} customerUser={customerUser} displayName={displayName} photoURL={photoURL} goAccount={goAccount} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} />
       {/* a public seller's shop link: say clearly who sells it (not Kyvro itself) */}
       {shopCtx && shopCtx.kind === 'seller' && currentView !== 'admin' && (
         <div className={`border-b px-4 py-2 text-center text-xs ${isDarkMode ? 'bg-[#121212] border-gray-800 text-gray-300' : 'bg-[#D4AF37]/10 border-[#D4AF37]/30 text-gray-700'}`}>
@@ -1279,7 +1291,19 @@ export default function App() {
           </div>
         </div>
       )}
-      <Footer navHas={navHas} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} customerUser={customerUser} onSignIn={handleCustomerSignIn} goAccount={goAccount} />
+      {/* home page of the main store only (not on a shop link): invite visitors to sell */}
+      {currentView === 'home' && !shopSlug && (
+        <section className={`border-t ${isDarkMode ? 'bg-[#0d0d0d] border-gray-800' : 'bg-[#111] border-gray-800'}`}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+            <div>
+              <p className="text-lg sm:text-xl font-bold text-white">Start your own business with <span className="text-[#D4AF37]">Kyvro</span>.</p>
+              <p className="text-sm text-gray-400 mt-1">Free 10 products, no investment. We deliver, you earn the markup.</p>
+            </div>
+            <button type="button" onClick={startSelling} className="shrink-0 w-full sm:w-auto bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold px-8 py-3 rounded text-xs uppercase tracking-widest shadow hover:opacity-90 transition">Start selling</button>
+          </div>
+        </section>
+      )}
+      <Footer onStartSelling={startSelling} navHas={navHas} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} customerUser={customerUser} onSignIn={handleCustomerSignIn} goAccount={goAccount} />
 
     </div>
   );
