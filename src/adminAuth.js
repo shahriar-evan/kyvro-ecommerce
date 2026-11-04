@@ -45,7 +45,7 @@ export function watchAdminAccess(email, callback) {
     (snap) => {
       if (!snap.exists()) return callback({ role: null, active: false, name: "" });
       const data = snap.data();
-      callback({ role: ROLES.includes(data.role) ? data.role : "admin", active: data.active !== false, name: data.name || "", editAll: data.editAll === true, addProducts: data.addProducts === true, canApprove: data.canApprove === true, commission: Number(data.commission) || 0 });
+      callback({ role: ROLES.includes(data.role) ? data.role : "admin", active: data.active !== false, name: data.name || "", editAll: data.editAll === true, addProducts: data.addProducts === true, canApprove: data.canApprove === true, canCreateShop: data.canCreateShop === true, commission: Number(data.commission) || 0 });
     },
     () => {} // ignore network/permission errors
   );
@@ -100,6 +100,7 @@ export async function createAdminAccount(email, password, role = "admin", profil
     editAll: profile.editAll === true,
     addProducts: profile.addProducts === true,
     canApprove: profile.canApprove === true,
+    canCreateShop: profile.canCreateShop === true,
     commission: Math.max(0, Math.min(MAX_COMMISSION, Number(profile.commission) || 0)),
   });
   // Owner-only extras. The password is only saved when we really created the account
@@ -183,6 +184,11 @@ export async function setAdminAddProducts(email, on) {
 // Owner: allow / stop this person from APPROVING pending products (making them live)
 export async function setAdminCanApprove(email, on) {
   await updateDoc(doc(db, "admins", norm(email)), { canApprove: !!on });
+}
+
+// Owner: allow / stop an Admin from creating their own shop (the shop still waits for the Owner to accept it)
+export async function setAdminCanCreateShop(email, on) {
+  await updateDoc(doc(db, "admins", norm(email)), { canCreateShop: !!on });
 }
 
 // Owner: commission percent (0-100) this person earns on the profit of the orders they confirm

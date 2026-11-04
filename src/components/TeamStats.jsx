@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { askConfirm } from './AlertCenter';
 import { loadStatsResets, resetAdminStats, listAdmins } from '../adminAuth';
+import { isOwnerEmail } from '../adminEmails';
 import { toDate, formatDateTime } from '../utils/dates';
 import { askInput } from './AlertCenter';
 import { watchPayouts, addPayout, deletePayout } from '../payouts';
@@ -39,18 +40,20 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
   const [to, setTo] = useState('');
   const [open, setOpen] = useState('');
   const me = keyOf(loggedInUserEmail, adminName);
+  // the Owner sees everybody; a Manager also sees the Admins (to manage them); an Admin sees only their own numbers
+  const teamView = isOwner || adminRole === 'manager';
   // when the Owner reset a person's numbers (counting starts again from that moment)
   const [resets, setResets] = useState({});
-  useEffect(() => { loadStatsResets(isOwner, loggedInUserEmail).then(setResets); }, [isOwner, loggedInUserEmail]);
+  useEffect(() => { loadStatsResets(teamView, loggedInUserEmail).then(setResets); }, [teamView, loggedInUserEmail]);
   // a shop's markup on one order = (price the customer paid - store price) x pieces
   const markupOf = (o) => (o.items || []).reduce((n, it) => n + Math.max(0, (Number(it.price) || 0) - (it.basePrice !== undefined ? Number(it.basePrice) || 0 : Number(it.price) || 0)) * (parseInt(it.quantity, 10) || 0), 0);
   const myShopSlugs = Object.entries(shopOwners).filter(([, o]) => String(o.email || '').toLowerCase() === String(loggedInUserEmail || '').toLowerCase()).map(([k]) => k);
   // Managers earn the shop markup, Admins earn commission: the Owner's view needs everybody's role
   const [roles, setRoles] = useState({});
   useEffect(() => {
-    if (!isOwner) return;
+    if (!teamView) return;
     listAdmins().then((l) => { const m = {}; l.forEach((a) => { m[String(a.email).toLowerCase()] = a.role; }); setRoles(m); }).catch(() => {});
-  }, [isOwner]);
+  }, [teamView]);
   // what the Owner already paid out (a Manager's markup / an Admin's commission)
   const [payouts, setPayouts] = useState([]);
   useEffect(() => watchPayouts(isOwner, loggedInUserEmail, setPayouts, () => {}), [isOwner, loggedInUserEmail]);
@@ -147,8 +150,10 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
       if (ev.kind !== 'sold') s[ev.kind].push(ev);
       if (ev.kind === 'shop') s.shopTotal += markupOf(ev.order);
       const em = String((people[ev.who] || {}).email || '').toLowerCase();
-      const role = isOwner ? roles[em] : (ev.who === me ? adminRole : '');
-      if (((ev.kind === 'sold') || (ev.kind === 'confirmed' && !ev.order.soldBy)) && ev.order.status === 'Delivered' && !ev.order.returned && role !== 'manager' && role !== 'owner') { // Admins earn commission, Managers earn the shop markup
+      const role = isOwnerEmail(em) ? 'owner' : teamView ? roles[em] : (ev.who === me ? adminRole : '');
+      // an order from this person's own shop link earns them the markup only, not commission
+      const ownShop = !!ev.order.shop && !!shopOwners[ev.order.shop] && String(shopOwners[ev.order.shop].email || '').toLowerCase() === em;
+      if (((ev.kind === 'sold') || (ev.kind === 'confirmed' && !ev.order.soldBy)) && ev.order.status === 'Delivered' && !ev.order.returned && !ownShop && role !== 'manager' && role !== 'owner') { // Admins earn commission, Managers earn the shop markup
         const { profit, unknown, commission, lines } = orderProfit(ev.order);
         s.profit += profit; s.unknownCost += unknown; s.commTotal += commission; s.comm.push({ ev, profit, unknown, commission, lines });
       }
@@ -209,7 +214,8 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
     try { await addPayout(p.email || p.key, p.name, Number(a), note || '', { email: loggedInUserEmail }); }
     catch (err) { alert('Could not save: ' + (err.code === 'permission-denied' ? 'publish the latest Firestore rules first.' : err.message)); }
   };
-  const visibleKeys = Object.keys(people).filter((k) => isOwner || k === me);
+  const visibleKeys = Object.keys(people).filter((k) => isOwner || k === me
+    || (adminRole === 'manager' && roles[String((people[k] || {}).email || '').toLowerCase()] === 'admin'));
   const rows = visibleKeys
     .map((k) => ({ ...people[k], s: stats[k] || { confirmed: [], delivered: [], cancelled: [], pieces: 0, sales: 0, products: {}, profit: 0, unknownCost: 0, commTotal: 0, comm: [], shop: [], shopTotal: 0, mine: { orders: 0, pieces: 0, sales: 0, list: {} } } }))
     .sort((a, b) => b.s.confirmed.length - a.s.confirmed.length);
@@ -222,9 +228,9 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
     <div className="space-y-5">
       <div className={card}>
         <div>
-          <h3 className="text-lg font-bold">{isOwner ? 'Team Performance' : 'My Performance'}</h3>
+          <h3 className="text-lg font-bold">{teamView ? 'Team Performance' : 'My Performance'}</h3>
           <p className="text-xs text-gray-500 mt-1">
-            {isOwner ? 'Who confirmed, delivered and cancelled how many orders, and the products and sales behind them.' : 'The orders you confirmed, delivered and cancelled.'}
+            {teamView ? (isOwner ? 'Who confirmed, delivered and cancelled how many orders, and the products and sales behind them.' : 'Your numbers and the Admins\' numbers: orders they confirmed, delivered and cancelled, and their earnings.') : 'The orders you confirmed, delivered and cancelled.'}
             {' '}Sales and products count confirmed orders that were not cancelled later.
           </p>
         </div>
@@ -262,18 +268,20 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
         const paidList = paidOf(p);
         const paid = paidList.reduce((n, x) => n + (Number(x.amount) || 0), 0);
         const due = earned - paid;
-        const isOpen = open === p.key || !isOwner;
+        const isOpen = open === p.key || !teamView;
+        // what was paid out is private between the Owner and that person
+        const showPay = isOwner || p.key === me;
         const prods = Object.entries(s.products).sort((a, b) => b[1] - a[1]);
         return (
           <div key={p.key} className={card}>
-            <button type="button" onClick={() => isOwner && setOpen(open === p.key ? '' : p.key)} className={`w-full text-left ${isOwner ? 'cursor-pointer' : 'cursor-default'}`}>
+            <button type="button" onClick={() => teamView && setOpen(open === p.key ? '' : p.key)} className={`w-full text-left ${teamView ? 'cursor-pointer' : 'cursor-default'}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="font-bold">{p.name}{p.key === me ? ' (you)' : ''}</p>
                   {p.email && <p className="text-[11px] text-gray-500">{p.email}</p>}
                   {p.key !== me && <p className="text-[11px] mt-1"><span className="px-2 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] font-bold">{p.key === me ? 'My products' : 'Products added'} ({(addedBy[p.key] || []).length})</span></p>}
                 </div>
-                {isOwner && <span className="text-[11px] text-[#D4AF37] font-bold uppercase tracking-wider">{isOpen ? 'Hide orders' : 'Show orders'}</span>}
+                {teamView && <span className="text-[11px] text-[#D4AF37] font-bold uppercase tracking-wider">{isOpen ? 'Hide orders' : 'Show orders'}</span>}
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4 text-center">
                 {[
@@ -317,7 +325,7 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
               </div>
             )}
 
-            {(earned > 0 || paid > 0) && (
+            {showPay && (earned > 0 || paid > 0) && (
               <div className={`rounded border p-3 text-xs space-y-2 ${isDarkMode ? 'border-gray-800 bg-[#121212]' : 'border-gray-200 bg-gray-50'}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span><strong>Earnings</strong> (commission + shop markup) in this period</span>
@@ -438,7 +446,7 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
           </div>
         );
       })}
-      {isOwner && rows.length === 0 && <p className="text-sm text-gray-500 text-center py-8">No confirmed orders yet.</p>}
+      {teamView && rows.length === 0 && <p className="text-sm text-gray-500 text-center py-8">No confirmed orders yet.</p>}
     </div>
   );
 }
