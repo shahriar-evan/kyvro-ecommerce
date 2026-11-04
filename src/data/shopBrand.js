@@ -45,7 +45,9 @@ export const PRO_EXTRAS = ['tagline', 'contactUrl', 'about', 'socialLinks'];
 export const PREMIUM_EXTRAS = ['brandColor', 'announcement', 'pinnedItems'];
 
 // ---- Plan features: what each tier gets by default; the Owner / a Manager can switch any of them ON or OFF for a
-// shop (shops/{slug}.features). firestore.rules uses the same defaults (featOn). ----
+// shop (shops/{slug}.features). firestore.rules uses the same defaults (featOn).
+// paid: true = shop identity (name change, logo, banner): Premium ON, Pro OFF unless switched on, Free never (even with
+// an override; rules: paidFeatOn). The shop link (slug) never changes. ----
 export const FEATURES = [
   { key: 'allProducts', label: 'All products', pro: true },
   { key: 'priorityApproval', label: 'Priority approval', pro: true },
@@ -59,14 +61,17 @@ export const FEATURES = [
   { key: 'verified', label: 'Verified badge', pro: false },
   { key: 'weeklyPayout', label: 'Weekly payout', pro: false },
   { key: 'prioritySupport', label: 'Priority support', pro: false },
-  { key: 'logo', label: 'Logo upload', pro: false },
-  { key: 'banner', label: 'Banner upload', pro: false },
+  { key: 'shopName', label: 'Shop name change', pro: false, paid: true },
+  { key: 'logo', label: 'Logo upload', pro: false, paid: true },
+  { key: 'banner', label: 'Banner upload', pro: false, paid: true },
   { key: 'salesStats', label: 'Sales stats', pro: false },
   { key: 'earningsCsv', label: 'Monthly earnings CSV', pro: false },
 ];
 export const featureDefault = (key, tier) => tier === 'premium' || (tier === 'pro' && !!(FEATURES.find((f) => f.key === key) || {}).pro);
+// a paid-only feature is always off on the Free plan, whatever the override says
+export const featureLockedFree = (key, tier) => tier === 'free' && !!(FEATURES.find((f) => f.key === key) || {}).paid;
 // { key: true/false } for a shop: override first, else the tier default. tier = 'free' | 'pro' | 'premium'.
 export const effectiveFeatures = (shop, tier) => {
   const o = (shop && shop.features) || {};
-  return Object.fromEntries(FEATURES.map((f) => [f.key, typeof o[f.key] === 'boolean' ? o[f.key] : featureDefault(f.key, tier)]));
+  return Object.fromEntries(FEATURES.map((f) => [f.key, featureLockedFree(f.key, tier) ? false : typeof o[f.key] === 'boolean' ? o[f.key] : featureDefault(f.key, tier)]));
 };

@@ -76,8 +76,9 @@ export async function rejectShop(slug) {
 }
 
 // extra: { planExempt: true } for the Owner's own shop (no plan limit; the rules allow it only for the Owner)
+// name = null: the name is not written (no "Shop name change" feature). The link (slug) never changes.
 export const saveShopItems = (slug, name, items, extra = {}) =>
-  updateDoc(doc(db, "shops", slug), { name: String(name || "").trim().slice(0, 60), items, ...extra, updatedAt: new Date().toISOString() });
+  updateDoc(doc(db, "shops", slug), { ...(name == null ? {} : { name: String(name || "").trim().slice(0, 60) }), items, ...extra, updatedAt: new Date().toISOString() });
 
 // Owner only: switch a shop on / off
 export const setShopActive = (slug, on) => updateDoc(doc(db, "shops", slug), { active: !!on });

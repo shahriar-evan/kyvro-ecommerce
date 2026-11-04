@@ -53,9 +53,9 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   const [paying, setPaying] = useState(''); // the tier whose payment page is opening
   // Pro / Premium shop extras shown on the storefront
   const [extras, setExtras] = useState(() => shopExtrasOf(null));
-  // public seller ("Sell on Kyvro"): blocked shop names (the application itself is in SellerDashboard)
+  // blocked shop-name words (settings/sellerRules): checked on every name change except the Owner's (also in firestore.rules)
   const [sellerRules, setSellerRules] = useState(null);
-  useEffect(() => (sellerMode ? watchSellerRules(setSellerRules) : undefined), [sellerMode]);
+  useEffect(() => (isOwner ? undefined : watchSellerRules(setSellerRules)), [isOwner]);
 
   const uid = auth.currentUser ? auth.currentUser.uid : '';
   useEffect(() => {
@@ -208,7 +208,13 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
       const badSocial = Object.entries(ex.socialLinks).find(([, v]) => !httpsLinkOk(v));
       if (badSocial) { setMsg({ type: 'err', text: `${badSocial[0]}: the link must start with https://` }); return; }
     }
-    if (sellerMode) { const bad = sellerNameBlocked(name, shop.slug, sellerRules); if (bad) { setMsg({ type: 'err', text: `The shop name cannot contain "${bad}".` }); return; } }
+    // shop name: changes at once (feature "Shop name change"), the link stays the same; blocked words are refused
+    const nameChanged = name.trim() !== String(shop.name || '').trim();
+    if (nameChanged) {
+      if (!feat.shopName) { setMsg({ type: 'err', text: 'Changing the shop name is not on for your plan.' }); return; }
+      if (name.trim().length < 2) { setMsg({ type: 'err', text: 'The shop name needs at least 2 letters.' }); return; }
+      if (!isOwner) { const bad = sellerNameBlocked(name, '', sellerRules); if (bad) { setMsg({ type: 'err', text: `The shop name cannot contain "${bad}".` }); return; } }
+    }
     setBusy(true);
     try {
       // only the extras this plan may change (the rules refuse the others)
@@ -216,7 +222,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
       const FIELD_FEATURE = { tagline: 'tagline', contactUrl: 'tagline', about: 'about', socialLinks: 'social', brandColor: 'brandColor', announcement: 'announcement', pinnedItems: 'pinned' };
       const keys = Object.keys(FIELD_FEATURE).filter((k) => feat[FIELD_FEATURE[k]]);
       const changes = Object.fromEntries(keys.filter((k) => JSON.stringify(ex[k]) !== JSON.stringify(before[k])).map((k) => [k, ex[k]]));
-      await saveShopItems(shop.slug, name, items, { ...(isOwner ? { planExempt: true } : {}), ...changes });
+      await saveShopItems(shop.slug, nameChanged ? name : null, items, { ...(isOwner ? { planExempt: true } : {}), ...changes });
       setExtras(ex);
       setDraft(draftFrom({ items })); // what was really saved (products no longer for sale drop out)
       setMsg({ type: 'ok', text: 'Saved. Your shop link now shows these products and prices.' });
@@ -351,7 +357,8 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
           <div className="flex flex-wrap gap-2">{linkButtons(shop.slug, goldBtn)}</div>
         </div>
         <label className="block text-xs font-semibold text-gray-500">Shop name
-          <input className={`${inputCls} block mt-1 w-full sm:w-72`} maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
+          <input className={`${inputCls} block mt-1 w-full sm:w-72 disabled:opacity-60`} maxLength={60} value={name} disabled={!feat.shopName} onChange={(e) => setName(e.target.value)} />
+          <span className="block mt-1 text-[11px] font-normal">{feat.shopName ? 'The new name shows at once. Your shop link never changes.' : '🔒 Changing the name is a Premium feature (Pro: Kyvro can switch it on). Your shop link never changes.'}</span>
         </label>
         <ShopExtrasEditor extras={extras} setExtras={setExtras} feat={feat} shop={shop} tier={isOwner ? 'premium' : effectiveTier(shop)} shopName={name} link={link}
           pinChoices={live.filter((p) => draft[p.id] !== undefined)} isDarkMode={isDarkMode} inputCls={inputCls} />
