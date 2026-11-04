@@ -1,23 +1,23 @@
 import React from 'react';
 import { Zap, Rocket, Gem, Check, Clock } from 'lucide-react';
 import { normalizePlans, planPrice } from '../data/priceCheck';
+import { PLAN_TEXT, fill } from '../data/planText';
 
 // The three seller plans side by side (Free / Pro / Premium), in the Kyvro gold / dark style.
 //   mode 'apply'   : before applying (every button says Get started)
 //   mode 'upgrade' : an approved shop owner's plan (Current plan / Upgrade / Renew)
 // Prices, discounts and the period come from settings/plans. "Coming soon" features are shown greyed out, never as available.
-export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mode = 'apply', currentTier = 'free', busy = '', onChoose }) {
+export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mode = 'apply', currentTier = 'free', busy = '', onChoose, lang = 'en' }) {
+  const T = PLAN_TEXT[lang] || PLAN_TEXT.en;
   const plans = normalizePlans(rawPlans);
-  const free = [`${plans.freeLimit} products`, 'Your own shop link', 'Earn markup on every delivered order', 'Kyvro handles payment and delivery'];
   const tiers = [
-    { key: 'free', name: 'Free', icon: Zap, blurb: 'Start selling today.', features: free },
-    { key: 'pro', name: 'Pro', icon: Rocket, blurb: 'For growing sellers.', badge: 'Most Popular', features: ['All products', 'Priority approval', 'Shop tagline + WhatsApp / Facebook button', 'Social links (Facebook, Instagram, TikTok, YouTube)', 'About section', 'Share kit (QR code + caption)', 'Logo upload (on request)', 'Everything in Free'] },
-    { key: 'premium', name: 'Premium', icon: Gem, blurb: 'For serious sellers.', badge: 'Best Value', features: ['Everything in Pro', 'Shop name wordmark in the header', 'Brand color', 'Announcement strip', 'Pin top 3 products', 'Logo upload (Owner approved)', 'Verified seller badge', 'Weekly payout', 'Priority support'],
-      soon: ['Custom banner upload', 'Custom domain', 'Featured on Kyvro', 'Sales stats', 'Shop coupon codes', 'Order email notification', 'Monthly earnings CSV'] },
+    { key: 'free', name: T.free, icon: Zap, blurb: T.blurbFree, features: T.featFree.map((f) => fill(f, plans.freeLimit, lang)) },
+    { key: 'pro', name: T.pro, icon: Rocket, blurb: T.blurbPro, badge: T.mostPopular, features: T.featPro },
+    { key: 'premium', name: T.premium, icon: Gem, blurb: T.blurbPremium, badge: T.bestValue, features: T.featPremium, soon: T.soonPremium },
   ];
 
   const button = (t) => {
-    if (mode === 'apply') return { label: 'Get started', disabled: false };
+    if (mode === 'apply') return { label: t.key === 'pro' ? T.btnPro : t.key === 'premium' ? T.btnPremium : T.btnFree, disabled: false };
     if (t.key === 'free') return { label: currentTier === 'free' ? 'Current plan' : 'Included', disabled: true };
     if (t.key === 'pro') {
       if (currentTier === 'premium') return { label: 'Included in Premium', disabled: true };
@@ -31,7 +31,7 @@ export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mo
   const line = isDarkMode ? 'border-gray-800' : 'border-gray-200';
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6 items-stretch md:pt-4">
         {tiers.map((t) => {
           const pro = t.key === 'pro';
@@ -48,31 +48,31 @@ export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mo
                   {premium ? <Gem size={12} /> : <Rocket size={12} />}{t.badge}
                 </span>
               )}
-              <p className={`flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] ${pro || premium ? 'text-[#D4AF37]' : muted}`}><Icon size={16} />{t.name}{current && <span className="ml-auto normal-case tracking-normal text-[10px] px-2 py-0.5 rounded-full bg-green-600 text-white">Current</span>}</p>
+              <p className={`flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] ${pro || premium ? 'text-[#D4AF37]' : muted}`}><Icon size={16} />{t.name}{current && <span className="ml-auto normal-case tracking-normal text-[10px] px-2 py-0.5 rounded-full bg-green-600 text-white">{T.current}</span>}</p>
               <p className={`text-xs mt-1 ${muted}`}>{t.blurb}</p>
 
               <div className="mt-5 min-h-[5.5rem]">
                 {cfg && cfg.discount > 0 && (
                   <p className="flex items-center gap-2">
                     <span className={`text-base line-through ${muted}`}>{formatPrice(cfg.price)}</span>
-                    <span className="px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold">{cfg.discount}% OFF</span>
+                    <span className="px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold">{fill(T.off, cfg.discount, lang)}</span>
                   </p>
                 )}
                 <p className="mt-1 text-4xl font-bold tracking-tight">{formatPrice(price)}</p>
-                <p className={`text-xs mt-1 ${muted}`}>{t.key === 'free' ? 'forever' : `per ${plans.periodDays} days`}</p>
+                <p className={`text-xs mt-1 ${muted}`}>{t.key === 'free' ? T.forever : fill(T.perDays, plans.periodDays, lang)}</p>
               </div>
 
               <ul className={`mt-5 pt-5 border-t space-y-3 text-sm ${line}`}>
                 {t.features.map((f) => (
                   <li key={f} className="flex items-start gap-2.5">
                     <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-[#D4AF37] text-black"><Check size={11} strokeWidth={3} /></span>
-                    <span className={f.startsWith('Everything') ? 'font-semibold' : ''}>{f}</span>
+                    <span className={f === T.featPro[T.featPro.length - 1] || f === T.featPremium[0] ? 'font-semibold' : ''}>{f}</span>
                   </li>
                 ))}
                 {(t.soon || []).map((f) => (
                   <li key={f} className={`flex items-start gap-2.5 ${muted} opacity-70`}>
                     <Clock size={16} className="shrink-0 mt-0.5" />
-                    <span>{f} <span className="ml-1 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border border-current">Coming soon</span></span>
+                    <span>{f} <span className="ml-1 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border border-current">{T.soon}</span></span>
                   </li>
                 ))}
               </ul>
@@ -88,7 +88,7 @@ export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mo
         })}
       </div>
       <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
-        {['Pay with bKash / Nagad', 'Activates right after payment', 'No auto-charge, renew manually'].map((p) => (
+        {T.pills.map((p) => (
           <span key={p} className={`px-4 py-2 rounded-full border text-xs ${isDarkMode ? 'border-gray-800 text-gray-300 bg-[#121212]' : 'border-gray-200 text-gray-600 bg-white'}`}>{p}</span>
         ))}
       </div>
