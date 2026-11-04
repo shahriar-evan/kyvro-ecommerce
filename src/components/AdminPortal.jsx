@@ -25,6 +25,14 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
   const searched = psq ? products.filter((p) => [p.name, p.category, p.gender, p.brand, p.id, p.supplierName].some((v) => String(v || '').toLowerCase().includes(psq))) : products;
   const shownProducts = catFilter === 'All' ? searched : searched.filter((p) => catLabel(p) === catFilter);
   const isOwner = adminRole === 'owner';
+  // My Shop with unsaved ticks / prices: ask before switching to another tab
+  const shopDirty = React.useRef(false);
+  const goTab = async (tab, before) => {
+    if (adminTab === 'my-shop' && tab !== 'my-shop' && shopDirty.current
+      && !(await askConfirm('You have unsaved changes in your shop. Leave without saving?', { danger: true, confirmText: 'Leave' }))) return;
+    if (before) before();
+    setAdminTab(tab);
+  };
   // Owner: Admins' shop requests that wait for Accept / Reject (red badge on the Team Shops tab)
   const [pendingShops, setPendingShops] = React.useState(0);
   React.useEffect(() => (isOwner ? watchAllShops((list) => setPendingShops(list.filter(isPendingShop).length), () => {}) : undefined), [isOwner]);
@@ -251,19 +259,19 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
 
               <div className="flex flex-wrap gap-2 border-b pb-4">
                 <button 
-                  onClick={() => setAdminTab('products')} 
+                  onClick={() => goTab('products')} 
                   className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'products' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
                 >
                   Products ({products.length}){pendingCount > 0 && <span className="ml-2 bg-red-600 text-white rounded-full px-2 py-0.5 text-[10px]">{pendingCount} pending</span>}
                 </button>
                 {(canAddProduct || editingProductId) && <button 
-                  onClick={() => { setEditingProductId(null); setAdminTab('add-product'); }} 
+                  onClick={() => goTab('add-product', () => setEditingProductId(null))} 
                   className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'add-product' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
                 >
                   {editingProductId ? 'Edit Product' : '+ Add Product'}
                 </button>}
                 <button 
-                  onClick={() => setAdminTab('orders')} 
+                  onClick={() => goTab('orders')} 
                   className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'orders' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
                 >
                   Orders ({orders.length})
@@ -275,27 +283,27 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                   )}
                 </button>
                 <button
-                  onClick={() => setAdminTab('stats')}
+                  onClick={() => goTab('stats')}
                   className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'stats' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
                 >
                   {isOwner ? 'Team Stats' : 'My Stats'}
                 </button>
                 <button
-                  onClick={() => setAdminTab('my-shop')}
+                  onClick={() => goTab('my-shop')}
                   className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'my-shop' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
                 >
                   {isOwner ? 'Team Shops' : adminRole === 'manager' || adminCanCreateShop ? 'My Shop' : 'Shops'}
                   {isOwner && pendingShops > 0 && <span className="ml-2 px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[10px]">{pendingShops}</span>}
                 </button>
                 <button
-                  onClick={() => setAdminTab('my-products')}
+                  onClick={() => goTab('my-products')}
                   className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'my-products' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
                 >
                   My Products ({products.filter((p) => p.addedBy && String(p.addedBy).toLowerCase() === String(loggedInUserEmail || '').toLowerCase()).length})
                 </button>
                 {isOwner && (
                   <button
-                    onClick={() => setAdminTab('settings')}
+                    onClick={() => goTab('settings')}
                     className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'settings' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
                   >
                     Banner &amp; Discount
@@ -303,7 +311,7 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                 )}
                 {canManageTeam && (
                   <button 
-                    onClick={() => setAdminTab('admins')} 
+                    onClick={() => goTab('admins')} 
                     className={`px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition ${adminTab === 'admins' ? 'bg-[#D4AF37] text-black' : 'bg-gray-200 dark:bg-[#181818] text-gray-700 dark:text-gray-300'}`}
                   >
                     {isOwner ? 'Manage Admins' : 'Add Admin'}
@@ -711,7 +719,7 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                 </div>
               )}
 
-              {adminTab === 'my-shop' && <MyShop canCreateShop={adminCanCreateShop} adminRole={adminRole} products={products} isOwner={isOwner} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} />}
+              {adminTab === 'my-shop' && <MyShop onDirtyChange={(d) => { shopDirty.current = d; }} canCreateShop={adminCanCreateShop} adminRole={adminRole} products={products} isOwner={isOwner} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} />}
 
               {adminTab === 'my-products' && <MyProducts products={products} loggedInUserEmail={loggedInUserEmail} isDarkMode={isDarkMode} formatPrice={formatPrice} startEditProduct={startEditProduct} canEditProduct={canEditProduct} />}
 

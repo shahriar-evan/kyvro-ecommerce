@@ -3,12 +3,35 @@ import { auth } from '../firebase';
 import { watchMyShop, watchAllShops, watchShopOwners, createShop, saveShopItems, setShopActive, isPendingShop, acceptShop, rejectShop } from '../shops';
 import { askConfirm } from './AlertCenter';
 import { maxMarkupFor, shopPriceClamp, SHOP_COLLECTIONS, productInCollection } from '../data/shopConfig';
+import { flatSubCategories, subLabel } from '../data/catalog';
+
+const shopUrl = (slug) => `${window.location.origin}/?shop=${slug}`;
+
+// Premium ON / OFF switch (a real button, so Space / Enter work and screen readers hear "switch, on / off")
+function ShopSwitch({ on, busy, onToggle, isDarkMode, label }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-label={label}
+        disabled={busy}
+        onClick={onToggle}
+        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-wait ${isDarkMode ? 'focus-visible:ring-offset-[#161616]' : 'focus-visible:ring-offset-white'} ${on ? 'bg-gradient-to-r from-emerald-400 to-green-600 border-green-500 shadow-[0_0_12px_rgba(34,197,94,0.55)]' : isDarkMode ? 'bg-[#2a2a2a] border-gray-700' : 'bg-gray-300 border-gray-300'}`}
+      >
+        <span className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-out ${on ? 'translate-x-[22px]' : 'translate-x-[2px]'}`} />
+      </button>
+      <span className={`w-7 text-[11px] font-bold tracking-wider ${on ? 'text-green-600' : 'text-gray-500'}`}>{busy ? '...' : on ? 'ON' : 'OFF'}</span>
+    </span>
+  );
+}
 
 // "My Shop": every Manager gets their own link (kyvro.store/?shop=name). They choose which products to show
 // (by collection or one by one) and the price they sell at, up to the limit for that product. The whole markup is theirs.
 // An Admin the Owner switched "Shop create" ON for can make one too: it stays switched off until the Owner accepts it.
 // Payments (online, delivery charge, cash on delivery) all stay with the store; the Owner pays the markup out later.
-export default function MyShop({ canCreateShop = false, adminRole, products, isOwner, isDarkMode, formatPrice, adminName, loggedInUserEmail }) {
+export default function MyShop({ canCreateShop = false, adminRole, products, isOwner, isDarkMode, formatPrice, adminName, loggedInUserEmail, onDirtyChange }) {
   const [shop, setShop] = useState(undefined); // undefined = loading, null = none yet
   const [draft, setDraft] = useState({}); // productId -> price text (only the products that are in the shop)
   const [name, setName] = useState('');
@@ -17,6 +40,8 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
   const [msg, setMsg] = useState(null);
   const [allShops, setAllShops] = useState([]);
   const [owners, setOwners] = useState({});
+  const [switching, setSwitching] = useState(''); // slug of the shop whose ON / OFF is being saved
+  const [openCat, setOpenCat] = useState(''); // the one category that is open in the product picker
 
   const uid = auth.currentUser ? auth.currentUser.uid : '';
   useEffect(() => {
@@ -36,20 +61,56 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
     return watchMyShop(uid, (s) => setShop(s), () => setShop(null));
   }, [isOwner, adminRole, uid, canCreateShop]);
 
-  // load the saved shop into the editable draft (once per shop, and again after saving)
+  // the saved shop as an editable draft: loaded once per shop, again after Discard
+  const draftFrom = (s) => { const d = {}; Object.entries((s && s.items) || {}).forEach(([id, p]) => { d[id] = String(p); }); return d; };
   const [loadedFor, setLoadedFor] = useState('');
   useEffect(() => {
     if (shop && loadedFor !== shop.slug) {
-      const d = {};
-      Object.entries(shop.items || {}).forEach(([id, p]) => { d[id] = String(p); });
-      setDraft(d); setName(shop.name || ''); setLoadedFor(shop.slug);
+      setDraft(draftFrom(shop)); setName(shop.name || ''); setLoadedFor(shop.slug);
     }
   }, [shop, loadedFor]);
 
+  // unsaved = the ticks, prices or name differ from what is saved in Firestore
+  const savedItems = (shop && shop.items) || {};
+  const dirty = !!shop && (
+    name !== (shop.name || '')
+    || Object.keys(draft).length !== Object.keys(savedItems).length
+    || Object.entries(draft).some(([id, v]) => savedItems[id] === undefined || Number(v) !== Number(savedItems[id]))
+  );
+  useEffect(() => { if (onDirtyChange) onDirtyChange(dirty); }, [dirty]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { if (onDirtyChange) onDirtyChange(false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // closing or reloading the page with unsaved changes: the browser asks first
+  useEffect(() => {
+    if (!dirty) return undefined;
+    const warn = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+
   const live = useMemo(() => products.filter((p) => (p.status || 'approved') === 'approved'), [products]);
-  const link = shop ? `${window.location.origin}/?shop=${shop.slug}` : '';
+  const link = shop ? shopUrl(shop.slug) : '';
   const card = `p-5 sm:p-6 rounded-lg border space-y-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`;
   const inputCls = `border p-2 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`;
+
+  // main categories that have products (plus "Other" for products that are in none of them)
+  const cats = useMemo(() => {
+    const list = SHOP_COLLECTIONS.map((c) => ({ ...c, items: live.filter((p) => productInCollection(p, c.name)) })).filter((c) => c.items.length);
+    const rest = live.filter((p) => !SHOP_COLLECTIONS.some((c) => productInCollection(p, c.name)));
+    if (rest.length) list.push({ name: '__other', label: 'Other', items: rest });
+    return list;
+  }, [live]);
+  // one category's products grouped by sub-category (product.category), in the same order as the store menu
+  const groupsOf = (cat) => {
+    const order = flatSubCategories(cat.name);
+    const rank = (s) => (!s ? 1e6 : order.indexOf(s) === -1 ? 1e5 : order.indexOf(s));
+    const m = new Map();
+    cat.items.forEach((p) => {
+      const sub = p.category && p.category !== cat.name && p.category !== p.gender ? p.category : '';
+      if (!m.has(sub)) m.set(sub, []);
+      m.get(sub).push(p);
+    });
+    return [...m.entries()].sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b)).map(([sub, items]) => ({ sub, items }));
+  };
 
   const doCreate = async () => {
     setMsg(null);
@@ -61,8 +122,8 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
   };
 
   const toggle = (p) => setDraft((d) => { const n = { ...d }; if (n[p.id] !== undefined) delete n[p.id]; else n[p.id] = String(p.price); return n; });
-  const addAll = (col) => setDraft((d) => { const n = { ...d }; live.filter((p) => productInCollection(p, col)).forEach((p) => { if (n[p.id] === undefined) n[p.id] = String(p.price); }); return n; });
-  const removeAll = (col) => setDraft((d) => { const n = { ...d }; live.filter((p) => productInCollection(p, col)).forEach((p) => { delete n[p.id]; }); return n; });
+  const selectAll = (list) => setDraft((d) => { const n = { ...d }; list.forEach((p) => { if (n[p.id] === undefined) n[p.id] = String(p.price); }); return n; });
+  const clearAll = (list) => setDraft((d) => { const n = { ...d }; list.forEach((p) => { delete n[p.id]; }); return n; });
 
   const save = async () => {
     setMsg(null);
@@ -77,12 +138,33 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
       items[String(p.id)] = shopPriceClamp(p.price, w);
     }
     setBusy(true);
-    try { await saveShopItems(shop.slug, name, items); setMsg({ type: 'ok', text: 'Saved. Your shop link now shows these products and prices.' }); }
+    try {
+      await saveShopItems(shop.slug, name, items);
+      setDraft(draftFrom({ items })); // what was really saved (products no longer for sale drop out)
+      setMsg({ type: 'ok', text: 'Saved. Your shop link now shows these products and prices.' });
+    }
     catch (err) { setMsg({ type: 'err', text: err.code === 'permission-denied' ? 'Could not save: publish the latest Firestore rules first.' : err.message }); }
     setBusy(false);
   };
+  const discard = async () => {
+    if (!(await askConfirm('Discard your unsaved changes?', { danger: true, confirmText: 'Discard' }))) return;
+    setDraft(draftFrom(shop)); setName(shop.name || ''); setMsg(null);
+  };
 
   const copy = async (text) => { try { await navigator.clipboard.writeText(text); setMsg({ type: 'ok', text: 'Link copied.' }); } catch { setMsg({ type: 'err', text: 'Could not copy. Select the link and copy it.' }); } };
+  // Copy link + Open link (a preview: it also works for a shop that is OFF or waiting for the Owner)
+  const linkBtn = 'px-3 py-1.5 rounded border border-gray-400 font-semibold text-center';
+  const linkButtons = (slug, cls = linkBtn) => (
+    <>
+      <button type="button" onClick={() => copy(shopUrl(slug))} className={cls}>Copy link</button>
+      <a href={shopUrl(slug)} target="_blank" rel="noopener noreferrer" className={cls}>Open link</a>
+    </>
+  );
+  const flipShop = async (s) => {
+    setSwitching(s.slug);
+    try { await setShopActive(s.slug, s.active === false); } catch (e) { setMsg({ type: 'err', text: e.message }); }
+    setSwitching('');
+  };
 
   // ---------- Owner: all shops ----------
   const top = isOwner ? (
@@ -102,7 +184,8 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
                       <p className="font-bold">{s.name || s.slug} <span className="font-normal text-gray-500">· {owners[s.slug] ? (owners[s.slug].name || owners[s.slug].email) : ''}</span></p>
                       <p className="text-gray-500 break-all">{owners[s.slug] ? owners[s.slug].email : ''} · {Object.keys(s.items || {}).length} products so far</p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
+                      {linkButtons(s.slug)}
                       <button type="button" onClick={async () => { try { await acceptShop(s.slug); setMsg({ type: 'ok', text: `"${s.name}" is live now.` }); } catch (e) { setMsg({ type: 'err', text: e.code === 'permission-denied' ? 'Could not accept: publish the latest Firestore rules first.' : e.message }); } }} className="px-3 py-1.5 rounded bg-green-600 text-white font-semibold">Accept</button>
                       <button type="button" onClick={async () => { if (!(await askConfirm(`Reject the shop "${s.name}"? It is removed and the Admin can request again.`, { danger: true, confirmText: 'Reject' }))) return; try { await rejectShop(s.slug); setMsg({ type: 'ok', text: `"${s.name}" was rejected.` }); } catch (e) { setMsg({ type: 'err', text: e.message }); } }} className="px-3 py-1.5 rounded border border-red-500 text-red-500 font-semibold">Reject</button>
                     </div>
@@ -117,11 +200,11 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
                 <div key={s.slug} className="py-3 flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-bold">{s.name || s.slug} <span className="font-normal text-gray-500">· {owners[s.slug] ? (owners[s.slug].name || owners[s.slug].email) : ''}</span></p>
-                    <p className="text-gray-500 break-all">{window.location.origin}/?shop={s.slug} · {Object.keys(s.items || {}).length} products</p>
+                    <p className="text-gray-500 break-all">{shopUrl(s.slug)} · {Object.keys(s.items || {}).length} products</p>
                   </div>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => copy(`${window.location.origin}/?shop=${s.slug}`)} className="px-3 py-1.5 rounded border border-gray-400 font-semibold">Copy link</button>
-                    <button type="button" onClick={async () => { try { await setShopActive(s.slug, s.active === false); } catch (e) { setMsg({ type: 'err', text: e.message }); } }} className={`px-3 py-1.5 rounded font-semibold ${s.active === false ? 'bg-gray-400 text-white' : 'bg-green-600 text-white'}`}>{s.active === false ? 'OFF' : 'ON'}</button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {linkButtons(s.slug)}
+                    <ShopSwitch on={s.active !== false} busy={switching === s.slug} onToggle={() => flipShop(s)} isDarkMode={isDarkMode} label={`Shop ${s.name || s.slug} on or off`} />
                   </div>
                 </div>
               ))}
@@ -143,9 +226,9 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
               <div key={x.slug} className="py-3 flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-bold">{x.name || x.slug}</p>
-                  <p className="text-gray-500 break-all">{window.location.origin}/?shop={x.slug} · {Object.keys(x.items || {}).length} products</p>
+                  <p className="text-gray-500 break-all">{shopUrl(x.slug)} · {Object.keys(x.items || {}).length} products</p>
                 </div>
-                <button type="button" onClick={() => copy(`${window.location.origin}/?shop=${x.slug}`)} className="px-3 py-1.5 rounded border border-gray-400 font-semibold">Copy link</button>
+                <div className="flex flex-wrap gap-2">{linkButtons(x.slug)}</div>
               </div>
             ))}
           </div>
@@ -172,6 +255,8 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
   }
 
   const count = Object.keys(draft).length;
+  const open = cats.find((c) => c.name === openCat) || null;
+  const goldBtn = 'px-4 py-2 rounded bg-[#D4AF37] text-black text-xs font-bold uppercase tracking-wider text-center';
   return wrap(
     <div className="space-y-5">
       <div className={card}>
@@ -181,7 +266,7 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
             {isPendingShop(shop) && <p className="text-xs text-amber-600 mt-1">The Owner was notified. You can already choose products and prices; the link starts working when the Owner accepts your shop.</p>}
             <p className="text-xs text-gray-500 break-all mt-1">{link}</p>
           </div>
-          <button type="button" onClick={() => copy(link)} className="px-4 py-2 rounded bg-[#D4AF37] text-black text-xs font-bold uppercase tracking-wider">Copy link</button>
+          <div className="flex flex-wrap gap-2">{linkButtons(shop.slug, goldBtn)}</div>
         </div>
         <label className="block text-xs font-semibold text-gray-500">Shop name
           <input className={`${inputCls} block mt-1 w-full sm:w-72`} maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
@@ -190,50 +275,88 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
       </div>
 
       <div className={card}>
-        <p className="text-xs font-bold uppercase tracking-wider">Categories</p>
-        <div className="flex flex-wrap gap-2">
-          {SHOP_COLLECTIONS.map((c) => {
-            const list = live.filter((p) => productInCollection(p, c.name));
-            if (!list.length) return null;
-            const on = list.filter((p) => draft[p.id] !== undefined).length;
-            return (
-              <span key={c.name} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs">
-                <strong>{c.label}</strong> <span className="text-gray-500">{on}/{list.length}</span>
-                <button type="button" onClick={() => addAll(c.name)} className="text-green-600 font-semibold">Add all</button>
-                <button type="button" onClick={() => removeAll(c.name)} className="text-red-500 font-semibold">Remove</button>
-              </span>
-            );
-          })}
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-xs font-bold uppercase tracking-wider">Products in my shop</p>
+          <p className="text-[11px] text-gray-500">Open a category to choose its products. Your ticks are kept until you press Save.</p>
         </div>
-      </div>
+        {cats.length === 0 ? <p className="text-sm text-gray-500">No live products yet.</p> : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {cats.map((c) => {
+              const on = c.items.filter((p) => draft[p.id] !== undefined).length;
+              const active = openCat === c.name;
+              return (
+                <button key={c.name} type="button" aria-expanded={active} onClick={() => setOpenCat(active ? '' : c.name)}
+                  className={`text-left rounded-lg border p-3 transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${active ? 'border-[#D4AF37] bg-[#D4AF37]/10 shadow-[0_0_0_1px_rgba(212,175,55,0.4)]' : isDarkMode ? 'border-gray-800 bg-[#121212] hover:border-gray-600' : 'border-gray-200 bg-gray-50 hover:border-gray-400'}`}>
+                  <p className="text-sm font-bold truncate">{c.label}</p>
+                  <p className="mt-1 flex items-center justify-between gap-2 text-[11px]">
+                    <span className={`px-2 py-0.5 rounded-full font-bold ${on > 0 ? 'bg-[#D4AF37] text-black' : isDarkMode ? 'bg-[#222] text-gray-400' : 'bg-gray-200 text-gray-600'}`}>{on} / {c.items.length} selected</span>
+                    <span className={`text-[#D4AF37] transition-transform duration-150 ${active ? 'rotate-180' : ''}`} aria-hidden="true">▾</span>
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
-      <div className={card}>
-        <p className="text-xs font-bold uppercase tracking-wider">Products ({count} in my shop)</p>
-        <div className="divide-y text-xs">
-          {live.map((p) => {
-            const on = draft[p.id] !== undefined;
-            const max = p.price + maxMarkupFor(p.price);
-            const val = Number(draft[p.id]);
-            return (
-              <div key={p.id} className="py-3 flex flex-wrap items-center gap-3">
-                <input type="checkbox" checked={on} onChange={() => toggle(p)} className="accent-[#D4AF37] w-4 h-4" />
-                {p.image && <img src={p.image} alt="" className="w-10 h-10 object-cover rounded border" />}
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold truncate">{p.name}</p>
-                  <p className="text-gray-500">Store price {formatPrice(p.price)} · highest you can sell for {formatPrice(max)}</p>
-                </div>
-                {on && (
-                  <div className="text-right">
-                    <input type="number" className={`${inputCls} w-28 text-right`} value={draft[p.id]} onChange={(e) => setDraft((d) => ({ ...d, [p.id]: e.target.value }))} />
-                    <p className={`mt-1 ${val > max || val < p.price ? 'text-red-500' : 'text-green-600'}`}>{val > max ? `Too high (max ${formatPrice(max)})` : val < p.price ? 'Below store price' : `Your earning ${formatPrice(Math.max(0, val - p.price))} per piece`}</p>
+        {open && (
+          <div className={`rounded-lg border p-3 sm:p-4 space-y-3 ${isDarkMode ? 'border-[#D4AF37]/30 bg-[#121212]' : 'border-[#D4AF37]/40 bg-[#D4AF37]/5'}`}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-bold text-[#D4AF37]">{open.label}</p>
+              <div className="flex gap-2 text-xs">
+                <button type="button" onClick={() => selectAll(open.items)} className="px-3 py-1.5 rounded border border-green-600 text-green-600 font-semibold">Select all</button>
+                <button type="button" onClick={() => clearAll(open.items)} className="px-3 py-1.5 rounded border border-red-500 text-red-500 font-semibold">Clear</button>
+              </div>
+            </div>
+            {groupsOf(open).map((g) => (
+              <div key={g.sub || '_'}>
+                {(g.sub || groupsOf(open).length > 1) && (
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">{g.sub ? subLabel(g.sub) : 'Other'} <span className="font-normal">({g.items.filter((p) => draft[p.id] !== undefined).length} / {g.items.length})</span></p>
+                    <div className="flex gap-3 text-[11px]">
+                      <button type="button" onClick={() => selectAll(g.items)} className="text-green-600 font-semibold">Select all</button>
+                      <button type="button" onClick={() => clearAll(g.items)} className="text-red-500 font-semibold">Clear</button>
+                    </div>
                   </div>
                 )}
+                <div className="divide-y text-xs">
+                  {g.items.map((p) => {
+                    const on = draft[p.id] !== undefined;
+                    const max = p.price + maxMarkupFor(p.price);
+                    const val = Number(draft[p.id]);
+                    return (
+                      <div key={p.id} className="py-3 flex flex-wrap items-center gap-3">
+                        <input type="checkbox" checked={on} onChange={() => toggle(p)} className="accent-[#D4AF37] w-4 h-4" />
+                        {p.image && <img src={p.image} alt="" className="w-10 h-10 object-cover rounded border" />}
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold truncate">{p.name}</p>
+                          <p className="text-gray-500">Store price {formatPrice(p.price)} · highest you can sell for {formatPrice(max)}</p>
+                        </div>
+                        {on && (
+                          <div className="text-right">
+                            <input type="number" className={`${inputCls} w-28 text-right`} value={draft[p.id]} onChange={(e) => setDraft((d) => ({ ...d, [p.id]: e.target.value }))} />
+                            <p className={`mt-1 ${val > max || val < p.price ? 'text-red-500' : 'text-green-600'}`}>{val > max ? `Too high (max ${formatPrice(max)})` : val < p.price ? 'Below store price' : `Your earning ${formatPrice(Math.max(0, val - p.price))} per piece`}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            );
-          })}
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* stays at the bottom of the screen: nothing is written until Save */}
+      <div className={`sticky bottom-3 z-20 rounded-lg border px-4 py-3 flex flex-wrap items-center justify-between gap-3 backdrop-blur shadow-[0_8px_30px_-10px_rgba(0,0,0,0.5)] ${dirty ? 'border-[#D4AF37]' : isDarkMode ? 'border-gray-800' : 'border-gray-200'} ${isDarkMode ? 'bg-[#0d0d0d]/95' : 'bg-white/95'}`}>
+        <div className="min-w-0 text-xs">
+          <p className="font-bold">{count} product{count === 1 ? '' : 's'} selected</p>
+          {msg ? <p className={msg.type === 'ok' ? 'text-green-600' : 'text-red-500'}>{msg.text}</p> : <p className="text-gray-500">{dirty ? 'Unsaved changes' : 'All changes saved'}</p>}
         </div>
-        {msg && <p className={`text-xs ${msg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{msg.text}</p>}
-        <button type="button" disabled={busy} onClick={save} className="bg-[#D4AF37] text-black font-bold px-6 py-3 rounded text-xs uppercase tracking-widest disabled:opacity-50">{busy ? 'Saving...' : 'Save my shop'}</button>
+        <div className="flex gap-2">
+          <button type="button" disabled={busy || !dirty} onClick={discard} className="px-4 py-2.5 rounded border border-gray-400 text-xs font-bold uppercase tracking-wider disabled:opacity-40">Discard</button>
+          <button type="button" disabled={busy || !dirty} onClick={save} className="bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold px-6 py-2.5 rounded text-xs uppercase tracking-widest shadow disabled:opacity-40">{busy ? 'Saving...' : 'Save my shop'}</button>
+        </div>
       </div>
     </div>
   );
