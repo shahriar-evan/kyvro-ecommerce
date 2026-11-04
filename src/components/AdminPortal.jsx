@@ -13,6 +13,7 @@ import { watchAllShops, isPendingShop } from '../shops';
 import { MAX_COMMISSION } from '../adminAuth';
 import MyProducts from './MyProducts';
 import StoreSettings from './StoreSettings';
+import PlanSettings from './PlanSettings';
 import { subLabel, allPlaces, COLLECTION_LABELS, SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
 
 export default function AdminPortal({ adminCanCreateShop = false, adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canEditProduct, canAddProduct = true, shopOwners = {}, productCommissions = {}, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, productCosts = {}, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct, clearProductForm, handleDeleteRequest }) {
@@ -320,6 +321,7 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
               </div>
 
               {adminTab === 'settings' && isOwner && <StoreSettings products={products} settings={storeSettings} isDarkMode={isDarkMode} formatPrice={formatPrice} staff={{ email: loggedInUserEmail, name: adminName }} />}
+              {adminTab === 'settings' && isOwner && <div className="mt-5"><PlanSettings isDarkMode={isDarkMode} formatPrice={formatPrice} staff={{ email: loggedInUserEmail, name: adminName }} /></div>}
 
               {adminTab === 'admins' && canManageTeam && <AdminManager isDarkMode={isDarkMode} currentEmail={loggedInUserEmail} currentName={adminName} adminRole={adminRole} />}
 
