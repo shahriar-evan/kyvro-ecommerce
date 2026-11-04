@@ -129,7 +129,6 @@ export default function Header({ shopBrand = null, onStartSelling, cart, curr, c
                     <button onClick={() => go(() => goAccount('saved'))} className={itemCls}>My Saved Items</button>
                     {customerUser && <button onClick={() => go(onSignOut)} className={itemCls}>Sign Out</button>}
                     {onStartSelling && <button onClick={() => go(onStartSelling)} className={`${itemCls} border-t border-gray-200/20 mt-1 text-[#D4AF37] font-semibold`}>Start your own business</button>}
-                    <button onClick={() => go(() => setCurrentView('admin'))} className={`${itemCls} ${onStartSelling ? '' : 'border-t border-gray-200/20 mt-1'}`}>Admin Panel</button>
                   </div>
                 </>
               )}

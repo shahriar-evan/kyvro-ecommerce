@@ -1,5 +1,5 @@
 import { getApp } from "firebase/app";
-import { getFirestore, doc, collection, query, where, onSnapshot, setDoc, updateDoc, deleteDoc, deleteField, serverTimestamp } from "firebase/firestore";
+import { getFirestore, doc, collection, query, where, onSnapshot, setDoc, updateDoc, deleteDoc, deleteField, serverTimestamp, getDocs } from "firebase/firestore";
 import "./firebase"; // makes sure the default Firebase app exists
 
 const db = getFirestore(getApp());
@@ -76,6 +76,16 @@ export async function rejectShop(slug) {
 }
 
 // extra: { planExempt: true } for the Owner's own shop (no plan limit; the rules allow it only for the Owner)
+// Shop name change (its own Save button in My Shop). The link (slug) never changes.
+export const saveShopName = (slug, name) =>
+  updateDoc(doc(db, "shops", slug), { name: String(name || "").trim().slice(0, 60), updatedAt: new Date().toISOString() });
+// is this name already used by another shop? (same letters, any upper / lower case; shops are public)
+export async function shopNameTaken(name, mySlug) {
+  const n = String(name || "").trim().toLowerCase();
+  const snap = await getDocs(collection(db, "shops"));
+  return snap.docs.some((d) => d.id !== mySlug && String(d.data().name || "").trim().toLowerCase() === n);
+}
+
 // name = null: the name is not written (no "Shop name change" feature). The link (slug) never changes.
 export const saveShopItems = (slug, name, items, extra = {}) =>
   updateDoc(doc(db, "shops", slug), { ...(name == null ? {} : { name: String(name || "").trim().slice(0, 60) }), items, ...extra, updatedAt: new Date().toISOString() });

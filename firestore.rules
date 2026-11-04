@@ -248,9 +248,16 @@ service cloud.firestore {
     }
     function shopPremiumNow() { return shopPaidNow() && resource.data.tier == 'premium'; }
     // a feature of the shop right now: the Owner's / a Manager's override (features.<key>), else the tier's default
+    // the Owner's per-plan switches (settings/plans.tierFeatures.<free|pro|premium>.<key>) come next, then the built-in default
+    function shopTierNow() { return shopPremiumNow() ? 'premium' : (shopPaidNow() ? 'pro' : 'free'); }
+    function tierFeat() {
+      let tf = exists(plansPath()) ? get(plansPath()).data.get('tierFeatures', {}) : {};
+      return tf.get(shopTierNow(), {});
+    }
     function featOn(k, onPro) {
       let f = resource.data.get('features', {});
-      return (k in f) ? f[k] == true : (shopPremiumNow() || (onPro && shopPaidNow()));
+      let t = tierFeat();
+      return (k in f) ? f[k] == true : ((k in t) ? t[k] == true : (shopPremiumNow() || (onPro && shopPaidNow())));
     }
     // shop identity (shopName, logo, banner): Premium ON, Pro OFF unless the Owner / a Manager switched it on,
     // Free never (not even with an override)
@@ -358,11 +365,12 @@ service cloud.firestore {
     // Entries from before approvals have no status and count as approved.
     match /sellers/{uid} {
       function categoriesOk(d) {
-        return d.categories is list && d.categories.size() >= 1 && d.categories.size() <= 20;
+        return d.categories is list && d.categories.size() >= 1 && d.categories.size() <= 20
+          && d.get('subCategories', []) is list && d.get('subCategories', []).size() <= 60;
       }
       function applicationOk() {
         let d = request.resource.data;
-        return d.keys().hasOnly(['slug', 'email', 'name', 'whatsapp', 'district', 'area', 'address', 'pageLink', 'productNote', 'categories', 'agreed', 'status', 'createdAt'])
+        return d.keys().hasOnly(['slug', 'email', 'name', 'whatsapp', 'district', 'area', 'address', 'pageLink', 'socialLinks', 'productNote', 'categories', 'subCategories', 'agreed', 'status', 'createdAt'])
           && d.email == myEmail()
           && d.name is string && d.name.size() >= 2 && d.name.size() <= 80
           && d.whatsapp is string && d.whatsapp.matches('^(\\+?8801[3-9][0-9]{8}|01[3-9][0-9]{8}|\\+[1-9][0-9]{7,14})$')
@@ -371,6 +379,10 @@ service cloud.firestore {
           && d.get('address', '') is string && d.get('address', '').size() <= 300
           && d.get('pageLink', '') is string && d.get('pageLink', '').size() <= 300
           && (d.get('pageLink', '') == '' || d.get('pageLink', '').matches('^https?://[^ ]+$'))
+          // social media links: Facebook / Instagram / TikTok, any of them, https only
+          && d.get('socialLinks', {}) is map && d.get('socialLinks', {}).keys().hasOnly(['facebook', 'instagram', 'tiktok'])
+          && httpsOk(d.get('socialLinks', {}).get('facebook', '')) && httpsOk(d.get('socialLinks', {}).get('instagram', ''))
+          && httpsOk(d.get('socialLinks', {}).get('tiktok', ''))
           // the store categories the seller wants to sell (at least one); productNote is an optional short note
           && categoriesOk(d)
           && d.get('productNote', '') is string && d.get('productNote', '').size() <= 300
@@ -391,7 +403,7 @@ service cloud.firestore {
                     // while the application waits, the seller can change the categories they chose
                     || (signedIn() && request.auth.uid == uid && !isStaff()
                         && resource.data.get('status', 'approved') == 'pending'
-                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['categories'])
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['categories', 'subCategories'])
                         && categoriesOk(request.resource.data))
                     // the Owner decides
                     || (isOwner()
@@ -464,7 +476,13 @@ service cloud.firestore {
         && request.resource.data.blockedRegex is string && request.resource.data.blockedRegex.size() <= 3000;
       // Shop plans (Free limit, paid price, period, reminder days). Only the Owner. Must match normalizePlans() in src/data/priceCheck.js
       allow create, update: if docId == 'plans' && isOwner()
-        && request.resource.data.keys().hasOnly(['enabled', 'originalPrice', 'discountPercent', 'freeLimit', 'periodDays', 'reminderDays', 'pro', 'premium', 'supportWhatsapp', 'updatedAt', 'updatedByName'])
+        && request.resource.data.keys().hasOnly(['enabled', 'originalPrice', 'discountPercent', 'freeLimit', 'freeCategoryLimit', 'tierFeatures', 'periodDays', 'reminderDays', 'pro', 'premium', 'supportWhatsapp', 'updatedAt', 'updatedByName'])
+        // Free plan: products from at most freeCategoryLimit categories; tierFeatures = the Owner's ON / OFF per plan
+        && request.resource.data.get('freeCategoryLimit', 3) is int && request.resource.data.get('freeCategoryLimit', 3) >= 1 && request.resource.data.get('freeCategoryLimit', 3) <= 20
+        && request.resource.data.get('tierFeatures', {}) is map && request.resource.data.get('tierFeatures', {}).keys().hasOnly(['free', 'pro', 'premium'])
+        && request.resource.data.get('tierFeatures', {}).get('free', {}) is map && request.resource.data.get('tierFeatures', {}).get('free', {}).size() <= 30
+        && request.resource.data.get('tierFeatures', {}).get('pro', {}) is map && request.resource.data.get('tierFeatures', {}).get('pro', {}).size() <= 30
+        && request.resource.data.get('tierFeatures', {}).get('premium', {}) is map && request.resource.data.get('tierFeatures', {}).get('premium', {}).size() <= 30
         && request.resource.data.enabled is bool
         // Pro and Premium: price and discount % each (originalPrice / discountPercent are the old single paid plan = Pro)
         && tierOk(request.resource.data.pro) && tierOk(request.resource.data.premium)

@@ -3,7 +3,8 @@ import { auth } from '../firebase';
 import { askConfirm, askInput } from './AlertCenter';
 import { watchAllShops, watchShopOwners, setShopFeatures, grantLogo, denyLogoRequest, approveLogo, rejectLogo, setShopOn, approveBanner, rejectBanner } from '../shops';
 import { watchSellers, killSellerShop, reviveSellerShop } from '../sellers';
-import { effectiveTier, toMillis, TIER_LABEL } from '../data/priceCheck';
+import { effectiveTier, toMillis, TIER_LABEL, normalizePlans } from '../data/priceCheck';
+import { watchPlans } from '../storeSettings';
 import { FEATURES, featureDefault, featureLockedFree } from '../data/shopBrand';
 
 // Plan Members (Owner and Managers): every shop with its plan, and per feature Default / ON / OFF.
@@ -23,6 +24,9 @@ export default function PlanMembers({ isOwner, isDarkMode }) {
   const me = auth.currentUser ? auth.currentUser.uid : '';
 
   useEffect(() => watchAllShops(setShops, () => {}), []);
+  // the Owner's per-plan feature switches (Shop plans)
+  const [plans, setPlans] = useState(() => normalizePlans(null));
+  useEffect(() => watchPlans(setPlans), []);
   useEffect(() => watchShopOwners(setOwners, () => {}), []);
   useEffect(() => (isOwner ? watchSellers(setSellers, () => {}) : undefined), [isOwner]);
 
@@ -116,7 +120,7 @@ export default function PlanMembers({ isOwner, isDarkMode }) {
           {/* features */}
           <div className="divide-y text-xs">
             {FEATURES.map((f) => {
-              const base = cur.tier === 'owner' ? true : featureDefault(f.key, cur.tier);
+              const base = cur.tier === 'owner' ? true : featureDefault(f.key, cur.tier, plans.tierFeatures);
               // shop name / logo / banner: never on the Free plan (also in firestore.rules)
               const locked = cur.tier !== 'owner' && featureLockedFree(f.key, cur.tier);
               const v = typeof draft[f.key] === 'boolean' ? (draft[f.key] ? 'on' : 'off') : 'default';

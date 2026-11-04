@@ -4,7 +4,8 @@ import { watchAllShops } from '../shops';
 import { watchSellers, watchSellerPayouts, watchSubscriptions, killSellerShop, reviveSellerShop, removeSeller, watchSellerRules, saveSellerRules, sellerStatus, approveSeller, rejectSeller } from '../sellers';
 import { formatDateTime } from '../utils/dates';
 import { watchPayouts, addPayout } from '../payouts';
-import { toMillis, effectiveTier } from '../data/priceCheck';
+import { toMillis, effectiveTier, normalizePlans } from '../data/priceCheck';
+import { watchPlans } from '../storeSettings';
 import { effectiveFeatures } from '../data/shopBrand';
 
 // a shop's markup on one order = (price the customer paid - store price) x pieces
@@ -27,6 +28,8 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
   useEffect(() => watchAllShops((list) => setShops(Object.fromEntries(list.map((s) => [s.slug, s]))), () => {}), []);
   useEffect(() => watchSellerPayouts(setBkash), []);
   useEffect(() => watchSubscriptions(setSubs), []);
+  const [plans, setPlans] = useState(() => normalizePlans(null));
+  useEffect(() => watchPlans(setPlans), []);
   useEffect(() => watchPayouts(true, loggedInUserEmail, setPayouts, () => {}), [loggedInUserEmail]);
   useEffect(() => watchSellerRules((r) => { setRules(r); setWords((w) => w || r.blockedWords.join(', ')); }), []);
 
@@ -48,9 +51,9 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
     const paid = payouts.filter((p) => String(p.email || '').toLowerCase() === String(s.email || '').toLowerCase()).reduce((n, p) => n + (Number(p.amount) || 0), 0);
     const until = toMillis((subs[s.uid] || {}).paidUntil);
     const tier = effectiveTier(subs[s.uid] || null);
-    const feat = effectiveFeatures(shop, shop ? effectiveTier(shop) : tier);
+    const feat = effectiveFeatures(shop, shop ? effectiveTier(shop) : tier, plans.tierFeatures);
     return { ...s, tier, feat, shop, orders: mine.length, earned, paid, due: earned - paid, until, bkash: (bkash[s.uid] || {}).bkash || '' };
-  }).sort((a, b) => b.due - a.due), [sellers, shops, orders, payouts, subs, bkash]);
+  }).sort((a, b) => b.due - a.due), [sellers, shops, orders, payouts, subs, bkash, plans]);
 
   const card = `p-5 sm:p-6 rounded-lg border space-y-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`;
   const btn = 'px-3 py-1.5 rounded text-[11px] font-bold';
@@ -125,8 +128,10 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
                     {row('WhatsApp', s.whatsapp)}
                     {row('District / area', [s.district, s.area].filter(Boolean).join(', '))}
                     {row('Address', s.address)}
-                    {row('Page', s.pageLink, true)}
+                    {s.pageLink && row('Page', s.pageLink, true)}
+                    {['facebook', 'instagram', 'tiktok'].map((k) => (s.socialLinks && s.socialLinks[k] ? <React.Fragment key={k}>{row(k === 'tiktok' ? 'TikTok' : k[0].toUpperCase() + k.slice(1), s.socialLinks[k], true)}</React.Fragment> : null))}
                     <div className="sm:col-span-2">{row('Categories', Array.isArray(s.categories) && s.categories.length ? s.categories.join(', ') : '')}</div>
+                    {Array.isArray(s.subCategories) && s.subCategories.length > 0 && <div className="sm:col-span-2">{row('Sub-categories', s.subCategories.join(', '))}</div>}
                     <div className="sm:col-span-2">{row('Note', s.productNote)}</div>
                     {row('Independent seller confirmed', s.agreed ? 'Yes' : 'No')}
                   </div>

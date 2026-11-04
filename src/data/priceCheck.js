@@ -31,7 +31,7 @@ export const shopPriceClamp = (base, wanted) => {
 // (settings/plans). The server always takes the price from that document, never from the browser.
 // ---------------------------------------------------------------------------
 export const DEFAULT_PLANS = {
-  enabled: true, freeLimit: 10, periodDays: 30, reminderDays: 3,
+  enabled: true, freeLimit: 10, freeCategoryLimit: 3, periodDays: 30, reminderDays: 3,
   pro: { price: 999, discount: 40 },
   premium: { price: 2999, discount: 40 },
   supportWhatsapp: '',
@@ -46,6 +46,12 @@ const tierCfg = (t, def, legacy) => ({
   discount: num(t && t.discount !== undefined ? t.discount : legacy.discount, def.discount, 0, 90),
 });
 // settings/plans -> clean numbers. Before tiers there was one paid plan (originalPrice / discountPercent): that is Pro.
+// per-plan feature switches set by the Owner (settings/plans.tierFeatures): { free: {key: bool}, pro: {...}, premium: {...} }.
+// A key that is not set falls back to the built-in default (FEATURES in src/data/shopBrand.js). Same in firestore.rules (featOn).
+const cleanTierFeatures = (tf) => Object.fromEntries(['free', 'pro', 'premium'].map((t) => {
+  const m = (tf && tf[t]) || {};
+  return [t, Object.fromEntries(Object.entries(m).filter(([k, v]) => /^[A-Za-z]{1,30}$/.test(k) && typeof v === 'boolean').slice(0, 30))];
+}));
 export const normalizePlans = (p) => {
   const x = p || {};
   const pro = tierCfg(x.pro, DEFAULT_PLANS.pro, { price: x.originalPrice, discount: x.discountPercent });
@@ -54,6 +60,9 @@ export const normalizePlans = (p) => {
   return {
     enabled: x.enabled !== false,
     freeLimit: num(x.freeLimit, DEFAULT_PLANS.freeLimit, 1, SHOP_MAX_ITEMS),
+    // Free plan: products from at most this many categories (Pro / Premium: all categories)
+    freeCategoryLimit: num(x.freeCategoryLimit, DEFAULT_PLANS.freeCategoryLimit, 1, 20),
+    tierFeatures: cleanTierFeatures(x.tierFeatures),
     periodDays: num(x.periodDays, DEFAULT_PLANS.periodDays, 1, 366),
     reminderDays: num(x.reminderDays, DEFAULT_PLANS.reminderDays, 0, 30),
     pro,

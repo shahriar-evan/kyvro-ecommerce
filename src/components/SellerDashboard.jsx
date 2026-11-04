@@ -14,7 +14,16 @@ import { PlanCompare, PlanFaq } from './PlanCompareFaq';
 import { PLAN_TEXT, BN_FONT } from '../data/planText';
 import { watchMySubscription } from '../storeSettings';
 import { watchShop } from '../shops';
-import { effectiveFeatures } from '../data/shopBrand';
+import { effectiveFeatures, httpsLinkOk } from '../data/shopBrand';
+import { flatSubCategories, subLabel } from '../data/catalog';
+
+// social links on the application (any of them, all optional; https only)
+const APPLY_SOCIALS = [
+  { key: 'facebook', label: 'Facebook', placeholder: 'https://facebook.com/yourpage' },
+  { key: 'instagram', label: 'Instagram', placeholder: 'https://instagram.com/yourname' },
+  { key: 'tiktok', label: 'TikTok', placeholder: 'https://tiktok.com/@yourname' },
+];
+const NO_SOCIALS = { facebook: '', instagram: '', tiktok: '' };
 
 // "Sell on Kyvro": a signed-in customer's own shop. The shop editor is the same as the team's (My Shop, plan,
 // markup cap). Earnings come from the server without any customer details; payouts are what the Owner already paid.
@@ -27,7 +36,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
   const [bkashMsg, setBkashMsg] = useState(null);
   const [saving, setSaving] = useState(false);
   // application form (no NID, passport, bank or bKash: bKash is asked after approval)
-  const [form, setForm] = useState({ shopName: '', name: '', whatsapp: '', district: '', area: '', address: '', pageLink: '', productNote: '', agreed: false });
+  const [form, setForm] = useState({ shopName: '', name: '', whatsapp: '', district: '', area: '', address: '', socialLinks: NO_SOCIALS, productNote: '', agreed: false });
   const [formMsg, setFormMsg] = useState('');
   const [applying, setApplying] = useState(false);
   const [rules, setRules] = useState(null);
@@ -44,6 +53,8 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
   useEffect(() => watchPlans(setPlans), []);
   // the store's categories the seller wants to sell (saved as text in productNote; products are picked later in My Shop)
   const [cats, setCats] = useState([]);
+  // sub-categories inside the chosen categories, saved as "Men's › Shirt" (none ticked = the whole category)
+  const [subs, setSubs] = useState([]);
   const [catMsg, setCatMsg] = useState(null);
   // my plan (for the Premium priority support link)
   const [mySub, setMySub] = useState(null);
@@ -73,7 +84,8 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
   // a rejected seller applies again with their last details filled in
   useEffect(() => {
     if (seller && status !== 'approved') setCats((c) => (c.length ? c : (Array.isArray(seller.categories) ? seller.categories : [])));
-    if (seller && status === 'rejected') setForm((f) => (f.name ? f : { ...f, name: seller.name || '', whatsapp: seller.whatsapp || '', district: seller.district || '', area: seller.area || '', address: seller.address || '', pageLink: seller.pageLink || '', productNote: seller.productNote || '' }));
+    if (seller && status !== 'approved') setSubs((c) => (c.length ? c : (Array.isArray(seller.subCategories) ? seller.subCategories : [])));
+    if (seller && status === 'rejected') setForm((f) => (f.name ? f : { ...f, name: seller.name || '', whatsapp: seller.whatsapp || '', district: seller.district || '', area: seller.area || '', address: seller.address || '', socialLinks: { ...NO_SOCIALS, ...(seller.socialLinks || {}) }, productNote: seller.productNote || '' }));
     else if (customerUser && !seller) setForm((f) => (f.name ? f : { ...f, name: customerUser.displayName || '' }));
   }, [seller, status]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -100,6 +112,9 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
   if (seller === undefined) return <p className="text-sm text-gray-500 py-8 text-center">Loading...</p>;
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  // Free plan: at most plans.freeCategoryLimit categories (the plan chosen on the plan page, or saved in the application note)
+  const chosenPlan = seller ? (/Premium plan/.test(seller.productNote || '') ? 'premium' : /Pro plan/.test(seller.productNote || '') ? 'pro' : 'free') : (plan || 'free');
+  const catLimit = chosenPlan === 'free' ? plans.freeCategoryLimit : Infinity;
   const apply = async () => {
     setFormMsg('');
     const f = form;
@@ -110,11 +125,13 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
     if (f.name.trim().length < 2) return setFormMsg('Write your full name.');
     if (!normalizeWhatsapp(f.whatsapp)) return setFormMsg('Write a valid WhatsApp number: 01XXXXXXXXX, +8801XXXXXXXXX or an international number starting with +.');
     if (f.district.trim().length < 2 || f.area.trim().length < 2) return setFormMsg('Write your district and area.');
-    if (f.pageLink.trim() && !/^https?:\/\/\S+$/.test(f.pageLink.trim())) return setFormMsg('The page link must start with https://');
+    const badSocial = APPLY_SOCIALS.find((x) => !httpsLinkOk(String(f.socialLinks[x.key] || '').trim()));
+    if (badSocial) return setFormMsg(`${badSocial.label}: the link must start with https://`);
     if (!cats.length) return setFormMsg('Tick at least one category you want to sell.');
+    if (cats.length > catLimit) return setFormMsg(`The Free plan sells from up to ${catLimit} categories. Untick some, or choose Pro / Premium for all categories.`);
     if (!f.agreed) return setFormMsg('Please tick the box to confirm you are an independent seller.');
     setApplying(true);
-    try { await applyAsSeller({ uid, email, shopName: f.shopName, details: { ...f, categories: cats, productNote: plan === 'pro' || plan === 'premium' ? `Chose the ${TIER_LABEL[plan]} plan` : '' } }); }
+    try { await applyAsSeller({ uid, email, shopName: f.shopName, details: { ...f, categories: cats, subCategories: subs.filter((x) => cats.includes(x.split(' › ')[0])), productNote: plan === 'pro' || plan === 'premium' ? `Chose the ${TIER_LABEL[plan]} plan` : '' } }); }
     catch (e) { setFormMsg(e.code === 'permission-denied' ? 'Could not send the application. You may already have a shop, the name may not be allowed, or new sellers are paused.' : e.message); }
     setApplying(false);
   };
@@ -130,16 +147,40 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
     );
   }
   // the store's categories as tick boxes (same list as the shop's category picker)
-  const toggleCat = (l) => setCats((c) => (c.includes(l) ? c.filter((x) => x !== l) : [...c, l]));
+  const toggleCat = (l) => {
+    setCatMsg(null); setFormMsg('');
+    if (cats.includes(l)) { setCats((c) => c.filter((x) => x !== l)); setSubs((s) => s.filter((x) => x.split(' › ')[0] !== l)); return; }
+    if (cats.length >= catLimit) { const t = `The Free plan sells from up to ${catLimit} categories. Choose Pro / Premium for all categories.`; setFormMsg(t); setCatMsg({ type: 'err', text: t }); return; }
+    setCats((c) => [...c, l]);
+  };
+  const toggleSub = (key) => setSubs((s) => (s.includes(key) ? s.filter((x) => x !== key) : [...s, key]));
+  const chip = (on, cls) => `inline-flex items-center gap-2 rounded-full border font-semibold transition ${cls} ${on ? 'border-[#D4AF37] bg-[#D4AF37] text-black' : isDarkMode ? 'border-gray-700 text-gray-300' : 'border-gray-300 text-gray-700'}`;
+  const tick = (on) => <span className={`inline-flex h-4 w-4 items-center justify-center rounded border text-[10px] ${on ? 'border-black bg-black text-[#D4AF37]' : 'border-current'}`}>{on ? '✓' : ''}</span>;
   const catPicker = (
-    <div className="mt-2 flex flex-wrap gap-2">
-      {catLabels.map((l) => {
-        const on = cats.includes(l);
+    <div className="mt-2 space-y-3">
+      <div className="flex flex-wrap gap-2">
+        {catLabels.map((l) => {
+          const on = cats.includes(l);
+          return <button key={l} type="button" aria-pressed={on} onClick={() => toggleCat(l)} className={chip(on, 'px-3 py-2 text-xs')}>{tick(on)}{l}</button>;
+        })}
+      </div>
+      {catLimit !== Infinity && <p className="text-[11px] text-gray-500">Free plan: up to {catLimit} categories ({cats.length} / {catLimit} chosen). Pro / Premium: all categories.</p>}
+      {/* sub-categories of each chosen category (optional: none ticked = the whole category) */}
+      {cats.map((l) => {
+        const col = (SHOP_COLLECTIONS.find((c) => c.label === l) || {}).name;
+        const list = col ? flatSubCategories(col) : [];
+        if (!list.length) return null;
         return (
-          <button key={l} type="button" aria-pressed={on} onClick={() => toggleCat(l)}
-            className={`inline-flex items-center gap-2 px-3 py-2 rounded-full border text-xs font-semibold transition ${on ? 'border-[#D4AF37] bg-[#D4AF37] text-black' : isDarkMode ? 'border-gray-700 text-gray-300' : 'border-gray-300 text-gray-700'}`}>
-            <span className={`inline-flex h-4 w-4 items-center justify-center rounded border text-[10px] ${on ? 'border-black bg-black text-[#D4AF37]' : 'border-current'}`}>{on ? '✓' : ''}</span>{l}
-          </button>
+          <div key={l} className={`rounded-lg border p-3 ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
+            <p className="text-[11px] font-semibold text-gray-500 mb-2">{l}: which ones? <span className="font-normal">(optional, none = all of {l})</span></p>
+            <div className="flex flex-wrap gap-2">
+              {list.map((n) => {
+                const key = `${l} › ${n}`;
+                const on = subs.includes(key);
+                return <button key={key} type="button" aria-pressed={on} onClick={() => toggleSub(key)} className={chip(on, 'px-2.5 py-1.5 text-[11px]')}>{tick(on)}{subLabel(n)}</button>;
+              })}
+            </div>
+          </div>
         );
       })}
     </div>
@@ -147,7 +188,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
   const saveCats = async () => {
     setCatMsg(null);
     if (!cats.length) { setCatMsg({ type: 'err', text: 'Tick at least one category.' }); return; }
-    try { await updateSellerCategories(uid, cats); setCatMsg({ type: 'ok', text: 'Categories saved.' }); }
+    try { await updateSellerCategories(uid, cats, subs.filter((x) => cats.includes(x.split(' › ')[0]))); setCatMsg({ type: 'ok', text: 'Categories saved.' }); }
     catch (e) { setCatMsg({ type: 'err', text: e.code === 'permission-denied' ? 'Could not save (publish the latest Firestore rules).' : e.message }); }
   };
 
@@ -204,7 +245,16 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
           {field('district', 'District *', { maxLength: 40, placeholder: 'e.g. Dhaka' })}
           {field('area', 'Area *', { maxLength: 60, placeholder: 'e.g. Mirpur' })}
           <div className="sm:col-span-2">{field('address', 'Full address (optional)', { maxLength: 300 })}</div>
-          <div className="sm:col-span-2">{field('pageLink', 'Facebook / Instagram page link (optional)', { maxLength: 300, placeholder: 'https://facebook.com/...' })}</div>
+          <div className="sm:col-span-2">
+            <p className="text-xs font-semibold text-gray-500">Social media links <span className="font-normal">(optional: add any one, two or all three)</span></p>
+            <div className="mt-1 grid sm:grid-cols-3 gap-3">
+              {APPLY_SOCIALS.map((x) => (
+                <label key={x.key} className="block text-[11px] font-semibold text-gray-500">{x.label}
+                  <input className={`${inputCls} block mt-1 w-full`} maxLength={200} placeholder={x.placeholder} value={form.socialLinks[x.key]} onChange={(e) => set('socialLinks', { ...form.socialLinks, [x.key]: e.target.value })} />
+                </label>
+              ))}
+            </div>
+          </div>
           <div className="sm:col-span-2">
             <p className="text-xs font-semibold text-gray-500">Which categories will you sell? * <span className="font-normal">(you choose the exact products after approval, and can change them any time in My Shop)</span></p>
             {catPicker}
@@ -268,7 +318,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
             <p className="text-[11px] text-gray-500">You earn the markup (your price − the store price) when an order is delivered. Returned and cancelled orders earn nothing. Kyvro confirms and delivers every order.</p>
             {earnErr && <p className="text-xs text-red-500">{earnErr}</p>}
             {earn && (() => {
-              const f = effectiveFeatures(myShop, myShop ? effectiveTier(myShop) : effectiveTier(mySub));
+              const f = effectiveFeatures(myShop, myShop ? effectiveTier(myShop) : effectiveTier(mySub), plans.tierFeatures);
               return <SellerStats orders={earn.orders} formatPrice={formatPrice} isDarkMode={isDarkMode} statsOn={f.salesStats} csvOn={f.earningsCsv} />;
             })()}
             {earn && (earn.orders.length === 0 ? <p className="text-sm text-gray-500">No orders from your shop yet.</p> : (
@@ -283,7 +333,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
             ))}
           </div>
 
-          {effectiveFeatures(myShop, myShop ? effectiveTier(myShop) : effectiveTier(mySub)).prioritySupport && (
+          {effectiveFeatures(myShop, myShop ? effectiveTier(myShop) : effectiveTier(mySub), plans.tierFeatures).prioritySupport && (
             <div className={`${card} border-[#D4AF37]/60`}>
               <h3 className="text-lg font-bold flex items-center gap-2">Priority support <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#D4AF37] text-black font-bold uppercase">Premium</span></h3>
               {plans.supportWhatsapp
