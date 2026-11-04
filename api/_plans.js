@@ -26,8 +26,9 @@ export async function readPlans(token) {
   return normalizePlans(d && d.data);
 }
 
-// Who is calling: their Firebase login token must be accepted by Firestore (reading their own team entry proves it),
-// and they must be an active Manager or Admin (the Owner has no plan). Returns { uid, email, name } or { error, status }.
+// Who is calling: their Firebase login token must be accepted by Firestore (reading their own team / seller entry
+// proves it), and they must be an active Manager or Admin, or a public seller (the Owner has no plan).
+// Returns { uid, email, name, seller?, slug? } or { error, status }.
 export async function planCaller(req) {
   const auth = req.headers.authorization || '';
   const idToken = auth.startsWith('Bearer ') ? auth.slice(7) : '';
@@ -37,7 +38,14 @@ export async function planCaller(req) {
   const uid = String(claims.sub || claims.user_id || '');
   if (!email || !uid) return { error: 'Please sign in.', status: 401 };
   const r = await fetch(`${FS}/documents/admins/${encodeURIComponent(email)}`, { headers: { Authorization: `Bearer ${idToken}` } });
-  if (!r.ok) return { error: 'Only team members with a shop can buy a plan.', status: 403 };
+  if (r.status === 404) {
+    // not on the team: a public seller has their own sellers/{uid} entry (readable only with their own login)
+    const sr = await fetch(`${FS}/documents/sellers/${encodeURIComponent(uid)}`, { headers: { Authorization: `Bearer ${idToken}` } });
+    if (!sr.ok) return { error: 'Open your shop first (Sell on Kyvro).', status: 403 };
+    const sd = fields(await sr.json());
+    return { uid, email, name: String(sd.name || ''), seller: true, slug: String(sd.slug || '') };
+  }
+  if (!r.ok) return { error: 'Please sign in again.', status: 401 };
   const me = fields(await r.json());
   if (me.active === false || !['manager', 'admin'].includes(me.role || 'admin')) return { error: 'Only Managers and Admins buy a plan.', status: 403 };
   return { uid, email, name: String(me.name || '') };

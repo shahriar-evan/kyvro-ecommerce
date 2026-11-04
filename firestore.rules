@@ -225,6 +225,15 @@ service cloud.firestore {
       return !plansOn() || n <= (hasPaid() ? 300 : freeLimit()) || n <= resource.data.items.size();
     }
 
+    // ---- Public sellers ("Sell on Kyvro"): any signed-in customer who is NOT on the team can open ONE shop ----
+    // settings/sellerRules (Owner): open = new sellers allowed; blockedRegex = shop names / links that are refused
+    // (built from blockedWords in the Owner's settings; default kyvro, official, admin, owner, support).
+    function sellerRulesPath() { return /databases/$(database)/documents/settings/sellerRules; }
+    function sellersOpen() { return !exists(sellerRulesPath()) || get(sellerRulesPath()).data.get('open', true) == true; }
+    function blockedRe() { return exists(sellerRulesPath()) ? get(sellerRulesPath()).data.get('blockedRegex', '.*(kyvro|official|admin|owner|support).*') : '.*(kyvro|official|admin|owner|support).*'; }
+    function sellerNameOk(name, slug) { return !name.lower().matches(blockedRe()) && !slug.matches(blockedRe()); }
+    function sellerPath(uid) { return /databases/$(database)/documents/sellers/$(uid); }
+
     // Team shops (kyvro.store/?shop=name). Everyone can read a shop (customers open the link).
     // A Manager (or the Owner) creates a shop that is live at once. An Admin with "Shop create" ON can create one too,
     // but it starts switched off with status 'pending' until the Owner accepts it (status 'approved', active true).
@@ -233,26 +242,66 @@ service cloud.firestore {
     match /shops/{slug} {
       allow read: if true;
       allow create: if slug.matches('^[a-z0-9-]{3,40}$')
-        && request.resource.data.keys().hasOnly(['name', 'ownerUid', 'active', 'status', 'items', 'createdAt', 'updatedAt', 'planExempt'])
+        && request.resource.data.keys().hasOnly(['name', 'ownerUid', 'active', 'status', 'items', 'createdAt', 'updatedAt', 'planExempt', 'kind'])
         // "no plan limit" is only for the Owner's own shop
         && (!('planExempt' in request.resource.data) || isOwner())
         && request.resource.data.ownerUid == request.auth.uid
         && request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 60
         && request.resource.data.items is map && request.resource.data.items.size() == 0
         && request.resource.data.createdAt == request.time
-        && (((isManager() || isOwner()) && request.resource.data.active == true && request.resource.data.get('status', 'approved') == 'approved')
-            || (canShopNow() && request.resource.data.active == false && request.resource.data.status == 'pending'));
+        && (((isManager() || isOwner()) && request.resource.data.get('kind', 'team') == 'team' && request.resource.data.active == true && request.resource.data.get('status', 'approved') == 'approved')
+            || (canShopNow() && request.resource.data.get('kind', 'team') == 'team' && request.resource.data.active == false && request.resource.data.status == 'pending')
+            // a public seller: not on the team, live at once (Free plan), one shop per account: the sellers/{uid} entry is
+            // written in the same batch and can never be made twice
+            || (signedIn() && !isStaff() && request.resource.data.get('kind', '') == 'seller'
+                && request.resource.data.active == true && request.resource.data.get('status', 'approved') == 'approved'
+                && !exists(sellerPath(request.auth.uid))
+                && existsAfter(sellerPath(request.auth.uid))
+                && getAfter(sellerPath(request.auth.uid)).data.slug == slug
+                && sellersOpen() && sellerNameOk(request.resource.data.name, slug)));
       allow update: if request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 60
         && request.resource.data.items is map && request.resource.data.items.size() <= 300
-        && ((isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'active', 'status', 'updatedAt', 'planExempt'])
+        // the Owner: everything, also the seller kill switch (killed: the seller can never switch the shop on again)
+        && ((isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'active', 'status', 'updatedAt', 'planExempt', 'killed', 'killNote'])
                 && request.resource.data.get('status', 'approved') in ['pending', 'approved'])
             || ((isManager() || canShopNow())
                 && resource.data.ownerUid == request.auth.uid
                 && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt'])
-                && shopSizeOk()));
+                && shopSizeOk())
+            // a public seller: only their own shop's name and products, not after the Owner switched it off for good
+            || (signedIn() && !isStaff() && resource.data.get('kind', '') == 'seller'
+                && resource.data.ownerUid == request.auth.uid
+                && resource.data.get('killed', false) != true
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt'])
+                && shopSizeOk()
+                && sellerNameOk(request.resource.data.name, slug)));
       // the Owner deletes a shop (also what "Reject" does with a request)
       allow delete: if isOwner();
     }
+    // A public seller's private entry (one per account, written together with the shop). The seller and the Owner read it.
+    match /sellers/{uid} {
+      allow read: if (signedIn() && request.auth.uid == uid) || isOwner();
+      allow create: if signedIn() && request.auth.uid == uid && !isStaff()
+        && request.resource.data.keys().hasOnly(['slug', 'email', 'name', 'createdAt'])
+        && request.resource.data.email == myEmail()
+        && request.resource.data.name is string && request.resource.data.name.size() <= 80
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.slug is string && request.resource.data.slug.matches('^[a-z0-9-]{3,40}$')
+        && existsAfter(/databases/$(database)/documents/shops/$(request.resource.data.slug))
+        && getAfter(/databases/$(database)/documents/shops/$(request.resource.data.slug)).data.ownerUid == uid
+        && getAfter(/databases/$(database)/documents/shops/$(request.resource.data.slug)).data.get('kind', '') == 'seller';
+      allow update: if false;
+      allow delete: if isOwner();
+    }
+    // Where a seller wants their markup paid (bKash). The seller writes it; ONLY the Owner can read it.
+    match /sellerPayout/{uid} {
+      allow read, delete: if isOwner();
+      allow create, update: if signedIn() && request.auth.uid == uid && exists(sellerPath(uid))
+        && request.resource.data.keys().hasOnly(['bkash', 'updatedAt'])
+        && request.resource.data.bkash is string && request.resource.data.bkash.matches('^01[3-9][0-9]{8}$')
+        && request.resource.data.updatedAt is string && request.resource.data.updatedAt.size() <= 40;
+    }
+
     match /shopOwners/{slug} {
       // Managers can read whose shop is whose too (they see the Admins' shop earnings in Team Stats)
       allow read: if isOwner() || isManager() || (signedIn() && resource.data.email == myEmail());
@@ -295,6 +344,12 @@ service cloud.firestore {
     // them), only the Owner can change them. maxPercent / maxFixed are the highest discounts among the rules.
     match /settings/{docId} {
       allow read: if true;
+      // Public sellers: open (new sellers allowed) and the blocked shop names (Owner only)
+      allow create, update: if docId == 'sellerRules' && isOwner()
+        && request.resource.data.keys().hasOnly(['open', 'blockedWords', 'blockedRegex', 'updatedAt', 'updatedByName'])
+        && request.resource.data.open is bool
+        && request.resource.data.blockedWords is list && request.resource.data.blockedWords.size() <= 100
+        && request.resource.data.blockedRegex is string && request.resource.data.blockedRegex.size() <= 3000;
       // Shop plans (Free limit, paid price, period, reminder days). Only the Owner. Must match normalizePlans() in src/data/priceCheck.js
       allow create, update: if docId == 'plans' && isOwner()
         && request.resource.data.keys().hasOnly(['enabled', 'originalPrice', 'discountPercent', 'freeLimit', 'periodDays', 'reminderDays', 'updatedAt', 'updatedByName'])
