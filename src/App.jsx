@@ -1228,6 +1228,13 @@ export default function App() {
 
       {/* 2. HEADER */}
       <Header cart={cart} curr={curr} currencyKey={currencyKey} currentView={currentView} isDarkMode={isDarkMode} setCurrencyKey={setCurrencyKey} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} setIsDarkMode={setIsDarkMode} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} navHas={navHas} customerUser={customerUser} displayName={displayName} photoURL={photoURL} goAccount={goAccount} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} />
+      {/* a public seller's shop link: say clearly who sells it (not Kyvro itself) */}
+      {shopCtx && shopCtx.kind === 'seller' && currentView !== 'admin' && (
+        <div className={`border-b px-4 py-2 text-center text-xs ${isDarkMode ? 'bg-[#121212] border-gray-800 text-gray-300' : 'bg-[#D4AF37]/10 border-[#D4AF37]/30 text-gray-700'}`}>
+          Sold by <strong className="text-[#D4AF37]">{shopCtx.name}</strong>
+          <span className="text-gray-500"> · Independent seller, not official Kyvro. Kyvro delivers the order and takes the payment.</span>
+        </div>
+      )}
 
       {/* MOBILE MENU DRAWER */}
       {isMobileMenuOpen && <MobileMenu navHas={navHas} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} />}
@@ -1245,7 +1252,7 @@ export default function App() {
       {currentView === 'product-detail' && selectedProduct && <ProductDetail key={selectedProduct.id} product={selectedProduct} products={storefrontProducts} setSelectedProduct={setSelectedProduct} storeSettings={storeSettings} cartSubtotal={subtotal} cartUnits={cart.reduce((n, i) => n + (parseInt(i.quantity, 10) || 0), 0)} addToCart={addToCart} calculateDiscountPercent={calculateDiscountPercent} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} savedIds={savedIds} toggleSaved={toggleSaved} />}
 
       {currentView === 'tracking' && <OrderTracking customerUser={customerUser} onSignIn={handleCustomerSignIn} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
-      {currentView === 'account' && <AccountView customerUser={customerUser} displayName={displayName} photoURL={photoURL} activeTab={accountTab} setActiveTab={setAccountTab} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} onSaveProfile={handleSaveProfile} onCancelOrder={handleCancelMyOrder} myOrders={myOrders} savedProducts={savedProducts} toggleSaved={toggleSaved} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedProduct={setSelectedProduct} />}
+      {currentView === 'account' && <AccountView products={products} isStaff={isAdminLoggedIn} customerUser={customerUser} displayName={displayName} photoURL={photoURL} activeTab={accountTab} setActiveTab={setAccountTab} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} onSaveProfile={handleSaveProfile} onCancelOrder={handleCancelMyOrder} myOrders={myOrders} savedProducts={savedProducts} toggleSaved={toggleSaved} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedProduct={setSelectedProduct} />}
 
       {/* CHECKOUT (guest checkout, no login needed) */}
       {currentView === 'checkout' && <CheckoutView storeSettings={storeSettings} cart={cart} checkoutForm={checkoutForm} setCheckoutForm={setCheckoutForm} checkoutError={checkoutError} deliveryCharge={deliveryCharge} grandTotal={grandTotal} formatPrice={formatPrice} handleCheckoutSubmit={handleCheckoutSubmit} isDarkMode={isDarkMode} placingOrder={placingOrder} removeFromCart={removeFromCart} updateCartQty={updateCartQty} setCurrentView={setCurrentView} subtotal={subtotal} discount={discount} discountLabel={discountLabel} reward={reward} customerUser={customerUser} authReady={authReady} onSignIn={handleCustomerSignIn} />}

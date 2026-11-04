@@ -6,6 +6,7 @@ import { maxMarkupFor, shopPriceClamp, SHOP_COLLECTIONS, productInCollection } f
 import { flatSubCategories, subLabel } from '../data/catalog';
 import { watchPlans, watchMySubscription } from '../storeSettings';
 import { normalizePlans, planPrice, toMillis, SHOP_MAX_ITEMS } from '../data/priceCheck';
+import { createSellerShop, watchSellerRules, sellerNameBlocked } from '../sellers';
 
 const shopUrl = (slug) => `${window.location.origin}/?shop=${slug}`;
 
@@ -33,7 +34,7 @@ function ShopSwitch({ on, busy, onToggle, isDarkMode, label }) {
 // (by collection or one by one) and the price they sell at, up to the limit for that product. The whole markup is theirs.
 // An Admin the Owner switched "Shop create" ON for can make one too: it stays switched off until the Owner accepts it.
 // Payments (online, delivery charge, cash on delivery) all stay with the store; the Owner pays the markup out later.
-export default function MyShop({ canCreateShop = false, adminRole, products, isOwner, isDarkMode, formatPrice, adminName, loggedInUserEmail, onDirtyChange }) {
+export default function MyShop({ sellerMode = false, canCreateShop = false, adminRole, products, isOwner, isDarkMode, formatPrice, adminName, loggedInUserEmail, onDirtyChange }) {
   const [shop, setShop] = useState(undefined); // undefined = loading, null = none yet
   const [draft, setDraft] = useState({}); // productId -> price text (only the products that are in the shop)
   const [name, setName] = useState('');
@@ -47,6 +48,10 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
   const [plans, setPlans] = useState(() => normalizePlans(null));
   const [sub, setSub] = useState(null); // my plan (subscriptions/{uid}), written only by the server
   const [paying, setPaying] = useState(false);
+  // public seller ("Sell on Kyvro"): blocked shop names + the promise they must accept
+  const [sellerRules, setSellerRules] = useState(null);
+  const [agree, setAgree] = useState(false);
+  useEffect(() => (sellerMode ? watchSellerRules(setSellerRules) : undefined), [sellerMode]);
 
   const uid = auth.currentUser ? auth.currentUser.uid : '';
   useEffect(() => {
@@ -151,9 +156,18 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
   const doCreate = async () => {
     setMsg(null);
     if (newName.trim().length < 2) { setMsg({ type: 'err', text: 'Write a name for your shop (at least 2 letters).' }); return; }
+    if (sellerMode) {
+      if (sellerRules && !sellerRules.open) { setMsg({ type: 'err', text: 'Kyvro is not taking new sellers right now. Please try again later.' }); return; }
+      const bad = sellerNameBlocked(newName, '', sellerRules);
+      if (bad) { setMsg({ type: 'err', text: `The shop name cannot contain "${bad}". Please choose another name.` }); return; }
+      if (!agree) { setMsg({ type: 'err', text: 'Please accept the seller terms first.' }); return; }
+    }
     setBusy(true);
-    try { await createShop({ uid, email: loggedInUserEmail, name: newName, ownerName: adminName, pending: !isOwner && adminRole === 'admin' }); }
-    catch (err) { setMsg({ type: 'err', text: err.code === 'permission-denied' ? 'Could not create the shop: publish the latest Firestore rules first.' : err.message }); }
+    try {
+      if (sellerMode) await createSellerShop({ uid, email: loggedInUserEmail, name: newName, sellerName: adminName });
+      else await createShop({ uid, email: loggedInUserEmail, name: newName, ownerName: adminName, pending: !isOwner && adminRole === 'admin' });
+    }
+    catch (err) { setMsg({ type: 'err', text: err.code === 'permission-denied' ? (sellerMode ? 'Could not open the shop. You may already have a shop, the name may not be allowed, or new sellers are paused.' : 'Could not create the shop: publish the latest Firestore rules first.') : err.message }); }
     setBusy(false);
   };
 
@@ -182,6 +196,7 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
       items[String(p.id)] = shopPriceClamp(p.price, w);
     }
     if (Object.keys(items).length > cap) { limitMsg(); return; }
+    if (sellerMode) { const bad = sellerNameBlocked(name, shop.slug, sellerRules); if (bad) { setMsg({ type: 'err', text: `The shop name cannot contain "${bad}".` }); return; } }
     setBusy(true);
     try {
       await saveShopItems(shop.slug, name, items, isOwner ? { planExempt: true } : {});
@@ -239,9 +254,9 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
               </div>
             </div>
           )}
-          {allShops.filter((s) => !isPendingShop(s)).length === 0 ? <p className="text-sm text-gray-500">No shops yet.</p> : (
+          {allShops.filter((s) => !isPendingShop(s) && s.kind !== 'seller').length === 0 ? <p className="text-sm text-gray-500">No shops yet.</p> : (
             <div className="divide-y text-xs">
-              {allShops.filter((s) => !isPendingShop(s)).map((s) => (
+              {allShops.filter((s) => !isPendingShop(s) && s.kind !== 'seller').map((s) => (
                 <div key={s.slug} className="py-3 flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-bold">{s.name || s.slug} <span className="font-normal text-gray-500">· {owners[s.slug] ? (owners[s.slug].name || owners[s.slug].email) : ''}</span></p>
@@ -265,9 +280,9 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
         <h3 className="text-lg font-bold">Shops</h3>
         <p className="text-xs text-gray-500">These are the team's shop pages. Share them, keep an eye on their orders and confirm them in the Orders tab. You earn the commission shown on each product.{canCreateShop ? '' : ' Want your own shop? Ask the Owner to switch "Shop create" ON for you.'}</p>
         {msg && <p className={`text-xs ${msg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{msg.text}</p>}
-        {allShops.filter((x) => x.active !== false).length === 0 ? <p className="text-sm text-gray-500">No shops yet.</p> : (
+        {allShops.filter((x) => x.active !== false && x.kind !== 'seller').length === 0 ? <p className="text-sm text-gray-500">No shops yet.</p> : (
           <div className="divide-y text-xs">
-            {allShops.filter((x) => x.active !== false).map((x) => (
+            {allShops.filter((x) => x.active !== false && x.kind !== 'seller').map((x) => (
               <div key={x.slug} className="py-3 flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-bold">{x.name || x.slug}</p>
@@ -289,7 +304,13 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
     return wrap(
       <div className={card}>
         <h3 className="text-lg font-bold">Create my shop</h3>
-        <p className="text-xs text-gray-500">You get your own link, and you earn the markup. Customers who open it see the same Kyvro store, but only the products you choose, at the price you set (within the allowed limit). Everything above the store price is your earning.{!isOwner && adminRole === 'admin' ? ' Orders from your own shop earn the markup, not commission. Your shop starts switched off: the Owner gets a notification and turns it on when they accept it.' : ' Admins can share your link and confirm its orders; they earn commission, not the markup.'}</p>
+        <p className="text-xs text-gray-500">You get your own link, and you earn the markup. Customers who open it see the same Kyvro store, but only the products you choose, at the price you set (within the allowed limit). Everything above the store price is your earning.{sellerMode ? ' Kyvro takes the payment, delivers the order and pays your markup to your bKash after the order is delivered. You do not handle orders or customers.' : !isOwner && adminRole === 'admin' ? ' Orders from your own shop earn the markup, not commission. Your shop starts switched off: the Owner gets a notification and turns it on when they accept it.' : ' Admins can share your link and confirm its orders; they earn commission, not the markup.'}</p>
+        {sellerMode && (
+          <label className="flex items-start gap-2 text-xs cursor-pointer">
+            <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 accent-[#D4AF37]" />
+            <span>I am an independent seller, not Kyvro. I will not pretend to be Kyvro or use names like {(sellerRules ? sellerRules.blockedWords : ['kyvro', 'official']).slice(0, 5).map((w) => `"${w}"`).join(', ')}. Kyvro can switch my shop off at any time.</span>
+          </label>
+        )}
         <div className="flex flex-wrap gap-2 items-center">
           <input className={`${inputCls} w-64`} placeholder="Shop name, e.g. Rahim Fashion" maxLength={60} value={newName} onChange={(e) => setNewName(e.target.value)} />
           <button type="button" disabled={busy} onClick={doCreate} className="bg-[#D4AF37] text-black font-bold px-5 py-2 rounded text-xs uppercase tracking-wider disabled:opacity-50">{busy ? 'Creating...' : 'Create shop'}</button>
@@ -309,6 +330,7 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
           <div className="min-w-0">
             <h3 className="text-lg font-bold">My Shop{isPendingShop(shop) ? ' (waiting for the Owner)' : shop.active === false ? ' (switched off by the Owner)' : ''}</h3>
             {isPendingShop(shop) && <p className="text-xs text-amber-600 mt-1">The Owner was notified. You can already choose products and prices; the link starts working when the Owner accepts your shop.</p>}
+            {shop.killed && <p className="text-xs text-red-500 mt-1 font-semibold">Kyvro switched this shop off{shop.killNote ? `: ${shop.killNote}` : ''}. It cannot be changed or switched on again. Contact kyvrofashion@gmail.com if you think this is a mistake.</p>}
             <p className="text-xs text-gray-500 break-all mt-1">{link}</p>
           </div>
           <div className="flex flex-wrap gap-2">{linkButtons(shop.slug, goldBtn)}</div>
@@ -429,7 +451,7 @@ export default function MyShop({ canCreateShop = false, adminRole, products, isO
         </div>
         <div className="flex gap-2">
           <button type="button" disabled={busy || !dirty} onClick={discard} className="px-4 py-2.5 rounded border border-gray-400 text-xs font-bold uppercase tracking-wider disabled:opacity-40">Discard</button>
-          <button type="button" disabled={busy || !dirty} onClick={save} className="bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold px-6 py-2.5 rounded text-xs uppercase tracking-widest shadow disabled:opacity-40">{busy ? 'Saving...' : 'Save my shop'}</button>
+          <button type="button" disabled={busy || !dirty || !!shop.killed} onClick={save} className="bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold px-6 py-2.5 rounded text-xs uppercase tracking-widest shadow disabled:opacity-40">{busy ? 'Saving...' : 'Save my shop'}</button>
         </div>
       </div>
     </div>

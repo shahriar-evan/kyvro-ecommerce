@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { askConfirm } from './AlertCenter';
-import { Heart, User, Package, Wallet, Settings, LogOut } from 'lucide-react';
+import { Heart, User, Package, Wallet, Settings, LogOut, Store } from 'lucide-react';
+import SellerDashboard from './SellerDashboard';
 import { formatDateTime, toDate } from '../utils/dates';
 import { CANCEL_WINDOW_MINUTES } from '../orders';
 import { imageFileToDataURL } from '../utils/imageUpload';
@@ -19,12 +20,13 @@ const TABS = [
   { key: 'orders', label: 'My Orders', icon: Package },
   { key: 'saved', label: 'Saved Items', icon: Heart },
   { key: 'settings', label: 'Account Settings', icon: Settings },
+  { key: 'sell', label: 'Sell on Kyvro', icon: Store },
   { key: 'wallet', label: 'My Wallet', icon: Wallet },
 ];
 
 export default function AccountView({
   customerUser, displayName, photoURL, activeTab, setActiveTab, onSignIn, onSignOut, onSaveProfile, onCancelOrder,
-  myOrders, savedProducts, toggleSaved, formatPrice, isDarkMode, setCurrentView, setSelectedProduct,
+  myOrders, savedProducts, toggleSaved, formatPrice, isDarkMode, setCurrentView, setSelectedProduct, products = [], isStaff = false,
 }) {
   const [name, setName] = useState(displayName || '');
   const [photo, setPhoto] = useState(photoURL || '');
@@ -262,6 +264,8 @@ export default function AccountView({
           </div>
         )
       )}
+
+      {activeTab === 'sell' && <SellerDashboard customerUser={customerUser} isStaff={isStaff} products={products} formatPrice={formatPrice} isDarkMode={isDarkMode} onSignIn={onSignIn} />}
 
       {activeTab === 'settings' && (
         <div className={`${card} max-w-xl space-y-5`}>
