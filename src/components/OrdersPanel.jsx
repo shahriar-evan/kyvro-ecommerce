@@ -5,6 +5,8 @@ import { updateOrderStatus, isPaidOrder, requestCancelOrder, declineCancelReques
 import { formatDateTime, toDate } from '../utils/dates';
 import { phoneKey, emailKey } from '../data/shopConfig';
 import { watchBlocked, blockPhone, blockEmail, unblockPhone, unblockEmail } from '../blocklist';
+import { checkOrderPrices } from '../data/priceCheck';
+import { watchAllShops } from '../shops';
 
 const STATUS_STYLE = {
   Pending: 'bg-yellow-500/15 text-yellow-600',
@@ -23,7 +25,7 @@ const PAYMENT_STYLE = {
 
 const csv = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
-export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, formatPrice, adminName, loggedInUserEmail, canUnblock, isOwner, showSupplier = true }) {
+export default function OrdersPanel({ orders, products = [], productCosts = {}, isDarkMode, formatPrice, adminName, loggedInUserEmail, canUnblock, isOwner, canDeliver = false, showSupplier = true }) {
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState(null);
@@ -53,6 +55,13 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
     const stop = watchOrderSupply(setSupply, (err) => console.error('Could not load supplier orders:', err));
     return () => stop();
   }, []);
+
+  // The browser saves the order, so its prices are checked against the live products / shop before it is confirmed
+  // (only Pending orders: later the store price may change on purpose)
+  const [shops, setShops] = useState({});
+  useEffect(() => watchAllShops((list) => setShops(Object.fromEntries(list.map((s) => [s.slug, s]))), () => {}), []);
+  const productsById = Object.fromEntries(products.map((p) => [String(p.id), p]));
+  const priceCheck = (o) => (o.status === 'Pending' && products.length ? checkOrderPrices(o, productsById, o.shop ? shops[o.shop] : null) : { ok: true, problems: [] });
 
   // ---- Dropshipping: cost, profit and the text to paste into the supplier's site ----
   // Supplier's own delivery fee per supplier order (same for every area for now)
@@ -447,6 +456,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
               <div className="text-right shrink-0">
                 <span className={`inline-block px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${STATUS_STYLE[o.status] || ''}`}>{o.status}</span>
                 {o.returned && <span className="block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-600 text-white">Returned</span>}
+                {!priceCheck(o).ok && <span className="block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-600 text-white">Price mismatch</span>}
                 {o.cancelRequest && o.cancelRequest.status === 'pending' && o.status !== 'Cancelled' && <span className="block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-600 text-white">Cancel request</span>}
                 <p className="text-sm font-bold mt-1">{formatPrice(o.total)}</p>
                 {(() => {
@@ -694,13 +704,19 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
               <button type="button" onClick={() => copyOrder(o)} className={`${btn} ${copiedId === o.id ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
                 {copiedId === o.id ? 'Copied ✓' : 'Copy order details'}
               </button>
+              {!priceCheck(o).ok && (
+                <div className="w-full p-2 rounded bg-red-600/10 text-red-500 text-[11px]">
+                  <p className="font-bold">The prices in this order do not match the store. The customer may have changed them. Check before confirming:</p>
+                  {priceCheck(o).problems.map((t, i) => <p key={i}>• {t}</p>)}
+                </div>
+              )}
               {o.status === 'Pending' && !isUnpaid(o) && (
-                <button disabled={busy} onClick={() => setStatus(o, 'Processing')} className={`${btn} bg-green-600 text-white hover:opacity-90`}>Confirm &amp; start processing</button>
+                <button disabled={busy} onClick={() => setStatus(o, 'Processing', priceCheck(o).ok ? '' : `The prices in order ${o.orderNumber} do not match the store:\n\n${priceCheck(o).problems.join('\n')}\n\nConfirm it anyway?`)} className={`${btn} bg-green-600 text-white hover:opacity-90`}>Confirm &amp; start processing</button>
               )}
               {o.status === 'Processing' && (
                 <button disabled={busy} onClick={() => setStatus(o, 'Shipped')} className={`${btn} bg-purple-600 text-white hover:opacity-90`}>Mark as shipped</button>
               )}
-              {o.status === 'Shipped' && (
+              {o.status === 'Shipped' && canDeliver && (
                 <button disabled={busy} onClick={() => setStatus(o, 'Delivered')} className={`${btn} bg-green-600 text-white hover:opacity-90`}>Mark as delivered</button>
               )}
               {o.status === 'Delivered' && showSupplier && !o.returned && (
@@ -712,7 +728,7 @@ export default function OrdersPanel({ orders, productCosts = {}, isDarkMode, for
                 }} className={`${btn} border border-red-500 text-red-500 hover:bg-red-500/10`}>Mark as returned</button>
               )}
               {o.returned && <span className="text-[11px] text-red-500 self-center font-semibold">Returned{o.returned.loss > 0 ? ` · loss ${formatPrice(o.returned.loss)}` : ''}{o.returned.note ? ` · ${o.returned.note}` : ''}. No commission or markup is paid on it.</span>}
-              {(o.paymentStatus === 'Awaiting payment' || o.paymentStatus === 'Awaiting verification') && o.status !== 'Cancelled' && (!isUnpaid(o) || isOwner) && (
+              {(o.paymentStatus === 'Awaiting payment' || o.paymentStatus === 'Awaiting verification') && o.status !== 'Cancelled' && isOwner && (
                 <button disabled={busy} onClick={() => run(o.id, () => markOrderPaid(o.id, staff))} className={`${btn} bg-[#D4AF37] text-black hover:opacity-90`}>Mark payment received</button>
               )}
               {o.status !== 'Cancelled' && o.status !== 'Delivered' && (isOwner || !isPaidOrder(o)) && (

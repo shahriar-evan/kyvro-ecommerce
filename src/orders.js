@@ -142,7 +142,7 @@ export async function updateOrderStatus(orderId, status, staff) {
       history: arrayUnion(historyEntry(status, staff)),
     };
     if (status === "Processing") {
-      patch.confirmedBy = staff.email || "";
+      patch.confirmedBy = String(staff.email || "").toLowerCase(); // the rules check it is your own email
       patch.confirmedByName = staff.name || staff.email || "";
     }
     if (deduct) patch.stockDeducted = true;

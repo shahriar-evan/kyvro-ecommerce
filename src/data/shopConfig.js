@@ -192,30 +192,8 @@ export const cleanPhone = (p) => String(p || '').replace(/[\s()-]/g, '');
 export const phoneKey = (p) => cleanPhone(p).replace(/^[+]/, '').replace(/^880/, '0').replace(/^1/, '01');
 export const emailKey = (e) => String(e || '').trim().toLowerCase();
 
-// ---------------------------------------------------------------------------
-// Admin shops ("?shop=name" links): the highest price an admin may sell a product for, by the Owner's (base) price.
-// 100 -> 149, 300 -> 399, 400 -> 549, 1200 -> 1450. To change the limits, change the numbers below.
-// ---------------------------------------------------------------------------
-export const SHOP_MARKUP_BANDS = [
-  { upTo: 199, add: 49 },
-  { upTo: 399, add: 99 },
-  { upTo: 799, add: 149 },
-  { upTo: 1999, add: 250 },
-  { upTo: 4999, add: 350 },
-  { upTo: Infinity, add: 500 },
-];
-export const maxMarkupFor = (base) => {
-  const b = Number(base) || 0;
-  const band = SHOP_MARKUP_BANDS.find((x) => b <= x.upTo);
-  return band ? band.add : 0;
-};
-// The price a shop may really use: never below the base price, never above base + the allowed markup
-export const shopPriceClamp = (base, wanted) => {
-  const b = Number(base) || 0;
-  const w = Number(wanted);
-  if (!isFinite(w)) return b;
-  return Math.max(b, Math.min(Math.round(w), b + maxMarkupFor(b)));
-};
+// Admin shops: the markup limits live in ./priceCheck.js (the server uses them too)
+export { SHOP_MARKUP_BANDS, maxMarkupFor, shopPriceClamp } from './priceCheck.js';
 
 // Which collection a product belongs to (same rule as the home page cards and the menu)
 export const SHOP_COLLECTIONS = [

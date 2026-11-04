@@ -2,6 +2,7 @@ import { getApp } from "firebase/app";
 import { getFirestore, doc, collection, query, where, onSnapshot, setDoc, updateDoc, deleteDoc, deleteField } from "firebase/firestore";
 import "./firebase"; // makes sure the default Firebase app exists
 import { imageFileToDataURL } from "./utils/imageUpload";
+import { MAX_COMMISSION } from "./adminAuth";
 
 const db = getFirestore(getApp());
 
@@ -65,7 +66,7 @@ export function watchProductCommissions(onData, onError) {
 }
 // profit = what is left per piece after the supplier price (so Admins can see what they earn without ever seeing the supplier price)
 export const setProductCommission = (id, pct, info = {}) => {
-  const n = Number(pct);
+  const n = Math.min(MAX_COMMISSION, Number(pct) || 0);
   if (!n || n <= 0) return deleteDoc(doc(db, "productCommission", String(id)));
   return setDoc(doc(db, "productCommission", String(id)), clean({
     pct: n,

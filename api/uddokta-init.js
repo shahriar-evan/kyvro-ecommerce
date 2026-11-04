@@ -4,7 +4,7 @@
 // Environment variables (Vercel -> Project -> Settings -> Environment Variables):
 //   UDDOKTAPAY_BASE_URL   e.g. https://sandbox.uddoktapay.com  (or your live panel URL, no trailing slash)
 //   UDDOKTAPAY_API_KEY    API key from the UddoktaPay dashboard
-import { SITE, getOrder, amountDue } from './_sslc.js';
+import { SITE, getOrder, amountDue, verifyOrderPrices } from './_sslc.js';
 import { uddoktaConfigured, UDDOKTA_BASE, UDDOKTA_KEY } from './_uddokta.js';
 
 export const config = { maxDuration: 30 };
@@ -21,6 +21,11 @@ export default async function handler(req, res) {
     const due = amountDue(order);
     if (due.error) return res.status(409).json({ error: due.error });
     if (!(due.amount > 0)) return res.status(400).json({ error: 'Invalid order amount.' });
+    const check = await verifyOrderPrices(order);
+    if (!check.ok) {
+      console.warn('Order price check failed', orderNumber, check.problems.join('; '));
+      return res.status(409).json({ error: 'The prices in this order do not match the store. Please empty your cart and order again.' });
+    }
 
     const c = order.customer || {};
     const r = await fetch(`${UDDOKTA_BASE}/api/checkout-v2`, {

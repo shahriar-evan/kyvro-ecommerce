@@ -1,0 +1,520 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function myEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    function myDocPath() {
+      return /databases/$(database)/documents/admins/$(myEmail());
+    }
+
+    // Fixed owner: must match OWNER_EMAILS in src/adminEmails.js (needs a verified email, i.e. Google login)
+    function isFixedOwner() {
+      return signedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in ['shahriarevan545@gmail.com'];
+    }
+
+    // Someone who is on the team list and has access ON
+    function hasActiveEntry() {
+      return signedIn()
+        && exists(myDocPath())
+        && get(myDocPath()).data.get('active', true) == true;
+    }
+
+    function myRole() {
+      return get(myDocPath()).data.get('role', 'admin');
+    }
+
+    function isOwner() {
+      return isFixedOwner() || (hasActiveEntry() && myRole() == 'owner');
+    }
+
+    function isManager() {
+      return hasActiveEntry() && myRole() == 'manager';
+    }
+
+    // Any team member with access ON (Owner, Manager or Admin)
+    function isStaff() {
+      return isFixedOwner() || hasActiveEntry();
+    }
+
+    function validRole() {
+      return request.resource.data.get('role', 'admin') in ['owner', 'manager', 'admin'];
+    }
+
+    // Team list: document id = lowercase email
+    match /admins/{email} {
+      // Anyone can read their own entry (login check + live access check); owners and managers can read the list
+      allow get: if isOwner() || isManager() || (signedIn() && myEmail() == email);
+      allow list: if isOwner() || isManager();
+      // Owners can do everything. Managers can only create new entries with the "admin" role, nothing else
+      allow create: if (isOwner() && validRole())
+                    || (isManager() && request.resource.data.role == 'admin' && request.resource.data.get('editAll', false) == false
+                       && request.resource.data.get('addProducts', false) == false
+                       && request.resource.data.get('canApprove', false) == false
+                       && request.resource.data.get('commission', 0) == 0);
+      allow update: if isOwner() && validRole();
+      allow delete: if isOwner();
+    }
+
+    // Owner-only details: phone, note and the password set when the person was added.
+    // Managers and Admins can never read these.
+    match /adminPrivate/{email} {
+      allow read, delete: if isOwner();
+      // The Owner can change everything. A Manager can only clear the saved password of an Admin-role member
+      // (that is what "Reset password" does after the reset email is sent).
+      allow update: if isOwner()
+        || (isManager()
+            && exists(/databases/$(database)/documents/admins/$(email))
+            && get(/databases/$(database)/documents/admins/$(email)).data.get('role', 'admin') == 'admin'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['password'])
+            && !('password' in request.resource.data));
+      // A manager may only create it for an Admin-role member they just added
+      allow create: if isOwner()
+                    || (isManager()
+                        && exists(/databases/$(database)/documents/admins/$(email))
+                        && get(/databases/$(database)/documents/admins/$(email)).data.role == 'admin');
+    }
+
+    // Stats reset time per team member (Owner only writes it; a member can read only their own)
+    match /statsReset/{email} {
+      allow read: if isOwner() || (signedIn() && myEmail() == email);
+      allow write: if isOwner();
+    }
+
+    // Customer profile (name, photo, saved items). Each signed-in customer can read and change only their own.
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'photoURL', 'saved', 'updatedAt'])
+        && request.resource.data.get('name', '') is string && request.resource.data.get('name', '').size() <= 80
+        && request.resource.data.get('photoURL', '') is string && request.resource.data.get('photoURL', '').size() <= 80000
+        && request.resource.data.get('saved', []) is list && request.resource.data.get('saved', []).size() <= 300;
+      allow delete: if false;
+    }
+
+    // Products: everyone can see them. Team members add and edit. Delete: Owner any, Manager and Admin only the ones they added.
+    match /products/{pid} {
+      function validProduct() {
+        let d = request.resource.data;
+        return d.name is string && d.name.size() > 0 && d.name.size() <= 150
+          && d.price is number && d.price >= 0
+          && d.image is string && d.image.size() <= 900000
+          && d.stock is number && d.stock >= 0;
+      }
+      // A delete request (deleteRequested) can be raised by whoever added the product (or the Owner),
+      // and only the Owner can remove it again. Normal edits must leave it as it is.
+      function deleteFlagOk() {
+        let before = resource.data.get('deleteRequested', false);
+        let after = request.resource.data.get('deleteRequested', false);
+        return before == after
+          || isOwner()
+          || (after == true && before == false && resource.data.get('addedBy', '').lower() == myEmail());
+      }
+      allow read: if isStaff() || resource.data.get('status', '') == 'approved';
+      // Customers can only read approved products. Team members can read everything (including pending ones).
+      // The Owner can add products (live at once, or pending). Anyone else can add a product only if the Owner switched
+      // "Add products" ON for them, and it is always created "pending" until the Owner approves it.
+      allow create: if isStaff() && validProduct()
+        && (isOwner()
+            || (hasActiveEntry() && get(myDocPath()).data.get('addProducts', false) == true
+                && request.resource.data.get('status', '') == 'pending'))
+        && (isOwner() || request.resource.data.get('status', '') == 'pending')
+        // the person who adds it is written as "added by" (only the Owner may write someone else)
+        && (isOwner() || request.resource.data.get('addedBy', '') == myEmail());
+      // Only the Owner, or someone the Owner switched "Approve products" ON for, can change a product's status (that is what "Approve" does)
+      function canApproveNow() { return isOwner() || (hasActiveEntry() && get(myDocPath()).data.get('canApprove', false) == true); }
+      // Editing a product's details: only the Owner, or the person who added it. Everybody else can only do the
+      // automatic changes: stock numbers when an order is confirmed / cancelled, a delete request, or approving (only with the Owner's permission).
+      function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+      function canEditThis() {
+        return isOwner()
+          || resource.data.get('addedBy', '').lower() == myEmail()
+          || (hasActiveEntry() && get(myDocPath()).data.get('editAll', false) == true)
+          || changed().hasOnly(['stock', 'sizeStock', 'colorStock', 'sold', 'updatedAt'])
+          || changed().hasOnly(['deleteRequested', 'deleteRequestedBy', 'deleteRequestedByName', 'deleteRequestedAt'])
+          || (canApproveNow() && changed().hasOnly(['status', 'approvedBy', 'approvedByName', 'approvedAt']));
+      }
+      allow update: if isStaff() && validProduct() && deleteFlagOk() && canEditThis()
+        && request.resource.data.get('addedBy', '') == resource.data.get('addedBy', '')
+        && (request.resource.data.get('status', 'approved') == resource.data.get('status', 'approved')
+            || (canApproveNow() && request.resource.data.get('status', '') == 'approved'));
+      // The Owner can delete any product. Managers and Admins can only delete their OWN product directly while it is
+      // still pending (never approved); a live product needs the Owner's confirmation (deleteRequested).
+      // A Manager, or anyone with "Approve products" ON, can also reject a pending product.
+      allow delete: if isOwner()
+        || (isStaff() && resource.data.get('addedBy', '').lower() == myEmail() && resource.data.get('status', 'approved') != 'approved')
+        || ((isManager() || canApproveNow()) && resource.data.get('status', 'approved') == 'pending');
+    }
+
+    // Supplier details for dropshipping (supplier shop name, what the supplier charges you, product link).
+    // PRIVATE: only the Owner and Managers can read it. An Admin can only CREATE the entry when adding a new product
+    // (so the Owner knows where it comes from) and can never read it back. Customers can never read it.
+    // Document id = product id.
+    match /productCosts/{pid} {
+      function productCostOk() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['supplierName', 'supplierCost', 'supplierLink', 'colorLinks', 'colorCosts', 'colorAltLinks', 'extraSuppliers', 'updatedAt', 'updatedBy'])
+          && d.get('supplierName', '') is string && d.get('supplierName', '').size() <= 80
+          && d.supplierCost is number && d.supplierCost >= 0 && d.supplierCost < 10000000
+          && d.get('supplierLink', '') is string && d.get('supplierLink', '').size() <= 500
+          && d.get('colorLinks', {}) is map && d.get('colorLinks', {}).size() <= 30
+          && d.get('colorCosts', {}) is map && d.get('colorCosts', {}).size() <= 30
+          && d.get('colorAltLinks', {}) is map && d.get('colorAltLinks', {}).size() <= 30
+          && d.get('extraSuppliers', []) is list && d.get('extraSuppliers', []).size() <= 10
+          && d.get('updatedAt', '') is string && d.get('updatedAt', '').size() <= 40
+          && d.get('updatedBy', '') is string && d.get('updatedBy', '').size() <= 200;
+      }
+      allow read: if isOwner() || isManager();
+      // (create only runs when there is no productCosts entry yet; changing an existing one is "update" below)
+      // An Admin only for a product they added themselves, so nobody can plant a supplier link on someone else's product
+      allow create: if productCostOk()
+        && (isOwner() || isManager()
+            || (hasActiveEntry()
+                && exists(/databases/$(database)/documents/products/$(pid))
+                && get(/databases/$(database)/documents/products/$(pid)).data.get('addedBy', '') == myEmail()));
+      allow update: if (isOwner() || isManager()) && productCostOk();
+      allow delete: if isOwner() || isManager();
+    }
+
+    // Team commission per product (percent of the profit). Team members can read it. Only the Owner can create it or change
+    // the percent; a Manager can only refresh the profit numbers (when the price or supplier price changes) and keep the percent.
+    // "profit" is the profit per piece, kept here so an Admin can see what they earn without ever seeing the supplier price.
+    match /productCommission/{pid} {
+      function commissionShapeOk() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['pct', 'profit', 'colorProfit', 'updatedAt'])
+          // highest commission % = MAX_COMMISSION in src/adminAuth.js
+          && d.pct is number && d.pct > 0 && d.pct <= 15
+          && d.get('profit', 0) is number
+          && d.get('colorProfit', {}) is map && d.get('colorProfit', {}).size() <= 30
+          && d.get('updatedAt', '') is string && d.get('updatedAt', '').size() <= 40;
+      }
+      allow read: if isStaff();
+      allow create: if isOwner() && commissionShapeOk();
+      allow update: if (isOwner() || (isManager() && request.resource.data.pct == resource.data.pct)) && commissionShapeOk();
+      allow delete: if isOwner();
+    }
+
+    // Manager shops (kyvro.store/?shop=name). Everyone can read a shop (customers open the link). Only a Manager (or the Owner)
+    // creates a shop and can change its name and items later; Admins cannot set up a shop. The Owner can also switch a shop
+    // on or off. No email is stored here: the private "shopOwners" document says whose shop it is.
+    match /shops/{slug} {
+      allow read: if true;
+      allow create: if (isManager() || isOwner()) && slug.matches('^[a-z0-9-]{3,40}$')
+        && request.resource.data.keys().hasOnly(['name', 'ownerUid', 'active', 'items', 'createdAt', 'updatedAt'])
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 60
+        && request.resource.data.active == true
+        && request.resource.data.items is map && request.resource.data.items.size() == 0
+        && request.resource.data.createdAt == request.time;
+      allow update: if (isManager() || isOwner())
+        && request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 60
+        && request.resource.data.items is map && request.resource.data.items.size() <= 300
+        && ((isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'active', 'updatedAt']))
+            || (resource.data.ownerUid == request.auth.uid
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt'])));
+      allow delete: if isOwner();
+    }
+    match /shopOwners/{slug} {
+      allow read: if isOwner() || (signedIn() && resource.data.email == myEmail());
+      allow create: if (isManager() || isOwner())
+        && request.resource.data.keys().hasOnly(['email', 'name'])
+        && request.resource.data.email == myEmail()
+        && get(/databases/$(database)/documents/shops/$(slug)).data.ownerUid == request.auth.uid;
+      allow update, delete: if isOwner();
+    }
+
+    // What the Owner already paid to a team member (markup / commission). The Owner writes; a member can read only their own.
+    match /payouts/{id} {
+      allow read: if isOwner() || (signedIn() && resource.data.email == myEmail());
+      allow create: if isOwner()
+        && request.resource.data.keys().hasOnly(['email', 'name', 'amount', 'note', 'at', 'by'])
+        && request.resource.data.amount is number && request.resource.data.amount > 0 && request.resource.data.amount < 100000000
+        && request.resource.data.email is string && request.resource.data.email.size() <= 200;
+      allow update: if false;
+      allow delete: if isOwner();
+    }
+
+    // Which supplier shop an order was already placed at (document id = order number). PRIVATE: Owner and Managers only.
+    match /orderSupply/{orderId} {
+      allow read: if isOwner() || isManager();
+      allow create, update: if (isOwner() || isManager())
+        && request.resource.data.keys().hasOnly(['placed', 'updatedAt'])
+        && request.resource.data.placed is map
+        && request.resource.data.placed.size() <= 10;
+      allow delete: if isOwner();
+    }
+
+    // Store settings (top banner text + automatic discount rules). Everyone can read them (the website needs
+    // them), only the Owner can change them. maxPercent / maxFixed are the highest discounts among the rules.
+    match /settings/{docId} {
+      allow read: if true;
+      allow create, update: if docId == 'store' && isOwner()
+        && request.resource.data.keys().hasOnly(['announcementText', 'bannerSpeed', 'discountEnabled', 'discountRules', 'maxPercent', 'maxFixed', 'deliveryInside', 'deliveryOutside', 'deliveryExtraPerItem', 'deliveryIncludedItems', 'freeDeliveryEnabled', 'freeDeliveryMin', 'freeDeliveryFor', 'maintenanceMode', 'maintenanceMessage', 'manualPayEnabled', 'manualbKash', 'manualNagad', 'updatedAt', 'updatedByName'])
+        && request.resource.data.deliveryInside is number && request.resource.data.deliveryInside >= 0 && request.resource.data.deliveryInside <= 100000
+        && request.resource.data.deliveryOutside is number && request.resource.data.deliveryOutside >= 0 && request.resource.data.deliveryOutside <= 100000
+        && request.resource.data.deliveryExtraPerItem is number && request.resource.data.deliveryExtraPerItem >= 0 && request.resource.data.deliveryExtraPerItem <= 10000
+        && request.resource.data.deliveryIncludedItems is number && request.resource.data.deliveryIncludedItems >= 1 && request.resource.data.deliveryIncludedItems <= 100
+        && request.resource.data.freeDeliveryEnabled is bool
+        && request.resource.data.freeDeliveryMin is number && request.resource.data.freeDeliveryMin >= 0 && request.resource.data.freeDeliveryMin <= 10000000
+        && request.resource.data.freeDeliveryFor in ['online', 'cod', 'both']
+        && request.resource.data.get('bannerSpeed', 100) is number && request.resource.data.get('bannerSpeed', 100) >= 25 && request.resource.data.get('bannerSpeed', 100) <= 300
+        && request.resource.data.get('maintenanceMode', false) is bool
+        && request.resource.data.get('manualPayEnabled', false) is bool
+        && request.resource.data.get('manualbKash', '') is string && request.resource.data.get('manualbKash', '').size() <= 16
+        && request.resource.data.get('manualNagad', '') is string && request.resource.data.get('manualNagad', '').size() <= 16
+        && request.resource.data.get('maintenanceMessage', '') is string && request.resource.data.get('maintenanceMessage', '').size() <= 300
+        && request.resource.data.announcementText is string && request.resource.data.announcementText.size() <= 500
+        && request.resource.data.discountEnabled is bool
+        && request.resource.data.discountRules is list && request.resource.data.discountRules.size() <= 10
+        && request.resource.data.maxPercent is number && request.resource.data.maxPercent >= 0 && request.resource.data.maxPercent <= 100
+        && request.resource.data.maxFixed is number && request.resource.data.maxFixed >= 0;
+      allow delete: if false;
+    }
+
+    // Blocked customers (spam). Team members add them; Owner and Manager can unblock. The order rules below refuse
+    // a new order from a blocked phone number or a blocked signed-in account.
+    match /blockedPhones/{key} {
+      allow read: if isStaff();
+      allow create: if isStaff() && key.matches('^[0-9]{7,16}$')
+        && request.resource.data.keys().hasOnly(['phone', 'orderNumber', 'blockedBy', 'blockedByName', 'at']);
+      allow update: if false;
+      allow delete: if isOwner() || isManager();
+    }
+    match /blockedEmails/{key} {
+      allow read: if isStaff();
+      allow create: if isStaff() && key.matches('^[^/]+@[^/]+$')
+        && request.resource.data.keys().hasOnly(['email', 'orderNumber', 'blockedBy', 'blockedByName', 'at']);
+      allow update: if false;
+      allow delete: if isOwner() || isManager();
+    }
+
+    // Offer-email list. A customer is added automatically when they sign in with Google (document id = their email).
+    // Only the Owner can read the whole list. A customer can read and switch their own entry.
+    // The "Unsubscribe" link in an email works without signing in: it must carry the secret token (unsubWith) of that entry.
+    match /subscribers/{key} {
+      allow list: if isOwner();
+      allow get: if isOwner() || (signedIn() && myEmail() == key);
+      allow create: if signedIn() && ('email' in request.auth.token) && myEmail() == key
+        && request.resource.data.keys().hasOnly(['email', 'name', 'uid', 'token', 'source', 'unsubscribed', 'createdAt'])
+        && request.resource.data.email == key
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.token is string && request.resource.data.token.size() >= 20 && request.resource.data.token.size() <= 64
+        && request.resource.data.unsubscribed == false;
+      // the customer's own switch
+      allow update: if signedIn() && ('email' in request.auth.token) && myEmail() == key
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'unsubscribed', 'unsubscribedAt', 'unsubWith', 'updatedAt']);
+      // the unsubscribe link of an email (no sign-in, secret token required)
+      allow update: if request.resource.data.unsubscribed == true
+        && request.resource.data.get('unsubWith', '') == resource.data.token
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unsubscribed', 'unsubscribedAt', 'unsubWith']);
+      allow delete: if isOwner();
+    }
+
+    // Phone / browser notification addresses (one per device). A signed-in customer can add or remove their own device.
+    // Only the Owner can list them (the "Send" button uses that list to send the notification).
+    match /pushTokens/{token} {
+      allow list: if isOwner();
+      allow get: if isOwner() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow create, update: if signedIn()
+        && request.resource.data.keys().hasOnly(['token', 'uid', 'email', 'ua', 'createdAt'])
+        && request.resource.data.token == token
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email is string && request.resource.data.email.size() <= 200
+        && request.resource.data.ua is string && request.resource.data.ua.size() <= 200;
+      allow delete: if isOwner() || (signedIn() && resource.data.uid == request.auth.uid);
+    }
+
+    // Customer orders. Anyone can PLACE an order, with or without a Google sign-in (with strict checks below).
+    // A signed-in customer's order is linked to their account (uid + email) so they can see it under "My Orders".
+    // Only team members can read or update orders (a signed-in customer can also read their own). Only the Owner can delete finished orders (history).
+    // NOTE: the delivery charge (by area, default 100 / 150) and the free-delivery rule come from settings/store and must match src/data/shopConfig.js
+    match /orders/{orderId} {
+      // The biggest discount an order may have: the Owner's settings, or the default (20%) if none were saved yet
+      function maxDiscount(subtotal) {
+        let path = /databases/$(database)/documents/settings/store;
+        return exists(path)
+          ? (get(path).data.get('discountEnabled', true) == true
+              ? subtotal * get(path).data.get('maxPercent', 0) / 100 + get(path).data.get('maxFixed', 0)
+              : 0)
+          : subtotal * 20 / 100;
+      }
+
+      // Flat delivery charge and free-delivery rule set by the Owner (defaults: 100 inside Dhaka, 150 outside, free from 2000 with Online Payment)
+      function deliveryCfg(k, def) {
+        let path = /databases/$(database)/documents/settings/store;
+        return exists(path) ? get(path).data.get(k, def) : def;
+      }
+      function isFreeDelivery(net, method) {
+        return deliveryCfg('freeDeliveryEnabled', true) == true
+                && net >= deliveryCfg('freeDeliveryMin', 2000)
+                && (deliveryCfg('freeDeliveryFor', 'online') == 'both'
+                    || (deliveryCfg('freeDeliveryFor', 'online') == 'online' && (method == 'Online Payment' || method == 'Manual bKash / Nagad'))
+                    || (deliveryCfg('freeDeliveryFor', 'online') == 'cod' && method == 'Cash on Delivery'));
+      }
+      function baseShipping(area) {
+        return area == 'Inside Dhaka' ? deliveryCfg('deliveryInside', 100) : deliveryCfg('deliveryOutside', 150);
+      }
+      // Not free: the area charge, plus the extra-per-item amount a whole number of times (the number of items
+      // cannot be checked here, so the rule only allows the right steps: base, base + extra, base + 2 x extra ...)
+      function validShipping(net, method, area, shipping) {
+        return isFreeDelivery(net, method)
+          ? shipping == 0
+          : (shipping >= baseShipping(area)
+             && shipping <= baseShipping(area) + deliveryCfg('deliveryExtraPerItem', 15) * 1000
+             && (deliveryCfg('deliveryExtraPerItem', 15) == 0
+                 ? shipping == baseShipping(area)
+                 : (shipping - baseShipping(area)) % deliveryCfg('deliveryExtraPerItem', 15) == 0));
+      }
+
+      // Same steps as phoneKey() in src/data/shopConfig.js: +8801712345678, 8801712345678 and 01712345678 are one number
+      function phoneKey(p) {
+        return p.replace('^[+]', '').replace('^880', '0').replace('^1', '01');
+      }
+
+      function notBlocked(phone) {
+        return !exists(/databases/$(database)/documents/blockedPhones/$(phoneKey(phone)))
+          && (!signedIn() || !('email' in request.auth.token)
+              || !exists(/databases/$(database)/documents/blockedEmails/$(myEmail())));
+      }
+
+      // While the Owner has the website in maintenance mode, only team members can place (test) orders
+      function siteOpen() {
+        let path = /databases/$(database)/documents/settings/store;
+        return !exists(path) || get(path).data.get('maintenanceMode', false) != true;
+      }
+
+      function validNewOrder() {
+        let d = request.resource.data;
+        let c = d.customer;
+        return d.keys().hasOnly(['orderNumber', 'createdAt', 'customer', 'items', 'subtotal', 'discount', 'discountLabel', 'deliveryArea', 'shipping', 'total', 'paymentMethod', 'paymentStatus', 'status', 'uid', 'email', 'manualPay', 'shop', 'soldBy'])
+          && d.keys().hasAll(['orderNumber', 'createdAt', 'customer', 'items', 'subtotal', 'discount', 'discountLabel', 'deliveryArea', 'shipping', 'total', 'paymentMethod', 'paymentStatus', 'status'])
+          && (siteOpen() || isStaff())
+          // signed in: the order must carry the customer's own uid + email. Guest (not signed in): no uid / email at all.
+          && (signedIn()
+                ? (d.get('uid', '') == request.auth.uid && ('email' in request.auth.token) && d.get('email', '') == myEmail())
+                : (!('uid' in d) && !('email' in d)))
+          && d.orderNumber is string
+          && d.orderNumber == orderId
+          && d.orderNumber.size() >= 8 && d.orderNumber.size() <= 24
+          && d.createdAt == request.time
+          && c is map
+          && c.keys().hasOnly(['name', 'phone', 'address', 'notes'])
+          && c.name is string && c.name.size() >= 2 && c.name.size() <= 80
+          && c.phone is string && c.phone.matches('^[+]?[0-9]{7,15}$') && notBlocked(c.phone)
+          && c.address is string && c.address.size() >= 10 && c.address.size() <= 400
+          && c.notes is string && c.notes.size() <= 500
+          && d.items is list && d.items.size() >= 1 && d.items.size() <= 30
+          // an order an Admin placed while selling carries that Admin's own email (for the commission)
+          && (!('soldBy' in d) || (hasActiveEntry() && d.soldBy == myEmail()))
+          // an order from an admin's shop link carries that shop's name, and the shop must exist
+          && (!('shop' in d) || (d.shop is string && d.shop.matches('^[a-z0-9-]{3,40}$') && exists(/databases/$(database)/documents/shops/$(d.shop))
+                                 && get(/databases/$(database)/documents/shops/$(d.shop)).data.get('active', false) == true))
+          && d.subtotal is number && d.subtotal > 0 && d.subtotal < 10000000
+          && d.discount is number && d.discount >= 0 && d.discount < d.subtotal
+          && d.discount <= maxDiscount(d.subtotal)
+          && d.discountLabel is string && d.discountLabel.size() <= 80
+          && d.deliveryArea in ['Inside Dhaka', 'Outside Dhaka']
+          && d.paymentMethod in ['Cash on Delivery', 'Online Payment', 'Manual bKash / Nagad']
+          && d.status == 'Pending'
+          && d.shipping is number
+          && validShipping(d.subtotal - d.discount, d.paymentMethod, d.deliveryArea, d.shipping)
+          && (
+               (d.paymentMethod == 'Online Payment' && d.paymentStatus == 'Awaiting payment')
+            || (d.paymentMethod == 'Cash on Delivery' && d.paymentStatus == 'Cash on Delivery')
+            || (d.paymentMethod == 'Manual bKash / Nagad' && d.paymentStatus == 'Awaiting verification')
+             )
+          && (d.paymentMethod == 'Manual bKash / Nagad'
+                ? (d.get('manualPay', null) is map
+                    && d.manualPay.keys().hasOnly(['wallet', 'sender', 'trxId'])
+                    && d.manualPay.keys().hasAll(['wallet', 'sender', 'trxId'])
+                    && d.manualPay.wallet in ['bKash', 'Nagad']
+                    && d.manualPay.sender is string && d.manualPay.sender.matches('^[+]?[0-9]{7,15}$')
+                    && d.manualPay.trxId is string && d.manualPay.trxId.matches('^[A-Za-z0-9]{6,20}$'))
+                : !('manualPay' in d))
+          && d.total == d.subtotal - d.discount + d.shipping;
+      }
+
+      allow create: if validNewOrder();
+      // Team members read everything. A signed-in customer can read only the orders placed with their own account.
+      allow read: if isStaff() || (signedIn() && resource.data.uid == request.auth.uid);
+      // A customer can cancel their OWN order: only while it is still Pending, within 30 minutes of ordering,
+      // and only by changing the status to Cancelled (plus the activity trail). Once the team confirms it, this stops working.
+      allow update: if signedIn() && resource.data.get('uid', '') == request.auth.uid
+        && resource.data.get('paymentStatus', '') != 'Paid'
+        && resource.data.get('advancePaid', 0) == 0
+        && resource.data.status == 'Pending'
+        && request.time < resource.data.createdAt + duration.value(30, 'm')
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'history'])
+        && request.resource.data.status == 'Cancelled';
+      // Team members may only change the status / payment status, the activity trail and the cancel request.
+      // PAID orders (paid online, or the delivery charge was paid online): only the Owner can cancel them or change their payment status.
+      // Manager / Admin can only SEND a cancel request (cancelRequest, status 'pending'); the Owner approves or declines it.
+      allow update: if isStaff()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'paymentStatus', 'history', 'updatedAt', 'confirmedBy', 'confirmedByName', 'stockDeducted', 'cancelRequest', 'returned'])
+        // a returned order: only the Owner or a Manager, only on a Delivered order, and it can be set once
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['returned'])
+            || ((isOwner() || isManager()) && resource.data.status == 'Delivered' && !('returned' in resource.data)
+                && request.resource.data.returned is map
+                && request.resource.data.returned.keys().hasOnly(['at', 'by', 'byName', 'loss', 'note'])
+                && request.resource.data.returned.loss is number && request.resource.data.returned.loss >= 0 && request.resource.data.returned.loss < 10000000
+                && request.resource.data.returned.note is string && request.resource.data.returned.note.size() <= 300))
+        && request.resource.data.get('stockDeducted', false) is bool
+        && request.resource.data.status in ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled']
+        && request.resource.data.paymentStatus in ['Awaiting payment', 'Awaiting verification', 'Cash on Delivery', 'Paid']
+        && (isOwner() || (
+             // not the Owner: a paid order cannot be cancelled and its payment status cannot change
+             (!(resource.data.get('paymentStatus', '') == 'Paid' || resource.data.get('advancePaid', 0) > 0)
+                || request.resource.data.status != 'Cancelled'
+                || resource.data.status == 'Cancelled')
+             && (resource.data.get('paymentStatus', '') != 'Paid'
+                || request.resource.data.paymentStatus == 'Paid')
+             // not the Owner: cannot mark an order as Paid (the Owner checks the TrxID / amount first)
+             && (request.resource.data.paymentStatus != 'Paid'
+                || resource.data.get('paymentStatus', '') == 'Paid')
+             // not the Owner: only a Manager can mark an order Delivered (that is when commission / markup is earned)
+             && (request.resource.data.status != 'Delivered'
+                || resource.data.status == 'Delivered'
+                || isManager())
+             // not the Owner: "confirmed by" can only be yourself (your team name, or your email / login name when no team name is set)
+             && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['confirmedBy', 'confirmedByName'])
+                || (request.resource.data.get('confirmedBy', '') == myEmail()
+                    && (request.resource.data.get('confirmedByName', '') == get(myDocPath()).data.get('name', '')
+                        || (get(myDocPath()).data.get('name', '') == ''
+                            && (request.resource.data.get('confirmedByName', '') == myEmail()
+                                || request.resource.data.get('confirmedByName', '') == request.auth.token.get('name', ''))))))
+             // not the Owner: the cancel request can only be a new 'pending' request written by themselves
+             && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['cancelRequest'])
+                || (request.resource.data.cancelRequest is map
+                    && request.resource.data.cancelRequest.keys().hasOnly(['reason', 'by', 'byName', 'at', 'status'])
+                    && request.resource.data.cancelRequest.status == 'pending'
+                    && request.resource.data.cancelRequest.by == myEmail()
+                    && request.resource.data.cancelRequest.reason is string
+                    && request.resource.data.cancelRequest.reason.size() >= 5
+                    && request.resource.data.cancelRequest.reason.size() <= 500
+                    && request.resource.data.cancelRequest.byName is string
+                    && request.resource.data.cancelRequest.byName.size() <= 100
+                    && request.resource.data.cancelRequest.at is string
+                    && request.resource.data.cancelRequest.at.size() <= 40
+                    && resource.data.get('cancelRequest', {}).get('status', '') != 'pending'))
+           ));
+      // Only the Owner can clear history, and only finished orders (Delivered / Cancelled)
+      // Also an unpaid order the customer abandoned at the payment page (nothing was paid, nothing confirmed)
+      allow delete: if isOwner() && (resource.data.status in ['Delivered', 'Cancelled']
+        || (resource.data.status == 'Pending' && resource.data.get('paymentStatus', '') != 'Paid' && resource.data.get('advancePaid', 0) == 0));
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

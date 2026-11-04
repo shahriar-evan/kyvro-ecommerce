@@ -10,6 +10,7 @@
 //   SITE_URL                   optional, default https://kyvro.store
 
 import crypto from 'node:crypto';
+import { checkOrderPrices } from '../src/data/priceCheck.js';
 
 export const PROJECT = process.env.FIREBASE_PROJECT_ID || 'kyvro-admin-auth';
 export const SITE = (process.env.SITE_URL || 'https://kyvro.store').replace(/\/$/, '');
@@ -77,6 +78,26 @@ export async function getOrder(orderNumber) {
   const o = Object.fromEntries(Object.entries(d.fields || {}).map(([k, v]) => [k, val(v)]));
   o.id = orderNumber;
   return o;
+}
+
+// Reads one document (null when it does not exist)
+async function getDocument(path) {
+  const token = await accessToken();
+  const r = await fetch(`${FS}/documents/${path}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`Could not read ${path}.`);
+  const d = await r.json();
+  return Object.fromEntries(Object.entries(d.fields || {}).map(([k, v]) => [k, val(v)]));
+}
+
+// The browser saves the order, so its prices are checked here against the live products (and the shop) before any
+// payment page opens. Returns { ok, problems }.
+export async function verifyOrderPrices(order) {
+  const ids = [...new Set((order.items || []).map((it) => String(it.id)).filter((id) => /^[A-Za-z0-9_-]{1,60}$/.test(id)))];
+  const list = await Promise.all(ids.map((id) => getDocument(`products/${id}`)));
+  const productsById = Object.fromEntries(ids.map((id, i) => [id, list[i]]).filter(([, p]) => p));
+  const shop = order.shop && /^[a-z0-9-]{3,40}$/.test(String(order.shop)) ? await getDocument(`shops/${order.shop}`) : null;
+  return checkOrderPrices(order, productsById, shop);
 }
 
 // Writes the payment result into the order (+ a line in the activity trail). Only called after SSLCommerz confirmed it.
