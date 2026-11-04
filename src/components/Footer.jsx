@@ -1,7 +1,7 @@
 import React from 'react';
 import logoImg from '../assets/logo.png';
 
-export default function Footer({ navHas = () => true, isDarkMode, setCurrentView, setSelectedCategory, customerUser, onSignIn, goAccount }) {
+export default function Footer({ onStartSelling, navHas = () => true, isDarkMode, setCurrentView, setSelectedCategory, customerUser, onSignIn, goAccount }) {
   return (
     <>
       <footer className={`border-t pt-12 sm:pt-16 pb-12 mt-auto ${isDarkMode ? 'bg-[#121212] border-gray-800 text-gray-300' : 'bg-white border-gray-200 text-gray-700'}`}>
@@ -29,6 +29,7 @@ export default function Footer({ navHas = () => true, isDarkMode, setCurrentView
               <li><span>Instagram: @kyvro_fashion</span></li>
               <li><span>TikTok: tiktok.com/@kyvro.store</span></li>
               <li><button onClick={() => setCurrentView('tracking')} className="hover:text-[#D4AF37]">Order Tracking</button></li>
+              {onStartSelling && <li><button onClick={onStartSelling} className="hover:text-[#D4AF37]">Start your own business</button></li>}
               <li><button onClick={() => setCurrentView('privacy')} className="hover:text-[#D4AF37]">Privacy Policy</button></li>
               <li><button onClick={() => setCurrentView('terms')} className="hover:text-[#D4AF37]">Terms &amp; Conditions</button></li>
               <li><button onClick={() => setCurrentView('refund')} className="hover:text-[#D4AF37]">Return &amp; Refund Policy</button></li>

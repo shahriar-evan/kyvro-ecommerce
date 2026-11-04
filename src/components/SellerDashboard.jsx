@@ -3,6 +3,8 @@ import MyShop from './MyShop';
 import { watchMySeller, saveSellerBkash, loadSellerEarnings, applyAsSeller, sellerStatus, normalizeWhatsapp, watchSellerRules, sellerNameBlocked } from '../sellers';
 import { watchPayouts } from '../payouts';
 import { formatDateTime, toDate } from '../utils/dates';
+import { getAdminStatus } from '../adminAuth';
+import { isOwnerEmail } from '../adminEmails';
 
 // "Sell on Kyvro": a signed-in customer's own shop. The shop editor is the same as the team's (My Shop, plan,
 // markup cap). Earnings come from the server without any customer details; payouts are what the Owner already paid.
@@ -24,6 +26,15 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
   const email = customerUser && customerUser.email ? customerUser.email.toLowerCase() : '';
 
   useEffect(() => watchMySeller(uid, setSeller), [uid]);
+  // a team member (Owner / Manager / Admin) signed in with their team email cannot become a seller
+  const [teamMember, setTeamMember] = useState(false);
+  useEffect(() => {
+    if (!email) { setTeamMember(false); return; }
+    if (isOwnerEmail(email)) { setTeamMember(true); return; }
+    let live = true;
+    getAdminStatus(email).then((st) => { if (live) setTeamMember(!!st.role); });
+    return () => { live = false; };
+  }, [email]);
   const status = sellerStatus(seller);
   const approved = status === 'approved';
   useEffect(() => (approved && email ? watchPayouts(false, email, setPayouts, () => {}) : undefined), [approved, email]);
@@ -47,8 +58,13 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
       </div>
     );
   }
-  if (isStaff) {
-    return <div className={card}><p className="text-sm text-gray-500">You are on the Kyvro team. Your shop is in the Admin Portal (My Shop).</p></div>;
+  if (isStaff || teamMember) {
+    return (
+      <div className={card}>
+        <h3 className="text-lg font-bold">Sell on Kyvro</h3>
+        <p className="text-sm text-gray-500">Team members cannot become sellers. Your shop is in the Admin Portal (My Shop).</p>
+      </div>
+    );
   }
   if (seller === undefined) return <p className="text-sm text-gray-500 py-8 text-center">Loading...</p>;
 
@@ -72,7 +88,16 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
     setApplying(false);
   };
 
-  // ---- not applied yet, or rejected: the application form ----
+  // ---- not applied yet, or rejected: the application form (only while the Owner takes new sellers) ----
+  if ((!seller || status === 'rejected') && rules && !rules.open) {
+    return (
+      <div className={card}>
+        <h3 className="text-lg font-bold">Sell on Kyvro</h3>
+        {status === 'rejected' && <p className="text-xs p-3 rounded border border-red-500/40 text-red-500 bg-red-500/10"><strong>Rejected</strong>{seller.rejectNote ? `: ${seller.rejectNote}` : ''}.</p>}
+        <p className="text-sm text-gray-500">Seller sign-up is closed right now. It is coming back soon, please check again later.</p>
+      </div>
+    );
+  }
   if (!seller || status === 'rejected') {
     const field = (k, label, props = {}) => (
       <label className="block text-xs font-semibold text-gray-500">{label}
