@@ -13,7 +13,7 @@ import { ensureSubscribed } from './subscribers';
 import PushPrompt from './components/PushPrompt';
 import { watchProducts, watchProductCosts, watchProductCommissions, setProductCommission, saveProductCost, removeProductCost, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
 import { watchStoreSettings, watchPlans } from './storeSettings';
-import { visibleShopIds, normalizePlans } from './data/priceCheck';
+import { visibleShopIds, normalizePlans, effectiveTier } from './data/priceCheck';
 import { cleanPhone, ONLINE_PAY_ON, DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
 import { INITIAL_PRODUCTS } from './data/products';
 import { CURRENCIES } from './data/currencies';
@@ -1240,13 +1240,30 @@ export default function App() {
 
       {/* 2. HEADER */}
       <Header onStartSelling={startSelling} cart={cart} curr={curr} currencyKey={currencyKey} currentView={currentView} isDarkMode={isDarkMode} setCurrencyKey={setCurrencyKey} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} setIsDarkMode={setIsDarkMode} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} navHas={navHas} customerUser={customerUser} displayName={displayName} photoURL={photoURL} goAccount={goAccount} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} />
-      {/* a public seller's shop link: say clearly who sells it (not Kyvro itself) */}
-      {shopCtx && shopCtx.kind === 'seller' && currentView !== 'admin' && (
-        <div className={`border-b px-4 py-2 text-center text-xs ${isDarkMode ? 'bg-[#121212] border-gray-800 text-gray-300' : 'bg-[#D4AF37]/10 border-[#D4AF37]/30 text-gray-700'}`}>
-          Sold by <strong className="text-[#D4AF37]">{shopCtx.name}</strong>
-          <span className="text-gray-500"> · Independent seller, not official Kyvro. Kyvro delivers the order and takes the payment.</span>
-        </div>
-      )}
+      {/* a shop link: who sells it (a public seller is not Kyvro itself), Verified for Premium, and the Pro / Premium tagline + contact */}
+      {shopCtx && currentView !== 'admin' && (() => {
+        const tier = shopCtx.planExempt ? 'premium' : effectiveTier(shopCtx);
+        const extras = tier !== 'free' && (shopCtx.tagline || shopCtx.contactUrl);
+        const seller = shopCtx.kind === 'seller';
+        if (!seller && !extras) return null;
+        const c = String(shopCtx.contactUrl || '');
+        const href = /^https?:/.test(c) ? c : `https://wa.me/${c.replace(/^\+/, '').replace(/^0/, '880')}`;
+        return (
+          <div className={`border-b px-4 py-2 text-center text-xs space-y-1 ${isDarkMode ? 'bg-[#121212] border-gray-800 text-gray-300' : 'bg-[#D4AF37]/10 border-[#D4AF37]/30 text-gray-700'}`}>
+            <p>
+              {seller ? 'Sold by ' : ''}<strong className="text-[#D4AF37]">{shopCtx.name}</strong>
+              {seller && tier === 'premium' && !shopCtx.planExempt && <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full bg-[#D4AF37] text-black text-[10px] font-bold align-middle">✓ Verified</span>}
+              {seller && <span className="text-gray-500"> · Independent seller, not official Kyvro. Kyvro delivers the order and takes the payment.</span>}
+            </p>
+            {extras && (
+              <p className="flex flex-wrap items-center justify-center gap-2">
+                {shopCtx.tagline && <span className="italic">{shopCtx.tagline}</span>}
+                {c && <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-3 py-1 rounded-full bg-green-600 text-white font-semibold">{/^https?:/.test(c) ? (/facebook|fb\.com/i.test(c) ? 'Facebook' : 'Contact') : 'WhatsApp'}</a>}
+              </p>
+            )}
+          </div>
+        );
+      })()}
 
       {/* MOBILE MENU DRAWER */}
       {isMobileMenuOpen && <MobileMenu navHas={navHas} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} />}

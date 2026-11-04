@@ -4,7 +4,7 @@ import { watchAllShops } from '../shops';
 import { watchSellers, watchSellerPayouts, watchSubscriptions, killSellerShop, reviveSellerShop, removeSeller, watchSellerRules, saveSellerRules, sellerStatus, approveSeller, rejectSeller } from '../sellers';
 import { formatDateTime } from '../utils/dates';
 import { watchPayouts, addPayout } from '../payouts';
-import { toMillis } from '../data/priceCheck';
+import { toMillis, effectiveTier } from '../data/priceCheck';
 
 // a shop's markup on one order = (price the customer paid - store price) x pieces
 const markupOf = (o) => (o.items || []).reduce((n, it) => n + Math.max(0, (Number(it.price) || 0) - (it.basePrice !== undefined ? Number(it.basePrice) || 0 : Number(it.price) || 0)) * (parseInt(it.quantity, 10) || 0), 0);
@@ -29,7 +29,11 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
   useEffect(() => watchPayouts(true, loggedInUserEmail, setPayouts, () => {}), [loggedInUserEmail]);
   useEffect(() => watchSellerRules((r) => { setRules(r); setWords((w) => w || r.blockedWords.join(', ')); }), []);
 
-  const pending = sellers.filter((s) => sellerStatus(s) === 'pending');
+  // the plan an applicant picked (saved in the note); Pro / Premium applicants come first (priority approval)
+  const chosenTier = (s) => { const m = /Chose the (Pro|Premium|Paid) plan/.exec(String(s.productNote || '')); return !m ? 'free' : m[1] === 'Premium' ? 'premium' : 'pro'; };
+  const rank = { premium: 0, pro: 1, free: 2 };
+  const pending = sellers.filter((s) => sellerStatus(s) === 'pending')
+    .sort((a, b) => (rank[chosenTier(a)] - rank[chosenTier(b)]) || (toMillis(a.createdAt) - toMillis(b.createdAt)));
   const rejectedCount = sellers.filter((s) => sellerStatus(s) === 'rejected').length;
   const rows = useMemo(() => sellers.filter((s) => sellerStatus(s) === 'approved').map((s) => {
     const shop = shops[s.slug] || null;
@@ -37,7 +41,8 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
     const earned = mine.filter((o) => o.status === 'Delivered' && !o.returned).reduce((n, o) => n + markupOf(o), 0);
     const paid = payouts.filter((p) => String(p.email || '').toLowerCase() === String(s.email || '').toLowerCase()).reduce((n, p) => n + (Number(p.amount) || 0), 0);
     const until = toMillis((subs[s.uid] || {}).paidUntil);
-    return { ...s, shop, orders: mine.length, earned, paid, due: earned - paid, until, bkash: (bkash[s.uid] || {}).bkash || '' };
+    const tier = effectiveTier(subs[s.uid] || null);
+    return { ...s, tier, shop, orders: mine.length, earned, paid, due: earned - paid, until, bkash: (bkash[s.uid] || {}).bkash || '' };
   }).sort((a, b) => b.due - a.due), [sellers, shops, orders, payouts, subs, bkash]);
 
   const card = `p-5 sm:p-6 rounded-lg border space-y-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`;
@@ -104,7 +109,9 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
               const row = (k, v, link) => (v ? <p><span className="text-gray-500">{k}:</span> {link ? <a href={v} target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] underline break-all">{v}</a> : <span className="break-words">{v}</span>}</p> : null);
               return (
                 <div key={s.uid} className="py-3 space-y-2">
-                  <p className="font-bold text-sm">{shops[s.slug] ? shops[s.slug].name : s.slug} <span className="font-normal text-xs text-gray-500">· applied {formatDateTime(s.createdAt)}</span></p>
+                  <p className="font-bold text-sm flex flex-wrap items-center gap-2">{shops[s.slug] ? shops[s.slug].name : s.slug}
+                    {chosenTier(s) !== 'free' && <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${chosenTier(s) === 'premium' ? 'bg-black text-[#D4AF37] border border-[#D4AF37]' : 'bg-[#D4AF37] text-black'}`}>{chosenTier(s) === 'premium' ? 'Premium' : 'Pro'} · priority</span>}
+                    <span className="font-normal text-xs text-gray-500">· applied {formatDateTime(s.createdAt)}</span></p>
                   <div className="grid sm:grid-cols-2 gap-x-4 gap-y-1">
                     {row('Full name', s.name)}
                     {row('Email', s.email)}
@@ -138,8 +145,11 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
                 <div key={r.uid} className="py-3 space-y-2">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-bold">{r.shop ? r.shop.name : r.slug} <span className="font-normal text-gray-500">· {r.name || ''} {r.email}</span></p>
-                      <p className="text-gray-500 break-all">{window.location.origin}/?shop={r.slug} · {r.shop ? Object.keys(r.shop.items || {}).length : 0} products · {r.orders} order(s) · {r.until > Date.now() ? `Paid until ${new Date(r.until).toLocaleDateString('en-GB')}` : 'Free plan'}</p>
+                      <p className="font-bold">{r.shop ? r.shop.name : r.slug}
+                        {r.tier !== 'free' && <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase align-middle ${r.tier === 'premium' ? 'bg-black text-[#D4AF37] border border-[#D4AF37]' : 'bg-[#D4AF37] text-black'}`}>{r.tier === 'premium' ? 'Premium' : 'Pro'}</span>}
+                        {r.tier === 'premium' && <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase align-middle bg-green-600 text-white">Weekly payout</span>}
+                        <span className="font-normal text-gray-500"> · {r.name || ''} {r.email}</span></p>
+                      <p className="text-gray-500 break-all">{window.location.origin}/?shop={r.slug} · {r.shop ? Object.keys(r.shop.items || {}).length : 0} products · {r.orders} order(s) · {r.until > Date.now() ? `${r.tier === 'premium' ? 'Premium' : 'Pro'} until ${new Date(r.until).toLocaleDateString('en-GB')}` : 'Free plan'}</p>
                       <p className="text-gray-500">bKash: {r.bkash || 'not given yet'}</p>
                       {r.shop && r.shop.killed && <p className="text-red-500 font-semibold">Switched off by you{r.shop.killNote ? `: ${r.shop.killNote}` : ''}</p>}
                     </div>
