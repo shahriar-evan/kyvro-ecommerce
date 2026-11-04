@@ -252,11 +252,17 @@ service cloud.firestore {
       let f = resource.data.get('features', {});
       return (k in f) ? f[k] == true : (shopPremiumNow() || (onPro && shopPaidNow()));
     }
+    // shop identity (shopName, logo, banner): Premium ON, Pro OFF unless the Owner / a Manager switched it on,
+    // Free never (not even with an override)
+    function paidFeatOn(k) { return shopPaidNow() && featOn(k, false); }
     function httpsOk(v) { return v is string && v.size() <= 200 && (v == '' || v.matches('^https://[^ <>"]+$')); }
     function shopExtrasOk() {
       let d = request.resource.data;
       let changed = d.diff(resource.data).affectedKeys();
-      return (!changed.hasAny(['tagline', 'contactUrl'])
+      // shop name: changes at once with the feature on, never with a blocked word (the link / slug is the document id
+      // and can never change)
+      return (!changed.hasAny(['name']) || (paidFeatOn('shopName') && !d.name.lower().matches(blockedRe())))
+        && (!changed.hasAny(['tagline', 'contactUrl'])
           || (featOn('tagline', true)
               && d.get('tagline', '') is string && d.get('tagline', '').size() <= 80
               && d.get('contactUrl', '') is string && d.get('contactUrl', '').size() <= 200
@@ -272,16 +278,16 @@ service cloud.firestore {
         && (!changed.hasAny(['pinnedItems']) || (featOn('pinned', false) && d.get('pinnedItems', []) is list && d.get('pinnedItems', []).size() <= 3))
         // logo: a Pro shop may ask for permission; with the logo feature on, upload one that waits for approval
         && (!changed.hasAny(['logoRequest'])
-          || (!('logoRequest' in d) || (shopPaidNow() && !featOn('logo', false) && d.logoRequest is map && d.logoRequest.keys().hasOnly(['at']) && d.logoRequest.at is string && d.logoRequest.at.size() <= 40)))
+          || (!('logoRequest' in d) || (shopPaidNow() && !paidFeatOn('logo') && d.logoRequest is map && d.logoRequest.keys().hasOnly(['at']) && d.logoRequest.at is string && d.logoRequest.at.size() <= 40)))
         && (!changed.hasAny(['logoPending', 'logoPendingAt', 'logoReject'])
-          || (featOn('logo', false)
+          || (paidFeatOn('logo')
               && !('logoReject' in d)
               && d.get('logoPending', '') is string && d.get('logoPending', '').size() <= 200000
               && (d.get('logoPending', '') == '' || d.get('logoPending', '').matches('^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$'))
               && d.get('logoPendingAt', '') is string && d.get('logoPendingAt', '').size() <= 40))
-        // banner: Premium (or switched on); uploaded banners wait for approval like the logo
+        // banner: Premium (or switched on for Pro); uploaded banners wait for approval like the logo
         && (!changed.hasAny(['bannerPending', 'bannerPendingAt', 'bannerReject'])
-          || (featOn('banner', false)
+          || (paidFeatOn('banner')
               && !('bannerReject' in d)
               && d.get('bannerPending', '') is string && d.get('bannerPending', '').size() <= 300000
               && (d.get('bannerPending', '') == '' || d.get('bannerPending', '').matches('^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$'))
@@ -328,7 +334,7 @@ service cloud.firestore {
             // shops. Not their own shop (no self-upgrade), and never switching on a killed or a waiting (pending) shop.
             || (isManager() && resource.data.ownerUid != request.auth.uid
                 && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['features', 'logo', 'logoPending', 'logoPendingAt', 'logoReject', 'logoRequest', 'banner', 'bannerPending', 'bannerPendingAt', 'bannerReject', 'active', 'updatedAt'])
-                && request.resource.data.get('features', {}) is map && request.resource.data.get('features', {}).keys().hasOnly(['allProducts', 'priorityApproval', 'tagline', 'social', 'about', 'shareKit', 'brandColor', 'announcement', 'pinned', 'verified', 'weeklyPayout', 'prioritySupport', 'logo', 'banner', 'salesStats', 'earningsCsv'])
+                && request.resource.data.get('features', {}) is map && request.resource.data.get('features', {}).keys().hasOnly(['allProducts', 'priorityApproval', 'tagline', 'social', 'about', 'shareKit', 'brandColor', 'announcement', 'pinned', 'verified', 'weeklyPayout', 'prioritySupport', 'shopName', 'logo', 'banner', 'salesStats', 'earningsCsv'])
                 && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['logo'])
                     || request.resource.data.get('logo', '') == '' || request.resource.data.get('logo', '') == resource.data.get('logoPending', ''))
                 && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['banner'])
@@ -336,13 +342,13 @@ service cloud.firestore {
                 && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['active'])
                     || (resource.data.get('killed', false) != true && resource.data.get('status', 'approved') == 'approved')))
             // a public seller: only their own shop's name and products, not after the Owner switched it off for good
+            // (a name change is checked in shopExtrasOk: feature on + no blocked word)
             || (signedIn() && !isStaff() && resource.data.get('kind', '') == 'seller'
                 && resource.data.ownerUid == request.auth.uid
                 && resource.data.get('killed', false) != true
                 && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'logoRequest', 'logoPending', 'logoPendingAt', 'logoReject', 'bannerPending', 'bannerPendingAt', 'bannerReject'])
                 && shopExtrasOk()
-                && shopSizeOk()
-                && sellerNameOk(request.resource.data.name, slug)));
+                && shopSizeOk()));
       // the Owner deletes a shop (also what "Reject" does with a request)
       allow delete: if isOwner();
     }

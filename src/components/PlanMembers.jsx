@@ -4,7 +4,7 @@ import { askConfirm, askInput } from './AlertCenter';
 import { watchAllShops, watchShopOwners, setShopFeatures, grantLogo, denyLogoRequest, approveLogo, rejectLogo, setShopOn, approveBanner, rejectBanner } from '../shops';
 import { watchSellers, killSellerShop, reviveSellerShop } from '../sellers';
 import { effectiveTier, toMillis, TIER_LABEL } from '../data/priceCheck';
-import { FEATURES, featureDefault } from '../data/shopBrand';
+import { FEATURES, featureDefault, featureLockedFree } from '../data/shopBrand';
 
 // Plan Members (Owner and Managers): every shop with its plan, and per feature Default / ON / OFF.
 // Owner only: a plan by hand (comp), the seller's private details and the kill switch. A Manager can switch features,
@@ -117,14 +117,16 @@ export default function PlanMembers({ isOwner, isDarkMode }) {
           <div className="divide-y text-xs">
             {FEATURES.map((f) => {
               const base = cur.tier === 'owner' ? true : featureDefault(f.key, cur.tier);
+              // shop name / logo / banner: never on the Free plan (also in firestore.rules)
+              const locked = cur.tier !== 'owner' && featureLockedFree(f.key, cur.tier);
               const v = typeof draft[f.key] === 'boolean' ? (draft[f.key] ? 'on' : 'off') : 'default';
-              const eff = typeof draft[f.key] === 'boolean' ? draft[f.key] : base;
+              const eff = locked ? false : typeof draft[f.key] === 'boolean' ? draft[f.key] : base;
               return (
                 <div key={f.key} className="py-2 flex flex-wrap items-center justify-between gap-2">
-                  <span><strong>{f.label}</strong> <span className={eff ? 'text-green-600' : 'text-gray-500'}>· {eff ? 'on' : 'off'}</span></span>
+                  <span><strong>{f.label}</strong> <span className={eff ? 'text-green-600' : 'text-gray-500'}>· {eff ? 'on' : 'off'}</span>{locked && <span className="text-gray-500"> (Pro / Premium only)</span>}</span>
                   <span className="inline-flex rounded border overflow-hidden">
                     {[['default', `Default (${base ? 'on' : 'off'})`], ['on', 'ON'], ['off', 'OFF']].map(([k, l]) => (
-                      <button key={k} type="button" disabled={ownShop || busy} onClick={() => setDraft((d) => { const n = { ...d }; if (k === 'default') delete n[f.key]; else n[f.key] = k === 'on'; return n; })}
+                      <button key={k} type="button" disabled={ownShop || busy || locked} onClick={() => setDraft((d) => { const n = { ...d }; if (k === 'default') delete n[f.key]; else n[f.key] = k === 'on'; return n; })}
                         className={`px-2.5 py-1 text-[11px] font-semibold ${v === k ? 'bg-[#D4AF37] text-black' : ''} disabled:opacity-50`}>{l}</button>
                     ))}
                   </span>
