@@ -5,7 +5,7 @@ import { updateOrderStatus, isPaidOrder, requestCancelOrder, declineCancelReques
 import { formatDateTime, toDate } from '../utils/dates';
 import { phoneKey, emailKey } from '../data/shopConfig';
 import { watchBlocked, blockPhone, blockEmail, unblockPhone, unblockEmail } from '../blocklist';
-import { checkOrderPrices, visibleShopIds } from '../data/priceCheck';
+import { checkOrderPrices, orderVisibleIds } from '../data/priceCheck';
 import { watchPlans } from '../storeSettings';
 import { watchAllShops } from '../shops';
 
@@ -67,7 +67,7 @@ export default function OrdersPanel({ orders, products = [], productCosts = {}, 
   const priceCheck = (o) => {
     if (o.status !== 'Pending' || !products.length) return { ok: true, problems: [] };
     const shop = o.shop ? shops[o.shop] : null;
-    return checkOrderPrices(o, productsById, shop, shop ? visibleShopIds(shop, productsById, plans) : null);
+    return checkOrderPrices(o, productsById, shop, orderVisibleIds(o, shop, productsById, plans));
   };
 
   // ---- Dropshipping: cost, profit and the text to paste into the supplier's site ----

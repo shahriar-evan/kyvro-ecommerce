@@ -70,6 +70,18 @@ export function visibleShopIds(shop, productsById, plans, now = Date.now()) {
   return new Set(ranked.slice(0, p.freeLimit));
 }
 
+// Orders placed before shop plans went live are never refused for a hidden product. Set this to the day the plans
+// were deployed (orders from before it were placed when every product of a shop was showing).
+export const PLANS_START = '2026-11-05T00:00:00+06:00';
+// The same limit, but for an order that was already placed: a product the customer could see when ordering stays
+// payable. An order placed while the shop's plan was paid (or before plans started) is never limited; an order placed
+// on the Free plan is checked against the shop's best sellers.
+export function orderVisibleIds(order, shop, productsById, plans, now = Date.now()) {
+  const placed = toMillis(order && order.createdAt);
+  if (!shop || (placed && (placed <= toMillis(shop.paidUntil) || placed < toMillis(PLANS_START)))) return null;
+  return visibleShopIds(shop, productsById, plans, now);
+}
+
 // Checks the prices saved in an order against the live products (and the shop, for a shop-link order).
 // The browser writes the order, so a customer could change the prices before saving it: this catches that.
 //   productsById: { [id]: product }   shop: the shops/{slug} document, or null / undefined when it does not exist

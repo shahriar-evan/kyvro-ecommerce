@@ -10,7 +10,7 @@
 //   SITE_URL                   optional, default https://kyvro.store
 
 import crypto from 'node:crypto';
-import { checkOrderPrices, normalizePlans, visibleShopIds, shopIsPaid } from '../src/data/priceCheck.js';
+import { checkOrderPrices, normalizePlans, orderVisibleIds, shopIsPaid } from '../src/data/priceCheck.js';
 
 export const PROJECT = process.env.FIREBASE_PROJECT_ID || 'kyvro-admin-auth';
 export const SITE = (process.env.SITE_URL || 'https://kyvro.store').replace(/\/$/, '');
@@ -107,7 +107,7 @@ export async function verifyOrderPrices(order) {
       const extra = all.filter((id) => !productsById[id] && /^[A-Za-z0-9_-]{1,60}$/.test(id));
       const more = await Promise.all(extra.map((id) => getDocument(`products/${id}`)));
       const everyone = { ...productsById, ...Object.fromEntries(extra.map((id, i) => [id, more[i]]).filter(([, p]) => p)) };
-      visible = visibleShopIds(shop, everyone, plans);
+      visible = orderVisibleIds(order, shop, everyone, plans);
     }
   }
   return checkOrderPrices(order, productsById, shop, visible);
