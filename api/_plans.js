@@ -8,7 +8,7 @@
 
 import { PROJECT, FS, accessToken, val } from './_sslc.js';
 import { UDDOKTA_BASE, UDDOKTA_KEY } from './_uddokta.js';
-import { normalizePlans, planPrice, toMillis } from '../src/data/priceCheck.js';
+import { normalizePlans, planPrice, toMillis, effectiveTier } from '../src/data/priceCheck.js';
 
 const DOCS = `projects/${PROJECT}/databases/(default)/documents`;
 const fields = (d) => Object.fromEntries(Object.entries((d && d.fields) || {}).map(([k, v]) => [k, val(v)]));
@@ -53,8 +53,15 @@ export async function planCaller(req) {
   return { uid, email, name: String(me.name || '') };
 }
 
-// Copies the plan end date onto the person's shops (the storefront reads it there; subscriptions are private)
-export async function syncShops(token, uid, paidUntilIso) {
+// The caller's current plan (subscriptions/{uid}) as { tier: 'free'|'pro'|'premium', paidUntil }
+export async function currentPlan(token, uid) {
+  const d = await readDoc(token, `subscriptions/${uid}`);
+  const data = (d && d.data) || {};
+  return { tier: effectiveTier(data), paidUntil: data.paidUntil || null };
+}
+
+// Copies the plan end date and tier onto the person's shops (the storefront reads them there; subscriptions are private)
+export async function syncShops(token, uid, paidUntilIso, tier = 'pro') {
   const r = await fetch(`${FS}/documents:runQuery`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -64,8 +71,8 @@ export async function syncShops(token, uid, paidUntilIso) {
   const rows = (await r.json()).filter((x) => x.document);
   if (!rows.length) return 0;
   const writes = rows.map((x) => ({
-    update: { name: x.document.name, fields: { paidUntil: { timestampValue: paidUntilIso } } },
-    updateMask: { fieldPaths: ['paidUntil'] },
+    update: { name: x.document.name, fields: { paidUntil: { timestampValue: paidUntilIso }, tier: { stringValue: tier === 'premium' ? 'premium' : 'pro' } } },
+    updateMask: { fieldPaths: ['paidUntil', 'tier'] },
     currentDocument: { exists: true },
   }));
   await fetch(`${FS}/documents:commit`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ writes }) });
@@ -107,21 +114,24 @@ export async function confirmPlanPayment(invoiceId) {
     }
     const sub = await readDoc(token, `subscriptions/${uid}`);
     const now = Date.now();
+    // the tier bought; a running Premium stays Premium (no downgrade by a late Pro payment)
+    const bought = meta.tier === 'premium' ? 'premium' : 'pro';
+    const tier = sub && effectiveTier(sub.data, now) === 'premium' ? 'premium' : bought;
     const from = Math.max(now, toMillis(sub && sub.data.paidUntil));
     const until = new Date(from + days * 86400000).toISOString();
     const at = new Date(now).toISOString();
     const str = (s) => ({ stringValue: String(s || '').slice(0, 200) });
     const body = { writes: [
       // the invoice is recorded once: a second callback / webhook for it fails here and changes nothing
-      { update: { name: paymentPath, fields: { uid: str(uid), email: str(meta.email), amount: { doubleValue: amount }, days: { integerValue: String(days) }, at: { timestampValue: at }, method: str(v.payment_method), transactionId: str(v.transaction_id) } }, currentDocument: { exists: false } },
-      { update: { name: subPath, fields: { plan: str('paid'), paidUntil: { timestampValue: until }, lastPaymentAt: { timestampValue: at }, lastPaymentId: str(invoiceId), email: str(meta.email), name: str(meta.name) } },
-        updateMask: { fieldPaths: ['plan', 'paidUntil', 'lastPaymentAt', 'lastPaymentId', 'email', 'name'] },
+      { update: { name: paymentPath, fields: { uid: str(uid), email: str(meta.email), tier: str(bought), amount: { doubleValue: amount }, days: { integerValue: String(days) }, at: { timestampValue: at }, method: str(v.payment_method), transactionId: str(v.transaction_id) } }, currentDocument: { exists: false } },
+      { update: { name: subPath, fields: { plan: str('paid'), tier: str(tier), paidUntil: { timestampValue: until }, lastPaymentAt: { timestampValue: at }, lastPaymentId: str(invoiceId), email: str(meta.email), name: str(meta.name) } },
+        updateMask: { fieldPaths: ['plan', 'tier', 'paidUntil', 'lastPaymentAt', 'lastPaymentId', 'email', 'name'] },
         currentDocument: sub ? { updateTime: sub.updateTime } : { exists: false } },
     ] };
     const c = await fetch(`${FS}/documents:commit`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (c.ok) {
-      await syncShops(token, uid, until);
-      return { ok: true, uid, paidUntil: until };
+      await syncShops(token, uid, until, tier);
+      return { ok: true, uid, paidUntil: until, tier };
     }
     if (c.status !== 400 && c.status !== 409) throw new Error('Could not save the plan.');
     // FAILED_PRECONDITION / ABORTED: already recorded, or the plan changed meanwhile -> look again

@@ -30,23 +30,45 @@ export const shopPriceClamp = (base, wanted) => {
 // Shop plans: Free = up to freeLimit products shown, Paid = all of them for periodDays. The Owner edits these numbers
 // (settings/plans). The server always takes the price from that document, never from the browser.
 // ---------------------------------------------------------------------------
-export const DEFAULT_PLANS = { enabled: true, originalPrice: 999, discountPercent: 40, freeLimit: 10, periodDays: 30, reminderDays: 3 };
+export const DEFAULT_PLANS = {
+  enabled: true, freeLimit: 10, periodDays: 30, reminderDays: 3,
+  pro: { price: 999, discount: 40 },
+  premium: { price: 2999, discount: 40 },
+  supportWhatsapp: '',
+};
+export const PLAN_TIERS = ['pro', 'premium'];
+export const TIER_LABEL = { free: 'Free', pro: 'Pro', premium: 'Premium' };
 // the most products a shop document can hold at all (also checked in firestore.rules)
 export const SHOP_MAX_ITEMS = 300;
 const num = (v, def, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : def; };
+const tierCfg = (t, def, legacy) => ({
+  price: num(t && t.price !== undefined ? t.price : legacy.price, def.price, 1, 1000000),
+  discount: num(t && t.discount !== undefined ? t.discount : legacy.discount, def.discount, 0, 90),
+});
+// settings/plans -> clean numbers. Before tiers there was one paid plan (originalPrice / discountPercent): that is Pro.
 export const normalizePlans = (p) => {
   const x = p || {};
+  const pro = tierCfg(x.pro, DEFAULT_PLANS.pro, { price: x.originalPrice, discount: x.discountPercent });
+  const premium = tierCfg(x.premium, DEFAULT_PLANS.premium, {});
+  const wa = String(x.supportWhatsapp || '').replace(/[\s()-]/g, '');
   return {
     enabled: x.enabled !== false,
-    originalPrice: num(x.originalPrice, DEFAULT_PLANS.originalPrice, 1, 1000000),
-    discountPercent: num(x.discountPercent, DEFAULT_PLANS.discountPercent, 0, 90),
     freeLimit: num(x.freeLimit, DEFAULT_PLANS.freeLimit, 1, SHOP_MAX_ITEMS),
     periodDays: num(x.periodDays, DEFAULT_PLANS.periodDays, 1, 366),
     reminderDays: num(x.reminderDays, DEFAULT_PLANS.reminderDays, 0, 30),
+    pro,
+    premium,
+    supportWhatsapp: /^\+?[0-9]{8,15}$/.test(wa) ? wa : '',
+    // older code reads these: they are the Pro numbers
+    originalPrice: pro.price,
+    discountPercent: pro.discount,
   };
 };
-// what a customer pays for one period, e.g. 999 with 40% off = 599
-export const planPrice = (plans) => { const p = normalizePlans(plans); return Math.round(p.originalPrice * (1 - p.discountPercent / 100)); };
+// what a seller pays for one period of a tier, e.g. Pro 999 with 40% off = 599, Premium 2999 - 40% = 1799
+export const planPrice = (plans, tier = 'pro') => {
+  const c = normalizePlans(plans)[tier === 'premium' ? 'premium' : 'pro'];
+  return Math.round((c.price * (100 - c.discount)) / 100);
+};
 // a Firestore Timestamp, an ISO text or milliseconds -> milliseconds (0 = none)
 export const toMillis = (v) => {
   if (!v) return 0;
@@ -57,6 +79,9 @@ export const toMillis = (v) => {
   return Number.isFinite(t) ? t : 0;
 };
 export const shopIsPaid = (shop, now = Date.now()) => toMillis(shop && shop.paidUntil) > now;
+// the tier that counts right now for a subscription or a shop: 'free' once paidUntil has passed;
+// a paid plan from before tiers (no tier) is Pro
+export const effectiveTier = (x, now = Date.now()) => (toMillis(x && x.paidUntil) > now ? (x.tier === 'premium' ? 'premium' : 'pro') : 'free');
 // The products a shop may show right now: null = all of them. A shop whose paid plan ran out shows only its
 // freeLimit best sellers (most "sold"; ties and no sales: the product added to the store first). The rest are
 // hidden, not deleted, and come back when the plan is renewed. The Owner's own shop has no limit.

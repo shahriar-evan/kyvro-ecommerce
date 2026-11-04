@@ -234,6 +234,17 @@ service cloud.firestore {
     function sellerNameOk(name, slug) { return !name.lower().matches(blockedRe()) && !slug.matches(blockedRe()); }
     function sellerPath(uid) { return /databases/$(database)/documents/sellers/$(uid); }
 
+    // Pro / Premium shop extras: a short tagline and a contact link (WhatsApp number or Facebook / web link), shown on the
+    // storefront. Only while the shop's paid plan runs (tier and paidUntil on the shop are written by the server only).
+    function shopExtrasOk() {
+      let d = request.resource.data;
+      return !d.diff(resource.data).affectedKeys().hasAny(['tagline', 'contactUrl'])
+        || (resource.data.get('tier', '') in ['pro', 'premium'] && resource.data.get('paidUntil', null) is timestamp && resource.data.paidUntil > request.time
+            && d.get('tagline', '') is string && d.get('tagline', '').size() <= 80
+            && d.get('contactUrl', '') is string && d.get('contactUrl', '').size() <= 200
+            && (d.get('contactUrl', '') == '' || d.get('contactUrl', '').matches('^(https?://[^ ]+|[+]?[0-9]{8,15})$')));
+    }
+
     // Team shops (kyvro.store/?shop=name). Everyone can read a shop (customers open the link).
     // A Manager (or the Owner) creates a shop that is live at once. An Admin with "Shop create" ON can create one too,
     // but it starts switched off with status 'pending' until the Owner accepts it (status 'approved', active true).
@@ -263,17 +274,19 @@ service cloud.firestore {
       allow update: if request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 60
         && request.resource.data.items is map && request.resource.data.items.size() <= 300
         // the Owner: everything, also the seller kill switch (killed: the seller can never switch the shop on again)
-        && ((isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'active', 'status', 'updatedAt', 'planExempt', 'killed', 'killNote'])
+        && ((isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'active', 'status', 'updatedAt', 'planExempt', 'killed', 'killNote', 'tagline', 'contactUrl'])
                 && request.resource.data.get('status', 'approved') in ['pending', 'approved'])
             || ((isManager() || canShopNow())
                 && resource.data.ownerUid == request.auth.uid
-                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt'])
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl'])
+                && shopExtrasOk()
                 && shopSizeOk())
             // a public seller: only their own shop's name and products, not after the Owner switched it off for good
             || (signedIn() && !isStaff() && resource.data.get('kind', '') == 'seller'
                 && resource.data.ownerUid == request.auth.uid
                 && resource.data.get('killed', false) != true
-                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt'])
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl'])
+                && shopExtrasOk()
                 && shopSizeOk()
                 && sellerNameOk(request.resource.data.name, slug)));
       // the Owner deletes a shop (also what "Reject" does with a request)
@@ -377,6 +390,11 @@ service cloud.firestore {
     // Store settings (top banner text + automatic discount rules). Everyone can read them (the website needs
     // them), only the Owner can change them. maxPercent / maxFixed are the highest discounts among the rules.
     match /settings/{docId} {
+      function tierOk(t) {
+        return t is map && t.keys().hasOnly(['price', 'discount'])
+          && t.price is number && t.price >= 1 && t.price <= 1000000
+          && t.discount is number && t.discount >= 0 && t.discount <= 90;
+      }
       allow read: if true;
       // Public sellers: open (new sellers allowed) and the blocked shop names (Owner only)
       allow create, update: if docId == 'sellerRules' && isOwner()
@@ -386,10 +404,12 @@ service cloud.firestore {
         && request.resource.data.blockedRegex is string && request.resource.data.blockedRegex.size() <= 3000;
       // Shop plans (Free limit, paid price, period, reminder days). Only the Owner. Must match normalizePlans() in src/data/priceCheck.js
       allow create, update: if docId == 'plans' && isOwner()
-        && request.resource.data.keys().hasOnly(['enabled', 'originalPrice', 'discountPercent', 'freeLimit', 'periodDays', 'reminderDays', 'updatedAt', 'updatedByName'])
+        && request.resource.data.keys().hasOnly(['enabled', 'originalPrice', 'discountPercent', 'freeLimit', 'periodDays', 'reminderDays', 'pro', 'premium', 'supportWhatsapp', 'updatedAt', 'updatedByName'])
         && request.resource.data.enabled is bool
-        && request.resource.data.originalPrice is number && request.resource.data.originalPrice >= 1 && request.resource.data.originalPrice <= 1000000
-        && request.resource.data.discountPercent is number && request.resource.data.discountPercent >= 0 && request.resource.data.discountPercent <= 90
+        // Pro and Premium: price and discount % each (originalPrice / discountPercent are the old single paid plan = Pro)
+        && tierOk(request.resource.data.pro) && tierOk(request.resource.data.premium)
+        && request.resource.data.get('originalPrice', 1) is number && request.resource.data.get('discountPercent', 0) is number
+        && request.resource.data.get('supportWhatsapp', '') is string && request.resource.data.get('supportWhatsapp', '').size() <= 20
         && request.resource.data.freeLimit is int && request.resource.data.freeLimit >= 1 && request.resource.data.freeLimit <= 300
         && request.resource.data.periodDays is int && request.resource.data.periodDays >= 1 && request.resource.data.periodDays <= 366
         && request.resource.data.reminderDays is int && request.resource.data.reminderDays >= 0 && request.resource.data.reminderDays <= 30;

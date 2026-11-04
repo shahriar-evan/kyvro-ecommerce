@@ -16,9 +16,10 @@ export default async function handler(req, res) {
     const token = await accessToken();
     const r = await fetch(`${FS}/documents/subscriptions/${me.uid}`, { headers: { Authorization: `Bearer ${token}` } });
     if (!r.ok) return res.status(200).json({ synced: 0 });
-    const until = val(((await r.json()).fields || {}).paidUntil);
+    const f = (await r.json()).fields || {};
+    const until = val(f.paidUntil);
     if (!until) return res.status(200).json({ synced: 0 });
-    return res.status(200).json({ synced: await syncShops(token, me.uid, until) });
+    return res.status(200).json({ synced: await syncShops(token, me.uid, until, val(f.tier) === 'premium' ? 'premium' : 'pro') });
   } catch (e) {
     return res.status(200).json({ synced: 0, error: e.message || 'failed' });
   }
