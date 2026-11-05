@@ -44,10 +44,10 @@ export default function Header({ shopBrand = null, onStartSelling, onAdminPanel 
                   <span className="text-[9px] tracking-[0.2em] font-sans -mt-0.5 text-gray-500">POWERED BY KYVRO</span>
                 </div>
               ) : (
-                <span className={`flex items-center gap-1 sm:gap-1.5 lg:gap-2 whitespace-nowrap leading-none max-[349px]:hidden ${isDarkMode ? 'text-white' : 'text-black'}`}>
-                  <span className="text-[16px] min-[400px]:text-[18px] sm:text-[22px] xl:text-[24px] font-serif font-bold tracking-[0.03em] min-[400px]:tracking-wider xl:tracking-widest">KYVRO</span>
-                  <span className="text-[#D4AF37] text-[15px] sm:text-[20px] xl:text-[22px] leading-none" aria-hidden="true">&bull;</span>
-                  <span className="text-[14px] min-[400px]:text-[16px] sm:text-[20px] xl:text-[22px] font-bold" lang="bn">কাইভ্রো</span>
+                <span className={`flex items-center gap-1 sm:gap-2 lg:gap-2.5 whitespace-nowrap leading-none max-[349px]:hidden ${isDarkMode ? 'text-white' : 'text-black'}`}>
+                  <span className="text-[17px] min-[400px]:text-[20px] sm:text-[28px] xl:text-[32px] font-serif font-bold tracking-[0.03em] min-[400px]:tracking-wider xl:tracking-widest">KYVRO</span>
+                  <span className={`${isDarkMode ? 'text-[#D4AF37]' : 'text-black'} text-[16px] sm:text-[24px] xl:text-[28px] leading-none`} aria-hidden="true">&bull;</span>
+                  <span className="text-[15px] min-[400px]:text-[18px] sm:text-[26px] xl:text-[30px] font-bold" lang="bn">কাইভ্রো</span>
                 </span>
               )}
             </div>
