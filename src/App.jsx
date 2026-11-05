@@ -102,6 +102,16 @@ export default function App() {
   }, [shopSlug]);
   const shopCtx = shopSlug && shopDoc ? shopDoc : null; // the active shop (null = the main store)
   const shopLoading = !!shopKey && (!shopSlug || shopDoc === undefined);
+  // an old link name (alias) or the shop id: show the shop's current link in the address bar; the tab shows its name
+  useEffect(() => {
+    if (!shopCtx) return;
+    try {
+      if (shopCtx.handle && shopKey !== shopCtx.handle && new URLSearchParams(window.location.search).get('shop')) {
+        window.history.replaceState(window.history.state, '', `${window.location.pathname}?shop=${shopCtx.handle}`);
+        sessionStorage.setItem('kyvro_shop', shopCtx.handle);
+      }
+    } catch (e) { /* ignore */ }
+  }, [shopCtx && shopCtx.handle]); // eslint-disable-line react-hooks/exhaustive-deps
   // shop plans: a shop whose paid plan ran out shows only its best sellers (the rest are hidden, not deleted)
   const [plans, setPlans] = useState(() => normalizePlans(null));
   useEffect(() => (shopSlug ? watchPlans(setPlans) : undefined), [shopSlug]);
@@ -110,6 +120,7 @@ export default function App() {
   const shopTier = shopCtx ? (shopCtx.planExempt ? 'premium' : effectiveTier(shopCtx)) : 'free';
   // what the shop may show right now: tier defaults, or the Owner's / a Manager's ON / OFF for this shop
   const shopFeat = shopCtx ? (shopCtx.planExempt ? Object.fromEntries(FEATURES.map((f) => [f.key, true])) : effectiveFeatures(shopCtx, shopTier, plans.tierFeatures)) : {};
+  useEffect(() => { if (shopCtx) { try { document.title = `${shopDisplayName(shopCtx)} · Kyvro`; } catch (e) { /* ignore */ } } }, [shopCtx && shopDisplayName(shopCtx)]); // eslint-disable-line react-hooks/exhaustive-deps
   const shopBrand = shopCtx ? { name: shopDisplayName(shopCtx, shopFeat), wordmark: shopTier === 'premium', color: shopFeat.brandColor ? brandHex(shopCtx.brandColor) : '#D4AF37', logo: shopFeat.logo && shopCtx.logo ? shopCtx.logo : '' } : null;
   const storefrontProducts = shopLoading ? [] : shopCtx
     ? shopProducts.filter((p) => shopCtx.items && shopCtx.items[String(p.id)] !== undefined && (!shopVisible || shopVisible.has(String(p.id)))).map((p) => {
