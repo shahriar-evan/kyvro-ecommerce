@@ -1364,7 +1364,7 @@ export default function App() {
         <section className={`border-t ${isDarkMode ? 'bg-[#0d0d0d] border-gray-800' : 'bg-[#111] border-gray-800'}`}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
             <div>
-              <p className="text-lg sm:text-xl font-bold text-white">Start your own business with <span className="text-[#D4AF37]">Kyvro</span>.</p>
+              <p className="text-lg sm:text-xl font-bold text-white">Start your own business with <span className="text-[#D4AF37]">Kyvro · কাইভ্রো</span></p>
               <p className="text-sm text-gray-400 mt-1">Free 10 products, no investment. We deliver, you earn the markup.</p>
             </div>
             <button type="button" onClick={startSelling} className="shrink-0 w-full sm:w-auto bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold px-8 py-3 rounded text-xs uppercase tracking-widest shadow hover:opacity-90 transition">Start selling</button>
