@@ -3,9 +3,10 @@ import qrcode from 'qrcode-generator';
 import { BRAND_COLORS, SOCIALS } from '../data/shopBrand';
 import { imageFileToDataURL } from '../utils/imageUpload';
 import { requestLogo, uploadLogo, uploadBanner } from '../shops';
+import { GOLD_BTN, OUTLINE_BTN, planBadge } from './ui';
 
-// My Shop: the shop page extras. Pro + Premium: tagline, contact button, about, social links and the share kit
-// (link, QR code, ready caption). Premium only: brand color, announcement strip, pinned products.
+// My Shop: the shop page extras, in plan order. Pro + Premium: tagline, contact button, about, social links, logo, banner
+// and the share kit (link, QR code, ready caption). Premium only (last): brand color, announcement strip, pinned products.
 // Locked parts are shown greyed with what unlocks them. Saving happens with the shop's Save button.
 export default function ShopExtrasEditor({ extras, setExtras, feat, shop, tier = 'free', shopName, link, pinChoices = [], isDarkMode, inputCls }) {
   const [copied, setCopied] = useState('');
@@ -48,9 +49,8 @@ export default function ShopExtrasEditor({ extras, setExtras, feat, shop, tier =
   const askLogo = async () => { setLogoMsg(null); try { await requestLogo(shop.slug); setLogoMsg({ type: 'ok', text: 'Request sent to Kyvro.' }); } catch (e) { setLogoMsg({ type: 'err', text: e.message }); } };
   const set = (k, v) => setExtras((e) => ({ ...e, [k]: v }));
   const setSocial = (k, v) => setExtras((e) => ({ ...e, socialLinks: { ...e.socialLinks, [k]: v } }));
-  const box = `rounded-lg border p-4 space-y-3 ${isDarkMode ? 'border-gray-800 bg-[#121212]' : 'border-gray-200 bg-gray-50'}`;
+  const box = `rounded-xl border p-4 space-y-3 ${isDarkMode ? 'border-gray-800 bg-[#121212]' : 'border-gray-200 bg-gray-50'}`;
   const label = 'block text-xs font-semibold text-gray-500';
-  const lock = (who) => <span className="ml-2 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-500">🔒 {who}</span>;
 
   // QR code of the shop link, made in the browser (nothing is sent anywhere)
   const qr = useMemo(() => {
@@ -69,26 +69,41 @@ export default function ShopExtrasEditor({ extras, setExtras, feat, shop, tier =
     return e.pinnedItems.length >= 3 ? e : { ...e, pinnedItems: [...e.pinnedItems, id] };
   });
 
+  // section header: title + the plan that unlocks it (gold when it is on for this shop, grey with a lock when not)
+  const head = (title, plan, on, note) => (
+    <div className="flex flex-wrap items-center gap-y-1">
+      <p className="text-xs font-bold uppercase tracking-wider">{title}</p>
+      <span className={planBadge(plan, on)}>{on ? '✓' : '🔒'} {on ? plan : note || plan}</span>
+    </div>
+  );
+  const uploadBtn = (busy, text, onFile) => (
+    <label className="flex flex-col sm:flex-row sm:items-center gap-2 text-xs font-semibold cursor-pointer">
+      <span className={`${GOLD_BTN} w-full sm:w-auto`}>{busy ? 'Uploading...' : text}</span>
+      <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={busy} onChange={(e) => { onFile(e.target.files && e.target.files[0]); e.target.value = ''; }} />
+    </label>
+  );
+
   return (
     <div className="space-y-4">
+      {/* ---- Pro / Premium ---- */}
       <div className={`${box} ${proOn ? '' : 'opacity-60'}`}>
-        <p className="text-xs font-bold uppercase tracking-wider">Shop page {proOn ? '' : lock('Pro / Premium')}</p>
+        {head('Shop page', 'Pro / Premium', proOn)}
         <fieldset disabled={!proOn} className="space-y-3">
           <div className={`grid sm:grid-cols-2 gap-3 ${feat.tagline ? '' : 'opacity-50 pointer-events-none'}`}>
             <label className={label}>Tagline <span className="font-normal">(max 80)</span>
-              <input className={`${inputCls} block mt-1 w-full`} maxLength={80} value={extras.tagline} onChange={(e) => set('tagline', e.target.value)} placeholder="e.g. Trendy panjabi at the best price" />
+              <input className={`${inputCls} block mt-1 w-full !text-sm !rounded-lg`} maxLength={80} value={extras.tagline} onChange={(e) => set('tagline', e.target.value)} placeholder="e.g. Trendy panjabi at the best price" />
             </label>
             <label className={label}>Contact button <span className="font-normal">(WhatsApp number or https link)</span>
-              <input className={`${inputCls} block mt-1 w-full`} maxLength={200} value={extras.contactUrl} onChange={(e) => set('contactUrl', e.target.value)} placeholder="01712345678 or https://facebook.com/..." />
+              <input className={`${inputCls} block mt-1 w-full !text-sm !rounded-lg`} maxLength={200} value={extras.contactUrl} onChange={(e) => set('contactUrl', e.target.value)} placeholder="+8801712345678 or https://facebook.com/..." />
             </label>
           </div>
           <label className={`${label} ${feat.about ? '' : 'opacity-50 pointer-events-none'}`}>About your shop <span className="font-normal">(max 300, shown at the top of your shop)</span>
-            <textarea className={`${inputCls} block mt-1 w-full`} rows={2} maxLength={300} value={extras.about} onChange={(e) => set('about', e.target.value)} placeholder="Who you are and why people should buy from you" />
+            <textarea className={`${inputCls} block mt-1 w-full !text-sm !rounded-lg`} rows={3} maxLength={300} value={extras.about} onChange={(e) => set('about', e.target.value)} placeholder="Who you are and why people should buy from you" />
           </label>
           <div className={`grid sm:grid-cols-2 gap-3 ${feat.social ? '' : 'opacity-50 pointer-events-none'}`}>
             {SOCIALS.map((x) => (
               <label key={x.key} className={label}>{x.label}
-                <input className={`${inputCls} block mt-1 w-full`} maxLength={200} value={extras.socialLinks[x.key]} onChange={(e) => setSocial(x.key, e.target.value)} placeholder={x.placeholder} />
+                <input className={`${inputCls} block mt-1 w-full !text-sm !rounded-lg`} maxLength={200} value={extras.socialLinks[x.key]} onChange={(e) => setSocial(x.key, e.target.value)} placeholder={x.placeholder} />
               </label>
             ))}
           </div>
@@ -96,8 +111,71 @@ export default function ShopExtrasEditor({ extras, setExtras, feat, shop, tier =
         </fieldset>
       </div>
 
-      <div className={`${box} ${premiumOn ? '' : 'opacity-60'}`}>
-        <p className="text-xs font-bold uppercase tracking-wider">Premium look {premiumOn ? '' : lock('Premium')}</p>
+      {shop && (
+        <div className={`${box} ${feat.logo ? '' : 'opacity-60'}`}>
+          {head('Shop logo', 'Pro / Premium', feat.logo, tier === 'free' ? 'Pro / Premium' : 'On request')}
+          {shop.logo && <div className="flex items-center gap-3 text-xs"><img src={shop.logo} alt="" className="w-14 h-14 rounded-xl object-cover border" /><span className="text-green-600 font-semibold">Approved logo (shown on your shop)</span></div>}
+          {shop.logoPending && <div className="flex items-center gap-3 text-xs"><img src={shop.logoPending} alt="" className="w-14 h-14 rounded-xl object-cover border" /><span className="text-amber-600 font-semibold">Waiting for Kyvro's approval</span></div>}
+          {shop.logoReject && <p className="text-xs text-red-500">{shop.logoReject.kind === 'request' ? 'Logo request rejected' : 'Logo rejected'}{shop.logoReject.note ? `: ${shop.logoReject.note}` : ''}</p>}
+          {feat.logo ? (
+            <>
+              {uploadBtn(logoBusy, shop.logo || shop.logoPending ? 'Upload a new logo' : 'Upload logo', pickLogo)}
+              <p className="text-[11px] text-gray-500">PNG / JPG / WebP, max 500 KB, shown square. Kyvro approves it first.</p>
+            </>
+          ) : tier === 'pro' ? (
+            shop.logoRequest ? <p className="text-xs text-amber-600 font-semibold">Logo permission requested. Kyvro will decide soon.</p>
+              : <button type="button" onClick={askLogo} className={`${OUTLINE_BTN} w-full sm:w-auto`}>Request logo permission</button>
+          ) : <p className="text-[11px] text-gray-500">{tier === 'free' ? 'Your own logo on your shop page.' : 'Logo upload is switched off for your shop.'}</p>}
+          {logoMsg && <p className={`text-xs ${logoMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{logoMsg.text}</p>}
+        </div>
+      )}
+
+      {shop && (
+        <div className={`${box} ${feat.banner ? '' : 'opacity-60'}`}>
+          {head('Shop banner', 'Pro / Premium', feat.banner, tier === 'free' ? 'Pro / Premium' : 'Off for your shop')}
+          {shop.banner && <div className="space-y-1 text-xs"><img src={shop.banner} alt="" className="w-full max-h-36 object-cover rounded-xl border" /><span className="text-green-600 font-semibold">Approved banner (shown on top of your shop)</span></div>}
+          {shop.bannerPending && <div className="space-y-1 text-xs"><img src={shop.bannerPending} alt="" className="w-full max-h-36 object-cover rounded-xl border" /><span className="text-amber-600 font-semibold">Waiting for Kyvro's approval</span></div>}
+          {shop.bannerReject && <p className="text-xs text-red-500">Banner rejected{shop.bannerReject.note ? `: ${shop.bannerReject.note}` : ''}</p>}
+          {feat.banner ? (
+            <>
+              {uploadBtn(bannerBusy, shop.banner || shop.bannerPending ? 'Upload a new banner' : 'Upload banner', pickBanner)}
+              <p className="text-[11px] text-gray-500">Wide picture (about 3:1), PNG / JPG / WebP, max 2 MB. Kyvro approves it first.</p>
+            </>
+          ) : <p className="text-[11px] text-gray-500">A wide picture on top of your shop.</p>}
+          {bannerMsg && <p className={`text-xs ${bannerMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{bannerMsg.text}</p>}
+        </div>
+      )}
+
+      <div className={`${box} ${feat.shareKit ? '' : 'opacity-60'}`}>
+        {head('Share kit', 'Pro / Premium', feat.shareKit)}
+        {feat.shareKit ? (
+          <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start">
+            {qr && (
+              <div className="text-center shrink-0">
+                <img src={qr} alt="QR code of your shop link" className="w-32 h-32 rounded-xl bg-white p-1 border" />
+                <a href={qr} download={`${(shopName || 'shop').replace(/[^a-z0-9]+/gi, '-')}-qr.gif`} className="mt-1 inline-block text-[11px] underline text-[#B8921F]">Download QR</a>
+              </div>
+            )}
+            <div className="flex-1 min-w-0 space-y-2 w-full">
+              <div className="grid grid-cols-2 sm:flex gap-2">
+                <button type="button" onClick={() => copy(link, 'link')} className={OUTLINE_BTN}>{copied === 'link' ? 'Copied ✓' : 'Copy shop link'}</button>
+                <button type="button" onClick={() => copy(caption, 'caption')} className={GOLD_BTN}>{copied === 'caption' ? 'Copied ✓' : 'Copy caption'}</button>
+              </div>
+              <pre className={`whitespace-pre-wrap break-words text-[11px] p-3 rounded-xl border ${isDarkMode ? 'border-gray-800 bg-black/40' : 'border-gray-200 bg-white'}`}>{caption}</pre>
+              <p className="text-[11px] text-gray-500">Post the caption and the QR on Facebook, Instagram or WhatsApp.</p>
+            </div>
+          </div>
+        ) : <p className="text-[11px] text-gray-500">QR code of your shop link and a ready caption to post.</p>}
+      </div>
+
+      {/* ---- Premium only ---- */}
+      <div className="flex items-center gap-3 pt-2" aria-hidden="true">
+        <span className="h-px flex-1 bg-gradient-to-r from-transparent to-[#D4AF37]/60" />
+        <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#B8921F]">Premium</span>
+        <span className="h-px flex-1 bg-gradient-to-l from-transparent to-[#D4AF37]/60" />
+      </div>
+      <div className={`${box} ${premiumOn ? '!border-[#D4AF37]/40' : 'opacity-60'}`}>
+        {head('Premium look', 'Premium', premiumOn)}
         <fieldset disabled={!premiumOn} className="space-y-3">
           <div className={feat.brandColor ? '' : 'opacity-50 pointer-events-none'}>
             <p className={label}>Brand color <span className="font-normal">(your shop name, buttons and badges)</span></p>
@@ -114,17 +192,17 @@ export default function ShopExtrasEditor({ extras, setExtras, feat, shop, tier =
             </div>
           </div>
           <label className={`${label} ${feat.announcement ? '' : 'opacity-50 pointer-events-none'}`}>Announcement strip <span className="font-normal">(max 100, shown on top of your shop)</span>
-            <input className={`${inputCls} block mt-1 w-full`} maxLength={100} value={extras.announcement} onChange={(e) => set('announcement', e.target.value)} placeholder="e.g. Eid offer: free delivery this week" />
+            <input className={`${inputCls} block mt-1 w-full !text-sm !rounded-lg`} maxLength={100} value={extras.announcement} onChange={(e) => set('announcement', e.target.value)} placeholder="e.g. Eid offer: free delivery this week" />
           </label>
           <div className={feat.pinned ? '' : 'opacity-50 pointer-events-none'}>
-            <p className={label}>Pin top products <span className="font-normal">(up to 3, shown first on your shop; tick products below first)</span></p>
+            <p className={label}>Pin top products <span className="font-normal">(up to 3, shown first on your shop; tick products above first)</span></p>
             {pinChoices.length === 0 ? <p className="text-[11px] text-gray-500 mt-1">No products in your shop yet.</p> : (
               <div className="mt-2 flex flex-wrap gap-2">
                 {pinChoices.map((p) => {
                   const on = extras.pinnedItems.includes(String(p.id));
                   return (
                     <button key={p.id} type="button" onClick={() => togglePin(String(p.id))} aria-pressed={on}
-                      className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full border text-[11px] font-semibold max-w-[14rem] ${on ? 'border-[#D4AF37] bg-[#D4AF37] text-black' : 'border-gray-400/40'}`}>
+                      className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full border text-[11px] font-semibold max-w-full sm:max-w-[14rem] ${on ? 'border-[#D4AF37] bg-[#D4AF37] text-black' : 'border-gray-400/40'}`}>
                       {on ? '📌' : '+'} <span className="truncate">{p.name}</span>
                     </button>
                   );
@@ -133,65 +211,6 @@ export default function ShopExtrasEditor({ extras, setExtras, feat, shop, tier =
             )}
           </div>
         </fieldset>
-      </div>
-
-      {shop && tier !== 'free' && (
-        <div className={box}>
-          <p className="text-xs font-bold uppercase tracking-wider">Shop logo {feat.logo ? '' : lock(tier === 'pro' ? 'On request' : 'Premium')}</p>
-          {shop.logo && <div className="flex items-center gap-3 text-xs"><img src={shop.logo} alt="" className="w-12 h-12 rounded object-cover border" /><span className="text-green-600 font-semibold">Approved logo (shown on your shop)</span></div>}
-          {shop.logoPending && <div className="flex items-center gap-3 text-xs"><img src={shop.logoPending} alt="" className="w-12 h-12 rounded object-cover border" /><span className="text-amber-600 font-semibold">Waiting for Kyvro's approval</span></div>}
-          {shop.logoReject && <p className="text-xs text-red-500">{shop.logoReject.kind === 'request' ? 'Logo request rejected' : 'Logo rejected'}{shop.logoReject.note ? `: ${shop.logoReject.note}` : ''}</p>}
-          {feat.logo ? (
-            <label className="inline-flex items-center gap-2 text-xs font-semibold cursor-pointer">
-              <span className="px-3 py-1.5 rounded bg-[#D4AF37] text-black font-bold">{logoBusy ? 'Uploading...' : shop.logo || shop.logoPending ? 'Upload a new logo' : 'Upload logo'}</span>
-              <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={logoBusy} onChange={(e) => { pickLogo(e.target.files && e.target.files[0]); e.target.value = ''; }} />
-              <span className="font-normal text-gray-500">PNG / JPG / WebP, max 500 KB, shown square</span>
-            </label>
-          ) : tier === 'pro' ? (
-            shop.logoRequest ? <p className="text-xs text-amber-600 font-semibold">Logo permission requested. Kyvro will decide soon.</p>
-              : <button type="button" onClick={askLogo} className="px-3 py-1.5 rounded border border-[#D4AF37] text-[#D4AF37] text-xs font-bold">Request logo permission</button>
-          ) : <p className="text-[11px] text-gray-500">Logo upload is switched off for your shop.</p>}
-          {logoMsg && <p className={`text-xs ${logoMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{logoMsg.text}</p>}
-        </div>
-      )}
-
-      {shop && (
-        <div className={`${box} ${feat.banner ? '' : 'opacity-60'}`}>
-          <p className="text-xs font-bold uppercase tracking-wider">Shop banner {feat.banner ? '' : lock(tier === 'free' ? 'Pro / Premium' : 'Off for your shop')}</p>
-          {shop.banner && <div className="space-y-1 text-xs"><img src={shop.banner} alt="" className="w-full max-h-32 object-cover rounded border" /><span className="text-green-600 font-semibold">Approved banner (shown on top of your shop)</span></div>}
-          {shop.bannerPending && <div className="space-y-1 text-xs"><img src={shop.bannerPending} alt="" className="w-full max-h-32 object-cover rounded border" /><span className="text-amber-600 font-semibold">Waiting for Kyvro's approval</span></div>}
-          {shop.bannerReject && <p className="text-xs text-red-500">Banner rejected{shop.bannerReject.note ? `: ${shop.bannerReject.note}` : ''}</p>}
-          {feat.banner ? (
-            <label className="inline-flex flex-wrap items-center gap-2 text-xs font-semibold cursor-pointer">
-              <span className="px-3 py-1.5 rounded bg-[#D4AF37] text-black font-bold">{bannerBusy ? 'Uploading...' : shop.banner || shop.bannerPending ? 'Upload a new banner' : 'Upload banner'}</span>
-              <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={bannerBusy} onChange={(e) => { pickBanner(e.target.files && e.target.files[0]); e.target.value = ''; }} />
-              <span className="font-normal text-gray-500">Wide picture (about 3:1), PNG / JPG / WebP, max 2 MB</span>
-            </label>
-          ) : <p className="text-[11px] text-gray-500">A wide picture on top of your shop.</p>}
-          {bannerMsg && <p className={`text-xs ${bannerMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{bannerMsg.text}</p>}
-        </div>
-      )}
-
-      <div className={`${box} ${feat.shareKit ? '' : 'opacity-60'}`}>
-        <p className="text-xs font-bold uppercase tracking-wider">Share kit {feat.shareKit ? '' : lock('Pro / Premium')}</p>
-        {feat.shareKit ? (
-          <div className="flex flex-col sm:flex-row gap-4 items-start">
-            {qr && (
-              <div className="text-center shrink-0">
-                <img src={qr} alt="QR code of your shop link" className="w-32 h-32 rounded bg-white p-1 border" />
-                <a href={qr} download={`${(shopName || 'shop').replace(/[^a-z0-9]+/gi, '-')}-qr.gif`} className="mt-1 inline-block text-[11px] underline text-[#D4AF37]">Download QR</a>
-              </div>
-            )}
-            <div className="flex-1 min-w-0 space-y-2 w-full">
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => copy(link, 'link')} className="px-3 py-1.5 rounded border border-gray-400 text-xs font-semibold">{copied === 'link' ? 'Copied ✓' : 'Copy shop link'}</button>
-                <button type="button" onClick={() => copy(caption, 'caption')} className="px-3 py-1.5 rounded bg-[#D4AF37] text-black text-xs font-bold">{copied === 'caption' ? 'Copied ✓' : 'Copy caption'}</button>
-              </div>
-              <pre className={`whitespace-pre-wrap break-words text-[11px] p-2 rounded border ${isDarkMode ? 'border-gray-800 bg-black/40' : 'border-gray-200 bg-white'}`}>{caption}</pre>
-              <p className="text-[11px] text-gray-500">Post the caption and the QR on Facebook, Instagram or WhatsApp.</p>
-            </div>
-          </div>
-        ) : <p className="text-[11px] text-gray-500">QR code of your shop link and a ready caption to post.</p>}
       </div>
     </div>
   );

@@ -1,0 +1,6 @@
+// Shared Kyvro gold button / badge styles (My Shop, shop extras). Tailwind class strings only.
+export const GOLD_BTN = 'inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black text-xs font-bold uppercase tracking-wider shadow-[0_6px_18px_-8px_rgba(212,175,55,0.9)] hover:brightness-105 active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed';
+export const OUTLINE_BTN = 'inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border border-[#D4AF37]/70 text-[#B8921F] text-xs font-bold uppercase tracking-wider hover:bg-[#D4AF37]/10 active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed';
+export const GHOST_BTN = 'inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border border-gray-400/60 text-xs font-bold uppercase tracking-wider hover:border-gray-500 active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed';
+// small plan badge next to a section title: unlocked = gold, locked = grey with a lock
+export const planBadge = (text, unlocked) => `ml-2 inline-flex items-center gap-1 align-middle text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${unlocked ? 'bg-[#D4AF37]/15 text-[#B8921F] border border-[#D4AF37]/40' : 'bg-gray-500/15 text-gray-500'}`;
