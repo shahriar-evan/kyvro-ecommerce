@@ -24,36 +24,36 @@ export default function Header({ shopBrand = null, onStartSelling, onAdminPanel 
       <header className={`sticky top-0 z-40 backdrop-blur border-b ${isDarkMode ? 'bg-[#121212]/95 border-gray-800' : 'bg-white/95 border-gray-200'}`}>
         <div className="max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-2">
           
-          <div className="flex items-center gap-2 min-[380px]:gap-3 sm:gap-6 min-w-0">
+          <div className="flex items-center gap-1.5 min-[380px]:gap-2 sm:gap-6 min-w-0">
             <button 
               onClick={() => setIsMobileMenuOpen(true)}
-              className={`lg:hidden p-1 ${isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'}`}
+              className={`xl:hidden p-1 ${isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'}`}
             >
               <Menu size={24} />
             </button>
             <div 
               onClick={() => { setCurrentView('home'); setSelectedCategory('All'); }}
-              className="cursor-pointer flex items-center gap-1.5 min-[380px]:gap-2 sm:gap-3 min-w-0"
+              className="cursor-pointer flex items-center gap-1 sm:gap-1.5 min-w-0"
             >
-              {/* the Kyvro logo is always there; a Premium shop shows its own name as a wordmark next to it */}
+              {/* the Kyvro logo is always there; a Premium shop shows its own name as a wordmark next to it; otherwise one line "KYVRO • কাইভ্রো" centred on the logo */}
               {shopBrand && shopBrand.logo && <img src={shopBrand.logo} alt="" className="h-9 w-9 sm:h-11 sm:w-11 rounded object-cover border border-gray-300/40" />}
-              <KyvroMark dark={isDarkMode} title="Kyvro logo" className={`${shopBrand && shopBrand.wordmark ? 'h-6 sm:h-7' : 'h-7 sm:h-10'} w-auto shrink-0`} />
+              <KyvroMark dark={isDarkMode} title="Kyvro logo" className={`${shopBrand && shopBrand.wordmark ? 'h-7 sm:h-9' : 'h-9 min-[400px]:h-10 sm:h-12 xl:h-14'} w-auto shrink-0`} />
               {shopBrand && shopBrand.wordmark ? (
                 <div className="flex flex-col items-start min-w-0">
                   <span className="text-lg sm:text-2xl font-serif font-bold tracking-wide truncate max-w-[9rem] sm:max-w-[16rem]" style={{ color: shopBrand.color }}>{shopBrand.name}</span>
                   <span className="text-[9px] tracking-[0.2em] font-sans -mt-0.5 text-gray-500">POWERED BY KYVRO</span>
                 </div>
               ) : (
-                <div className="flex flex-col items-start max-[349px]:hidden">
-                  <span className={`text-base min-[400px]:text-lg sm:text-2xl font-serif font-bold tracking-wider min-[400px]:tracking-widest ${isDarkMode ? 'text-white' : 'text-black'}`}>KYVRO</span>
-                  {/* Bangla name + tagline under KYVRO on every screen (smaller on phones) */}
-                  <span className={`block whitespace-nowrap text-[6.5px] min-[370px]:text-[7px] min-[400px]:text-[8px] sm:text-[9px] tracking-[0.04em] min-[370px]:tracking-[0.06em] min-[400px]:tracking-[0.1em] sm:tracking-[0.3em] font-sans -mt-0.5 sm:-mt-1 ${isDarkMode ? 'text-[#D4AF37]' : 'text-black font-semibold'}`}>{shopBrand ? 'POWERED BY KYVRO' : <>কাইভ্রো &bull; WEAR YOUR STORY</>}</span>
-                </div>
+                <span className={`flex items-center gap-1 sm:gap-1.5 lg:gap-2 whitespace-nowrap leading-none max-[349px]:hidden ${isDarkMode ? 'text-white' : 'text-black'}`}>
+                  <span className="text-[16px] min-[400px]:text-[18px] sm:text-[22px] xl:text-[24px] font-serif font-bold tracking-[0.03em] min-[400px]:tracking-wider xl:tracking-widest">KYVRO</span>
+                  <span className="text-[#D4AF37] text-[15px] sm:text-[20px] xl:text-[22px] leading-none" aria-hidden="true">&bull;</span>
+                  <span className="text-[14px] min-[400px]:text-[16px] sm:text-[20px] xl:text-[22px] font-bold" lang="bn">কাইভ্রো</span>
+                </span>
               )}
             </div>
           </div>
 
-          <nav className={`hidden lg:flex items-center gap-5 xl:gap-6 text-sm font-medium tracking-wide ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>
+          <nav className={`hidden xl:flex items-center gap-6 text-sm font-medium tracking-wide ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>
             <button onClick={() => { setCurrentView('home'); setSelectedCategory('All'); }} className={`hover:text-[#D4AF37] transition ${currentView === 'home' ? 'text-[#D4AF37] border-b-2 border-[#D4AF37] pb-1' : ''}`}>HOME</button>
             {navHas('Men') && <button onClick={() => { setCurrentView('shop'); setSelectedCategory("Men"); }} className="hover:text-[#D4AF37] transition">MEN'S</button>}
             {navHas('Women') && <button onClick={() => { setCurrentView('shop'); setSelectedCategory("Women"); }} className="hover:text-[#D4AF37] transition">WOMEN'S</button>}
@@ -63,7 +63,7 @@ export default function Header({ shopBrand = null, onStartSelling, onAdminPanel 
           </nav>
 
           <div className="flex items-center gap-1 sm:gap-4 shrink-0">
-            <div className={`hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded border text-xs font-semibold ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-white' : 'bg-gray-100 border-gray-300 text-black'}`}>
+            <div className={`hidden md:flex items-center gap-1 px-2.5 py-1.5 rounded border text-xs font-semibold ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-white' : 'bg-gray-100 border-gray-300 text-black'}`}>
               <span>{curr.flag}</span>
               <select 
                 value={currencyKey} 
@@ -80,7 +80,7 @@ export default function Header({ shopBrand = null, onStartSelling, onAdminPanel 
 
             <button 
               onClick={() => setIsDarkMode(!isDarkMode)}
-              className={`p-2 rounded-full border transition flex items-center justify-center ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-[#D4AF37] hover:bg-[#222]' : 'bg-gray-100 border-gray-300 text-black hover:bg-gray-200'}`}
+              className={`p-1.5 sm:p-2 rounded-full border transition hidden min-[430px]:flex items-center justify-center ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-[#D4AF37] hover:bg-[#222]' : 'bg-gray-100 border-gray-300 text-black hover:bg-gray-200'}`}
               title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
             >
               {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
@@ -88,7 +88,7 @@ export default function Header({ shopBrand = null, onStartSelling, onAdminPanel 
 
             <button
               onClick={() => setCurrentView('tracking')}
-              className={`transition p-1 hidden sm:flex items-center gap-1 ${isDarkMode ? 'text-gray-300 hover:text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]'}`}
+              className={`transition p-1 hidden md:flex items-center gap-1 ${isDarkMode ? 'text-gray-300 hover:text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]'}`}
               title="Order Tracking"
             >
               <Truck size={18} /><span className="hidden lg:inline text-xs font-semibold">Order Tracking</span>
