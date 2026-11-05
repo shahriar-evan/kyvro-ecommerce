@@ -26,8 +26,7 @@ const TABS = [
 
 export default function AccountView({
   customerUser, displayName, photoURL, activeTab, setActiveTab, onSignIn, onSignOut, onSaveProfile, onCancelOrder,
-  myOrders, savedProducts, toggleSaved, formatPrice, isDarkMode, setCurrentView, setSelectedProduct, products = [], isStaff = false,
-}) {
+  myOrders, savedProducts, toggleSaved, formatPrice, isDarkMode, setCurrentView, setSelectedProduct, products = [], isStaff = false, sellPlan = '' }) {
   const [name, setName] = useState(displayName || '');
   const [photo, setPhoto] = useState(photoURL || '');
   const [busy, setBusy] = useState(false);
@@ -265,7 +264,7 @@ export default function AccountView({
         )
       )}
 
-      {activeTab === 'sell' && <SellerDashboard customerUser={customerUser} isStaff={isStaff} products={products} formatPrice={formatPrice} isDarkMode={isDarkMode} onSignIn={onSignIn} />}
+      {activeTab === 'sell' && <SellerDashboard customerUser={customerUser} isStaff={isStaff} products={products} formatPrice={formatPrice} isDarkMode={isDarkMode} onSignIn={onSignIn} initialPlan={sellPlan} />}
 
       {activeTab === 'settings' && (
         <div className={`${card} max-w-xl space-y-5`}>
