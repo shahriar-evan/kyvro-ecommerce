@@ -31,3 +31,7 @@
   animation: kyvroMarquee 60s linear infinite;
 }
 .kyvro-marquee:hover { animation-play-state: paused; }
+
+/* Storefront themes (src/data/themes.js): small type changes on every page; the home page layout is in ThemedHome.jsx */
+[data-theme="minimal"] .font-serif { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; letter-spacing: -0.01em; }
+[data-theme="bold"] .font-serif { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-weight: 800; }

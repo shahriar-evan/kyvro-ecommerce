@@ -77,6 +77,8 @@ export const FEATURES = [
   { key: 'banner', label: 'Banner upload', pro: false, paid: true },
   { key: 'salesStats', label: 'Sales stats', pro: true },
   { key: 'earningsCsv', label: 'Monthly earnings CSV', pro: false },
+  // storefront themes other than Classic (src/data/themes.js); never on Free
+  { key: 'themes', label: 'All themes (Minimal, Bold, Boutique)', pro: true, paid: true },
 ];
 // the built-in default of a tier (used when the Owner did not switch the feature for that plan)
 export const builtInDefault = (key, tier) => tier === 'premium' || (tier === 'pro' && !!(FEATURES.find((f) => f.key === key) || {}).pro);

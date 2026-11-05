@@ -19,6 +19,8 @@ import { effectiveFeatures, httpsLinkOk, FEATURES, shopDisplayName } from '../da
 import { LayoutDashboard, ShoppingBag, Package, Store, BarChart3, Palette, LayoutTemplate, TicketPercent, Wallet, LifeBuoy, Gem, Lock, Receipt } from 'lucide-react';
 import SellerDashLayout from './SellerDashLayout';
 import SellerBanner from './SellerBanner';
+import ThemePicker from './ThemePicker';
+import { saveShopTheme } from '../themeStore';
 import { flatSubCategories, subLabel, matchesCollectionPage } from '../data/catalog';
 
 // social links on the application (any of them, all optional; https only)
@@ -109,6 +111,7 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
   }, [seller, status]); // eslint-disable-line react-hooks/exhaustive-deps
   // dashboard page (menu on the left) and the Billing History rows (from the server: subscriptionPayments is server-only)
   const [section, setSection] = useState('dashboard');
+  const [themeSlug, setThemeSlug] = useState(''); // Themes page: which shop (sellers with more than one)
   const [billing, setBilling] = useState(null); // null = loading, { payments } or { error }
   useEffect(() => {
     if (section !== 'sub-billing' || !customerUser) return undefined;
@@ -356,7 +359,7 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
     { title: 'Shop & Growth', items: [
       { key: 'manage', label: 'Manage Shop', icon: Store },
       { key: 'analytics', label: 'Analytics', icon: BarChart3, badge: needs('salesStats') },
-      { key: 'themes', label: 'Themes', icon: Palette, badge: needs('brandColor') },
+      { key: 'themes', label: 'Themes', icon: Palette },
       { key: 'landing', label: 'Landing Pages', icon: LayoutTemplate, badge: 'Soon' },
       { key: 'promo', label: 'Promo Codes', icon: TicketPercent, badge: 'Soon' },
     ] },
@@ -551,7 +554,28 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
       </>
     ) : locked('Analytics', 'Pro', 'Sales stats for your shop: orders, delivered, earnings by month and your best sellers.');
   } else if (s === 'themes') {
-    before = feat.brandColor ? title('Themes', 'Re-design your shop: brand color, announcement strip and pinned products.') : locked('Themes', needs('brandColor'), 'Re-design your shop with your own brand color, an announcement strip on top and your best products pinned first.');
+    // which shop's theme (a seller with 2 / 3 shops picks one); Classic on every plan, the rest on Pro / Premium
+    const tShop = myShops.find((x) => x.slug === themeSlug) || myShop || null;
+    const tFeat = effectiveFeatures(tShop, tShop ? effectiveTier(tShop) : acctTier, plans.tierFeatures);
+    before = !tShop ? notYet : (
+      <>
+        {myShops.length > 1 && (
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-semibold text-gray-500">Shop:</span>
+            {sellerShopList(seller).map((slug) => myShops.find((x) => x.slug === slug)).filter(Boolean).map((x) => (
+              <button key={x.slug} type="button" aria-pressed={x.slug === tShop.slug} onClick={() => setThemeSlug(x.slug)}
+                className={`px-3 py-1.5 rounded-full border font-bold ${x.slug === tShop.slug ? 'border-[#D4AF37] bg-[#D4AF37] text-black' : isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>{shopDisplayName(x)}</button>
+            ))}
+          </div>
+        )}
+        <ThemePicker current={{ theme: tShop.theme, mode: tShop.themeMode }} allowAll={!!tFeat.themes} previewPath={`/${tShop.handle || tShop.slug}`}
+          onSave={(t, m) => saveShopTheme(tShop.slug, t, m)} onUpgrade={goPlans} isDarkMode={isDarkMode}
+          note={tFeat.themes ? 'Pick a design for your shop, see it in the preview, then press Apply theme.' : 'Free plan: the Classic theme with light or dark. Pro and Premium get every theme. You can still preview them all.'} />
+        {feat.brandColor
+          ? title('Premium look', 'Brand color, announcement strip and pinned products (saved with "Save my shop").')
+          : <div className={`${card} !space-y-2`}><p className="text-sm font-bold flex items-center gap-2"><Lock size={14} /> Premium look</p><p className="text-xs text-gray-500">Your own brand color, an announcement strip on top and your best products pinned first. <button type="button" onClick={goPlans} className="underline text-[#B8921F] font-semibold">Upgrade to Premium</button></p></div>}
+      </>
+    );
   } else if (s === 'landing') {
     before = locked('Landing Pages', 'Soon', 'A separate page for one offer or one product, to share in your ads.');
   } else if (s === 'promo') {

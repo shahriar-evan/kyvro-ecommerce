@@ -16,6 +16,8 @@ import PushPrompt from './components/PushPrompt';
 import { watchProducts, watchProductCosts, watchProductCommissions, setProductCommission, saveProductCost, removeProductCost, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
 import { watchStoreSettings, watchPlans } from './storeSettings';
 import { visibleShopIds, normalizePlans, effectiveTier, shopIsPaid } from './data/priceCheck';
+import { themePreviewFromUrl, cleanTheme, cleanMode } from './data/themes';
+import { watchSiteTheme } from './themeStore';
 import { shopExtrasOf, brandHex, SOCIALS, httpsLinkOk, contactOk, contactHref, contactLabel, effectiveFeatures, FEATURES, shopDisplayName } from './data/shopBrand';
 import { cleanPhone, ONLINE_PAY_ON, DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
 import { INITIAL_PRODUCTS } from './data/products';
@@ -91,6 +93,9 @@ export default function App() {
   });
   const [shopKey] = useState(() => {
     try {
+      // the theme picker's preview frame shares this tab's session: it never remembers a shop, and a main-site preview
+      // never picks up the shop remembered by the page around it
+      if (/[?&]themePreview=/.test(window.location.search)) return pathShop;
       if (pathShop) { sessionStorage.setItem('kyvro_shop', pathShop); return pathShop; }
       const q = String(new URLSearchParams(window.location.search).get('shop') || '').toLowerCase();
       if (SLUG_RE.test(q)) { sessionStorage.setItem('kyvro_shop', q); return q; }
@@ -143,6 +148,15 @@ export default function App() {
   // what the shop may show right now: tier defaults, or the Owner's / a Manager's ON / OFF for this shop
   const shopFeat = shopCtx ? (shopCtx.planExempt ? Object.fromEntries(FEATURES.map((f) => [f.key, true])) : effectiveFeatures(shopCtx, shopTier, plans.tierFeatures)) : {};
   useEffect(() => { if (shopCtx) { try { document.title = `${shopDisplayName(shopCtx)} · Kyvro`; } catch (e) { /* ignore */ } } }, [shopCtx && shopDisplayName(shopCtx)]); // eslint-disable-line react-hooks/exhaustive-deps
+  // storefront theme (src/data/themes.js): a preview (?themePreview=) > the shop's own theme (non-Classic needs the
+  // "themes" feature, else Classic) > the main site's theme (settings/theme)
+  const [siteTheme, setSiteTheme] = useState({ theme: 'classic', mode: 'auto' });
+  useEffect(() => watchSiteTheme(setSiteTheme), []);
+  const [themePreview] = useState(themePreviewFromUrl);
+  const shopThemeKey = shopCtx ? cleanTheme(shopCtx.theme) : 'classic';
+  const activeTheme = themePreview || (shopCtx
+    ? { theme: shopThemeKey === 'classic' || shopFeat.themes ? shopThemeKey : 'classic', mode: cleanMode(shopCtx.themeMode) }
+    : siteTheme);
   const shopBrand = shopCtx ? { name: shopDisplayName(shopCtx, shopFeat), wordmark: shopTier === 'premium', color: shopFeat.brandColor ? brandHex(shopCtx.brandColor) : '#D4AF37', logo: shopFeat.logo && shopCtx.logo ? shopCtx.logo : '' } : null;
   const storefrontProducts = shopLoading ? [] : shopCtx
     ? shopProducts.filter((p) => shopCtx.items && shopCtx.items[String(p.id)] !== undefined && (!shopVisible || shopVisible.has(String(p.id)))).map((p) => {
@@ -320,6 +334,8 @@ export default function App() {
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  // the theme's mode: Light / Dark open the page in that mode (the visitor can still switch); "Visitor chooses" leaves it
+  useEffect(() => { if (activeTheme.mode === 'light' || activeTheme.mode === 'dark') setIsDarkMode(activeTheme.mode === 'dark'); }, [activeTheme.theme, activeTheme.mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const banners = [coverPhoto1Img, men_womenImg, women_bannerImg, styleImg, punjabi_shirtImg, shirtImg, punjabiImg, sneakersImg];
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
@@ -1288,7 +1304,7 @@ export default function App() {
   const maintenanceOn = storeSettings.maintenanceMode === true;
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans relative transition-colors duration-300 overflow-x-clip ${isDarkMode ? 'bg-[#0f0f0f] text-gray-100' : 'bg-white text-gray-900'}`}>
+    <div data-theme={activeTheme.theme} className={`min-h-screen flex flex-col font-sans relative transition-colors duration-300 overflow-x-clip ${isDarkMode ? 'bg-[#0f0f0f] text-gray-100' : activeTheme.theme === 'boutique' ? 'bg-[#FBF7F0] text-gray-900' : 'bg-white text-gray-900'}`}>
 
       {maintenanceOn && (
         <div className="bg-amber-500 text-black text-center text-xs sm:text-sm font-semibold py-2.5 px-3">
@@ -1389,7 +1405,7 @@ export default function App() {
           <a href="/" className="mt-6 inline-flex px-6 py-3 rounded-full bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black text-xs font-bold uppercase tracking-widest">Go to Kyvro</a>
         </div>
       )}
-      {currentView === 'home' && !pathNotFound && <HomeView requestAdd={requestAdd} addToCart={addToCart} banners={banners} calculateDiscountPercent={calculateDiscountPercent} currentBannerIndex={currentBannerIndex} formatPrice={formatPrice} isDarkMode={isDarkMode} products={storefrontProducts} hideEmptyCategories={!!shopCtx} setCurrentBannerIndex={setCurrentBannerIndex} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} savedIds={savedIds} toggleSaved={toggleSaved} />}
+      {currentView === 'home' && !pathNotFound && <HomeView theme={activeTheme.theme} brandName={shopBrand ? shopBrand.name : 'Kyvro'} requestAdd={requestAdd} addToCart={addToCart} banners={banners} calculateDiscountPercent={calculateDiscountPercent} currentBannerIndex={currentBannerIndex} formatPrice={formatPrice} isDarkMode={isDarkMode} products={storefrontProducts} hideEmptyCategories={!!shopCtx} setCurrentBannerIndex={setCurrentBannerIndex} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} savedIds={savedIds} toggleSaved={toggleSaved} />}
 
       {/* SHOP CATALOG VIEW */}
       {currentView === 'shop' && <ShopView selectedSubCategory={selectedSubCategory} setSelectedSubCategory={setSelectedSubCategory} requestAdd={requestAdd} addToCart={addToCart} filteredProducts={filteredProducts} formatPrice={formatPrice} isDarkMode={isDarkMode} products={storefrontProducts} searchQuery={searchQuery} selectedCategory={selectedCategory} setCurrentView={setCurrentView} setSearchQuery={setSearchQuery} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} setSortBy={setSortBy} sortBy={sortBy} savedIds={savedIds} toggleSaved={toggleSaved} />}

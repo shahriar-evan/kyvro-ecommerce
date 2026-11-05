@@ -6,6 +6,7 @@ import StockLabel from './StockLabel';
 import WhatsAppButton from './WhatsAppButton';
 import { waOrderLink, waProductLines } from '../whatsappOrder';
 import { User, Shield, Truck, RefreshCw, ChevronRight, ArrowRight, Heart } from 'lucide-react';
+import ThemedHome from './ThemedHome';
 import heroBannerImg from '../assets/hero-banner.png';
 import heroBanner1Img from '../assets/hero-banner1.png';
 import heroBanner2Img from '../assets/hero-banner2.png';
@@ -17,7 +18,7 @@ import sneakersImg from '../assets/Snekers.png';
 const HERO_IMAGES = [heroBannerImg, heroBanner1Img, heroBanner2Img];
 const HERO_SECONDS = 10;
 
-export default function HomeView({ hideEmptyCategories = false, requestAdd, addToCart, banners, calculateDiscountPercent, currentBannerIndex, formatPrice, isDarkMode, products, setCurrentBannerIndex, setCurrentView, setSelectedCategory, setSelectedProduct, savedIds = [], toggleSaved = () => {} }) {
+export default function HomeView({ theme = 'classic', brandName = 'Kyvro', hideEmptyCategories = false, requestAdd, addToCart, banners, calculateDiscountPercent, currentBannerIndex, formatPrice, isDarkMode, products, setCurrentBannerIndex, setCurrentView, setSelectedCategory, setSelectedProduct, savedIds = [], toggleSaved = () => {} }) {
   const [heroIdx, setHeroIdx] = useState(0);
   useEffect(() => {
     if (HERO_IMAGES.length < 2) return undefined;
@@ -25,6 +26,13 @@ export default function HomeView({ hideEmptyCategories = false, requestAdd, addT
     return () => clearTimeout(t);
   }, [heroIdx]);
   useEffect(() => { HERO_IMAGES.forEach((src) => { const im = new Image(); im.src = src; }); }, []);
+
+  // the other themes (src/data/themes.js) share the data below and only change the layout
+  if (theme !== 'classic') {
+    return <ThemedHome theme={theme} brandName={brandName} heroImages={HERO_IMAGES} heroIdx={heroIdx} setHeroIdx={setHeroIdx} hideEmptyCategories={hideEmptyCategories}
+      requestAdd={requestAdd} banners={banners} currentBannerIndex={currentBannerIndex} setCurrentBannerIndex={setCurrentBannerIndex} formatPrice={formatPrice} isDarkMode={isDarkMode}
+      products={products} setCurrentView={setCurrentView} setSelectedCategory={setSelectedCategory} setSelectedProduct={setSelectedProduct} savedIds={savedIds} toggleSaved={toggleSaved} />;
+  }
 
   return (
     <>
