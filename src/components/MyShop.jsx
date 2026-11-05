@@ -8,6 +8,7 @@ import { watchPlans, watchMySubscription } from '../storeSettings';
 import { normalizePlans, toMillis, SHOP_MAX_ITEMS, effectiveTier, TIER_LABEL } from '../data/priceCheck';
 import PlanCards from './PlanCards';
 import ShopExtrasEditor from './ShopExtrasEditor';
+import { GOLD_BTN, OUTLINE_BTN, GHOST_BTN } from './ui';
 import { shopExtrasOf, httpsLinkOk, contactOk, cleanContact, effectiveFeatures, FEATURES } from '../data/shopBrand';
 import { watchSellerRules, sellerNameBlocked, normalizeSellerRules, watchMySeller } from '../sellers';
 
@@ -155,7 +156,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
 
   const live = useMemo(() => products.filter((p) => (p.status || 'approved') === 'approved'), [products]);
   const link = shop ? shopUrl(shop.slug) : '';
-  const card = `p-5 sm:p-6 rounded-lg border space-y-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`;
+  const card = `p-4 sm:p-6 rounded-2xl border space-y-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`;
   const inputCls = `border p-2 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`;
 
   // main categories that have products (plus "Other" for products that are in none of them)
@@ -377,68 +378,54 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
 
   const count = Object.keys(draft).length;
   const open = cats.find((c) => c.name === openCat) || null;
-  const goldBtn = 'px-4 py-2 rounded bg-[#D4AF37] text-black text-xs font-bold uppercase tracking-wider text-center';
+  // a thin gold line on top of each section and a gold section title (same look as the plan cards)
+  const goldLine = <span className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-[#B8921F] via-[#E9CB6B] to-[#B8921F]" />;
+  const section = `${card} relative overflow-hidden`;
+  const sectionTitle = (text, hint) => (
+    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+      <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#B8921F]">{text}</p>
+      {hint && <p className="text-[11px] text-gray-500">{hint}</p>}
+    </div>
+  );
   return wrap(
     <div className="space-y-5">
-      <div className={card}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* 1. the shop: link + name */}
+      <div className={section}>
+        {goldLine}
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="text-lg font-bold">My Shop{isPendingShop(shop) ? ' (waiting for the Owner)' : shop.active === false ? ' (switched off by the Owner)' : ''}</h3>
+            <h3 className="text-xl font-bold">My Shop{isPendingShop(shop) ? ' (waiting for the Owner)' : shop.active === false ? ' (switched off by the Owner)' : ''}</h3>
             {isPendingShop(shop) && <p className="text-xs text-amber-600 mt-1">The Owner was notified. You can already choose products and prices; the link starts working when the Owner accepts your shop.</p>}
             {shop.killed && <p className="text-xs text-red-500 mt-1 font-semibold">Kyvro switched this shop off{shop.killNote ? `: ${shop.killNote}` : ''}. It cannot be changed or switched on again. Contact kyvrofashion@gmail.com if you think this is a mistake.</p>}
             <p className="text-xs text-gray-500 break-all mt-1">{link}</p>
           </div>
-          <div className="flex flex-wrap gap-2">{linkButtons(shop.slug, goldBtn)}</div>
+          <div className="grid grid-cols-2 sm:flex gap-2 shrink-0">{linkButtons(shop.slug, GOLD_BTN)}</div>
         </div>
         <div>
           <label htmlFor="shop-name" className="block text-xs font-semibold text-gray-500">Shop name</label>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <input id="shop-name" className={`${inputCls} w-full sm:w-72`} maxLength={60} value={name} onChange={(e) => { setName(e.target.value); setNameMsg(null); }} />
-            <button type="button" disabled={nameBusy || name.trim() === String(shop.name || '').trim()} onClick={saveName} className="px-4 py-2 rounded bg-[#D4AF37] text-black text-xs font-bold uppercase tracking-wider disabled:opacity-40">{nameBusy ? 'Checking...' : 'Save name'}</button>
+          <div className="mt-1 flex flex-col sm:flex-row sm:items-center gap-2">
+            <input id="shop-name" className={`${inputCls} w-full sm:w-80 !text-sm !py-2.5 !rounded-lg`} maxLength={60} value={name} onChange={(e) => { setName(e.target.value); setNameMsg(null); }} />
+            <button type="button" disabled={nameBusy || name.trim() === String(shop.name || '').trim()} onClick={saveName} className={`${GOLD_BTN} w-full sm:w-auto`}>{nameBusy ? 'Checking...' : 'Save name'}</button>
           </div>
           {nameMsg
             ? <p className={`mt-1 text-[11px] ${nameMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{nameMsg.text}</p>
             : <p className="mt-1 text-[11px] text-gray-500">{feat.shopName ? 'The new name shows at once. Your shop link never changes.' : '🔒 Name change: Premium (Pro if Kyvro switches it on). Your shop link never changes.'}</p>}
         </div>
-        <ShopExtrasEditor extras={extras} setExtras={setExtras} feat={feat} shop={shop} tier={isOwner ? 'premium' : effectiveTier(shop)} shopName={name} link={link}
-          pinChoices={live.filter((p) => draft[p.id] !== undefined)} isDarkMode={isDarkMode} inputCls={inputCls} />
-        <p className="text-[11px] text-gray-500">Customers who open your link see only the products you tick below, at the price you type. The price can be higher than the store price by the limit shown for each product. Everything above the store price is yours when the order is delivered. Payments and delivery stay with the store.</p>
       </div>
 
-      {!isOwner && showPlan && plans.enabled && (
-        <div className={`${card} relative overflow-hidden`}>
-          <span className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-[#B8921F] via-[#E9CB6B] to-[#B8921F]" />
-          {paidUntil > 0 && (daysLeft <= 0 || daysLeft <= plans.reminderDays) && (
-            <div className={`rounded border p-3 text-xs flex flex-wrap items-center justify-between gap-2 ${daysLeft <= 0 ? 'border-red-500/50 bg-red-500/10 text-red-500' : 'border-amber-500/50 bg-amber-500/10 text-amber-600'}`}>
-              <span className="font-semibold">{daysLeft <= 0 ? `Your paid plan ended on ${fmtDate(paidUntil)}. Your shop now shows only its ${plans.freeLimit} best sellers; the others are hidden, not deleted.` : `Your paid plan ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'} (${fmtDate(paidUntil)}).`}</span>
-              <button type="button" disabled={!!paying} onClick={() => buyPlan(sub && sub.tier === 'premium' ? 'premium' : 'pro')} className="px-4 py-1.5 rounded bg-[#D4AF37] text-black font-bold uppercase tracking-wider disabled:opacity-50">{paying ? 'Opening...' : 'Renew'}</button>
-            </div>
-          )}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">My plan</p>
-              <p className="text-xl font-bold">{tier === 'free' ? 'Free' : <span className="text-[#D4AF37]">{TIER_LABEL[tier]}</span>}</p>
-            </div>
-            <p className="text-xs text-gray-500">{paid ? `All products · paid until ${fmtDate(paidUntil)}` : `${count} / ${plans.freeLimit} products · ${catsOf(Object.keys(draft)).size} / ${plans.freeCategoryLimit} categories`}</p>
-          </div>
-          <PlanCards plans={plans} formatPrice={formatPrice} isDarkMode={isDarkMode} mode="upgrade" currentTier={tier} busy={paying} onChoose={(t) => t !== 'free' && buyPlan(t)} />
-          {tier !== 'free' && <p className="text-[11px] text-gray-500 text-center">Renewing or upgrading adds {plans.periodDays} days to your current end date.</p>}
-        </div>
-      )}
-
-      <div className={card}>
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <p className="text-xs font-bold uppercase tracking-wider">Products in my shop</p>
-          <p className="text-[11px] text-gray-500">Open a category to choose its products. Your ticks are kept until you press Save.</p>
-        </div>
+      {/* 2. products and prices */}
+      <div className={section}>
+        {goldLine}
+        {sectionTitle('Products in my shop', 'Open a category to choose its products. Your ticks are kept until you press Save.')}
+        <p className="text-[11px] text-gray-500">Customers who open your link see only the products you tick, at the price you type (up to the limit shown for each product). Everything above the store price is yours when the order is delivered. Payments and delivery stay with the store.</p>
         {cats.length === 0 ? <p className="text-sm text-gray-500">No live products yet.</p> : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
             {cats.map((c) => {
               const on = c.items.filter((p) => draft[p.id] !== undefined).length;
               const active = openCat === c.name;
               return (
                 <button key={c.name} type="button" aria-expanded={active} onClick={() => setOpenCat(active ? '' : c.name)}
-                  className={`text-left rounded-lg border p-3 transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${active ? 'border-[#D4AF37] bg-[#D4AF37]/10 shadow-[0_0_0_1px_rgba(212,175,55,0.4)]' : isDarkMode ? 'border-gray-800 bg-[#121212] hover:border-gray-600' : 'border-gray-200 bg-gray-50 hover:border-gray-400'}`}>
+                  className={`text-left rounded-xl border p-3 transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] ${active ? 'border-[#D4AF37] bg-[#D4AF37]/10 shadow-[0_0_0_1px_rgba(212,175,55,0.4)]' : isDarkMode ? 'border-gray-800 bg-[#121212] hover:border-[#D4AF37]/50' : 'border-gray-200 bg-gray-50 hover:border-[#D4AF37]/60'}`}>
                   <p className="text-sm font-bold truncate">{c.label}</p>
                   <p className="mt-1 flex items-center justify-between gap-2 text-[11px]">
                     <span className={`px-2 py-0.5 rounded-full font-bold ${on > 0 ? 'bg-[#D4AF37] text-black' : isDarkMode ? 'bg-[#222] text-gray-400' : 'bg-gray-200 text-gray-600'}`}>{on} / {c.items.length} selected</span>
@@ -451,41 +438,41 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
         )}
 
         {open && (
-          <div className={`rounded-lg border p-3 sm:p-4 space-y-3 ${isDarkMode ? 'border-[#D4AF37]/30 bg-[#121212]' : 'border-[#D4AF37]/40 bg-[#D4AF37]/5'}`}>
+          <div className={`rounded-xl border p-3 sm:p-4 space-y-3 ${isDarkMode ? 'border-[#D4AF37]/30 bg-[#121212]' : 'border-[#D4AF37]/40 bg-[#D4AF37]/5'}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-bold text-[#D4AF37]">{open.label}</p>
-              <div className="flex gap-2 text-xs">
-                <button type="button" onClick={() => selectAll(open.items)} className="px-3 py-1.5 rounded border border-green-600 text-green-600 font-semibold">Select all</button>
-                <button type="button" onClick={() => clearAll(open.items)} className="px-3 py-1.5 rounded border border-red-500 text-red-500 font-semibold">Clear</button>
+              <p className="text-sm font-bold text-[#B8921F]">{open.label}</p>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => selectAll(open.items)} className={`${OUTLINE_BTN} !px-3 !py-1.5 !text-[11px]`}>Select all</button>
+                <button type="button" onClick={() => clearAll(open.items)} className={`${GHOST_BTN} !px-3 !py-1.5 !text-[11px]`}>Clear</button>
               </div>
             </div>
             {groupsOf(open).map((g) => (
               <div key={g.sub || '_'}>
                 {(g.sub || groupsOf(open).length > 1) && (
-                  <div className="flex items-center justify-between gap-2 pt-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                     <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">{g.sub ? subLabel(g.sub) : 'Other'} <span className="font-normal">({g.items.filter((p) => draft[p.id] !== undefined).length} / {g.items.length})</span></p>
                     <div className="flex gap-3 text-[11px]">
-                      <button type="button" onClick={() => selectAll(g.items)} className="text-green-600 font-semibold">Select all</button>
-                      <button type="button" onClick={() => clearAll(g.items)} className="text-red-500 font-semibold">Clear</button>
+                      <button type="button" onClick={() => selectAll(g.items)} className="text-[#B8921F] font-semibold hover:underline">Select all</button>
+                      <button type="button" onClick={() => clearAll(g.items)} className="text-gray-500 font-semibold hover:underline">Clear</button>
                     </div>
                   </div>
                 )}
-                <div className="divide-y text-xs">
+                <div className="divide-y divide-gray-500/15 text-xs">
                   {g.items.map((p) => {
                     const on = draft[p.id] !== undefined;
                     const max = p.price + maxMarkupFor(p.price);
                     const val = Number(draft[p.id]);
                     return (
-                      <div key={p.id} className="py-3 flex flex-wrap items-center gap-3">
-                        <input type="checkbox" checked={on} onChange={() => toggle(p)} className="accent-[#D4AF37] w-4 h-4" />
-                        {p.image && <img src={p.image} alt="" className="w-10 h-10 object-cover rounded border" />}
+                      <div key={p.id} className="py-3 flex flex-wrap sm:flex-nowrap items-center gap-3">
+                        <input type="checkbox" checked={on} onChange={() => toggle(p)} className="accent-[#D4AF37] w-5 h-5 shrink-0" aria-label={`Sell ${p.name}`} />
+                        {p.image && <img src={p.image} alt="" className="w-12 h-12 object-cover rounded-lg border shrink-0" />}
                         <div className="min-w-0 flex-1">
-                          <p className="font-semibold truncate">{p.name}</p>
+                          <p className="font-semibold line-clamp-2 sm:truncate">{p.name}</p>
                           <p className="text-gray-500">Store price {formatPrice(p.price)} · highest you can sell for {formatPrice(max)}</p>
                         </div>
                         {on && (
-                          <div className="text-right">
-                            <input type="number" className={`${inputCls} w-28 text-right`} value={draft[p.id]} onChange={(e) => setDraft((d) => ({ ...d, [p.id]: e.target.value }))} />
+                          <div className="w-full sm:w-auto sm:text-right pl-8 sm:pl-0">
+                            <input type="number" inputMode="numeric" className={`${inputCls} w-full sm:w-28 sm:text-right !text-sm !rounded-lg`} value={draft[p.id]} onChange={(e) => setDraft((d) => ({ ...d, [p.id]: e.target.value }))} aria-label={`Your price for ${p.name}`} />
                             <p className={`mt-1 ${val > max || val < p.price ? 'text-red-500' : 'text-green-600'}`}>{val > max ? `Too high (max ${formatPrice(max)})` : val < p.price ? 'Below store price' : `Your earning ${formatPrice(Math.max(0, val - p.price))} per piece`}</p>
                           </div>
                         )}
@@ -499,16 +486,46 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
         )}
       </div>
 
+      {/* 3. the shop page: Pro / Premium parts first, Premium-only last */}
+      <div className={section}>
+        {goldLine}
+        {sectionTitle('Shop page', 'Saved with "Save my shop" (logo and banner upload right away and wait for approval).')}
+        <ShopExtrasEditor extras={extras} setExtras={setExtras} feat={feat} shop={shop} tier={isOwner ? 'premium' : effectiveTier(shop)} shopName={name} link={link}
+          pinChoices={live.filter((p) => draft[p.id] !== undefined)} isDarkMode={isDarkMode} inputCls={inputCls} />
+      </div>
+
+      {/* 4. my plan */}
+      {!isOwner && showPlan && plans.enabled && (
+        <div className={section}>
+          {goldLine}
+          {paidUntil > 0 && (daysLeft <= 0 || daysLeft <= plans.reminderDays) && (
+            <div className={`rounded-xl border p-3 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${daysLeft <= 0 ? 'border-red-500/50 bg-red-500/10 text-red-500' : 'border-amber-500/50 bg-amber-500/10 text-amber-600'}`}>
+              <span className="font-semibold">{daysLeft <= 0 ? `Your paid plan ended on ${fmtDate(paidUntil)}. Your shop now shows only its ${plans.freeLimit} best sellers; the others are hidden, not deleted.` : `Your paid plan ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'} (${fmtDate(paidUntil)}).`}</span>
+              <button type="button" disabled={!!paying} onClick={() => buyPlan(sub && sub.tier === 'premium' ? 'premium' : 'pro')} className={`${GOLD_BTN} !py-1.5`}>{paying ? 'Opening...' : 'Renew'}</button>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#B8921F]">My plan</p>
+              <p className="text-xl font-bold">{tier === 'free' ? 'Free' : <span className="text-[#D4AF37]">{TIER_LABEL[tier]}</span>}</p>
+            </div>
+            <p className="text-xs text-gray-500">{paid ? `All products · paid until ${fmtDate(paidUntil)}` : `${count} / ${plans.freeLimit} products · ${catsOf(Object.keys(draft)).size} / ${plans.freeCategoryLimit} categories`}</p>
+          </div>
+          <PlanCards plans={plans} formatPrice={formatPrice} isDarkMode={isDarkMode} mode="upgrade" currentTier={tier} busy={paying} onChoose={(t) => t !== 'free' && buyPlan(t)} />
+          {tier !== 'free' && <p className="text-[11px] text-gray-500 text-center">Renewing or upgrading adds {plans.periodDays} days to your current end date.</p>}
+        </div>
+      )}
+
       {/* stays at the bottom of the screen: nothing is written until Save */}
-      <div className={`sticky bottom-3 z-20 rounded-lg border px-4 py-3 flex flex-wrap items-center justify-between gap-3 backdrop-blur shadow-[0_8px_30px_-10px_rgba(0,0,0,0.5)] ${dirty ? 'border-[#D4AF37]' : isDarkMode ? 'border-gray-800' : 'border-gray-200'} ${isDarkMode ? 'bg-[#0d0d0d]/95' : 'bg-white/95'}`}>
+      <div className={`sticky bottom-2 sm:bottom-3 z-20 rounded-2xl border px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 backdrop-blur shadow-[0_8px_30px_-10px_rgba(0,0,0,0.5)] ${dirty ? 'border-[#D4AF37]' : isDarkMode ? 'border-gray-800' : 'border-gray-200'} ${isDarkMode ? 'bg-[#0d0d0d]/95' : 'bg-white/95'}`}>
         <div className="min-w-0 text-xs">
-          <p className="font-bold">{cap < SHOP_MAX_ITEMS ? `Selected ${count} / ${cap}` : `${count} product${count === 1 ? '' : 's'} selected`}</p>
+          <p className="font-bold text-sm">{cap < SHOP_MAX_ITEMS ? `Selected ${count} / ${cap}` : `${count} product${count === 1 ? '' : 's'} selected`}</p>
           {allowed && <p className="text-[11px] text-gray-500">Free plan: from your approved categories ({appCats.join(', ')})</p>}
           {msg ? <p className={msg.type === 'ok' ? 'text-green-600' : 'text-red-500'}>{msg.text}</p> : <p className="text-gray-500">{dirty ? 'Unsaved changes' : 'All changes saved'}</p>}
         </div>
-        <div className="flex gap-2">
-          <button type="button" disabled={busy || !dirty} onClick={discard} className="px-4 py-2.5 rounded border border-gray-400 text-xs font-bold uppercase tracking-wider disabled:opacity-40">Discard</button>
-          <button type="button" disabled={busy || !dirty || !!shop.killed} onClick={save} className="bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold px-6 py-2.5 rounded text-xs uppercase tracking-widest shadow disabled:opacity-40">{busy ? 'Saving...' : 'Save my shop'}</button>
+        <div className="grid grid-cols-2 sm:flex gap-2">
+          <button type="button" disabled={busy || !dirty} onClick={discard} className={GHOST_BTN}>Discard</button>
+          <button type="button" disabled={busy || !dirty || !!shop.killed} onClick={save} className={GOLD_BTN}>{busy ? 'Saving...' : 'Save my shop'}</button>
         </div>
       </div>
     </div>
