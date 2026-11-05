@@ -1398,7 +1398,7 @@ export default function App() {
 
       {/* HOME VIEW */}
       {currentView === 'home' && pathNotFound && (
-        <div className="max-w-xl mx-auto px-4 py-24 text-center">
+        <div className="w-full max-w-xl mx-auto px-4 py-24 text-center">
           <p className="text-6xl font-extrabold text-[#D4AF37]">404</p>
           <h1 className="mt-3 text-xl font-bold">This page was not found</h1>
           <p className="mt-2 text-sm text-gray-500">There is no shop at kyvro.store/{pathShop}, or the shop is switched off right now.</p>
@@ -1414,7 +1414,7 @@ export default function App() {
 
       {currentView === 'tracking' && <OrderTracking customerUser={customerUser} onSignIn={handleCustomerSignIn} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
       {currentView === 'pricing' && (
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+        <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
           <SellPricing formatPrice={formatPrice} isDarkMode={isDarkMode} onChoose={choosePlan} busy={pricingBusy} />
           <p className="mt-8 text-center text-xs text-gray-500">{customerUser ? `Signed in as ${customerUser.email}.` : 'Choose a plan, then sign in with Google to apply.'}</p>
         </div>

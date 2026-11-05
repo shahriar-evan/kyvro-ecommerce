@@ -22,18 +22,18 @@ export default function Header({ shopBrand = null, onStartSelling, onAdminPanel 
   return (
     <>
       <header className={`sticky top-0 z-40 backdrop-blur border-b ${isDarkMode ? 'bg-[#121212]/95 border-gray-800' : 'bg-white/95 border-gray-200'}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-2">
           
-          <div className="flex items-center gap-3 sm:gap-6">
+          <div className="flex items-center gap-2 min-[380px]:gap-3 sm:gap-6 min-w-0">
             <button 
               onClick={() => setIsMobileMenuOpen(true)}
-              className={`md:hidden p-1 ${isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'}`}
+              className={`lg:hidden p-1 ${isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'}`}
             >
               <Menu size={24} />
             </button>
             <div 
               onClick={() => { setCurrentView('home'); setSelectedCategory('All'); }}
-              className="cursor-pointer flex items-center gap-2 sm:gap-3"
+              className="cursor-pointer flex items-center gap-1.5 min-[380px]:gap-2 sm:gap-3 min-w-0"
             >
               {/* the Kyvro logo is always there; a Premium shop shows its own name as a wordmark next to it */}
               {shopBrand && shopBrand.logo && <img src={shopBrand.logo} alt="" className="h-9 w-9 sm:h-11 sm:w-11 rounded object-cover border border-gray-300/40" />}
@@ -44,15 +44,15 @@ export default function Header({ shopBrand = null, onStartSelling, onAdminPanel 
                   <span className="text-[9px] tracking-[0.2em] font-sans -mt-0.5 text-gray-500">POWERED BY KYVRO</span>
                 </div>
               ) : (
-                <div className="flex flex-col items-start">
-                  <span className={`text-lg sm:text-2xl font-serif font-bold tracking-widest ${isDarkMode ? 'text-white' : 'text-black'}`}>KYVRO</span>
+                <div className="flex flex-col items-start max-[349px]:hidden">
+                  <span className={`text-base min-[380px]:text-lg sm:text-2xl font-serif font-bold tracking-widest ${isDarkMode ? 'text-white' : 'text-black'}`}>KYVRO</span>
                   <span className={`hidden sm:block text-[9px] tracking-[0.3em] font-sans -mt-1 ${isDarkMode ? 'text-[#D4AF37]' : 'text-black font-semibold'}`}>{shopBrand ? 'POWERED BY KYVRO' : <>কাইভ্রো &bull; WEAR YOUR STORY</>}</span>
                 </div>
               )}
             </div>
           </div>
 
-          <nav className={`hidden md:flex items-center gap-6 text-sm font-medium tracking-wide ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>
+          <nav className={`hidden lg:flex items-center gap-5 xl:gap-6 text-sm font-medium tracking-wide ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>
             <button onClick={() => { setCurrentView('home'); setSelectedCategory('All'); }} className={`hover:text-[#D4AF37] transition ${currentView === 'home' ? 'text-[#D4AF37] border-b-2 border-[#D4AF37] pb-1' : ''}`}>HOME</button>
             {navHas('Men') && <button onClick={() => { setCurrentView('shop'); setSelectedCategory("Men"); }} className="hover:text-[#D4AF37] transition">MEN'S</button>}
             {navHas('Women') && <button onClick={() => { setCurrentView('shop'); setSelectedCategory("Women"); }} className="hover:text-[#D4AF37] transition">WOMEN'S</button>}
@@ -61,7 +61,7 @@ export default function Header({ shopBrand = null, onStartSelling, onAdminPanel 
             {navHas('Watches') && <button onClick={() => { setCurrentView('shop'); setSelectedCategory("Watches"); }} className="hover:text-[#D4AF37] transition">WATCHES</button>}
           </nav>
 
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-1 min-[380px]:gap-2 sm:gap-4 shrink-0">
             <div className={`hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded border text-xs font-semibold ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-white' : 'bg-gray-100 border-gray-300 text-black'}`}>
               <span>{curr.flag}</span>
               <select 
