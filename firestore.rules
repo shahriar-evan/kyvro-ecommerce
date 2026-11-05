@@ -569,6 +569,11 @@ service cloud.firestore {
     // Store settings (top banner text + automatic discount rules). Everyone can read them (the website needs
     // them), only the Owner can change them. maxPercent / maxFixed are the highest discounts among the rules.
     match /settings/{docId} {
+      function dashSlideOk(b) {
+        return b is map && b.keys().hasOnly(['image', 'link'])
+          && b.image is string && b.image.size() <= 300000 && b.image.matches('^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$')
+          && b.get('link', '') is string && b.get('link', '').size() <= 300 && (b.get('link', '') == '' || b.get('link', '').matches('^https://[^ <>"]+$'));
+      }
       function tierOk(t) {
         return t is map && t.keys().hasOnly(['price', 'discount'])
           && t.price is number && t.price >= 1 && t.price <= 1000000
@@ -581,6 +586,13 @@ service cloud.firestore {
         && request.resource.data.open is bool
         && request.resource.data.blockedWords is list && request.resource.data.blockedWords.size() <= 100
         && request.resource.data.blockedRegex is string && request.resource.data.blockedRegex.size() <= 3000;
+      // Seller dashboard banner slides (max 3): picture as a data URL + optional https link. Only the Owner.
+      allow create, update: if docId == 'sellerDash' && isOwner()
+        && request.resource.data.keys().hasOnly(['banners', 'updatedAt', 'updatedByName'])
+        && request.resource.data.banners is list && request.resource.data.banners.size() <= 3
+        && (request.resource.data.banners.size() < 1 || dashSlideOk(request.resource.data.banners[0]))
+        && (request.resource.data.banners.size() < 2 || dashSlideOk(request.resource.data.banners[1]))
+        && (request.resource.data.banners.size() < 3 || dashSlideOk(request.resource.data.banners[2]));
       // Shop plans (Free limit, paid price, period, reminder days). Only the Owner. Must match normalizePlans() in src/data/priceCheck.js
       allow create, update: if docId == 'plans' && isOwner()
         && request.resource.data.keys().hasOnly(['enabled', 'originalPrice', 'discountPercent', 'freeLimit', 'freeCategoryLimit', 'tierFeatures', 'shopLimits', 'periodDays', 'reminderDays', 'pro', 'premium', 'supportWhatsapp', 'updatedAt', 'updatedByName'])

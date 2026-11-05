@@ -50,7 +50,7 @@ export const PLAN_TEXT = {
     featPro: ['All products', 'Priority approval', 'Social links (Facebook / Instagram / TikTok / YouTube)', 'Share kit (QR + caption)', 'Sales stats', 'Monthly payout'],
     featPremium: ['Verified seller badge', 'Tagline + WhatsApp / Facebook button', 'About section', 'Weekly payout', 'Priority support', 'Re-design Your Website', 'Announcement strip', 'Pin top products', 'Shop name wordmark in the header', 'Create Website Name', 'Custom logo (Kyvro approved)', 'Custom banner (Kyvro approved)', 'Sales stats', 'Monthly earnings CSV'],
     soonPremium: ['Custom domain', 'Featured on Kyvro', 'Shop coupon codes', 'Order email notification'],
-    pills: ['Pay with bKash / Nagad', 'Activates right after payment', 'No auto-charge, renew manually'],
+    pills: ['Pay with bKash / Nagad', 'Activates right after payment', 'No auto-charge, renew manually', 'No credit card needed. No hidden fees.'],
     compareTitle: 'Compare Plans', compareSub: 'Everything you get at a glance', feature: 'Feature',
     groups: { shop: 'Shop & products', branding: 'Branding', earnings: 'Earnings & support', soon: 'Coming soon' },
     rows: {
@@ -90,7 +90,7 @@ export const PLAN_TEXT = {
     featPro: ['সব পণ্য', 'অগ্রাধিকার অনুমোদন', 'সোশ্যাল লিংক (ফেসবুক / ইনস্টাগ্রাম / টিকটক / ইউটিউব)', 'শেয়ার কিট (QR + ক্যাপশন)', 'বিক্রির পরিসংখ্যান', 'মাসিক পেআউট'],
     featPremium: ['ভেরিফাইড সেলার ব্যাজ', 'ট্যাগলাইন + হোয়াটসঅ্যাপ/ফেসবুক বাটন', 'About সেকশন', 'সাপ্তাহিক পেআউট', 'অগ্রাধিকার সাপোর্ট', 'ওয়েবসাইট রি-ডিজাইন', 'ঘোষণা স্ট্রিপ', 'টপ পণ্য পিন করা', 'হেডারে শপের নাম', 'ওয়েবসাইটের নাম তৈরি', 'কাস্টম লোগো (Kyvro অনুমোদিত)', 'কাস্টম ব্যানার (Kyvro অনুমোদিত)', 'বিক্রির পরিসংখ্যান', 'মাসিক আয়ের CSV'],
     soonPremium: ['কাস্টম ডোমেইন', 'Kyvro-তে ফিচার্ড', 'শপ কুপন কোড', 'অর্ডার ইমেইল নোটিফিকেশন'],
-    pills: ['বিকাশ / নগদে পেমেন্ট', 'পেমেন্টের সাথে সাথে চালু', 'অটো-চার্জ নেই, নিজে নবায়ন করুন'],
+    pills: ['বিকাশ / নগদে পেমেন্ট', 'পেমেন্টের সাথে সাথে চালু', 'অটো-চার্জ নেই, নিজে নবায়ন করুন', 'ক্রেডিট কার্ড লাগবে না। কোনো লুকানো খরচ নেই।'],
     compareTitle: 'প্ল্যান তুলনা', compareSub: 'এক নজরে সব সুবিধা', feature: 'সুবিধা',
     groups: { shop: 'শপ ও পণ্য', branding: 'ব্র্যান্ডিং', earnings: 'আয় ও সাপোর্ট', soon: 'শিগগিরই আসছে' },
     rows: {

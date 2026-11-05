@@ -8,7 +8,8 @@ import { GOLD_BTN, OUTLINE_BTN, planBadge } from './ui';
 // My Shop: the shop page extras, in plan order. Pro + Premium: social links and the share kit (link, QR code, caption).
 // Premium (after the divider): tagline + contact button, about, logo, banner, brand color, announcement, pinned products.
 // Locked parts are shown greyed with what unlocks them. Saving happens with the shop's Save button.
-export default function ShopExtrasEditor({ extras, setExtras, feat, shop, tier = 'free', shopName, link, pinChoices = [], isDarkMode, inputCls }) {
+// only='theme': just the Premium look box (seller dashboard > Themes)
+export default function ShopExtrasEditor({ only = '', extras, setExtras, feat, shop, tier = 'free', shopName, link, pinChoices = [], isDarkMode, inputCls }) {
   const [copied, setCopied] = useState('');
   const [logoMsg, setLogoMsg] = useState(null);
   const [logoBusy, setLogoBusy] = useState(false);
@@ -85,8 +86,10 @@ export default function ShopExtrasEditor({ extras, setExtras, feat, shop, tier =
   const field = `${inputCls} block mt-1 w-full !text-sm !rounded-lg`;
   const lockNote = (on, what) => (on ? null : <p className="text-[11px] text-gray-500">{what}</p>);
 
+  const all = only !== 'theme';
   return (
     <div className="space-y-4">
+      {all && <>
       {/* ---- Pro / Premium: social links + share kit ---- */}
       <div className={`${box} ${feat.social ? '' : 'opacity-60'}`}>
         {head('Social links', 'Pro / Premium', feat.social)}
@@ -181,6 +184,8 @@ export default function ShopExtrasEditor({ extras, setExtras, feat, shop, tier =
         </div>
       )}
 
+      </>}
+
       <div className={`${box} ${premiumOn ? '!border-[#D4AF37]/40' : 'opacity-60'}`}>
         {head('Premium look', 'Premium', premiumOn)}
         <fieldset disabled={!premiumOn} className="space-y-3">
@@ -202,7 +207,7 @@ export default function ShopExtrasEditor({ extras, setExtras, feat, shop, tier =
             <input className={field} maxLength={100} value={extras.announcement} onChange={(e) => set('announcement', e.target.value)} placeholder="e.g. Eid offer: free delivery this week" />
           </label>
           <div className={feat.pinned ? '' : 'opacity-50 pointer-events-none'}>
-            <p className={label}>Pin top products <span className="font-normal">(up to 3, shown first on your shop; tick products above first)</span></p>
+            <p className={label}>Pin top products <span className="font-normal">(up to 3, shown first on your shop; from the products you sell)</span></p>
             {pinChoices.length === 0 ? <p className="text-[11px] text-gray-500 mt-1">No products in your shop yet.</p> : (
               <div className="mt-2 flex flex-wrap gap-2">
                 {pinChoices.map((p) => {

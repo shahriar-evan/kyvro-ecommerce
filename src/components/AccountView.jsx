@@ -167,7 +167,7 @@ export default function AccountView({
   const initial = (displayName || customerUser.email || '?').charAt(0).toUpperCase();
 
   return (
-    <div className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 w-full">
+    <div className={`flex-1 ${activeTab === 'sell' ? 'max-w-7xl' : 'max-w-5xl'} mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 w-full`}>
       <div className="flex items-center justify-between gap-4 mb-8">
         <div className="flex items-center gap-4 min-w-0">
           {photoURL

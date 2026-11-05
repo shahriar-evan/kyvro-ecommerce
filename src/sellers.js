@@ -1,6 +1,6 @@
 import { getApp } from "firebase/app";
 import { getFirestore, doc, collection, onSnapshot, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp } from "firebase/firestore";
-import "./firebase"; // makes sure the default Firebase app exists
+import { auth } from "./firebase"; // also makes sure the default Firebase app exists
 import { releaseShopHandle, prettyHandle } from "./shops";
 
 const db = getFirestore(getApp());
@@ -168,7 +168,10 @@ export const saveSellerBkash = (uid, bkash) =>
 
 // my markup per order, from the server (no customer names, phones or addresses)
 export async function loadSellerEarnings(user) {
-  const t = await user.getIdToken();
+  // the app keeps a plain copy of the user (no getIdToken), so the token comes from Firebase Auth
+  const u = user && typeof user.getIdToken === "function" ? user : auth.currentUser;
+  if (!u) throw new Error("Please sign in again.");
+  const t = await u.getIdToken();
   const r = await fetch("/api/plan?action=seller-earnings", { method: "POST", headers: { Authorization: `Bearer ${t}` } });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || "Could not load your earnings.");

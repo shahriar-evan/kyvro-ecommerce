@@ -40,7 +40,8 @@ function ShopSwitch({ on, busy, onToggle, isDarkMode, label }) {
 // (by collection or one by one) and the price they sell at, up to the limit for that product. The whole markup is theirs.
 // An Admin the Owner switched "Shop create" ON for can make one too: it stays switched off until the Owner accepts it.
 // Payments (online, delivery charge, cash on delivery) all stay with the store; the Owner pays the markup out later.
-export default function MyShop({ sellerMode = false, showPlan = true, canCreateShop = false, adminRole, products, isOwner, isDarkMode, formatPrice, adminName, loggedInUserEmail, onDirtyChange }) {
+// view (seller dashboard): 'all' (default), 'products', 'manage', 'theme', 'plan' or 'none' (stays mounted so unsaved ticks survive)
+export default function MyShop({ view = 'all', sellerMode = false, showPlan = true, canCreateShop = false, adminRole, products, isOwner, isDarkMode, formatPrice, adminName, loggedInUserEmail, onDirtyChange }) {
   const [shop, setShop] = useState(undefined); // undefined = loading, null = none yet
   const [draft, setDraft] = useState({}); // productId -> price text (only the products that are in the shop)
   const [name, setName] = useState('');
@@ -402,6 +403,8 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
       </div>
   ) : null;
   if (adminRole === 'admin' && !canCreateShop) return links;
+  if (view === 'none') return null;
+  const show = (...ks) => view === 'all' || ks.includes(view);
 
   // ---------- Manager (and an Admin with "Shop create" ON) ----------
   const wrap = (el) => <div className="space-y-5">{top}{el}{links}</div>;
@@ -442,7 +445,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   return wrap(
     <div className="space-y-5">
       {/* shop switcher: a seller with more than one shop (Pro 2, Premium 3) */}
-      {sellerMode && sortedShops.length > 1 && (
+      {show('products', 'manage', 'theme') && sellerMode && sortedShops.length > 1 && (
         <div className={`${card} !space-y-2`}>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#B8921F]">My shops</p>
           <div className="flex flex-wrap gap-2" role="tablist" aria-label="Choose the shop to edit">
@@ -460,25 +463,25 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
           </div>
         </div>
       )}
-      {extraHidden && (
+      {show('products', 'manage') && extraHidden && (
         <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-4 text-xs text-amber-600 font-semibold">
           Your paid plan has ended, so this shop is hidden from customers (nothing is deleted). Your first shop stays on the Free plan. Renew Pro / Premium below and this shop shows again.
         </div>
       )}
-      {shop.warning && shop.warning.note && (
+      {show('products', 'manage') && shop.warning && shop.warning.note && (
         <div className="rounded-2xl border border-red-500/50 bg-red-500/10 p-4 text-xs text-red-500">
           <p className="font-bold uppercase tracking-wider">Warning from Kyvro</p>
           <p className="mt-1 font-semibold">{shop.warning.note}</p>
           <p className="mt-1 text-[11px] opacity-80">Please fix this soon, otherwise the shop may be removed. Questions: kyvrofashion@gmail.com</p>
         </div>
       )}
-      {shop.inactiveHold && (
+      {show('products', 'manage') && shop.inactiveHold && (
         <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-4 text-xs text-amber-600 font-semibold">
           This shop is hidden from customers because nobody signed in for a long time while it still has open orders or money due. Kyvro makes it live again after those are cleared.
         </div>
       )}
       {/* 1. the shop: link + name */}
-      <div className={section}>
+      {show('manage') && <div className={section}>
         {goldLine}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div className="min-w-0">
@@ -514,10 +517,10 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
             ? <p className={`mt-1 text-[11px] ${nameMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{nameMsg.text}</p>
             : <p className="mt-1 text-[11px] text-gray-500">{feat.shopName ? 'Shown on top of your shop and in "Sold by". It shows at once.' : 'Your shop shows its link name. Upgrade to Premium to create your own website name.'}</p>}
         </div>
-      </div>
+      </div>}
 
       {/* 2. products and prices */}
-      <div className={section}>
+      {show('products') && <div className={section}>
         {goldLine}
         {sectionTitle('Products in my shop', 'Open a category to choose its products. Your ticks are kept until you press Save.')}
         <p className="text-[11px] text-gray-500">Customers who open your link see only the products you tick, at the price you type (up to the limit shown for each product). Everything above the store price is yours when the order is delivered. Payments and delivery stay with the store.</p>
@@ -587,18 +590,18 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
             ))}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* 3. the shop page: Pro / Premium parts first, Premium-only last */}
-      <div className={section}>
+      {show('manage', 'theme') && <div className={section}>
         {goldLine}
-        {sectionTitle('Shop page', 'Saved with "Save my shop" (logo and banner upload right away and wait for approval).')}
-        <ShopExtrasEditor extras={extras} setExtras={setExtras} feat={feat} shop={shop} tier={isOwner ? 'premium' : effectiveTier(shop)} shopName={name} link={link}
+        {view === 'theme' ? sectionTitle('Theme', 'Saved with "Save my shop".') : sectionTitle('Shop page', 'Saved with "Save my shop" (logo and banner upload right away and wait for approval).')}
+        <ShopExtrasEditor only={view === 'theme' ? 'theme' : ''} extras={extras} setExtras={setExtras} feat={feat} shop={shop} tier={isOwner ? 'premium' : effectiveTier(shop)} shopName={name} link={link}
           pinChoices={live.filter((p) => draft[p.id] !== undefined)} isDarkMode={isDarkMode} inputCls={inputCls} />
-      </div>
+      </div>}
 
       {/* 4. my plan */}
-      {!isOwner && showPlan && plans.enabled && (
+      {show('plan') && !isOwner && showPlan && plans.enabled && (
         <div className={section}>
           {goldLine}
           {paidUntil > 0 && (daysLeft <= 0 || daysLeft <= plans.reminderDays) && (
@@ -620,7 +623,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
       )}
 
       {/* stays at the bottom of the screen: nothing is written until Save */}
-      <div className={`sticky bottom-2 sm:bottom-3 z-20 rounded-2xl border px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 backdrop-blur shadow-[0_8px_30px_-10px_rgba(0,0,0,0.5)] ${dirty ? 'border-[#D4AF37]' : isDarkMode ? 'border-gray-800' : 'border-gray-200'} ${isDarkMode ? 'bg-[#0d0d0d]/95' : 'bg-white/95'}`}>
+      {show('products', 'manage', 'theme') && <div className={`sticky bottom-2 sm:bottom-3 z-20 rounded-2xl border px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 backdrop-blur shadow-[0_8px_30px_-10px_rgba(0,0,0,0.5)] ${dirty ? 'border-[#D4AF37]' : isDarkMode ? 'border-gray-800' : 'border-gray-200'} ${isDarkMode ? 'bg-[#0d0d0d]/95' : 'bg-white/95'}`}>
         <div className="min-w-0 text-xs">
           <p className="font-bold text-sm">{cap < SHOP_MAX_ITEMS ? `Selected ${count} / ${cap}` : `${count} product${count === 1 ? '' : 's'} selected`}</p>
           {allowed && <p className="text-[11px] text-gray-500">Free plan: from your approved categories ({appCats.join(', ')})</p>}
@@ -630,7 +633,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
           <button type="button" disabled={busy || !dirty} onClick={discard} className={GHOST_BTN}>Discard</button>
           <button type="button" disabled={busy || !dirty || !!shop.killed} onClick={save} className={GOLD_BTN}>{busy ? 'Saving...' : 'Save my shop'}</button>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

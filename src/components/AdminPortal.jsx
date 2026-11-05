@@ -14,6 +14,7 @@ import { MAX_COMMISSION } from '../adminAuth';
 import MyProducts from './MyProducts';
 import StoreSettings from './StoreSettings';
 import PlanSettings from './PlanSettings';
+import SellerDashBannerSettings from './SellerDashBannerSettings';
 import SellersPanel from './SellersPanel';
 import PlanMembers from './PlanMembers';
 import { subLabel, allPlaces, COLLECTION_LABELS, SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
@@ -348,6 +349,7 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
               {adminTab === 'sellers' && isOwner && <SellersPanel orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} loggedInUserEmail={loggedInUserEmail} adminName={adminName} />}
               {adminTab === 'settings' && isOwner && <StoreSettings products={products} settings={storeSettings} isDarkMode={isDarkMode} formatPrice={formatPrice} staff={{ email: loggedInUserEmail, name: adminName }} />}
               {adminTab === 'settings' && isOwner && <div className="mt-5"><PlanSettings isDarkMode={isDarkMode} formatPrice={formatPrice} staff={{ email: loggedInUserEmail, name: adminName }} /></div>}
+              {adminTab === 'settings' && isOwner && <div className="mt-5"><SellerDashBannerSettings isDarkMode={isDarkMode} staff={{ email: loggedInUserEmail, name: adminName }} /></div>}
 
               {adminTab === 'admins' && canManageTeam && <AdminManager isDarkMode={isDarkMode} currentEmail={loggedInUserEmail} currentName={adminName} adminRole={adminRole} />}
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import MyShop from './MyShop';
+import { auth } from '../firebase';
 import { requestSellerShop, sellerShopList, updateSellerCategories, watchMySeller, saveSellerBkash, loadSellerEarnings, applyAsSeller, sellerStatus, normalizeWhatsapp, watchSellerRules, sellerNameBlocked } from '../sellers';
 import { watchPayouts } from '../payouts';
 import { formatDateTime, toDate } from '../utils/dates';
@@ -7,14 +8,17 @@ import { getAdminStatus } from '../adminAuth';
 import { isOwnerEmail } from '../adminEmails';
 import { SHOP_COLLECTIONS, productInCollection } from '../data/shopConfig';
 import { watchPlans } from '../storeSettings';
-import { normalizePlans, effectiveTier, TIER_LABEL, shopLimitFor } from '../data/priceCheck';
+import { normalizePlans, effectiveTier, TIER_LABEL, shopLimitFor, toMillis } from '../data/priceCheck';
 import SellerStats from './SellerStats';
 import SellPricing from './SellPricing';
 import { watchMySubscription } from '../storeSettings';
 import { watchShop, watchMyShops, cleanHandle, HANDLE_RE, handleTaken, prettyHandle } from '../shops';
 import { GOLD_BTN, OUTLINE_BTN } from './ui';
 import { isReservedLink } from '../data/reservedLinks';
-import { effectiveFeatures, httpsLinkOk } from '../data/shopBrand';
+import { effectiveFeatures, httpsLinkOk, FEATURES, shopDisplayName } from '../data/shopBrand';
+import { LayoutDashboard, ShoppingBag, Package, Store, BarChart3, Palette, LayoutTemplate, TicketPercent, Wallet, LifeBuoy, Gem, Lock, Receipt } from 'lucide-react';
+import SellerDashLayout from './SellerDashLayout';
+import SellerBanner from './SellerBanner';
 import { flatSubCategories, subLabel, matchesCollectionPage } from '../data/catalog';
 
 // social links on the application (any of them, all optional; https only)
@@ -99,6 +103,19 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
     if (seller && status === 'rejected') setForm((f) => (f.name ? f : { ...f, name: seller.name || '', whatsapp: seller.whatsapp || '', district: seller.district || '', area: seller.area || '', address: seller.address || '', socialLinks: { ...NO_SOCIALS, ...(seller.socialLinks || {}) }, productNote: seller.productNote || '' }));
     else if (customerUser && !seller) setForm((f) => (f.name ? f : { ...f, name: customerUser.displayName || '' }));
   }, [seller, status]); // eslint-disable-line react-hooks/exhaustive-deps
+  // dashboard page (menu on the left) and the Billing History rows (from the server: subscriptionPayments is server-only)
+  const [section, setSection] = useState('dashboard');
+  const [billing, setBilling] = useState(null); // null = loading, { payments } or { error }
+  useEffect(() => {
+    if (section !== 'sub-billing' || !customerUser) return undefined;
+    let live = true;
+    setBilling(null);
+    Promise.resolve(auth.currentUser ? auth.currentUser.getIdToken() : Promise.reject(new Error('signed out')))
+      .then((t) => fetch('/api/plan?action=billing', { method: 'POST', headers: { Authorization: `Bearer ${t}` } }))
+      .then(async (r) => { const j = await r.json().catch(() => ({})); if (live) setBilling(r.ok ? { payments: Array.isArray(j.payments) ? j.payments : [] } : { error: j.error || 'Could not load your payments.' }); })
+      .catch(() => { if (live) setBilling({ error: 'Could not load your payments.' }); });
+    return () => { live = false; };
+  }, [section, customerUser]);
 
   const card = `p-5 sm:p-6 rounded-lg border space-y-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`;
   const inputCls = `border p-2 text-sm rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`;
@@ -314,153 +331,370 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
     setSaving(false);
   };
 
-  return (
-    <div className="space-y-5">
-      <div className={`rounded-lg border p-4 text-xs flex flex-wrap items-center justify-between gap-2 ${approved ? 'border-green-600/40 bg-green-600/10 text-green-600' : 'border-amber-500/40 bg-amber-500/10 text-amber-600'}`}>
-        <span className="font-bold uppercase tracking-wider">{approved ? 'Your shop is live' : 'Pending approval'}</span>
-        <span>{approved ? `Choose your products below and share your link. Free plan: ${plans.freeLimit} products, upgrade any time for all.` : 'Kyvro is checking your application. You can already choose products; your link starts working after approval.'}</span>
+  // ---- the dashboard: menu on the left, the chosen page on the right ----
+  const acctTier = effectiveTier(mySub);
+  const feat = effectiveFeatures(myShop, myShop ? effectiveTier(myShop) : acctTier, plans.tierFeatures);
+  // a locked item shows the plan that unlocks it (Pro where Pro has it by default, else Premium)
+  const needs = (key) => {
+    if (feat[key]) return null;
+    const f = FEATURES.find((x) => x.key === key);
+    const tf = plans.tierFeatures && plans.tierFeatures.pro;
+    const proHas = tf && typeof tf[key] === 'boolean' ? tf[key] : !!(f && f.pro);
+    return proHas && acctTier === 'free' ? 'Pro' : 'Premium';
+  };
+  const nav = [
+    { title: '', items: [
+      { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { key: 'orders', label: 'Orders', icon: ShoppingBag },
+      { key: 'products', label: 'Products', icon: Package },
+    ] },
+    { title: 'Shop & Growth', items: [
+      { key: 'manage', label: 'Manage Shop', icon: Store },
+      { key: 'analytics', label: 'Analytics', icon: BarChart3, badge: needs('salesStats') },
+      { key: 'themes', label: 'Themes', icon: Palette, badge: needs('brandColor') },
+      { key: 'landing', label: 'Landing Pages', icon: LayoutTemplate, badge: 'Soon' },
+      { key: 'promo', label: 'Promo Codes', icon: TicketPercent, badge: 'Soon' },
+    ] },
+    { title: 'Money', items: [
+      { key: 'earnings', label: 'Earnings & Payout', icon: Wallet },
+    ] },
+    { title: 'Settings', items: [
+      { key: 'sub', label: 'Subscription', icon: Gem, children: [
+        { key: 'sub-overview', label: 'Overview' },
+        { key: 'sub-plans', label: 'Plans' },
+        { key: 'sub-billing', label: 'Billing History' },
+      ] },
+      { key: 'support', label: 'Support', icon: LifeBuoy },
+    ] },
+  ];
+  const go = (key) => setSection(key);
+  const goPlans = () => setSection('sub-plans');
+  const fmtDay = (v) => { const ms = toMillis(v); return ms ? new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'; };
+  const paidUntilMs = toMillis(mySub && mySub.paidUntil);
+  const daysLeft = paidUntilMs ? Math.ceil((paidUntilMs - Date.now()) / 86400000) : 0;
+  const shopsUsed = sellerShopList(seller).length;
+  const shopLimit = shopLimitFor(plans, acctTier);
+  const productsInShops = myShops.reduce((n, x) => n + Object.keys(x.items || {}).length, 0);
+  const title = (text, sub) => (
+    <div>
+      <h2 className="text-xl sm:text-2xl font-bold">{text}</h2>
+      {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
+    </div>
+  );
+  const notYet = <div className={card}><p className="text-sm text-gray-500">This opens after Kyvro approves your shop.</p></div>;
+  // a page this plan does not have: what it does and the plan that unlocks it
+  const locked = (name, plan, what) => (
+    <div className={`${card} text-center !py-12`}>
+      <span className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#D4AF37]/15 text-[#B8921F]"><Lock size={24} /></span>
+      <h3 className="text-xl font-bold">{name}</h3>
+      <p className="text-sm text-gray-500 max-w-md mx-auto">{what}</p>
+      {plan === 'Soon'
+        ? <p className="text-xs font-bold uppercase tracking-wider text-[#B8921F]">Coming soon for Premium</p>
+        : <p className="text-xs font-bold uppercase tracking-wider text-[#B8921F]">Available on {plan}{plan === 'Pro' ? ' and Premium' : ''}</p>}
+      <button type="button" onClick={goPlans} className={GOLD_BTN}>{plan === 'Soon' ? 'See plans' : `Upgrade to ${plan}`}</button>
+    </div>
+  );
+  const stat = (label, value, Icon, tint) => (
+    <div className={`rounded-2xl border p-4 flex items-center gap-3 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
+      <span className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${tint}`}><Icon size={20} /></span>
+      <div className="min-w-0">
+        <p className="text-[11px] text-gray-500 truncate">{label}</p>
+        <p className="text-lg sm:text-xl font-bold truncate">{value}</p>
       </div>
-      {!approved && (
-        <div className={card}>
-          <p className="text-xs font-semibold text-gray-500">Categories you want to sell * <span className="font-normal">(you can change them while Kyvro checks your application)</span></p>
-          {catPicker}
-          <div className="flex flex-wrap items-center gap-3">
-            <button type="button" onClick={saveCats} className="bg-[#D4AF37] text-black font-bold px-5 py-2 rounded text-xs uppercase tracking-wider">Save categories</button>
-            {catMsg && <span className={`text-xs ${catMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{catMsg.text}</span>}
-          </div>
+    </div>
+  );
+  const orderRows = earn && (earn.orders.length === 0 ? <p className="text-sm text-gray-500">No orders from your shop yet.</p> : (
+    <div className="divide-y divide-gray-500/15 text-xs">
+      {earn.orders.map((o) => (
+        <div key={o.orderNumber} className="py-2.5 flex flex-wrap justify-between gap-x-4 gap-y-1">
+          <span><strong className="text-[#D4AF37]">{o.orderNumber}</strong>{earn.shops && earn.shops.length > 1 && o.shop ? <span className="ml-1 px-1.5 py-0.5 rounded bg-gray-500/15 text-[10px] font-semibold">{(() => { const x = myShops.find((m) => m.slug === o.shop); return x ? (x.handle || x.slug) : o.shop; })()}</span> : null} · {formatDateTime(o.createdAt)} · {o.items.map((it) => `${it.name} ×${it.quantity}`).join(', ')}</span>
+          <span>{o.returned ? 'Returned' : o.status} · markup <strong className={o.earned > 0 ? 'text-green-600' : 'text-gray-500'}>{formatPrice(o.markup)}</strong></span>
         </div>
-      )}
-      {approved && (() => {
-        // ---- My shops: Free 1, Pro 2, Premium 3 (the Owner can change the numbers); every new shop waits for approval ----
-        const acctTier = effectiveTier(mySub);
-        const limit = shopLimitFor(plans, acctTier);
-        const list = sellerShopList(seller).map((slug) => myShops.find((x) => x.slug === slug) || { slug, missing: true });
-        const used = sellerShopList(seller).length;
-        const canAdd = used < limit;
-        const sendShop = async () => {
-          setNsMsg(null);
-          const h = cleanHandle(nsHandle);
-          if (!HANDLE_RE.test(h)) return setNsMsg({ type: 'err', text: 'Shop link: 3 to 30 letters (a-z, 0-9 and -), e.g. rahim-shoes.' });
-          if (isReservedLink(h)) return setNsMsg({ type: 'err', text: `kyvro.store/${h} is used by the website itself. Try another one.` });
-          const bad = sellerNameBlocked(h, '', rules);
-          if (bad) return setNsMsg({ type: 'err', text: `The shop link cannot contain "${bad}".` });
-          if (!nsCats.length) return setNsMsg({ type: 'err', text: 'Tick at least one category for this shop.' });
-          setNsBusy(true);
-          try {
-            if (await handleTaken(h)) setNsMsg({ type: 'err', text: `kyvro.store/${h} is already taken. Try another one.` });
-            else { await requestSellerShop({ uid, seller, handle: h, categories: nsCats }); setNsMsg({ type: 'ok', text: `Sent. kyvro.store/${h} goes live after Kyvro approves it.` }); setNsHandle(''); setNsCats([]); setNsOpen(false); }
-          } catch (e) { setNsMsg({ type: 'err', text: e.code === 'permission-denied' ? 'Could not send: your plan allows no more shops, or the link is taken.' : e.message }); }
-          setNsBusy(false);
-        };
-        const upgradeText = acctTier === 'premium' ? `Premium: up to ${limit} shops.` : acctTier === 'pro' ? `Pro: ${limit} shops. Upgrade to Premium for ${shopLimitFor(plans, 'premium')}.` : `Free plan: ${limit} shop. Upgrade to Pro (${shopLimitFor(plans, 'pro')} shops) or Premium (${shopLimitFor(plans, 'premium')} shops) for more.`;
-        return (
+      ))}
+    </div>
+  ));
+  const refreshBtn = <button type="button" onClick={refresh} className="px-3 py-1.5 rounded-full border border-gray-400 text-xs font-semibold">Refresh</button>;
+
+  // ---- My shops (Free 1, Pro 2, Premium 3; the Owner can change the numbers); every new shop waits for approval ----
+  const myShopsCard = approved && (() => {
+    const list = sellerShopList(seller).map((slug) => myShops.find((x) => x.slug === slug) || { slug, missing: true });
+    const canAdd = shopsUsed < shopLimit;
+    const sendShop = async () => {
+      setNsMsg(null);
+      const h = cleanHandle(nsHandle);
+      if (!HANDLE_RE.test(h)) return setNsMsg({ type: 'err', text: 'Shop link: 3 to 30 letters (a-z, 0-9 and -), e.g. rahim-shoes.' });
+      if (isReservedLink(h)) return setNsMsg({ type: 'err', text: `kyvro.store/${h} is used by the website itself. Try another one.` });
+      const bad = sellerNameBlocked(h, '', rules);
+      if (bad) return setNsMsg({ type: 'err', text: `The shop link cannot contain "${bad}".` });
+      if (!nsCats.length) return setNsMsg({ type: 'err', text: 'Tick at least one category for this shop.' });
+      setNsBusy(true);
+      try {
+        if (await handleTaken(h)) setNsMsg({ type: 'err', text: `kyvro.store/${h} is already taken. Try another one.` });
+        else { await requestSellerShop({ uid, seller, handle: h, categories: nsCats }); setNsMsg({ type: 'ok', text: `Sent. kyvro.store/${h} goes live after Kyvro approves it.` }); setNsHandle(''); setNsCats([]); setNsOpen(false); }
+      } catch (e) { setNsMsg({ type: 'err', text: e.code === 'permission-denied' ? 'Could not send: your plan allows no more shops, or the link is taken.' : e.message }); }
+      setNsBusy(false);
+    };
+    const upgradeText = acctTier === 'premium' ? `Premium: up to ${shopLimit} shops.` : acctTier === 'pro' ? `Pro: ${shopLimit} shops. Upgrade to Premium for ${shopLimitFor(plans, 'premium')}.` : `Free plan: ${shopLimit} shop. Upgrade to Pro (${shopLimitFor(plans, 'pro')} shops) or Premium (${shopLimitFor(plans, 'premium')} shops) for more.`;
+    return (
+      <div className={card}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#B8921F]">My shops <span className="text-gray-500 normal-case tracking-normal font-semibold">({shopsUsed} / {shopLimit})</span></p>
+          {canAdd
+            ? <button type="button" onClick={() => { setNsOpen((v) => !v); setNsMsg(null); }} className={`${OUTLINE_BTN} !py-1.5`}>{nsOpen ? 'Close' : '+ New shop'}</button>
+            : <button type="button" onClick={goPlans} className="text-[11px] font-semibold text-[#B8921F] underline text-left">{upgradeText}</button>}
+        </div>
+        <div className="divide-y divide-gray-500/15 text-xs">
+          {list.map((x) => (
+            <div key={x.slug} className="py-2 flex flex-wrap items-center justify-between gap-2">
+              <span className="font-semibold">{x.missing ? x.slug : (x.handle ? prettyHandle(x.handle) : x.name)} <a href={`/${x.handle || x.slug}`} target="_blank" rel="noopener noreferrer" className="font-normal text-gray-500 hover:underline">· kyvro.store/{x.handle || x.slug}</a></span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${x.status === 'pending' ? 'bg-amber-500/15 text-amber-600' : x.active === false ? 'bg-gray-500/15 text-gray-500' : 'bg-green-600/15 text-green-600'}`}>{x.status === 'pending' ? 'Waiting for Kyvro' : x.active === false ? 'Off' : 'Live'}</span>
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] text-gray-500">{acctTier === 'free' ? `The Free plan's ${plans.freeLimit} products count across all your shops.` : 'Your plan covers all your shops.'} Switch between your shops on top of Products and Manage Shop.</p>
+        {nsMsg && <p className={`text-xs ${nsMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{nsMsg.text}</p>}
+        {nsOpen && canAdd && (
+          <div className={`rounded-xl border p-4 space-y-3 ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
+            <label className="block text-xs font-semibold text-gray-500">Shop link *
+              <div className={`mt-1 flex items-stretch rounded border overflow-hidden ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>
+                <span className={`px-2 flex items-center text-[11px] whitespace-nowrap ${isDarkMode ? 'bg-[#1a1a1a] text-gray-400' : 'bg-gray-100 text-gray-500'}`}>kyvro.store/</span>
+                <input className={`${inputCls} !border-0 !rounded-none flex-1 min-w-0`} value={nsHandle} maxLength={30} placeholder="rahim-shoes" onChange={(e) => setNsHandle(cleanHandle(e.target.value))} />
+              </div>
+            </label>
+            <div>
+              <p className="text-xs font-semibold text-gray-500">Categories for this shop *</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {catLabels.map((l) => {
+                  const on = nsCats.includes(l);
+                  return <button key={l} type="button" aria-pressed={on} onClick={() => setNsCats((c) => (on ? c.filter((x) => x !== l) : [...c, l]))} className={chip(on, 'px-3 py-1.5 text-xs')}>{tick(on)}{l}</button>;
+                })}
+              </div>
+            </div>
+            <button type="button" disabled={nsBusy} onClick={sendShop} className={`${GOLD_BTN} w-full sm:w-auto`}>{nsBusy ? 'Sending...' : 'Send shop request'}</button>
+            <p className="text-[11px] text-gray-500">Kyvro checks every new shop; it goes live after approval.</p>
+          </div>
+        )}
+      </div>
+    );
+  })();
+
+  // what shows above / below My Shop (My Shop itself stays mounted so unsaved ticks survive a page change)
+  let before = null;
+  const s = section;
+  if (s === 'dashboard') {
+    before = (
+      <>
+        <div className={`${card} !space-y-1`}>
+          <h2 className="text-xl sm:text-2xl font-bold">Hello, {(customerUser.displayName || 'Seller').split(' ')[0]}!</h2>
+          <p className="text-xs text-gray-500">{approved ? 'Your shop is live. Choose products, share your link and earn on every delivered order.' : 'Kyvro is checking your application. You can already choose products; your link starts working after approval.'}</p>
+        </div>
+        <SellerBanner isDarkMode={isDarkMode} />
+        {approved && (
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+            {stat('Earned', formatPrice(earned), Wallet, 'bg-[#D4AF37]/15 text-[#B8921F]')}
+            {stat(earned - paid >= 0 ? 'Due to you' : 'Overpaid', formatPrice(Math.abs(earned - paid)), Receipt, 'bg-red-500/10 text-red-500')}
+            {stat('Orders', earn ? earn.orders.length : '-', ShoppingBag, 'bg-green-600/10 text-green-600')}
+            {stat('Products in shop', productsInShops, Package, 'bg-purple-500/10 text-purple-500')}
+          </div>
+        )}
+        {earnErr && <p className="text-xs text-red-500">{earnErr}</p>}
+        {!approved && (
+          <div className={card}>
+            <p className="text-xs font-semibold text-gray-500">Categories you want to sell * <span className="font-normal">(you can change them while Kyvro checks your application)</span></p>
+            {catPicker}
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="button" onClick={saveCats} className="bg-[#D4AF37] text-black font-bold px-5 py-2 rounded text-xs uppercase tracking-wider">Save categories</button>
+              {catMsg && <span className={`text-xs ${catMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{catMsg.text}</span>}
+            </div>
+          </div>
+        )}
+        {myShopsCard}
+        {approved && earn && earn.orders.length > 0 && (
           <div className={card}>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#B8921F]">My shops <span className="text-gray-500 normal-case tracking-normal font-semibold">({used} / {limit})</span></p>
-              {canAdd
-                ? <button type="button" onClick={() => { setNsOpen((v) => !v); setNsMsg(null); }} className={`${OUTLINE_BTN} !py-1.5`}>{nsOpen ? 'Close' : '+ New shop'}</button>
-                : <span className="text-[11px] font-semibold text-[#B8921F]">{upgradeText}</span>}
+              <h3 className="text-lg font-bold">Latest orders</h3>
+              <button type="button" onClick={() => go('orders')} className="text-xs font-semibold text-[#B8921F] underline">See all</button>
             </div>
             <div className="divide-y divide-gray-500/15 text-xs">
-              {list.map((x) => (
-                <div key={x.slug} className="py-2 flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-semibold">{x.missing ? x.slug : (x.handle ? prettyHandle(x.handle) : x.name)} <span className="font-normal text-gray-500">· kyvro.store/{x.handle || x.slug}</span></span>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${x.status === 'pending' ? 'bg-amber-500/15 text-amber-600' : x.active === false ? 'bg-gray-500/15 text-gray-500' : 'bg-green-600/15 text-green-600'}`}>{x.status === 'pending' ? 'Waiting for Kyvro' : x.active === false ? 'Off' : 'Live'}</span>
+              {earn.orders.slice(0, 5).map((o) => (
+                <div key={o.orderNumber} className="py-2 flex flex-wrap justify-between gap-2">
+                  <span><strong className="text-[#D4AF37]">{o.orderNumber}</strong> · {formatDateTime(o.createdAt)}</span>
+                  <span>{o.returned ? 'Returned' : o.status} · <strong className={o.earned > 0 ? 'text-green-600' : 'text-gray-500'}>{formatPrice(o.markup)}</strong></span>
                 </div>
               ))}
             </div>
-            <p className="text-[11px] text-gray-500">{acctTier === 'free' ? `The Free plan's ${plans.freeLimit} products count across all your shops.` : 'Your plan covers all your shops.'} Switch between your shops on top of My Shop below.</p>
-            {nsMsg && <p className={`text-xs ${nsMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{nsMsg.text}</p>}
-            {nsOpen && canAdd && (
-              <div className={`rounded-xl border p-4 space-y-3 ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
-                <label className="block text-xs font-semibold text-gray-500">Shop link *
-                  <div className={`mt-1 flex items-stretch rounded border overflow-hidden ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>
-                    <span className={`px-2 flex items-center text-[11px] whitespace-nowrap ${isDarkMode ? 'bg-[#1a1a1a] text-gray-400' : 'bg-gray-100 text-gray-500'}`}>kyvro.store/</span>
-                    <input className={`${inputCls} !border-0 !rounded-none flex-1 min-w-0`} value={nsHandle} maxLength={30} placeholder="rahim-shoes" onChange={(e) => setNsHandle(cleanHandle(e.target.value))} />
-                  </div>
-                </label>
-                <div>
-                  <p className="text-xs font-semibold text-gray-500">Categories for this shop *</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {catLabels.map((l) => {
-                      const on = nsCats.includes(l);
-                      return <button key={l} type="button" aria-pressed={on} onClick={() => setNsCats((c) => (on ? c.filter((x) => x !== l) : [...c, l]))} className={chip(on, 'px-3 py-1.5 text-xs')}>{tick(on)}{l}</button>;
-                    })}
-                  </div>
-                </div>
-                <button type="button" disabled={nsBusy} onClick={sendShop} className={`${GOLD_BTN} w-full sm:w-auto`}>{nsBusy ? 'Sending...' : 'Send shop request'}</button>
-                <p className="text-[11px] text-gray-500">Kyvro checks every new shop; it goes live after approval.</p>
-              </div>
-            )}
           </div>
-        );
-      })()}
-      <MyShop sellerMode showPlan={approved} adminRole="seller" isOwner={false} products={products} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={customerUser.displayName || email} loggedInUserEmail={email} />
-
-      {approved && (
-        <>
-          <div className={card}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-lg font-bold">My earnings</h3>
-              <button type="button" onClick={refresh} className="px-3 py-1.5 rounded border border-gray-400 text-xs font-semibold">Refresh</button>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-              {[['Earned', earned, 'text-[#D4AF37]'], ['Paid to you', paid, 'text-green-600'], [earned - paid >= 0 ? 'Due' : 'Overpaid', Math.abs(earned - paid), earned - paid > 0 ? 'text-red-500' : 'text-green-600'], ['Waiting (not delivered)', earn ? earn.waiting : 0, 'text-gray-500']].map(([l, v, c]) => (
-                <div key={l} className={`rounded border p-3 ${isDarkMode ? 'border-gray-800 bg-[#121212]' : 'border-gray-200 bg-gray-50'}`}>
-                  <p className={`text-xl font-bold ${c}`}>{formatPrice(v)}</p>
-                  <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-1">{l}</p>
-                </div>
-              ))}
-            </div>
-            <p className="text-[11px] text-gray-500">{earn && earn.shops && earn.shops.length > 1 ? `All ${earn.shops.length} of your shops are counted together, in one payout. ` : ''}You earn the markup (your price − the store price) when an order is delivered. Returned and cancelled orders earn nothing. Kyvro confirms and delivers every order.</p>
-            {earnErr && <p className="text-xs text-red-500">{earnErr}</p>}
-            {earn && (() => {
-              const f = effectiveFeatures(myShop, myShop ? effectiveTier(myShop) : effectiveTier(mySub), plans.tierFeatures);
-              return <SellerStats orders={earn.orders} formatPrice={formatPrice} isDarkMode={isDarkMode} statsOn={f.salesStats} csvOn={f.earningsCsv} />;
-            })()}
-            {earn && (earn.orders.length === 0 ? <p className="text-sm text-gray-500">No orders from your shop yet.</p> : (
-              <div className="divide-y text-xs">
-                {earn.orders.map((o) => (
-                  <div key={o.orderNumber} className="py-2 flex flex-wrap justify-between gap-x-4 gap-y-1">
-                    <span><strong className="text-[#D4AF37]">{o.orderNumber}</strong>{earn.shops && earn.shops.length > 1 && o.shop ? <span className="ml-1 px-1.5 py-0.5 rounded bg-gray-500/15 text-[10px] font-semibold">{(() => { const x = myShops.find((m) => m.slug === o.shop); return x ? (x.handle || x.slug) : o.shop; })()}</span> : null} · {formatDateTime(o.createdAt)} · {o.items.map((it) => `${it.name} ×${it.quantity}`).join(', ')}</span>
-                    <span>{o.returned ? 'Returned' : o.status} · markup <strong className={o.earned > 0 ? 'text-green-600' : 'text-gray-500'}>{formatPrice(o.markup)}</strong></span>
-                  </div>
-                ))}
+        )}
+      </>
+    );
+  } else if (s === 'orders') {
+    before = !approved ? notYet : (
+      <>
+        <div className="flex flex-wrap items-end justify-between gap-2">{title('Orders', 'Orders from your shop links. Kyvro confirms and delivers every order; customer details stay with Kyvro.')}{refreshBtn}</div>
+        <div className={card}>{earnErr ? <p className="text-xs text-red-500">{earnErr}</p> : !earn ? <p className="text-sm text-gray-500">Loading...</p> : orderRows}</div>
+      </>
+    );
+  } else if (s === 'products') {
+    before = title('Products', 'Tick the products your shop sells and set your price (within the limit). Press "Save my shop" at the bottom.');
+  } else if (s === 'manage') {
+    before = title('Manage Shop', 'Your link, website name, social links, logo, banner and more. Locked parts open on Pro / Premium.');
+  } else if (s === 'analytics') {
+    before = !approved ? notYet : feat.salesStats ? (
+      <>
+        <div className="flex flex-wrap items-end justify-between gap-2">{title('Analytics', 'How your shop sells.')}{refreshBtn}</div>
+        <div className={card}>{earn ? <SellerStats orders={earn.orders} formatPrice={formatPrice} isDarkMode={isDarkMode} statsOn={feat.salesStats} csvOn={feat.earningsCsv} /> : <p className="text-sm text-gray-500">Loading...</p>}</div>
+      </>
+    ) : locked('Analytics', 'Pro', 'Sales stats for your shop: orders, delivered, earnings by month and your best sellers.');
+  } else if (s === 'themes') {
+    before = feat.brandColor ? title('Themes', 'Re-design your shop: brand color, announcement strip and pinned products.') : locked('Themes', needs('brandColor'), 'Re-design your shop with your own brand color, an announcement strip on top and your best products pinned first.');
+  } else if (s === 'landing') {
+    before = locked('Landing Pages', 'Soon', 'A separate page for one offer or one product, to share in your ads.');
+  } else if (s === 'promo') {
+    before = locked('Promo Codes', 'Soon', 'Your own coupon codes for your shop\'s customers.');
+  } else if (s === 'earnings') {
+    before = !approved ? notYet : (
+      <>
+        <div className="flex flex-wrap items-end justify-between gap-2">{title('Earnings & Payout')}{refreshBtn}</div>
+        <div className={card}>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+            {[['Earned', earned, 'text-[#D4AF37]'], ['Paid to you', paid, 'text-green-600'], [earned - paid >= 0 ? 'Due' : 'Overpaid', Math.abs(earned - paid), earned - paid > 0 ? 'text-red-500' : 'text-green-600'], ['Waiting (not delivered)', earn ? earn.waiting : 0, 'text-gray-500']].map(([l, v, c]) => (
+              <div key={l} className={`rounded border p-3 ${isDarkMode ? 'border-gray-800 bg-[#121212]' : 'border-gray-200 bg-gray-50'}`}>
+                <p className={`text-xl font-bold ${c}`}>{formatPrice(v)}</p>
+                <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-1">{l}</p>
               </div>
             ))}
           </div>
-
-          {effectiveFeatures(myShop, myShop ? effectiveTier(myShop) : effectiveTier(mySub), plans.tierFeatures).prioritySupport && (
-            <div className={`${card} border-[#D4AF37]/60`}>
-              <h3 className="text-lg font-bold flex items-center gap-2">Priority support <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#D4AF37] text-black font-bold uppercase">Premium</span></h3>
-              {plans.supportWhatsapp
-                ? <a href={`https://wa.me/${plans.supportWhatsapp.replace(/^\+/, '').replace(/^0/, '880')}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-green-600 text-white font-bold px-5 py-2 rounded text-xs uppercase tracking-wider">Chat on WhatsApp</a>
-                : <p className="text-xs text-gray-500">Email kyvrofashion@gmail.com and write "Premium" in the subject.</p>}
-              <p className="text-[11px] text-gray-500">Premium sellers get a weekly payout and are answered first.</p>
-            </div>
-          )}
-
-          <div className={card}>
-            <h3 className="text-lg font-bold">Payout</h3>
-            <p className="text-xs text-gray-500">Kyvro pays your markup to this bKash number. For your safety only Kyvro can see it, so it is not shown here after saving.</p>
-            <div className="flex flex-wrap gap-2 items-center">
-              <input className={`${inputCls} w-56`} inputMode="numeric" placeholder="bKash number, e.g. 017XXXXXXXX" value={bkash} onChange={(e) => setBkash(e.target.value)} />
-              <button type="button" disabled={saving} onClick={saveBkash} className="bg-[#D4AF37] text-black font-bold px-5 py-2 rounded text-xs uppercase tracking-wider disabled:opacity-50">{saving ? 'Saving...' : 'Save'}</button>
-            </div>
-            {bkashMsg && <p className={`text-xs ${bkashMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{bkashMsg.text}</p>}
-            {payouts.length > 0 && (
-              <div className="divide-y text-xs">
-                {[...payouts].sort((a, b) => (toDate(b.at) || 0) - (toDate(a.at) || 0)).map((x) => (
-                  <div key={x.id} className="py-1.5 flex flex-wrap justify-between gap-2">
-                    <span>{formatDateTime(x.at)}{x.note ? ` · ${x.note}` : ''}</span>
-                    <strong className="text-green-600">{formatPrice(x.amount)}</strong>
-                  </div>
-                ))}
-              </div>
-            )}
+          <p className="text-[11px] text-gray-500">{earn && earn.shops && earn.shops.length > 1 ? `All ${earn.shops.length} of your shops are counted together, in one payout. ` : ''}You earn the markup (your price − the store price) when an order is delivered. Returned and cancelled orders earn nothing. Payout: {feat.weeklyPayout ? 'weekly' : 'monthly'}.</p>
+          {earnErr && <p className="text-xs text-red-500">{earnErr}</p>}
+        </div>
+        <div className={card}>
+          <h3 className="text-lg font-bold">Payout</h3>
+          <p className="text-xs text-gray-500">Kyvro pays your markup to this bKash number. For your safety only Kyvro can see it, so it is not shown here after saving.</p>
+          <div className="flex flex-wrap gap-2 items-center">
+            <input className={`${inputCls} w-56`} inputMode="numeric" placeholder="bKash number, e.g. 017XXXXXXXX" value={bkash} onChange={(e) => setBkash(e.target.value)} />
+            <button type="button" disabled={saving} onClick={saveBkash} className="bg-[#D4AF37] text-black font-bold px-5 py-2 rounded text-xs uppercase tracking-wider disabled:opacity-50">{saving ? 'Saving...' : 'Save'}</button>
           </div>
-        </>
-      )}
+          {bkashMsg && <p className={`text-xs ${bkashMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{bkashMsg.text}</p>}
+          {payouts.length > 0 ? (
+            <div className="divide-y divide-gray-500/15 text-xs">
+              {[...payouts].sort((a, b) => (toDate(b.at) || 0) - (toDate(a.at) || 0)).map((x) => (
+                <div key={x.id} className="py-1.5 flex flex-wrap justify-between gap-2">
+                  <span>{formatDateTime(x.at)}{x.note ? ` · ${x.note}` : ''}</span>
+                  <strong className="text-green-600">{formatPrice(x.amount)}</strong>
+                </div>
+              ))}
+            </div>
+          ) : <p className="text-xs text-gray-500">No payouts yet.</p>}
+        </div>
+      </>
+    );
+  } else if (s === 'sub-overview') {
+    before = (
+      <>
+        {title('Subscription', 'Your plan covers all your shops. No auto-charge: you renew by hand with bKash / Nagad.')}
+        <div className={card}>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#B8921F]">Current plan</p>
+              <p className="text-2xl font-bold mt-1">{acctTier === 'free' ? 'Free' : <span className="text-[#D4AF37]">{TIER_LABEL[acctTier]}</span>}</p>
+              <p className="text-xs text-gray-500 mt-1">{acctTier === 'free' ? (paidUntilMs ? `Your paid plan ended on ${fmtDay(paidUntilMs)}.` : 'Free forever. Upgrade any time.') : `Active until ${fmtDay(paidUntilMs)} (${daysLeft} day${daysLeft === 1 ? '' : 's'} left).`}</p>
+            </div>
+            <button type="button" onClick={goPlans} className={GOLD_BTN}>{acctTier === 'free' ? 'Upgrade' : acctTier === 'pro' ? 'Renew or upgrade' : 'Renew'}</button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
+            {[
+              ['Shops', `${shopsUsed} / ${shopLimit}`],
+              ['Products', acctTier === 'free' && plans.enabled ? `${productsInShops} / ${plans.freeLimit}` : `${productsInShops} · all allowed`],
+              ['Payout', feat.weeklyPayout ? 'Weekly' : 'Monthly'],
+            ].map(([l, v]) => (
+              <div key={l} className={`rounded-xl border p-3 ${isDarkMode ? 'border-gray-800 bg-[#121212]' : 'border-gray-200 bg-gray-50'}`}>
+                <p className="text-lg font-bold">{v}</p>
+                <p className="text-[10px] uppercase tracking-wider text-gray-500 mt-1">{l}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className={card}>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#B8921F]">What your plan includes</p>
+          <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+            {FEATURES.filter((f) => f.key !== 'allProducts').map((f) => (
+              <li key={f.key} className={`flex items-center gap-2 ${feat[f.key] ? '' : 'text-gray-500'}`}>
+                <span className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] ${feat[f.key] ? 'bg-[#D4AF37] text-black' : 'bg-gray-500/15'}`}>{feat[f.key] ? '✓' : <Lock size={10} />}</span>
+                {f.label}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </>
+    );
+  } else if (s === 'sub-plans') {
+    before = title('Plans', 'Pay with bKash / Nagad. The plan starts right after the payment and covers all your shops.');
+  } else if (s === 'sub-billing') {
+    before = (
+      <>
+        {title('Billing History', 'Your plan payments. Comp plans given by Kyvro are not listed here.')}
+        <div className={card}>
+          {billing === null ? <p className="text-sm text-gray-500">Loading...</p>
+            : billing.error ? <p className="text-xs text-red-500">{billing.error}</p>
+              : billing.payments.length === 0 ? <p className="text-sm text-gray-500">No payments yet.</p> : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead><tr className="text-left text-gray-500 uppercase tracking-wider text-[10px]"><th className="py-2 pr-3">Date</th><th className="py-2 pr-3">Plan</th><th className="py-2 pr-3">Days</th><th className="py-2 pr-3">Method</th><th className="py-2 text-right">Amount</th></tr></thead>
+                    <tbody className="divide-y divide-gray-500/15">
+                      {billing.payments.map((p) => (
+                        <tr key={p.invoice}>
+                          <td className="py-2 pr-3 whitespace-nowrap">{fmtDay(p.at)}</td>
+                          <td className="py-2 pr-3 font-semibold">{TIER_LABEL[p.tier] || p.tier}</td>
+                          <td className="py-2 pr-3">{p.days || '-'}</td>
+                          <td className="py-2 pr-3 capitalize">{p.method || '-'}</td>
+                          <td className="py-2 text-right font-bold">{formatPrice(p.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+        </div>
+      </>
+    );
+  } else if (s === 'support') {
+    before = (
+      <>
+        {title('Support')}
+        {feat.prioritySupport ? (
+          <div className={`${card} border-[#D4AF37]/60`}>
+            <h3 className="text-lg font-bold flex items-center gap-2">Priority support <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#D4AF37] text-black font-bold uppercase">Premium</span></h3>
+            {plans.supportWhatsapp
+              ? <a href={`https://wa.me/${plans.supportWhatsapp.replace(/^\+/, '').replace(/^0/, '880')}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-green-600 text-white font-bold px-5 py-2 rounded text-xs uppercase tracking-wider">Chat on WhatsApp</a>
+              : <p className="text-xs text-gray-500">Email kyvrofashion@gmail.com and write "Premium" in the subject.</p>}
+            <p className="text-[11px] text-gray-500">Premium sellers are answered first.</p>
+          </div>
+        ) : (
+          <div className={card}>
+            <p className="text-sm">Questions about your shop? Email <a href="mailto:kyvrofashion@gmail.com" className="font-semibold text-[#B8921F] underline">kyvrofashion@gmail.com</a>.</p>
+            <p className="text-[11px] text-gray-500">Premium sellers get priority support on WhatsApp. <button type="button" onClick={goPlans} className="underline text-[#B8921F] font-semibold">See plans</button></p>
+          </div>
+        )}
+      </>
+    );
+  }
+  // My Shop's own pages; everything else keeps it mounted but hidden
+  const shopView = s === 'products' ? 'products' : s === 'manage' ? 'manage' : s === 'themes' && feat.brandColor ? 'theme' : s === 'sub-plans' ? 'plan' : 'none';
+
+  const head = (
+    <div className="flex items-center gap-3 min-w-0">
+      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#D4AF37] text-black font-bold">{(myShop ? shopDisplayName(myShop) : 'K').charAt(0).toUpperCase()}</span>
+      <div className="min-w-0">
+        <p className="text-sm font-bold truncate">{myShop ? shopDisplayName(myShop) : 'My shop'}</p>
+        <button type="button" onClick={() => go('sub-overview')} className={`text-[10px] font-bold uppercase tracking-wider ${acctTier === 'free' ? 'text-gray-500' : 'text-[#B8921F]'}`}>{TIER_LABEL[acctTier] || 'Free'} plan</button>
+      </div>
     </div>
+  );
+
+  return (
+    <SellerDashLayout nav={nav} active={section} onSelect={go} isDarkMode={isDarkMode} head={head}>
+      {before}
+      <MyShop view={shopView} sellerMode showPlan={approved} adminRole="seller" isOwner={false} products={products} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={customerUser.displayName || email} loggedInUserEmail={email} />
+    </SellerDashLayout>
   );
 }
