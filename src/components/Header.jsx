@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ShoppingBag, Search, User, Menu, Sun, Moon, Truck } from 'lucide-react';
-import logoImg from '../assets/logo.png';
+import KyvroMark from './KyvroMark';
 import { CURRENCIES } from '../data/currencies';
 
 export default function Header({ shopBrand = null, onStartSelling, onAdminPanel = null, cart, curr, currencyKey, currentView, isDarkMode, setCurrencyKey, setCurrentView, setIsCartOpen, setIsDarkMode, setIsMobileMenuOpen, setSelectedCategory, navHas = () => true, customerUser, displayName, photoURL, goAccount, onSignIn, onSignOut }) {
@@ -37,7 +37,7 @@ export default function Header({ shopBrand = null, onStartSelling, onAdminPanel 
             >
               {/* the Kyvro logo is always there; a Premium shop shows its own name as a wordmark next to it */}
               {shopBrand && shopBrand.logo && <img src={shopBrand.logo} alt="" className="h-9 w-9 sm:h-11 sm:w-11 rounded object-cover border border-gray-300/40" />}
-              <img src={logoImg} alt="Kyvro Logo" className={`${shopBrand && shopBrand.wordmark ? 'h-6 sm:h-7' : 'h-8 sm:h-10'} w-auto object-contain`} />
+              <KyvroMark dark={isDarkMode} title="Kyvro logo" className={`${shopBrand && shopBrand.wordmark ? 'h-6 sm:h-7' : 'h-7 sm:h-10'} w-auto shrink-0`} />
               {shopBrand && shopBrand.wordmark ? (
                 <div className="flex flex-col items-start min-w-0">
                   <span className="text-lg sm:text-2xl font-serif font-bold tracking-wide truncate max-w-[9rem] sm:max-w-[16rem]" style={{ color: shopBrand.color }}>{shopBrand.name}</span>
@@ -45,8 +45,9 @@ export default function Header({ shopBrand = null, onStartSelling, onAdminPanel 
                 </div>
               ) : (
                 <div className="flex flex-col items-start max-[349px]:hidden">
-                  <span className={`text-base min-[380px]:text-lg sm:text-2xl font-serif font-bold tracking-widest ${isDarkMode ? 'text-white' : 'text-black'}`}>KYVRO</span>
-                  <span className={`hidden sm:block text-[9px] tracking-[0.3em] font-sans -mt-1 ${isDarkMode ? 'text-[#D4AF37]' : 'text-black font-semibold'}`}>{shopBrand ? 'POWERED BY KYVRO' : <>কাইভ্রো &bull; WEAR YOUR STORY</>}</span>
+                  <span className={`text-base min-[400px]:text-lg sm:text-2xl font-serif font-bold tracking-wider min-[400px]:tracking-widest ${isDarkMode ? 'text-white' : 'text-black'}`}>KYVRO</span>
+                  {/* Bangla name + tagline under KYVRO on every screen (smaller on phones) */}
+                  <span className={`block whitespace-nowrap text-[6.5px] min-[370px]:text-[7px] min-[400px]:text-[8px] sm:text-[9px] tracking-[0.04em] min-[370px]:tracking-[0.06em] min-[400px]:tracking-[0.1em] sm:tracking-[0.3em] font-sans -mt-0.5 sm:-mt-1 ${isDarkMode ? 'text-[#D4AF37]' : 'text-black font-semibold'}`}>{shopBrand ? 'POWERED BY KYVRO' : <>কাইভ্রো &bull; WEAR YOUR STORY</>}</span>
                 </div>
               )}
             </div>
@@ -61,7 +62,7 @@ export default function Header({ shopBrand = null, onStartSelling, onAdminPanel 
             {navHas('Watches') && <button onClick={() => { setCurrentView('shop'); setSelectedCategory("Watches"); }} className="hover:text-[#D4AF37] transition">WATCHES</button>}
           </nav>
 
-          <div className="flex items-center gap-1 min-[380px]:gap-2 sm:gap-4 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-4 shrink-0">
             <div className={`hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded border text-xs font-semibold ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-white' : 'bg-gray-100 border-gray-300 text-black'}`}>
               <span>{curr.flag}</span>
               <select 
@@ -87,7 +88,7 @@ export default function Header({ shopBrand = null, onStartSelling, onAdminPanel 
 
             <button
               onClick={() => setCurrentView('tracking')}
-              className={`transition p-1 flex items-center gap-1 ${isDarkMode ? 'text-gray-300 hover:text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]'}`}
+              className={`transition p-1 hidden sm:flex items-center gap-1 ${isDarkMode ? 'text-gray-300 hover:text-[#D4AF37]' : 'text-gray-700 hover:text-[#D4AF37]'}`}
               title="Order Tracking"
             >
               <Truck size={18} /><span className="hidden lg:inline text-xs font-semibold">Order Tracking</span>
