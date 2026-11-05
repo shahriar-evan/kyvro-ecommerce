@@ -157,7 +157,7 @@ export default function ShopExtrasEditor({ extras, setExtras, feat, shop, tier =
 
       {shop && (
         <div className={`${box} ${feat.banner ? '' : 'opacity-60'}`}>
-          <p className="text-xs font-bold uppercase tracking-wider">Shop banner {feat.banner ? '' : lock(tier === 'pro' ? 'Premium (Kyvro can switch it on)' : 'Premium')}</p>
+          <p className="text-xs font-bold uppercase tracking-wider">Shop banner {feat.banner ? '' : lock(tier === 'free' ? 'Pro / Premium' : 'Off for your shop')}</p>
           {shop.banner && <div className="space-y-1 text-xs"><img src={shop.banner} alt="" className="w-full max-h-32 object-cover rounded border" /><span className="text-green-600 font-semibold">Approved banner (shown on top of your shop)</span></div>}
           {shop.bannerPending && <div className="space-y-1 text-xs"><img src={shop.bannerPending} alt="" className="w-full max-h-32 object-cover rounded border" /><span className="text-amber-600 font-semibold">Waiting for Kyvro's approval</span></div>}
           {shop.bannerReject && <p className="text-xs text-red-500">Banner rejected{shop.bannerReject.note ? `: ${shop.bannerReject.note}` : ''}</p>}

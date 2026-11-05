@@ -67,7 +67,7 @@ export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mo
                 {t.features.map((f) => (
                   <li key={f} className="flex items-start gap-2.5">
                     <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-[#D4AF37] text-black"><Check size={11} strokeWidth={3} /></span>
-                    <span className={f === T.featPro[T.featPro.length - 1] || f === T.featPremium[0] ? 'font-semibold' : ''}>{f}</span>
+                    <span>{f}</span>
                   </li>
                 ))}
                 {(t.soon || []).map((f) => (
