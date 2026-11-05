@@ -45,7 +45,10 @@ export async function planCaller(req) {
     const sd = fields(await sr.json());
     // a seller's shop waits for the Owner first (no status = from before approvals = approved)
     if ((sd.status || 'approved') !== 'approved') return { error: 'Your shop is waiting for approval.', status: 403 };
-    return { uid, email, name: String(sd.name || ''), seller: true, slug: String(sd.slug || '') };
+    // every shop of the seller (more than one on Pro / Premium); the first is the application's shop
+    const slug = String(sd.slug || '');
+    const shops = (Array.isArray(sd.shops) && sd.shops.length ? sd.shops : [slug]).map(String).filter((x) => /^[a-z0-9-]{3,40}$/.test(x)).slice(0, 10);
+    return { uid, email, name: String(sd.name || ''), seller: true, slug, shops };
   }
   if (!r.ok) return { error: 'Please sign in again.', status: 401 };
   const me = fields(await r.json());

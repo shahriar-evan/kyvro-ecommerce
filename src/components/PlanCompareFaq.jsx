@@ -3,7 +3,7 @@ import { Check, Minus, Clock, Plus } from 'lucide-react';
 import { PLAN_TEXT, COMPARE, fill } from '../data/planText';
 
 // Under the plan cards: "Compare Plans" (tier defaults, not a shop's overrides) and the FAQ. Texts in src/data/planText.js.
-export function PlanCompare({ lang = 'en', isDarkMode, freeLimit = 10 }) {
+export function PlanCompare({ lang = 'en', isDarkMode, freeLimit = 10, shopLimits = { free: 1, pro: 2, premium: 3 } }) {
   const T = PLAN_TEXT[lang] || PLAN_TEXT.en;
   const line = isDarkMode ? 'border-gray-800' : 'border-gray-200';
   const proCol = isDarkMode ? 'bg-[#D4AF37]/[0.07]' : 'bg-[#D4AF37]/[0.08]';
@@ -11,6 +11,7 @@ export function PlanCompare({ lang = 'en', isDarkMode, freeLimit = 10 }) {
   const cell = (v, soonRow) => {
     if (v === true) return <Check size={16} className="inline text-green-600" strokeWidth={3} aria-label="yes" />;
     if (v === false) return <Minus size={16} className="inline text-gray-400" aria-label="no" />;
+    if (typeof v === 'string' && v.startsWith('shops:')) return <span className="text-xs font-semibold">{fill(T.cell.cellShops, shopLimits[v.slice(6)] || 1, lang)}</span>;
     if (v === 'soon') return <span className="inline-flex items-center gap-1 text-[11px] text-gray-500"><Clock size={13} />{T.cell.soonCell}</span>;
     return <span className={`text-xs font-semibold ${soonRow ? 'text-gray-500' : ''}`}>{fill(T.cell[v] || v, freeLimit, lang)}</span>;
   };

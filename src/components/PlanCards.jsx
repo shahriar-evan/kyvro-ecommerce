@@ -10,11 +10,13 @@ import { PLAN_TEXT, fill } from '../data/planText';
 export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mode = 'apply', currentTier = 'free', busy = '', onChoose, lang = 'en' }) {
   const T = PLAN_TEXT[lang] || PLAN_TEXT.en;
   const plans = normalizePlans(rawPlans);
+  // first line of each card: how many shops one account may have on that plan (settings/plans.shopLimits)
+  const shopsLine = (t) => { const n = plans.shopLimits[t]; return fill(n === 1 ? T.shopOne : T.shopMany, n, lang); };
   const tiers = [
-    { key: 'free', name: T.free, icon: Zap, blurb: T.blurbFree, features: T.featFree.map((f) => fill(f, plans.freeLimit, lang)) },
-    { key: 'pro', name: T.pro, icon: Rocket, blurb: T.blurbPro, badge: T.mostPopular, features: T.featPro },
+    { key: 'free', name: T.free, icon: Zap, blurb: T.blurbFree, features: [shopsLine('free'), ...T.featFree.map((f) => fill(f, plans.freeLimit, lang))] },
+    { key: 'pro', name: T.pro, icon: Rocket, blurb: T.blurbPro, badge: T.mostPopular, features: [shopsLine('pro'), ...T.featPro] },
     // "Coming soon" items are shown only in the Compare Plans table (keeps the cards short)
-    { key: 'premium', name: T.premium, icon: Gem, blurb: T.blurbPremium, badge: T.bestValue, features: T.featPremium },
+    { key: 'premium', name: T.premium, icon: Gem, blurb: T.blurbPremium, badge: T.bestValue, features: [shopsLine('premium'), ...T.featPremium] },
   ];
 
   const button = (t) => {

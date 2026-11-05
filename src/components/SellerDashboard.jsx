@@ -369,7 +369,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
                 </div>
               ))}
             </div>
-            <p className="text-[11px] text-gray-500">{acctTier === 'free' ? `The Free plan's ${plans.freeLimit} products count across all your shops.` : 'Your plan covers all your shops.'} Editing a second shop comes soon; for now My Shop below edits your first shop.</p>
+            <p className="text-[11px] text-gray-500">{acctTier === 'free' ? `The Free plan's ${plans.freeLimit} products count across all your shops.` : 'Your plan covers all your shops.'} Switch between your shops on top of My Shop below.</p>
             {nsMsg && <p className={`text-xs ${nsMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{nsMsg.text}</p>}
             {nsOpen && canAdd && (
               <div className={`rounded-xl border p-4 space-y-3 ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
@@ -412,7 +412,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
                 </div>
               ))}
             </div>
-            <p className="text-[11px] text-gray-500">You earn the markup (your price − the store price) when an order is delivered. Returned and cancelled orders earn nothing. Kyvro confirms and delivers every order.</p>
+            <p className="text-[11px] text-gray-500">{earn && earn.shops && earn.shops.length > 1 ? `All ${earn.shops.length} of your shops are counted together, in one payout. ` : ''}You earn the markup (your price − the store price) when an order is delivered. Returned and cancelled orders earn nothing. Kyvro confirms and delivers every order.</p>
             {earnErr && <p className="text-xs text-red-500">{earnErr}</p>}
             {earn && (() => {
               const f = effectiveFeatures(myShop, myShop ? effectiveTier(myShop) : effectiveTier(mySub), plans.tierFeatures);
@@ -422,7 +422,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
               <div className="divide-y text-xs">
                 {earn.orders.map((o) => (
                   <div key={o.orderNumber} className="py-2 flex flex-wrap justify-between gap-x-4 gap-y-1">
-                    <span><strong className="text-[#D4AF37]">{o.orderNumber}</strong> · {formatDateTime(o.createdAt)} · {o.items.map((it) => `${it.name} ×${it.quantity}`).join(', ')}</span>
+                    <span><strong className="text-[#D4AF37]">{o.orderNumber}</strong>{earn.shops && earn.shops.length > 1 && o.shop ? <span className="ml-1 px-1.5 py-0.5 rounded bg-gray-500/15 text-[10px] font-semibold">{(() => { const x = myShops.find((m) => m.slug === o.shop); return x ? (x.handle || x.slug) : o.shop; })()}</span> : null} · {formatDateTime(o.createdAt)} · {o.items.map((it) => `${it.name} ×${it.quantity}`).join(', ')}</span>
                     <span>{o.returned ? 'Returned' : o.status} · markup <strong className={o.earned > 0 ? 'text-green-600' : 'text-gray-500'}>{formatPrice(o.markup)}</strong></span>
                   </div>
                 ))}

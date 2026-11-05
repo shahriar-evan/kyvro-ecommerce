@@ -5,6 +5,7 @@
 export const COMPARE = [
   { group: 'shop', rows: [
     ['products', 'cellFreeLimit', 'cellAll', 'cellAll'],
+    ['shops', 'shops:free', 'shops:pro', 'shops:premium'],
     ['ownLink', true, true, true],
     ['markup', true, true, true],
     ['handled', true, true, true],
@@ -53,13 +54,14 @@ export const PLAN_TEXT = {
     compareTitle: 'Compare Plans', compareSub: 'Everything you get at a glance', feature: 'Feature',
     groups: { shop: 'Shop & products', branding: 'Branding', earnings: 'Earnings & support', soon: 'Coming soon' },
     rows: {
-      products: 'Products', ownLink: 'Own shop link (change once in 30 days)', markup: 'Earn markup on delivered orders', handled: 'Kyvro handles payment & delivery', priority: 'Priority approval',
+      products: 'Products', shops: 'Shops per account', ownLink: 'Own shop link (change once in 30 days)', markup: 'Earn markup on delivered orders', handled: 'Kyvro handles payment & delivery', priority: 'Priority approval',
       shopName: 'Create Website Name', tagline: 'Tagline + WhatsApp / Facebook button', social: 'Social links', about: 'About section', shareKit: 'Share kit (QR + caption)',
       brandColor: 'Re-design Your Website', announcement: 'Announcement strip', pin: 'Pin top products', verified: 'Verified seller badge', logo: 'Custom logo', banner: 'Custom banner',
       payout: 'Payout', support: 'Priority support',
       featured: 'Featured on Kyvro', salesStats: 'Sales stats', coupons: 'Shop coupon codes', domain: 'Custom domain', orderEmail: 'Order email notification', csv: 'Monthly earnings CSV',
     },
-    cell: { cellFreeLimit: '{n}', cellAll: 'All', cellOnRequest: 'On request', cellByKyvro: 'If Kyvro allows', cellOwnerApproved: '✓ Owner approved', cellMonthly: 'Monthly', cellWeekly: 'Weekly', soonCell: 'Soon' },
+    shopOne: '{n} shop', shopMany: '{n} shops (one plan covers all)',
+    cell: { cellShops: '{n}', cellFreeLimit: '{n}', cellAll: 'All', cellOnRequest: 'On request', cellByKyvro: 'If Kyvro allows', cellOwnerApproved: '✓ Owner approved', cellMonthly: 'Monthly', cellWeekly: 'Weekly', soonCell: 'Soon' },
     faqTitle: 'Frequently Asked Questions',
     faq: [
       ['What is the Free plan?', 'The Free plan has no fee. You open your own shop link with 10 Kyvro products, sell them and earn the markup.'],
@@ -71,6 +73,7 @@ export const PLAN_TEXT = {
       ['How long does approval take?', 'Kyvro reviews your application. Pro and Premium applicants get priority.'],
       ['Who handles delivery and returns?', 'Kyvro confirms the order, gets it from the supplier and sends it to the customer. If an order is returned, that order earns no markup.'],
       ['What information do you ask for?', 'Your name, email, WhatsApp, address (district / area) and the categories you will sell. We never ask for NID, passport or bank details. Only the Kyvro owner sees your WhatsApp and address.'],
+      ['Can I have more than one shop?', 'Yes: Free 1 shop, Pro 2, Premium 3. One plan covers all your shops, and the earnings of all your shops are paid together. Every new shop goes live after Kyvro approves it. If your paid plan ends, your first shop stays on the Free plan and the others are hidden (not deleted) until you renew; on Free the 10 products count across all shops.'],
       ['Can I change my shop link or name?', 'Your shop link (kyvro.store/your-name) is free on every plan and can be changed in My Shop once in 30 days; old links keep working and open the new one. Your shop shows its link name (for example "Rahim Fashion") until you create your own Website Name, which is a Premium feature.'],
       ['Can I use my own logo or domain?', 'Logo and banner: on Premium you can upload them (they go live after Kyvro approves them). A custom domain is coming soon.'],
       ['Can I get a refund?', 'For a refund, please contact Kyvro support.'],
@@ -91,13 +94,14 @@ export const PLAN_TEXT = {
     compareTitle: 'প্ল্যান তুলনা', compareSub: 'এক নজরে সব সুবিধা', feature: 'সুবিধা',
     groups: { shop: 'শপ ও পণ্য', branding: 'ব্র্যান্ডিং', earnings: 'আয় ও সাপোর্ট', soon: 'শিগগিরই আসছে' },
     rows: {
-      products: 'পণ্য', ownLink: 'নিজের শপ লিংক (৩০ দিনে একবার বদলানো যায়)', markup: 'ডেলিভারড অর্ডারে মার্কআপ আয়', handled: 'পেমেন্ট ও ডেলিভারি Kyvro সামলায়', priority: 'অগ্রাধিকার অনুমোদন',
+      products: 'পণ্য', shops: 'অ্যাকাউন্টে শপ', ownLink: 'নিজের শপ লিংক (৩০ দিনে একবার বদলানো যায়)', markup: 'ডেলিভারড অর্ডারে মার্কআপ আয়', handled: 'পেমেন্ট ও ডেলিভারি Kyvro সামলায়', priority: 'অগ্রাধিকার অনুমোদন',
       shopName: 'ওয়েবসাইটের নাম তৈরি', tagline: 'ট্যাগলাইন + হোয়াটসঅ্যাপ/ফেসবুক বাটন', social: 'সোশ্যাল লিংক', about: 'About সেকশন', shareKit: 'শেয়ার কিট (QR + ক্যাপশন)',
       brandColor: 'ওয়েবসাইট রি-ডিজাইন', announcement: 'ঘোষণা স্ট্রিপ', pin: 'টপ পণ্য পিন করা', verified: 'ভেরিফাইড সেলার ব্যাজ', logo: 'কাস্টম লোগো', banner: 'কাস্টম ব্যানার',
       payout: 'পেআউট', support: 'অগ্রাধিকার সাপোর্ট',
       featured: 'Kyvro-তে ফিচার্ড', salesStats: 'বিক্রির পরিসংখ্যান', coupons: 'শপ কুপন কোড', domain: 'কাস্টম ডোমেইন', orderEmail: 'অর্ডার ইমেইল নোটিফিকেশন', csv: 'মাসিক আয়ের CSV',
     },
-    cell: { cellFreeLimit: '{n}টি', cellAll: 'সব', cellOnRequest: 'অনুরোধে', cellByKyvro: 'Kyvro চালু করলে', cellOwnerApproved: '✓ মালিক অনুমোদিত', cellMonthly: 'মাসিক', cellWeekly: 'সাপ্তাহিক', soonCell: 'শিগগিরই' },
+    shopOne: '{n}টি শপ', shopMany: '{n}টি শপ (এক প্ল্যানে সব শপ)',
+    cell: { cellShops: '{n}টি', cellFreeLimit: '{n}টি', cellAll: 'সব', cellOnRequest: 'অনুরোধে', cellByKyvro: 'Kyvro চালু করলে', cellOwnerApproved: '✓ মালিক অনুমোদিত', cellMonthly: 'মাসিক', cellWeekly: 'সাপ্তাহিক', soonCell: 'শিগগিরই' },
     faqTitle: 'সাধারণ প্রশ্ন',
     faq: [
       ['ফ্রি প্ল্যান কী?', 'ফ্রি প্ল্যানে কোনো ফি নেই। আপনি ১০টি Kyvro পণ্য নিয়ে নিজের শপ লিংক খুলে বিক্রি করতে পারবেন এবং মার্কআপ আয় করবেন।'],
@@ -109,6 +113,7 @@ export const PLAN_TEXT = {
       ['অনুমোদন পেতে কতক্ষণ লাগে?', 'Kyvro আপনার আবেদন যাচাই করে। প্রো ও প্রিমিয়াম আবেদনকারীরা অগ্রাধিকার পায়।'],
       ['ডেলিভারি ও রিটার্ন কে সামলায়?', 'Kyvro অর্ডার কনফার্ম করে, সরবরাহকারীর কাছ থেকে আনে এবং কাস্টমারের কাছে পাঠায়। রিটার্ন হলে ওই অর্ডারের মার্কআপ পাওয়া যায় না।'],
       ['কী কী তথ্য চাওয়া হয়?', 'নাম, ইমেইল, হোয়াটসঅ্যাপ নম্বর, ঠিকানা (জেলা/এলাকা) ও কোন ক্যাটাগরির পণ্য বিক্রি করবেন। এনআইডি, পাসপোর্ট বা ব্যাংকের তথ্য কখনোই চাই না। আপনার হোয়াটসঅ্যাপ ও ঠিকানা শুধু Kyvro-র মালিক দেখতে পান।'],
+      ['একাধিক শপ খুলতে পারব?', 'হ্যাঁ: Free-তে ১টি, Pro-তে ২টি, Premium-এ ৩টি শপ। এক প্ল্যানে আপনার সব শপ চলে, আর সব শপের আয় একসাথে পেআউট হয়। প্রতিটি নতুন শপ Kyvro অনুমোদন করলে লাইভ হয়। পেইড প্ল্যান শেষ হলে প্রথম শপ Free-তে থাকে, বাকিগুলো নবায়ন না করা পর্যন্ত লুকানো থাকে (মুছে যায় না); Free-তে ১০টি পণ্য সব শপ মিলিয়ে গোনা হয়।'],
       ['শপের লিংক বা নাম বদলাতে পারব?', 'শপ লিংক (kyvro.store/your-name) সব প্ল্যানে ফ্রি, My Shop থেকে ৩০ দিনে একবার বদলানো যায়; পুরনো লিংকও কাজ করে এবং নতুন লিংকে নিয়ে যায়। নিজের ওয়েবসাইটের নাম (Premium) না দেওয়া পর্যন্ত শপে লিংকের নাম দেখায় (যেমন "Rahim Fashion")।'],
       ['নিজের লোগো বা ডোমেইন ব্যবহার করতে পারব?', 'লোগো ও ব্যানার: প্রিমিয়ামে আপলোড করা যায় (Kyvro অনুমোদন করলে লাইভ হয়)। কাস্টম ডোমেইন শিগগিরই আসছে।'],
       ['রিফান্ড পাব?', 'রিফান্ডের জন্য Kyvro সাপোর্টের সাথে যোগাযোগ করুন।'],
