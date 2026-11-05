@@ -23,29 +23,29 @@ export function PlanCompare({ lang = 'en', isDarkMode, freeLimit = 10, shopLimit
       </div>
       {/* the table scrolls inside its box on small screens; the feature column stays in place */}
       <div className={`max-w-5xl mx-auto overflow-x-auto rounded-2xl border ${line} ${isDarkMode ? 'bg-[#161616]' : 'bg-white shadow-sm'}`}>
-        <table className="w-full min-w-[560px] text-sm border-collapse">
+        <table className="w-full sm:min-w-[560px] text-xs sm:text-sm border-collapse">
           <thead>
             <tr className={`border-b ${line}`}>
-              <th className={`sticky left-0 z-10 ${stickyBg} text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-gray-500`}>{T.feature}</th>
-              <th className="px-3 py-3 text-xs font-bold uppercase tracking-wider text-gray-500">{T.free}</th>
-              <th className={`px-3 py-3 text-xs font-bold uppercase tracking-wider text-[#D4AF37] border-b-2 border-[#D4AF37] ${proCol}`}>{T.pro}</th>
-              <th className="px-3 py-3 text-xs font-bold uppercase tracking-wider">{T.premium}</th>
+              <th className={`sticky left-0 z-10 ${stickyBg} text-left px-3 sm:px-4 py-3 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-gray-500`}>{T.feature}</th>
+              <th className="px-1.5 sm:px-3 py-3 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-gray-500">{T.free}</th>
+              <th className={`px-1.5 sm:px-3 py-3 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-[#D4AF37] border-b-2 border-[#D4AF37] ${proCol}`}>{T.pro}</th>
+              <th className="px-1.5 sm:px-3 py-3 text-[10px] sm:text-xs font-bold uppercase tracking-wider">{T.premium}</th>
             </tr>
           </thead>
           <tbody>
             {COMPARE.map((g) => (
               <React.Fragment key={g.group}>
                 <tr className={`border-b ${line} ${isDarkMode ? 'bg-black/30' : 'bg-gray-50'}`}>
-                  <td colSpan={4} className={`sticky left-0 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-gray-500 ${g.soon ? '' : ''}`}>
+                  <td colSpan={4} className={`sticky left-0 px-3 sm:px-4 py-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.16em] text-gray-500 ${g.soon ? '' : ''}`}>
                     {g.soon && <Clock size={12} className="inline mr-1 -mt-0.5" />}{T.groups[g.group]}
                   </td>
                 </tr>
                 {g.rows.map(([key, f, p, pr]) => (
                   <tr key={key} className={`border-b last:border-0 ${line}`}>
-                    <td className={`sticky left-0 z-10 ${stickyBg} px-4 py-3 ${g.soon ? 'text-gray-500' : ''}`}>{g.soon && <Clock size={13} className="inline mr-1.5 -mt-0.5 text-gray-400" />}{T.rows[key]}</td>
-                    <td className="px-3 py-3 text-center">{cell(f, g.soon)}</td>
-                    <td className={`px-3 py-3 text-center ${proCol}`}>{cell(p, g.soon)}</td>
-                    <td className="px-3 py-3 text-center">{cell(pr, g.soon)}</td>
+                    <td className={`sticky left-0 z-10 ${stickyBg} px-3 sm:px-4 py-2.5 sm:py-3 ${g.soon ? 'text-gray-500' : ''}`}>{g.soon && <Clock size={13} className="inline mr-1.5 -mt-0.5 text-gray-400" />}{T.rows[key]}</td>
+                    <td className="px-1.5 sm:px-3 py-2.5 sm:py-3 text-center">{cell(f, g.soon)}</td>
+                    <td className={`px-1.5 sm:px-3 py-2.5 sm:py-3 text-center ${proCol}`}>{cell(p, g.soon)}</td>
+                    <td className="px-1.5 sm:px-3 py-2.5 sm:py-3 text-center">{cell(pr, g.soon)}</td>
                   </tr>
                 ))}
               </React.Fragment>

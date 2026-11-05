@@ -90,7 +90,9 @@ export default function PlanSettings({ isDarkMode, staff, formatPrice }) {
       </div>
 
       {/* what each plan gets: ON / OFF per plan (a shop can still be switched one by one in Plan Members) */}
-      <div className={`rounded border ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
+      {/* scrolls sideways inside its own box on a narrow phone instead of pushing the page wider */}
+      <div className={`rounded border overflow-x-auto ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
+        <div className="min-w-[22rem]">
         <div className={`grid grid-cols-[1fr_repeat(3,4.5rem)] sm:grid-cols-[1fr_repeat(3,6rem)] gap-2 px-3 py-2 text-[11px] font-bold uppercase tracking-wider border-b ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
           <span>Plan features</span><span className="text-center">Free</span><span className="text-center">Pro</span><span className="text-center">Premium</span>
         </div>
@@ -108,6 +110,7 @@ export default function PlanSettings({ isDarkMode, staff, formatPrice }) {
               })}
             </div>
           ))}
+        </div>
         </div>
         <p className="px-3 py-2 text-[11px] text-gray-500 border-t border-gray-500/10">Shop name change, logo and banner are never on the Free plan. Plan Members can still switch a feature ON / OFF for one shop.</p>
       </div>
