@@ -17,10 +17,21 @@ import PlanSettings from './PlanSettings';
 import SellerDashBannerSettings from './SellerDashBannerSettings';
 import SellerDashLayout from './SellerDashLayout';
 import { AdminDashboard, AdminAnalytics } from './AdminDashboard';
-import { LayoutDashboard, BarChart3, ShoppingBag, Package, PlusCircle, Boxes, Users, Store, UserCheck, Gem, ShieldCheck, Settings } from 'lucide-react';
+import { LayoutDashboard, BarChart3, ShoppingBag, Package, PlusCircle, Boxes, Users, Store, UserCheck, Gem, ShieldCheck, Settings, Palette } from 'lucide-react';
+import ThemePicker from './ThemePicker';
+import { watchSiteTheme, saveSiteTheme } from '../themeStore';
 import SellersPanel from './SellersPanel';
 import PlanMembers from './PlanMembers';
 import { subLabel, allPlaces, COLLECTION_LABELS, SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
+
+// Owner: the main site's theme (settings/theme), every theme allowed
+function SiteThemePage({ isDarkMode, staff }) {
+  const [cur, setCur] = React.useState(null);
+  React.useEffect(() => watchSiteTheme(setCur), []);
+  if (!cur) return <p className="text-sm text-gray-500">Loading...</p>;
+  return <ThemePicker title="Store Theme" note="The design of the main kyvro.store website. Shop links keep their own theme (their owners choose it)."
+    current={cur} allowAll previewPath="/" onSave={(t, m) => saveSiteTheme(t, m, staff)} isDarkMode={isDarkMode} />;
+}
 
 export default function AdminPortal({ adminCanCreateShop = false, adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canEditProduct, canAddProduct = true, shopOwners = {}, productCommissions = {}, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, productCosts = {}, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct, clearProductForm, handleDeleteRequest }) {
   const [productSearch, setProductSearch] = React.useState('');
@@ -270,7 +281,7 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
               </div>
 
               {/* menu on the left (phone: a drop-down menu), the chosen page on the right */}
-              <SellerDashLayout isDarkMode={isDarkMode} active={adminTab} onSelect={(k) => (k === 'add-product' ? goTab(k, () => setEditingProductId(null)) : goTab(k))} nav={[
+              <SellerDashLayout label="Admin menu" isDarkMode={isDarkMode} active={adminTab} onSelect={(k) => (k === 'add-product' ? goTab(k, () => setEditingProductId(null)) : goTab(k))} nav={[
                 { title: '', items: [
                   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
                   { key: 'analytics', label: 'Analytics', icon: BarChart3 },
@@ -286,9 +297,10 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                   ...(canManageTeam ? [{ key: 'plan-members', label: 'Plan Members', icon: Gem }] : []),
                   ...(canManageTeam ? [{ key: 'admins', label: isOwner ? 'Manage Admins' : 'Add Admin', icon: ShieldCheck }] : []),
                 ] },
-                ...(isOwner ? [{ title: 'Settings', items: [{ key: 'settings', label: 'Banner & Discount', icon: Settings }] }] : []),
+                ...(isOwner ? [{ title: 'Settings', items: [{ key: 'settings', label: 'Banner & Discount', icon: Settings }, { key: 'theme', label: 'Store Theme', icon: Palette }] }] : []),
               ]}>
               {adminTab === 'dashboard' && <AdminDashboard orders={orders} products={products} adminRole={adminRole} adminName={adminName} formatPrice={formatPrice} isDarkMode={isDarkMode} goTab={goTab} canSeeProfit={canSeeSupplier} />}
+              {adminTab === 'theme' && isOwner && <SiteThemePage isDarkMode={isDarkMode} staff={{ email: loggedInUserEmail, name: adminName }} />}
               {adminTab === 'analytics' && <AdminAnalytics orders={orders} formatPrice={formatPrice} isDarkMode={isDarkMode} />}
               {adminTab === 'plan-members' && canManageTeam && <PlanMembers isOwner={isOwner} isDarkMode={isDarkMode} />}
               {adminTab === 'sellers' && isOwner && <SellersPanel orders={orders} products={products} isDarkMode={isDarkMode} formatPrice={formatPrice} loggedInUserEmail={loggedInUserEmail} adminName={adminName} />}
