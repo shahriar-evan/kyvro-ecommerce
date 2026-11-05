@@ -260,7 +260,9 @@ service cloud.firestore {
     function sellerRulesPath() { return /databases/$(database)/documents/settings/sellerRules; }
     function sellersOpen() { return !exists(sellerRulesPath()) || get(sellerRulesPath()).data.get('open', true) == true; }
     function blockedRe() { return exists(sellerRulesPath()) ? get(sellerRulesPath()).data.get('blockedRegex', '.*(kyvro|official|admin|owner|support).*') : '.*(kyvro|official|admin|owner|support).*'; }
-    function sellerNameOk(name, slug) { return !name.lower().matches(blockedRe()) && !slug.matches(blockedRe()); }
+    // big brand names: never in a seller's shop name or link (same list as BRAND_WORDS in src/sellers.js)
+    function brandRe() { return '.*(nike|adidas|gucci|zara|apple|puma|reebok|chanel|prada|dior|versace|armani|rolex|samsung|uniqlo|balenciaga|burberry|fendi|hermes|vuitton|levis).*'; }
+    function sellerNameOk(name, slug) { return !name.lower().matches(blockedRe()) && !slug.matches(blockedRe()) && !name.lower().matches(brandRe()) && !slug.matches(brandRe()); }
     function sellerPath(uid) { return /databases/$(database)/documents/sellers/$(uid); }
 
     // Pro / Premium shop extras, shown on the storefront. Allowed only while the shop's paid plan runs; tier and paidUntil
@@ -296,7 +298,7 @@ service cloud.firestore {
       // shop name: changes at once with the feature on, never with a blocked word (the link / slug is the document id
       // and can never change)
       // Website Name (name; autoName = none created yet): Premium (or switched on), never with a blocked word
-      return (!changed.hasAny(['name', 'autoName']) || (paidFeatOn('shopName', false) && !d.name.lower().matches(blockedRe()) && !('autoName' in d)))
+      return (!changed.hasAny(['name', 'autoName']) || (paidFeatOn('shopName', false) && !d.name.lower().matches(blockedRe()) && !d.name.lower().matches(brandRe()) && !('autoName' in d)))
         && (!changed.hasAny(['tagline', 'contactUrl'])
           || (featOn('tagline', false)
               && d.get('tagline', '') is string && d.get('tagline', '').size() <= 80
@@ -367,14 +369,18 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && (((isManager() || isOwner()) && request.resource.data.get('kind', 'team') == 'team' && request.resource.data.active == true && request.resource.data.get('status', 'approved') == 'approved')
             || (canShopNow() && request.resource.data.get('kind', 'team') == 'team' && request.resource.data.active == false && request.resource.data.status == 'pending')
-            // a public seller: not on the team. The shop starts OFF and 'pending' until the Owner approves it. One shop per
-            // account: the sellers/{uid} application is written in the same batch; a new one only after a rejection
+            // a public seller: not on the team. Their FIRST shop is live at once (on + 'approved', the application too);
+            // the older flow (off + 'pending') still works. One first shop per account: the sellers/{uid} application is
+            // written in the same batch; a new one only after a rejection or removal. More shops: see "extra" below.
             || (signedIn() && !isStaff() && request.resource.data.get('kind', '') == 'seller'
-                && request.resource.data.active == false && request.resource.data.status == 'pending'
+                && request.resource.data.get('extra', false) == false
+                && ((request.resource.data.active == true && request.resource.data.status == 'approved'
+                     && getAfter(sellerPath(request.auth.uid)).data.status == 'approved')
+                    || (request.resource.data.active == false && request.resource.data.status == 'pending'
+                     && getAfter(sellerPath(request.auth.uid)).data.status == 'pending'))
                 && (!exists(sellerPath(request.auth.uid)) || get(sellerPath(request.auth.uid)).data.get('status', 'approved') == 'rejected')
                 && existsAfter(sellerPath(request.auth.uid))
                 && getAfter(sellerPath(request.auth.uid)).data.slug == slug
-                && getAfter(sellerPath(request.auth.uid)).data.status == 'pending'
                 && sellersOpen() && sellerNameOk(request.resource.data.name, slug))
             // an approved seller asks for one more shop (extra): OFF and 'pending' until the Owner approves it; the shop
             // is added to sellers/{uid}.shops in the same batch, within the plan's shop limit (checked there)
@@ -391,7 +397,7 @@ service cloud.firestore {
         && handleOk()
         && request.resource.data.items is map && request.resource.data.items.size() <= 300
         // the Owner: everything, also the seller kill switch (killed: the seller can never switch the shop on again)
-        && ((isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'active', 'status', 'updatedAt', 'planExempt', 'killed', 'killNote', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'features', 'logo', 'logoPending', 'logoPendingAt', 'logoReject', 'logoRequest', 'banner', 'bannerPending', 'bannerPendingAt', 'bannerReject', 'handle', 'handleChangedAt', 'autoName'])
+        && ((isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'active', 'status', 'updatedAt', 'planExempt', 'killed', 'killNote', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'features', 'logo', 'logoPending', 'logoPendingAt', 'logoReject', 'logoRequest', 'banner', 'bannerPending', 'bannerPendingAt', 'bannerReject', 'handle', 'handleChangedAt', 'autoName', 'inactiveHold', 'warning'])
                 && request.resource.data.get('status', 'approved') in ['pending', 'approved'])
             || ((isManager() || canShopNow())
                 && resource.data.ownerUid == request.auth.uid
@@ -431,7 +437,8 @@ service cloud.firestore {
       }
       function applicationOk() {
         let d = request.resource.data;
-        return d.keys().hasOnly(['slug', 'email', 'name', 'whatsapp', 'district', 'area', 'address', 'pageLink', 'socialLinks', 'productNote', 'categories', 'subCategories', 'agreed', 'status', 'createdAt', 'shops'])
+        return d.keys().hasOnly(['slug', 'email', 'name', 'whatsapp', 'district', 'area', 'address', 'pageLink', 'socialLinks', 'productNote', 'categories', 'subCategories', 'agreed', 'status', 'createdAt', 'shops', 'lastSeenAt'])
+          && (!('lastSeenAt' in d) || d.lastSeenAt == request.time)
           // shops = every shop of this seller; an application starts with just its own shop
           && d.get('shops', [d.slug]) == [d.slug]
           && d.email == myEmail()
@@ -450,7 +457,8 @@ service cloud.firestore {
           && categoriesOk(d)
           && d.get('productNote', '') is string && d.get('productNote', '').size() <= 300
           && d.agreed == true
-          && d.status == 'pending'
+          // the first shop is live at once ('approved'); 'pending' = the older flow
+          && d.status in ['pending', 'approved']
           && d.createdAt == request.time
           && d.slug is string && d.slug.matches('^[a-z0-9-]{3,40}$')
           && existsAfter(/databases/$(database)/documents/shops/$(d.slug))
@@ -468,6 +476,10 @@ service cloud.firestore {
                         && resource.data.get('status', 'approved') == 'pending'
                         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['categories', 'subCategories'])
                         && categoriesOk(request.resource.data))
+                    // the seller signed in: last seen now (shops without orders are removed after 30 days without a visit)
+                    || (signedIn() && request.auth.uid == uid
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeenAt'])
+                        && request.resource.data.lastSeenAt == request.time)
                     // an approved seller adds one more shop to the list (the new shop is created in the same batch),
                     // never more than the plan's shop limit; earlier shops stay in the list
                     || (signedIn() && request.auth.uid == uid && !isStaff()
@@ -507,7 +519,7 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.slug is string
         && (!exists(/databases/$(database)/documents/shops/$(h)) || h == request.resource.data.slug)
-        && (isOwner() || !h.matches(blockedRe()))
+        && (isOwner() || (!h.matches(blockedRe()) && !h.matches(brandRe())))
         // the site's own routes can never be a shop link (kyvro.store/<link>); same list as src/data/reservedLinks.js
         && !h.matches('^(admin|api|s|shop|shops|men|mens|women|womens|winter|shoes|wallets|watches|cart|checkout|account|orders|order-tracking|wallet|sell|seller|sellers|plans|pricing|login|signup|about|contact|terms|privacy|help|support|kyvro|official|owner|www|static|assets)$')
         && existsAfter(/databases/$(database)/documents/shops/$(request.resource.data.slug))
