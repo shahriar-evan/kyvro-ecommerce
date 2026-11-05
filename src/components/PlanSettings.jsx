@@ -76,6 +76,18 @@ export default function PlanSettings({ isDarkMode, staff, formatPrice }) {
         {tierBox('premium', 'Premium')}
       </div>
       <p className="text-[11px] text-gray-500">Pro and Premium: all products and all categories.</p>
+      {/* how many shops one seller account may have (the Free products count across all of them) */}
+      <div className={box}>
+        <p className="text-xs font-bold uppercase tracking-wider text-[#D4AF37]">Shops per seller account</p>
+        <div className="grid grid-cols-3 gap-3">
+          {[['free', 'Free'], ['pro', 'Pro'], ['premium', 'Premium']].map(([t, l]) => (
+            <label key={t} className="text-xs font-semibold text-gray-500">{l}
+              <input type="number" min="1" max="5" className={input} value={(draft.shopLimits || {})[t] ?? ''} onChange={(e) => setDraft((d) => ({ ...d, shopLimits: { ...(d.shopLimits || {}), [t]: e.target.value } }))} />
+            </label>
+          ))}
+        </div>
+        <p className="text-[11px] text-gray-500">1 to 5. Every new shop waits for your approval (Sellers tab). On Free, the {preview.freeLimit} products count across all shops.</p>
+      </div>
 
       {/* what each plan gets: ON / OFF per plan (a shop can still be switched one by one in Plan Members) */}
       <div className={`rounded border ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
