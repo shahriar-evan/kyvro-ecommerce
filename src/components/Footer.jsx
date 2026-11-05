@@ -1,5 +1,5 @@
 import React from 'react';
-import logoImg from '../assets/logo.png';
+import KyvroMark from './KyvroMark';
 
 export default function Footer({ onStartSelling, navHas = () => true, isDarkMode, setCurrentView, setSelectedCategory, customerUser, onSignIn, goAccount }) {
   return (
@@ -9,7 +9,7 @@ export default function Footer({ onStartSelling, navHas = () => true, isDarkMode
           <div className="space-y-4">
             {/* logo + name: centered on a phone (one column), left from 640px (grid columns) */}
             <div className="flex items-center justify-center sm:justify-start gap-3">
-              <img src={logoImg} alt="Kyvro Logo" className="h-10 sm:h-12 w-auto object-contain" />
+              <KyvroMark dark={isDarkMode} title="Kyvro logo" className="h-10 sm:h-12 w-auto shrink-0" />
               <div className="flex flex-col items-start">
                 <span className={`text-lg sm:text-xl font-serif font-bold tracking-widest ${isDarkMode ? 'text-white' : 'text-black'}`}>KYVRO</span>
                 <span className={`text-[8px] sm:text-[9px] tracking-[0.3em] font-sans -mt-1 ${isDarkMode ? 'text-[#D4AF37]' : 'text-black font-semibold'}`}>কাইভ্রো &bull; WEAR YOUR STORY</span>

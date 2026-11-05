@@ -1,5 +1,5 @@
 import React from 'react';
-import logoImg from '../assets/logo.png';
+import KyvroMark from './KyvroMark';
 
 // Shown to every visitor while the Owner has "Website maintenance" switched ON in Admin > Store Settings.
 // Team members never see this page: they keep using the real website and the admin panel.
@@ -7,7 +7,7 @@ export default function MaintenancePage({ message, isDarkMode, onTeamLogin }) {
   const text = (message || '').trim();
   return (
     <div className={`min-h-screen flex flex-col items-center justify-center px-6 text-center ${isDarkMode ? 'bg-[#0f0f0f] text-gray-100' : 'bg-white text-gray-900'}`}>
-      <img src={logoImg} alt="Kyvro" className="h-14 w-auto object-contain mb-8" />
+      <KyvroMark dark={isDarkMode} title="Kyvro" className="h-14 w-auto mb-8" />
       <div className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-6 ${isDarkMode ? 'bg-indigo-500/15' : 'bg-indigo-50'}`} aria-hidden="true">🛠️</div>
       <h1 className="text-2xl sm:text-3xl font-bold tracking-wide mb-3">We'll be back soon</h1>
       <p className={`text-base mb-1 max-w-md ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
