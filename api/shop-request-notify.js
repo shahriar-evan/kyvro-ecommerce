@@ -30,7 +30,9 @@ async function sellerApplied(req, res) {
   if (!/^[A-Za-z0-9]{10,128}$/.test(uid)) return res.status(400).json({ error: 'Bad seller.' });
   const token = await accessToken();
   const app = await readDoc(token, `sellers/${uid}`);
-  if (!app || app.status !== 'pending') return res.status(200).json({ sent: 0, reason: 'no waiting application' });
+  // a new seller's first shop is live at once ('approved'); older flow: 'pending'
+  if (!app || !['pending', 'approved'].includes(app.status)) return res.status(200).json({ sent: 0, reason: 'no new application' });
+  const live = app.status === 'approved';
   if (app.notified) return res.status(200).json({ sent: 0, reason: 'already notified' });
   const mark = await fetch(`${FS}/documents:commit`, {
     method: 'POST',
@@ -46,8 +48,8 @@ async function sellerApplied(req, res) {
   const owners = await ownerEmails(token);
   const shopName = String(shop.name || app.slug || '').slice(0, 60);
   const person = String(app.name || app.email || 'Someone').slice(0, 80);
-  const title = `Seller application: ${shopName}`;
-  const text = `${person} wants to sell on Kyvro (${String(app.district || '')}). Admin Portal -> Sellers -> Pending applications.`;
+  const title = live ? `New seller shop (live): ${shopName}` : `Seller application: ${shopName}`;
+  const text = live ? `${person} opened a shop on Kyvro (${String(app.district || '')}). It is live. Admin Portal -> Sellers.` : `${person} wants to sell on Kyvro (${String(app.district || '')}). Admin Portal -> Sellers -> Pending applications.`;
   const pushed = await pushToOwners(token, owners, title, text);
   const sl = app.socialLinks || {};
   const socials = [['Facebook', sl.facebook], ['Instagram', sl.instagram], ['TikTok', sl.tiktok]].filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(' · ') || String(app.pageLink || '');
@@ -56,13 +58,13 @@ async function sellerApplied(req, res) {
 <div style="max-width:560px;margin:0 auto;background:#fff">
   <div style="background:#0b0b0b;padding:20px 24px;color:#D4AF37;font-size:20px;letter-spacing:3px;font-weight:bold">KYVRO</div>
   <div style="padding:24px;font-size:15px;line-height:1.7">
-    <p>A new seller applied: <strong>${esc(shopName)}</strong>. The shop stays off until you approve it.</p>
+    <p>${live ? `A new seller opened a shop: <strong>${esc(shopName)}</strong>. It is live now; you can switch it off (kill switch) or remove it any time.` : `A new seller applied: <strong>${esc(shopName)}</strong>. The shop stays off until you approve it.`}</p>
     <table style="font-size:14px">${row('Name', app.name)}${row('Email', app.email)}${row('WhatsApp', app.whatsapp)}${row('District', app.district)}${row('Area', app.area)}${row('Social', socials)}${row('Categories', Array.isArray(app.categories) ? app.categories.join(', ') : '')}${row('Sub-categories', Array.isArray(app.subCategories) ? app.subCategories.join(', ') : '')}${row('Note', app.productNote)}</table>
-    <p>Open the Admin Portal, go to <strong>Sellers</strong> and press <strong>Approve</strong> or <strong>Reject</strong>.</p>
+    <p>Open the Admin Portal and go to <strong>Sellers</strong>${live ? '' : ' to press <strong>Approve</strong> or <strong>Reject</strong>'}.</p>
     <p><a href="${esc(SITE)}" style="display:inline-block;background:#D4AF37;color:#000;padding:10px 18px;text-decoration:none;font-weight:bold;border-radius:4px">Open Kyvro</a></p>
   </div>
 </div></body></html>`;
-  const plain = `A new seller applied: ${shopName}\nName: ${app.name || ''}\nEmail: ${app.email || ''}\nWhatsApp: ${app.whatsapp || ''}\nDistrict: ${app.district || ''}, ${app.area || ''}\nSocial: ${socials}\nCategories: ${Array.isArray(app.categories) ? app.categories.join(', ') : ''}\nSub-categories: ${Array.isArray(app.subCategories) ? app.subCategories.join(', ') : ''}\nNote: ${app.productNote || ''}\n\nAdmin Portal -> Sellers -> Approve / Reject.\n${SITE}`;
+  const plain = `A new seller applied: ${shopName}\nName: ${app.name || ''}\nEmail: ${app.email || ''}\nWhatsApp: ${app.whatsapp || ''}\nDistrict: ${app.district || ''}, ${app.area || ''}\nSocial: ${socials}\nCategories: ${Array.isArray(app.categories) ? app.categories.join(', ') : ''}\nSub-categories: ${Array.isArray(app.subCategories) ? app.subCategories.join(', ') : ''}\nNote: ${app.productNote || ''}\n\n${live ? 'The shop is live. Admin Portal -> Sellers (kill switch / remove).' : 'Admin Portal -> Sellers -> Approve / Reject.'}\n${SITE}`;
   const emailed = await emailOwners(owners, title, html, plain);
   return res.status(200).json({ sent: pushed, emailed });
 }

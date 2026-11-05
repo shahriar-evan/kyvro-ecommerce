@@ -132,7 +132,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
     if (rules && !rules.open) return setFormMsg('Kyvro is not taking new sellers right now. Please try again later.');
     // shop link name: kyvro.store/<handle> (3 to 30 letters a-z, 0-9, "-"; free; can be changed later)
     const handle = cleanHandle(f.handle);
-    if (!HANDLE_RE.test(handle)) return setFormMsg('Write a shop link name: 3 to 30 letters (a-z, 0-9 and -), e.g. rahim-fashion.');
+    if (!HANDLE_RE.test(handle)) return setFormMsg('Write a shop link name: 3 to 30 letters (a-z, 0-9 and -), e.g. rupa-style.');
     if (isReservedLink(handle)) return setFormMsg(`kyvro.store/${handle} is used by the website itself. Please choose another shop link.`);
     const bad = sellerNameBlocked(handle, '', rules);
     if (bad) return setFormMsg(`The shop link cannot contain "${bad}". Please choose another one.`);
@@ -254,19 +254,19 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
             <button type="button" onClick={() => setPlan('')} className="underline text-gray-500">Change plan</button>
           </div>
         )}
-        {(plan === 'pro' || plan === 'premium') && !seller && <p className="text-xs p-3 rounded border border-[#D4AF37]/50 text-[#D4AF37] bg-[#D4AF37]/10 font-semibold">{TIER_LABEL[plan]} plan: you pay after your shop is approved (Sell on Kyvro → plan card). Until then your shop is on the Free plan.</p>}
-        <p className="text-xs text-gray-500">Open your own shop link with Kyvro products, set your price (within the limit) and earn the markup on delivered orders. Kyvro takes the payment and delivers every order. Your shop goes live after Kyvro approves your application. We never ask for NID, passport or bank details.</p>
+        {(plan === 'pro' || plan === 'premium') && !seller && <p className="text-xs p-3 rounded border border-[#D4AF37]/50 text-[#D4AF37] bg-[#D4AF37]/10 font-semibold">{TIER_LABEL[plan]} plan: your shop opens on the Free plan; pay right after from the plan card in My Shop to switch on {TIER_LABEL[plan]}.</p>}
+        <p className="text-xs text-gray-500">Open your own shop link with Kyvro products, set your price (within the limit) and earn the markup on delivered orders. Kyvro takes the payment and delivers every order. Your first shop goes live right away (more shops on Pro / Premium are checked by Kyvro first). Shops not visited for 30 days are removed. We never ask for NID, passport or bank details.</p>
         <div className="grid sm:grid-cols-2 gap-3">
           {/* shop link name (any plan) + the shop name shown on the website (Premium) */}
           <label className="block text-xs font-semibold text-gray-500">Shop link *
             <div className={`mt-1 flex items-stretch rounded border overflow-hidden ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>
               <span className={`px-2 flex items-center text-[11px] whitespace-nowrap ${isDarkMode ? 'bg-[#1a1a1a] text-gray-400' : 'bg-gray-100 text-gray-500'}`}>kyvro.store/</span>
-              <input className={`${inputCls} !border-0 !rounded-none flex-1 min-w-0`} value={form.handle} maxLength={30} placeholder="rahim-fashion" onChange={(e) => set('handle', cleanHandle(e.target.value))} />
+              <input className={`${inputCls} !border-0 !rounded-none flex-1 min-w-0`} value={form.handle} maxLength={30} placeholder="rupa-style" onChange={(e) => set('handle', cleanHandle(e.target.value))} />
             </div>
             <span className="block mt-1 font-normal text-[11px]">Your shop's web address. Free on every plan. You can change it later in My Shop (once in 30 days; old links keep working).</span>
           </label>
           <label className="block text-xs font-semibold text-gray-500">Create Website Name <span className="font-normal">🔒 Premium</span>
-            <input className={`${inputCls} block mt-1 w-full opacity-60`} value={prettyHandle(form.handle)} placeholder="Rahim Fashion" readOnly disabled />
+            <input className={`${inputCls} block mt-1 w-full opacity-60`} value={prettyHandle(form.handle)} placeholder="Rupa Style" readOnly disabled />
             <span className="block mt-1 font-normal text-[11px]">Until you create one (Premium), your shop shows its link name like this. Upgrade to Premium to create your own Website Name.</span>
           </label>
           {field('name', 'Full name *', { maxLength: 80 })}
@@ -317,8 +317,8 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
   return (
     <div className="space-y-5">
       <div className={`rounded-lg border p-4 text-xs flex flex-wrap items-center justify-between gap-2 ${approved ? 'border-green-600/40 bg-green-600/10 text-green-600' : 'border-amber-500/40 bg-amber-500/10 text-amber-600'}`}>
-        <span className="font-bold uppercase tracking-wider">{approved ? 'Approved' : 'Pending approval'}</span>
-        <span>{approved ? 'Your shop is approved. Free plan: 10 products, upgrade any time for all.' : 'Kyvro is checking your application. You can already choose products; your link starts working after approval.'}</span>
+        <span className="font-bold uppercase tracking-wider">{approved ? 'Your shop is live' : 'Pending approval'}</span>
+        <span>{approved ? `Choose your products below and share your link. Free plan: ${plans.freeLimit} products, upgrade any time for all.` : 'Kyvro is checking your application. You can already choose products; your link starts working after approval.'}</span>
       </div>
       {!approved && (
         <div className={card}>

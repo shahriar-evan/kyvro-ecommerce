@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { askConfirm, askInput } from './AlertCenter';
 import { watchAllShops, acceptShop } from '../shops';
+import { auth } from '../firebase';
+import { doc, updateDoc, getFirestore } from 'firebase/firestore';
+import { getApp } from 'firebase/app';
 import { watchSellers, watchSellerPayouts, watchSubscriptions, killSellerShop, reviveSellerShop, removeSeller, watchSellerRules, saveSellerRules, sellerStatus, approveSeller, rejectSeller, rejectSellerShop, sellerShopList } from '../sellers';
 import { formatDateTime } from '../utils/dates';
 import { watchPayouts, addPayout } from '../payouts';
@@ -57,6 +60,22 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
     return { ...s, tier, feat, shop, shopCount: own.size, orders: mine.length, earned, paid, due: earned - paid, until, bkash: (bkash[s.uid] || {}).bkash || '' };
   }).sort((a, b) => b.due - a.due), [sellers, shops, orders, payouts, subs, bkash, plans]);
 
+  // days since the seller last signed in (shops without orders are removed after 30 days without a visit)
+  const seenDays = (s) => { const t = toMillis(s.lastSeenAt) || toMillis(s.createdAt); return t ? Math.floor((Date.now() - t) / 86400000) : null; };
+  const seenText = (s) => { const d = seenDays(s); return d === null ? '' : d <= 0 ? 'seen today · ' : `seen ${d} day${d === 1 ? '' : 's'} ago${d >= 25 ? ' (Free, no open orders, nothing due: removed at 30 days, 60 if paid before)' : d >= 7 ? ' (warned by email)' : ''} · `; };
+  // Owner: warn a seller about one shop (note saved on the shop and emailed to the seller), before removing it
+  const warnShop = async (x) => {
+    const note = await askInput(`Warning for "${x.name}" (the seller sees it on My Shop and gets it by email):`);
+    if (!note || !String(note).trim()) return;
+    act(x.slug, async () => {
+      const t = await auth.currentUser.getIdToken();
+      const r = await fetch('/api/plan?action=warn', { method: 'POST', headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ slug: x.slug, note: String(note).trim() }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || 'Could not send the warning.');
+    }, 'Warning sent to the seller.');
+  };
+  // a shop hidden by the daily job (seller inactive, but with open orders or money due): live again
+  const unholdShop = (x) => act(x.slug, () => updateDoc(doc(getFirestore(getApp()), 'shops', x.slug), { active: true, inactiveHold: false, updatedAt: new Date().toISOString() }), `"${x.name}" is live again.`);
   const card = `p-5 sm:p-6 rounded-lg border space-y-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`;
   const btn = 'px-3 py-1.5 rounded text-[11px] font-bold';
   const act = async (key, fn, ok) => { setBusy(key); setMsg(null); try { await fn(); if (ok) setMsg({ type: 'ok', text: ok }); } catch (e) { setMsg({ type: 'err', text: e.message }); } setBusy(''); };
@@ -73,7 +92,7 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
     act(r.uid, () => killSellerShop(r.slug, note), 'Shop switched off.');
   };
   const remove = async (r) => {
-    if (!(await askConfirm(`Remove the seller ${r.email} and their shop? Their orders stay. The account could open a new shop later.`, { danger: true, confirmText: 'Remove' }))) return;
+    if (!(await askConfirm(`Remove the seller ${r.email} and all their shops now? Their orders stay. The account could open a new shop later.`, { danger: true, confirmText: 'Remove' }))) return;
     act(r.uid, () => removeSeller(r), 'Seller removed.');
   };
   const staff = { email: loggedInUserEmail, name: adminName };
@@ -194,7 +213,7 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
                         {r.tier !== 'free' && <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase align-middle ${r.tier === 'premium' ? 'bg-black text-[#D4AF37] border border-[#D4AF37]' : 'bg-[#D4AF37] text-black'}`}>{r.tier === 'premium' ? 'Premium' : 'Pro'}</span>}
                         {r.feat.weeklyPayout && <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase align-middle bg-green-600 text-white">Weekly payout</span>}
                         <span className="font-normal text-gray-500"> · {r.name || ''} {r.email}</span></p>
-                      <p className="text-gray-500 break-all">{window.location.origin}/{(r.shop && r.shop.handle) || r.slug} · {r.shop ? Object.keys(r.shop.items || {}).length : 0} products · {r.shopCount > 1 ? `${r.shopCount} shops · ` : ''}{r.orders} order(s) · {r.until > Date.now() ? `${r.tier === 'premium' ? 'Premium' : 'Pro'} until ${new Date(r.until).toLocaleDateString('en-GB')}` : 'Free plan'}</p>
+                      <p className="text-gray-500 break-all">{window.location.origin}/{(r.shop && r.shop.handle) || r.slug} · {r.shop ? Object.keys(r.shop.items || {}).length : 0} products · {seenText(r)}{r.shopCount > 1 ? `${r.shopCount} shops · ` : ''}{r.orders} order(s) · {r.until > Date.now() ? `${r.tier === 'premium' ? 'Premium' : 'Pro'} until ${new Date(r.until).toLocaleDateString('en-GB')}` : 'Free plan'}</p>
                       <p className="text-gray-500">bKash: {r.bkash || 'not given yet'}</p>
                       {r.shop && r.shop.killed && <p className="text-red-500 font-semibold">Switched off by you{r.shop.killNote ? `: ${r.shop.killNote}` : ''}</p>}
                     </div>
@@ -210,6 +229,31 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
                         : <button type="button" disabled={busy === r.uid} onClick={() => kill(r)} className={`${btn} bg-red-600 text-white disabled:opacity-50`}>Kill switch</button>)}
                       <button type="button" disabled={busy === r.uid} onClick={() => remove(r)} className={`${btn} border border-red-500 text-red-500 disabled:opacity-50`}>Remove</button>
                     </div>
+                  </div>
+                  {/* every shop of this seller: warn first (with a note), then remove if needed */}
+                  <div className={`rounded border divide-y divide-gray-500/15 ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
+                    {sellerShopList(r).map((slug) => shops[slug]).filter(Boolean).map((x) => {
+                      const first = x.slug === r.slug;
+                      const state = x.status === 'pending' ? 'WAITING' : x.inactiveHold ? 'HIDDEN (inactive)' : x.killed ? 'KILLED' : x.active === false ? 'OFF' : 'LIVE';
+                      return (
+                        <div key={x.slug} className="p-2 flex flex-wrap items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-semibold">{x.name}{first ? '' : ' (extra shop)'} <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${state === 'LIVE' ? 'bg-green-600 text-white' : 'bg-amber-500 text-black'}`}>{state}</span></p>
+                            <p className="text-gray-500 break-all">{window.location.origin}/{x.handle || x.slug}</p>
+                            {x.warning && x.warning.note && <p className="text-amber-600">Warned {String(x.warning.at || '').slice(0, 10)}: {x.warning.note}</p>}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <button type="button" disabled={!!busy} onClick={() => warnShop(x)} className={`${btn} border border-amber-500 text-amber-600 disabled:opacity-50`}>Warn</button>
+                            {x.inactiveHold && <button type="button" disabled={!!busy} onClick={() => unholdShop(x)} className={`${btn} border border-green-600 text-green-600 disabled:opacity-50`}>Make live</button>}
+                            <button type="button" disabled={!!busy} onClick={async () => {
+                              if (first) { remove(r); return; }
+                              if (!(await askConfirm(`Remove the shop "${x.name}" now? Its link stops working; orders stay.`, { danger: true, confirmText: 'Remove' }))) return;
+                              act(x.slug, () => rejectSellerShop(r, x.slug), `"${x.name}" was removed.`);
+                            }} className={`${btn} border border-red-500 text-red-500 disabled:opacity-50`}>{first ? 'Remove (all)' : 'Remove'}</button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );

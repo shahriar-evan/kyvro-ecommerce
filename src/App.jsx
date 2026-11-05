@@ -6,6 +6,7 @@ import { auth, googleProvider } from './firebase';
 import { isOwnerEmail } from './adminEmails';
 import { getAdminStatus, watchAdminAccess, MAX_COMMISSION } from './adminAuth';
 import { watchShop, watchMyShop, watchShopOwners, SLUG_RE, resolveShopKey, shopLinkKey } from './shops';
+import { touchSellerSeen } from './sellers';
 import { isReservedLink, ROOT_LINK_RE } from './data/reservedLinks';
 import { shopPriceClamp, productInCollection } from './data/shopConfig';
 import { placeOrder, watchOrders, cancelMyOrder } from './orders';
@@ -104,13 +105,18 @@ export default function App() {
     resolveShopKey(shopKey).then((id) => { if (live) setShopSlug(id); });
     return () => { live = false; };
   }, [shopKey]);
-  const [shopDoc, setShopDoc] = useState(undefined); // undefined = loading, null = not found or switched off
+  // a seller's extra shop (2nd / 3rd) is hidden while the account's paid plan has ended (not deleted; shows again after renewing)
+  const shopVisibleToAll = (d) => !!d && d.active !== false && d.status !== 'pending' && !(d.extra && !(shopIsPaid(d)));
+  const [shopRaw, setShopRaw] = useState(undefined); // undefined = loading, null = not found
   useEffect(() => {
     if (!shopSlug) return undefined;
-    // a seller's extra shop (2nd / 3rd) is hidden while the account's paid plan has ended (not deleted; shows again after renewing)
-    const visible = (d) => !!d && d.active !== false && !(d.extra && !(shopIsPaid(d)));
-    return watchShop(shopSlug, (d) => setShopDoc(visible(d) ? d : null), () => setShopDoc(null));
+    return watchShop(shopSlug, (d) => setShopRaw(d || null), () => setShopRaw(null));
   }, [shopSlug]);
+  // a shop that is not live (waiting for approval, switched off, hidden): customers get "not found", but the team and the
+  // shop's own owner see a preview with a notice on top (set below, once the login is known)
+  const [shopPreviewOk, setShopPreviewOk] = useState(false);
+  const shopDoc = shopRaw === undefined ? undefined : shopVisibleToAll(shopRaw) || (shopRaw && shopPreviewOk) ? shopRaw : null;
+  const shopPreview = !!shopRaw && !shopVisibleToAll(shopRaw) && shopPreviewOk;
   const shopCtx = shopSlug && shopDoc ? shopDoc : null; // the active shop (null = the main store)
   const shopLoading = !!shopKey && (!shopSlug || shopDoc === undefined);
   // the old ?shop=<key> form, an old link name (alias) or the shop id: move the address bar to kyvro.store/<current link>
@@ -341,6 +347,12 @@ export default function App() {
 
   // Admin & Firebase Auth States
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  // a not-live shop: the team (Owner / Manager / Admin) and the shop's own owner may preview it
+  useEffect(() => {
+    setShopPreviewOk(!!shopRaw && (isAdminLoggedIn || (!!customerUser && customerUser.uid === shopRaw.ownerUid)));
+  }, [shopRaw, isAdminLoggedIn, customerUser]);
+  // a seller who signs in counts as active (unused shops are removed after 30 days without a visit)
+  useEffect(() => { if (customerUser && customerUser.uid) touchSellerSeen(customerUser.uid); }, [customerUser && customerUser.uid]); // eslint-disable-line react-hooks/exhaustive-deps
   // Maintenance mode: visitors can browse everything, but ordering is locked (team members can still test-order)
   const visitorLocked = storeSettings.maintenanceMode === true && !isAdminLoggedIn;
   const lockText = ((storeSettings.maintenanceMessage || '').trim()) || "ওয়েবসাইটে কাজ চলছে, অর্ডার সাময়িক বন্ধ, কিন্তু added to cart করে রাখতে পারবেন। পরবর্তীতে ওয়েবসাইট পুনরায় চালু হলে পেমেন্ট করতে পারবেন অথবা ম্যানুয়ালি অর্ডার করতে WhatsApp এ যোগাযোগ করুন।\n\nMaintenance mode is ON. Ordering is paused for a little while, but you can keep items in your cart and pay when the website opens again, or contact us on WhatsApp to order manually.";
@@ -1295,6 +1307,11 @@ export default function App() {
       <Header shopBrand={shopBrand} onStartSelling={startSelling} cart={cart} curr={curr} currencyKey={currencyKey} currentView={currentView} isDarkMode={isDarkMode} setCurrencyKey={setCurrencyKey} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} setIsDarkMode={setIsDarkMode} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} navHas={navHas} customerUser={customerUser} displayName={displayName} photoURL={photoURL} goAccount={goAccount} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} />
       {/* a shop link: who sells it (a public seller is not Kyvro itself), Verified for Premium, the Pro / Premium page
           extras (tagline, contact, about, social links) and the Premium ones (announcement, brand color, top picks) */}
+      {shopPreview && currentView !== 'admin' && (
+        <div className="px-4 py-2.5 text-center text-xs font-semibold bg-amber-500 text-black" role="status">
+          Preview: this shop is not live yet{shopRaw.status === 'pending' ? ' (waiting for Kyvro\'s approval)' : shopRaw.killed ? ' (switched off by Kyvro)' : shopRaw.active === false ? ' (switched off)' : ' (hidden: the paid plan has ended)'}. Only you can see it; customers get "page not found".
+        </div>
+      )}
       {shopCtx && currentView !== 'admin' && (() => {
         const ex = shopExtrasOf(shopCtx);
         const f = shopFeat;

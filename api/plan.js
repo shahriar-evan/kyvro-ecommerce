@@ -6,16 +6,18 @@
 //   GET  /api/plan?action=reminders   daily reminder emails (Vercel Cron, needs CRON_SECRET)
 //   POST /api/plan?action=seller-earnings  a public seller's markup per order (no customer details)
 //   POST /api/plan?action=comp        the Owner gives or ends a plan by hand (Plan Members)
+//   POST /api/plan?action=warn        the Owner warns a seller about a shop (note saved on the shop + emailed)
 import init from './_plan/init.js';
 import callback from './_plan/callback.js';
 import sync from './_plan/sync.js';
 import reminders from './_plan/reminders.js';
 import sellerEarnings from './_plan/seller.js';
 import comp from './_plan/comp.js';
+import warn from './_plan/warn.js';
 
 export const config = { maxDuration: 60 };
 
-const ACTIONS = { init, callback, sync, reminders, 'seller-earnings': sellerEarnings, comp };
+const ACTIONS = { init, callback, sync, reminders, 'seller-earnings': sellerEarnings, comp, warn };
 
 export default async function handler(req, res) {
   const action = String((req.query && req.query.action) || '');

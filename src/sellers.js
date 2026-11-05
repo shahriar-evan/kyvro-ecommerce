@@ -10,7 +10,10 @@ const db = getFirestore(getApp());
 // is private (sellers/{uid}: the seller and the Owner read it). Where the markup is paid (bKash) is in sellerPayout/{uid}:
 // the seller writes it, only the Owner reads it. Sellers never see supplier data or customers' details.
 
-export const DEFAULT_BLOCKED_WORDS = ["kyvro", "official", "admin", "owner", "support"];
+// big brand names can never be part of a seller's shop name or link (always added to the Owner's list; also in
+// firestore.rules: brandRe). The Owner can add more words in Sellers -> Seller settings.
+export const BRAND_WORDS = ["nike", "adidas", "gucci", "zara", "apple", "puma", "reebok", "chanel", "prada", "dior", "versace", "armani", "rolex", "samsung", "uniqlo", "balenciaga", "burberry", "fendi", "hermes", "vuitton", "levis"];
+export const DEFAULT_BLOCKED_WORDS = ["kyvro", "official", "admin", "owner", "support", ...BRAND_WORDS];
 const escapeRe = (w) => String(w).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 // the regex the Firestore rules use (whole-text match, lower case); no words = nothing is blocked
 export const blockedRegexFor = (words) => {
@@ -18,7 +21,8 @@ export const blockedRegexFor = (words) => {
   return list.length ? `.*(${list.map(escapeRe).join("|")}).*` : "^$";
 };
 export const normalizeSellerRules = (r) => {
-  const words = Array.isArray(r && r.blockedWords) ? r.blockedWords.map((w) => String(w || "").trim().toLowerCase()).filter(Boolean).slice(0, 100) : DEFAULT_BLOCKED_WORDS;
+  const saved = Array.isArray(r && r.blockedWords) ? r.blockedWords.map((w) => String(w || "").trim().toLowerCase()).filter(Boolean).slice(0, 100) : DEFAULT_BLOCKED_WORDS;
+  const words = [...new Set([...saved, ...BRAND_WORDS])];
   return { open: !r || r.open !== false, blockedWords: words };
 };
 // the same check as firestore.rules, so the seller sees a clear message first
@@ -63,8 +67,9 @@ const cleanSellerSocials = (s) => Object.fromEntries(["facebook", "instagram", "
 // "Men's › Shirt" (category › sub-category)
 const cleanSubs = (list) => (Array.isArray(list) ? list : []).map((c) => String(c).slice(0, 80)).slice(0, 60);
 
-// Apply to sell: one batch writes the shop (OFF, 'pending') and the application (sellers/{uid}, 'pending').
-// The rules allow it once per account, and again only after the Owner rejected the last application.
+// Apply to sell: one batch writes the shop and the application (sellers/{uid}). The FIRST shop is live at once (approved,
+// on); the Owner gets a notification and can switch it off (kill switch) or remove it. More shops (Pro / Premium) wait
+// for the Owner's approval. The rules allow it once per account, and again only after a rejection or removal.
 // handle = the shop link name (kyvro.store/<handle>). The shop shows its pretty link name until it creates a
 // Website Name (Premium). The shop id (slug) is the handle plus 4 random letters and never changes.
 export async function applyAsSeller({ uid, email, handle, details }) {
@@ -78,8 +83,8 @@ export async function applyAsSeller({ uid, email, handle, details }) {
     autoName: true,
     ownerUid: uid,
     kind: "seller",
-    active: false,
-    status: "pending",
+    active: true,
+    status: "approved",
     items: {},
     createdAt: serverTimestamp(),
     updatedAt: new Date().toISOString(),
@@ -100,8 +105,9 @@ export async function applyAsSeller({ uid, email, handle, details }) {
     agreed: details.agreed === true,
     // every shop of this seller (the first one is this application's shop; more by plan: Free 1, Pro 2, Premium 3)
     shops: [slug],
-    status: "pending",
+    status: "approved",
     createdAt: serverTimestamp(),
+    lastSeenAt: serverTimestamp(),
   });
   await b.commit();
   // phone notification + email to the Owner (best effort; the application also shows in the Owner's Sellers tab)
@@ -111,6 +117,18 @@ export async function applyAsSeller({ uid, email, handle, details }) {
 
 // ---- More shops (Pro 2, Premium 3): an approved seller asks for another shop. It starts OFF and 'pending' until the
 // Owner approves it (Sellers tab -> New shop requests); the Owner gets a phone notification. ----
+// the seller visited the website (signed in): unused shops are removed after 30 days without a visit (daily job).
+// At most once a day per device; nothing happens for an account that is not a seller.
+export async function touchSellerSeen(uid) {
+  if (!uid) return;
+  try {
+    const k = `kyvro_seen_${uid}`;
+    const today = new Date().toISOString().slice(0, 10);
+    if (localStorage.getItem(k) === today) return;
+    await updateDoc(doc(db, "sellers", uid), { lastSeenAt: serverTimestamp() });
+    localStorage.setItem(k, today);
+  } catch (e) { /* not a seller, or offline */ }
+}
 export const sellerShopList = (seller) => (seller && Array.isArray(seller.shops) && seller.shops.length ? seller.shops : seller && seller.slug ? [seller.slug] : []);
 export async function requestSellerShop({ uid, seller, handle, categories }) {
   const slug = `${slugify(handle)}-${rand()}`;

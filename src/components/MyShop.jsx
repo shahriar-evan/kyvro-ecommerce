@@ -413,7 +413,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
         <h3 className="text-lg font-bold">Create my shop</h3>
         <p className="text-xs text-gray-500">You get your own link, and you earn the markup. Customers who open it see the same Kyvro store, but only the products you choose, at the price you set (within the allowed limit). Everything above the store price is your earning.{!isOwner && adminRole === 'admin' ? ' Orders from your own shop earn the markup, not commission. Your shop starts switched off: the Owner gets a notification and turns it on when they accept it.' : ' Admins can share your link and confirm its orders; they earn commission, not the markup.'}</p>
         <div className="flex flex-wrap gap-2 items-center">
-          <input className={`${inputCls} w-64`} placeholder="Shop name, e.g. Rahim Fashion" maxLength={60} value={newName} onChange={(e) => setNewName(e.target.value)} />
+          <input className={`${inputCls} w-64`} placeholder="Shop name, e.g. Rupa Style" maxLength={60} value={newName} onChange={(e) => setNewName(e.target.value)} />
           <button type="button" disabled={busy} onClick={doCreate} className="bg-[#D4AF37] text-black font-bold px-5 py-2 rounded text-xs uppercase tracking-wider disabled:opacity-50">{busy ? 'Creating...' : 'Create shop'}</button>
         </div>
         {msg && <p className={`text-xs ${msg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{msg.text}</p>}
@@ -463,6 +463,18 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
       {extraHidden && (
         <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-4 text-xs text-amber-600 font-semibold">
           Your paid plan has ended, so this shop is hidden from customers (nothing is deleted). Your first shop stays on the Free plan. Renew Pro / Premium below and this shop shows again.
+        </div>
+      )}
+      {shop.warning && shop.warning.note && (
+        <div className="rounded-2xl border border-red-500/50 bg-red-500/10 p-4 text-xs text-red-500">
+          <p className="font-bold uppercase tracking-wider">Warning from Kyvro</p>
+          <p className="mt-1 font-semibold">{shop.warning.note}</p>
+          <p className="mt-1 text-[11px] opacity-80">Please fix this soon, otherwise the shop may be removed. Questions: kyvrofashion@gmail.com</p>
+        </div>
+      )}
+      {shop.inactiveHold && (
+        <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-4 text-xs text-amber-600 font-semibold">
+          This shop is hidden from customers because nobody signed in for a long time while it still has open orders or money due. Kyvro makes it live again after those are cleared.
         </div>
       )}
       {/* 1. the shop: link + name */}
