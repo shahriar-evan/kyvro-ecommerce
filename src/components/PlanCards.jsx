@@ -59,12 +59,12 @@ export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mo
                   {premium ? <Gem size={15} /> : <Rocket size={15} />}{t.badge}
                 </span>
               )}
-              <p className={`mt-1 flex items-center gap-2 text-xl sm:text-2xl font-bold uppercase tracking-[0.14em] ${pro || premium ? 'text-[#D4AF37]' : ''}`}><Icon size={22} />{t.name}{current && <span className="ml-auto normal-case tracking-normal text-[10px] px-2 py-0.5 rounded-full bg-green-600 text-white">{T.current}</span>}</p>
-              <p className={`text-sm mt-1 ${muted}`}>{t.blurb}</p>
+              <p className={`mt-1 flex items-center justify-center gap-2 text-xl sm:text-2xl font-bold uppercase tracking-[0.14em] ${pro || premium ? 'text-[#D4AF37]' : ''}`}><Icon size={22} />{t.name}{current && <span className="ml-1 normal-case tracking-normal text-[10px] px-2 py-0.5 rounded-full bg-green-600 text-white">{T.current}</span>}</p>
+              <p className={`text-sm mt-1 text-center ${muted}`}>{t.blurb}</p>
 
-              <div className="mt-5 min-h-[5.5rem]">
+              <div className="mt-5 min-h-[5.5rem] text-center">
                 {cfg && cfg.discount > 0 && (
-                  <p className="flex items-center gap-2">
+                  <p className="flex items-center justify-center gap-2">
                     <span className={`text-base line-through ${muted}`}>{formatPrice(cfg.price)}</span>
                     <span className="px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold">{fill(T.off, cfg.discount, lang)}</span>
                   </p>
