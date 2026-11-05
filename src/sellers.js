@@ -65,7 +65,7 @@ const cleanSubs = (list) => (Array.isArray(list) ? list : []).map((c) => String(
 
 // Apply to sell: one batch writes the shop (OFF, 'pending') and the application (sellers/{uid}, 'pending').
 // The rules allow it once per account, and again only after the Owner rejected the last application.
-// handle = the shop link name (kyvro.store/?shop=<handle>). The shop shows its pretty link name until it creates a
+// handle = the shop link name (kyvro.store/<handle>). The shop shows its pretty link name until it creates a
 // Website Name (Premium). The shop id (slug) is the handle plus 4 random letters and never changes.
 export async function applyAsSeller({ uid, email, handle, details }) {
   const name = (prettyHandle(handle) || String(handle || "")).slice(0, 60);

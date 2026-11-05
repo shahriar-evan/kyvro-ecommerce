@@ -5,7 +5,8 @@ import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, signOu
 import { auth, googleProvider } from './firebase';
 import { isOwnerEmail } from './adminEmails';
 import { getAdminStatus, watchAdminAccess, MAX_COMMISSION } from './adminAuth';
-import { watchShop, watchMyShop, watchShopOwners, SLUG_RE, resolveShopKey } from './shops';
+import { watchShop, watchMyShop, watchShopOwners, SLUG_RE, resolveShopKey, shopLinkKey } from './shops';
+import { isReservedLink, ROOT_LINK_RE } from './data/reservedLinks';
 import { shopPriceClamp, productInCollection } from './data/shopConfig';
 import { placeOrder, watchOrders, cancelMyOrder } from './orders';
 import { watchProfile, saveProfile, watchMyOrders } from './customerData';
@@ -79,9 +80,17 @@ export default function App() {
   const pendingCount = products.filter(p => !isApproved(p)).length;
 
   // ---- Admin shop link: kyvro.store/?shop=name shows only that shop's products, at that shop's prices ----
-  // ?shop=<key>: the shop's link name (handle) or its id; shopSlug below is the shop id it points to
+  // kyvro.store/<key> (or the old kyvro.store/?shop=<key>): the shop's link name, an old alias or its id; shopSlug below
+  // is the shop id it points to. A path that is one of the site's own routes (RESERVED_LINKS) is never a shop.
+  const [pathShop] = useState(() => {
+    try {
+      const seg = decodeURIComponent(window.location.pathname.replace(/^\/+|\/+$/g, ''));
+      return ROOT_LINK_RE.test(seg) && !isReservedLink(seg) ? seg : '';
+    } catch (e) { return ''; }
+  });
   const [shopKey] = useState(() => {
     try {
+      if (pathShop) { sessionStorage.setItem('kyvro_shop', pathShop); return pathShop; }
       const q = String(new URLSearchParams(window.location.search).get('shop') || '').toLowerCase();
       if (SLUG_RE.test(q)) { sessionStorage.setItem('kyvro_shop', q); return q; }
       const saved = sessionStorage.getItem('kyvro_shop') || '';
@@ -102,16 +111,21 @@ export default function App() {
   }, [shopSlug]);
   const shopCtx = shopSlug && shopDoc ? shopDoc : null; // the active shop (null = the main store)
   const shopLoading = !!shopKey && (!shopSlug || shopDoc === undefined);
-  // an old link name (alias) or the shop id: show the shop's current link in the address bar; the tab shows its name
+  // the old ?shop=<key> form, an old link name (alias) or the shop id: move the address bar to kyvro.store/<current link>
   useEffect(() => {
     if (!shopCtx) return;
     try {
-      if (shopCtx.handle && shopKey !== shopCtx.handle && new URLSearchParams(window.location.search).get('shop')) {
-        window.history.replaceState(window.history.state, '', `${window.location.pathname}?shop=${shopCtx.handle}`);
-        sessionStorage.setItem('kyvro_shop', shopCtx.handle);
+      const key = shopLinkKey(shopCtx);
+      const viaQuery = !!new URLSearchParams(window.location.search).get('shop');
+      if (key && (viaQuery || (pathShop && pathShop !== key))) {
+        window.history.replaceState(window.history.state, '', `/${key}`);
+        sessionStorage.setItem('kyvro_shop', key);
       }
     } catch (e) { /* ignore */ }
-  }, [shopCtx && shopCtx.handle]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [shopCtx && shopLinkKey(shopCtx)]); // eslint-disable-line react-hooks/exhaustive-deps
+  // kyvro.store/<something> that is no shop (or a shop that is off): a "not found" page, and the main store afterwards
+  const pathNotFound = !!pathShop && !!shopSlug && shopDoc === null;
+  useEffect(() => { if (pathNotFound) { try { sessionStorage.removeItem('kyvro_shop'); } catch (e) { /* ignore */ } } }, [pathNotFound]);
   // shop plans: a shop whose paid plan ran out shows only its best sellers (the rest are hidden, not deleted)
   const [plans, setPlans] = useState(() => normalizePlans(null));
   useEffect(() => (shopSlug ? watchPlans(setPlans) : undefined), [shopSlug]);
@@ -1337,7 +1351,15 @@ export default function App() {
       {isCartOpen && <CartDrawer storeSettings={storeSettings} cart={cart} formatPrice={formatPrice} isDarkMode={isDarkMode} removeFromCart={removeFromCart} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} subtotal={subtotal} discount={discount} discountLabel={discountLabel} reward={reward} updateCartQty={updateCartQty} />}
 
       {/* HOME VIEW */}
-      {currentView === 'home' && <HomeView requestAdd={requestAdd} addToCart={addToCart} banners={banners} calculateDiscountPercent={calculateDiscountPercent} currentBannerIndex={currentBannerIndex} formatPrice={formatPrice} isDarkMode={isDarkMode} products={storefrontProducts} hideEmptyCategories={!!shopCtx} setCurrentBannerIndex={setCurrentBannerIndex} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} savedIds={savedIds} toggleSaved={toggleSaved} />}
+      {currentView === 'home' && pathNotFound && (
+        <div className="max-w-xl mx-auto px-4 py-24 text-center">
+          <p className="text-6xl font-extrabold text-[#D4AF37]">404</p>
+          <h1 className="mt-3 text-xl font-bold">This page was not found</h1>
+          <p className="mt-2 text-sm text-gray-500">There is no shop at kyvro.store/{pathShop}, or the shop is switched off right now.</p>
+          <a href="/" className="mt-6 inline-flex px-6 py-3 rounded-full bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black text-xs font-bold uppercase tracking-widest">Go to Kyvro</a>
+        </div>
+      )}
+      {currentView === 'home' && !pathNotFound && <HomeView requestAdd={requestAdd} addToCart={addToCart} banners={banners} calculateDiscountPercent={calculateDiscountPercent} currentBannerIndex={currentBannerIndex} formatPrice={formatPrice} isDarkMode={isDarkMode} products={storefrontProducts} hideEmptyCategories={!!shopCtx} setCurrentBannerIndex={setCurrentBannerIndex} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} savedIds={savedIds} toggleSaved={toggleSaved} />}
 
       {/* SHOP CATALOG VIEW */}
       {currentView === 'shop' && <ShopView selectedSubCategory={selectedSubCategory} setSelectedSubCategory={setSelectedSubCategory} requestAdd={requestAdd} addToCart={addToCart} filteredProducts={filteredProducts} formatPrice={formatPrice} isDarkMode={isDarkMode} products={storefrontProducts} searchQuery={searchQuery} selectedCategory={selectedCategory} setCurrentView={setCurrentView} setSearchQuery={setSearchQuery} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} setSortBy={setSortBy} sortBy={sortBy} savedIds={savedIds} toggleSaved={toggleSaved} />}
