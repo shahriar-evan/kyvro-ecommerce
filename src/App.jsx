@@ -1390,7 +1390,7 @@ export default function App() {
       })()}
 
       {/* MOBILE MENU DRAWER */}
-      {isMobileMenuOpen && <MobileMenu navHas={navHas} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} />}
+      {isMobileMenuOpen && <MobileMenu navHas={navHas} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} setCurrentView={setCurrentView} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} />}
 
       {/* CART SLIDE-OVER DRAWER */}
       {quickAdd && <QuickAdd product={quickAdd.product} goCheckout={quickAdd.goCheckout} onConfirm={confirmQuickAdd} onClose={() => setQuickAdd(null)} formatPrice={formatPrice} isDarkMode={isDarkMode} />}

@@ -26,7 +26,7 @@ const JacketIcon = mk(<>
   <path d="M12 5.8V21" />
 </>);
 
-export default function MobileMenu({ navHas = () => true, isDarkMode, setCurrentView, setIsMobileMenuOpen, setSelectedCategory }) {
+export default function MobileMenu({ navHas = () => true, isDarkMode, setIsDarkMode, setCurrentView, setIsMobileMenuOpen, setSelectedCategory }) {
   const close = () => setIsMobileMenuOpen(false);
   const items = ([
     { label: 'Home', sub: 'Back to the front page', icon: Home, go: () => setCurrentView('home') },
@@ -43,14 +43,24 @@ export default function MobileMenu({ navHas = () => true, isDarkMode, setCurrent
         <div className={`kyvro-slide w-[85%] max-w-sm h-full flex flex-col justify-between shadow-2xl ${isDarkMode ? 'bg-[#121212] text-white' : 'bg-white text-black'}`}>
           <div>
             <div className={`flex justify-between items-center px-6 pt-6 pb-5 border-b ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
-              <div>
-                <div className="text-2xl font-serif font-bold tracking-widest">KYVRO</div>
-                <div className="text-[10px] tracking-[0.3em] text-[#D4AF37] font-semibold mt-0.5">কাইভ্রো &bull; WEAR YOUR STORY</div>
+              <div className="flex items-center gap-2 whitespace-nowrap leading-none">
+                <span className="text-2xl font-serif font-bold tracking-widest">KYVRO</span>
+                <span className="text-[#D4AF37] text-2xl" aria-hidden="true">&bull;</span>
+                <span className="text-xl font-bold" lang="bn">কাইভ্রো</span>
               </div>
               <button onClick={close} aria-label="Close menu" className={`w-10 h-10 rounded-full flex items-center justify-center transition ${isDarkMode ? 'bg-white/10 text-gray-300 hover:bg-white/20' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
                 <X size={20} />
               </button>
             </div>
+            {setIsDarkMode && (
+              <div className={`mx-4 mt-4 flex items-center justify-between rounded-xl border px-4 py-3 ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
+                <span className="text-sm font-semibold">{isDarkMode ? 'Dark mode' : 'Light mode'}</span>
+                <button type="button" role="switch" aria-checked={isDarkMode} aria-label="Dark mode" onClick={() => setIsDarkMode(!isDarkMode)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${isDarkMode ? 'bg-[#D4AF37]' : 'bg-gray-300'}`}>
+                  <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${isDarkMode ? 'translate-x-[22px]' : 'translate-x-[2px]'}`} />
+                </button>
+              </div>
+            )}
             <nav className="px-4 py-4 flex flex-col gap-1">
               {items.map(({ label, sub, icon: Icon, go }) => (
                 <button
