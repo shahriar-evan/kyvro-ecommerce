@@ -251,7 +251,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
     if (n === String(shop.name || '').trim()) return;
     const shopTier = isOwner ? 'premium' : effectiveTier(shop);
     if (!feat.shopName) {
-      setNameMsg({ type: 'err', text: shopTier === 'premium' ? 'Shop name is switched off for your shop.' : 'Upgrade to Premium to set your own shop name. Until then your shop shows its link name.' });
+      setNameMsg({ type: 'err', text: shopTier === 'premium' ? 'Shop name is switched off for your shop.' : 'Upgrade to Premium to create your own website name. Until then your shop shows its link name.' });
       return;
     }
     if (n.length < 2) { setNameMsg({ type: 'err', text: 'The shop name needs at least 2 letters.' }); return; }
@@ -439,14 +439,14 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
         </div>
         {/* shop name shown on the website: Premium */}
         <div>
-          <label htmlFor="shop-name" className="block text-xs font-semibold text-gray-500">Shop name on the website <span className="font-normal">{feat.shopName ? '' : '🔒 Premium'}</span></label>
+          <label htmlFor="shop-name" className="block text-xs font-semibold text-gray-500">Create Website Name <span className="font-normal">{feat.shopName ? '' : '🔒 Premium'}</span></label>
           <div className="mt-1 flex flex-col sm:flex-row sm:items-center gap-2">
             <input id="shop-name" disabled={!feat.shopName} className={`${inputCls} w-full sm:w-80 !text-sm !py-2.5 !rounded-lg disabled:opacity-60`} maxLength={60} value={feat.shopName ? name : (shop.handle || name)} onChange={(e) => { setName(e.target.value); setNameMsg(null); }} />
             <button type="button" disabled={nameBusy || !feat.shopName || name.trim() === String(shop.name || '').trim()} onClick={saveName} className={`${GOLD_BTN} w-full sm:w-auto`}>{nameBusy ? 'Checking...' : 'Save name'}</button>
           </div>
           {nameMsg
             ? <p className={`mt-1 text-[11px] ${nameMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{nameMsg.text}</p>
-            : <p className="mt-1 text-[11px] text-gray-500">{feat.shopName ? 'Shown on top of your shop and in "Sold by". It shows at once.' : 'Your shop shows its link name. Upgrade to Premium to set your own shop name.'}</p>}
+            : <p className="mt-1 text-[11px] text-gray-500">{feat.shopName ? 'Shown on top of your shop and in "Sold by". It shows at once.' : 'Your shop shows its link name. Upgrade to Premium to create your own website name.'}</p>}
         </div>
       </div>
 

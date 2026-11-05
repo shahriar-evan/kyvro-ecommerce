@@ -174,8 +174,19 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
       {/* sub-categories of each chosen category (optional: none ticked = the whole category) */}
       {cats.map((l) => {
         const col = (SHOP_COLLECTIONS.find((c) => c.label === l) || {}).name;
-        const list = col ? flatSubCategories(col) : [];
-        if (!list.length) return null;
+        if (!col) return null;
+        // Men / Women / Winter have a fixed list; Shoes, Wallets, Watches use the sub-categories their products have
+        const fixed = flatSubCategories(col).length > 0;
+        const list = fixed ? flatSubCategories(col)
+          : [...new Set(liveProducts.filter((p) => productInCollection(p, col)).map((p) => String(p.category || '').trim()).filter((c) => c && c.toLowerCase() !== col.toLowerCase()))].sort();
+        const countOf = (n) => (fixed ? subCount(col, n) : liveProducts.filter((p) => productInCollection(p, col) && String(p.category || '').trim() === n).length);
+        if (!list.length) {
+          return (
+            <div key={l} className={`rounded-lg border p-3 text-[11px] text-gray-500 ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
+              <span className="font-semibold">{l}:</span> no sub-categories. You sell from all {l} ({catCount(l)}).
+            </div>
+          );
+        }
         return (
           <div key={l} className={`rounded-lg border p-3 ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
             <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
@@ -194,7 +205,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
               {list.map((n) => {
                 const key = `${l} › ${n}`;
                 const on = subs.includes(key);
-                return <button key={key} type="button" aria-pressed={on} onClick={() => toggleSub(key)} className={chip(on, 'px-2.5 py-1.5 text-[11px]')}>{tick(on)}{subLabel(n)} <span className={on ? 'text-black/60' : 'text-gray-500'}>({subCount(col, n)})</span></button>;
+                return <button key={key} type="button" aria-pressed={on} onClick={() => toggleSub(key)} className={chip(on, 'px-2.5 py-1.5 text-[11px]')}>{tick(on)}{subLabel(n)} <span className={on ? 'text-black/60' : 'text-gray-500'}>({countOf(n)})</span></button>;
               })}
             </div>
           </div>
@@ -243,9 +254,9 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
             </div>
             <span className="block mt-1 font-normal text-[11px]">Your shop's web address. Free on every plan, and you can change it later in My Shop.</span>
           </label>
-          <label className="block text-xs font-semibold text-gray-500">Shop name on the website <span className="font-normal">🔒 Premium</span>
+          <label className="block text-xs font-semibold text-gray-500">Create Website Name <span className="font-normal">🔒 Premium</span>
             <input className={`${inputCls} block mt-1 w-full opacity-60`} value={form.handle} readOnly disabled />
-            <span className="block mt-1 font-normal text-[11px]">Until you have Premium, your shop shows its link name. With Premium you can set your own shop name in My Shop.</span>
+            <span className="block mt-1 font-normal text-[11px]">Until you have Premium, your shop shows its link name. With Premium you can create your own website name in My Shop.</span>
           </label>
           {field('name', 'Full name *', { maxLength: 80 })}
           <label className="block text-xs font-semibold text-gray-500">Email (from your login)
