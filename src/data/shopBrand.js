@@ -51,7 +51,7 @@ export const shopDisplayName = (shop, feat) => (!shop ? '' : (feat && feat.shopN
 // shop (shops/{slug}.features). firestore.rules uses the same defaults (featOn).
 // paid: true = shop identity (name change, logo, banner): never on Free (even with an override; rules: paidFeatOn).
 // Name change, logo and banner: Premium ON (uploads wait for Kyvro's approval); Pro OFF unless switched on.
-// Pro by default: all products, priority approval, social links and the share kit. The rest is Premium. The shop link (slug) never changes. ----
+// Pro by default: all products, priority approval, social links, the share kit and sales stats. The rest is Premium. The shop link (slug) never changes. ----
 export const FEATURES = [
   { key: 'allProducts', label: 'All products', pro: true },
   { key: 'priorityApproval', label: 'Priority approval', pro: true },
@@ -59,16 +59,16 @@ export const FEATURES = [
   { key: 'social', label: 'Social links', pro: true },
   { key: 'about', label: 'About section', pro: false },
   { key: 'shareKit', label: 'Share kit (QR + caption)', pro: true },
-  { key: 'brandColor', label: 'Brand color', pro: false },
+  { key: 'brandColor', label: 'Re-design your website (brand color)', pro: false },
   { key: 'announcement', label: 'Announcement strip', pro: false },
   { key: 'pinned', label: 'Pinned products', pro: false },
   { key: 'verified', label: 'Verified badge', pro: false },
   { key: 'weeklyPayout', label: 'Weekly payout', pro: false },
   { key: 'prioritySupport', label: 'Priority support', pro: false },
-  { key: 'shopName', label: 'Shop name change', pro: false, paid: true },
+  { key: 'shopName', label: 'Create website name', pro: false, paid: true },
   { key: 'logo', label: 'Logo upload', pro: false, paid: true },
   { key: 'banner', label: 'Banner upload', pro: false, paid: true },
-  { key: 'salesStats', label: 'Sales stats', pro: false },
+  { key: 'salesStats', label: 'Sales stats', pro: true },
   { key: 'earningsCsv', label: 'Monthly earnings CSV', pro: false },
 ];
 // the built-in default of a tier (used when the Owner did not switch the feature for that plan)
