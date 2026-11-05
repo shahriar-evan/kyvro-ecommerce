@@ -9,7 +9,7 @@ import { normalizePlans, toMillis, SHOP_MAX_ITEMS, effectiveTier, TIER_LABEL } f
 import PlanCards from './PlanCards';
 import ShopExtrasEditor from './ShopExtrasEditor';
 import { shopExtrasOf, httpsLinkOk, contactOk, cleanContact, effectiveFeatures, FEATURES } from '../data/shopBrand';
-import { watchSellerRules, sellerNameBlocked, normalizeSellerRules } from '../sellers';
+import { watchSellerRules, sellerNameBlocked, normalizeSellerRules, watchMySeller } from '../sellers';
 
 const shopUrl = (slug) => `${window.location.origin}/?shop=${slug}`;
 
@@ -58,6 +58,9 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   useEffect(() => (isOwner ? undefined : watchSellerRules(setSellerRules)), [isOwner]);
 
   const uid = auth.currentUser ? auth.currentUser.uid : '';
+  // a public seller's application: on the Free plan they pick products only from the categories Kyvro approved
+  const [mySeller, setMySeller] = useState(null);
+  useEffect(() => (sellerMode && uid ? watchMySeller(uid, setMySeller) : undefined), [sellerMode, uid]);
   useEffect(() => {
     if (isOwner) {
       const a = watchAllShops(setAllShops, () => {});
@@ -126,6 +129,10 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   const catsOf = (ids) => new Set(ids.map((id) => live.find((x) => String(x.id) === String(id))).filter(Boolean).map(catOf));
   const catMsg = () => setMsg({ type: 'err', text: `The Free plan sells from up to ${plans.freeCategoryLimit} categories. Upgrade to Pro / Premium for all categories.` });
   const catsOk = (ids) => catsOf(ids).size <= catLimit;
+  // Free seller shop: only the categories in the approved application (labels like "Men's"); Pro / Premium: every category
+  const appCats = sellerMode && catLimit !== Infinity && mySeller && Array.isArray(mySeller.categories) ? mySeller.categories : [];
+  const allowedKey = appCats.map((l) => (SHOP_COLLECTIONS.find((c) => c.label === l) || {}).name).filter(Boolean).sort().join('|');
+  const allowed = allowedKey ? new Set(allowedKey.split('|')) : null;
   // the plan end date is copied onto the shop for the storefront; a shop made after paying gets it here
   const [synced, setSynced] = useState(false);
   useEffect(() => {
@@ -153,11 +160,12 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
 
   // main categories that have products (plus "Other" for products that are in none of them)
   const cats = useMemo(() => {
-    const list = SHOP_COLLECTIONS.map((c) => ({ ...c, items: live.filter((p) => productInCollection(p, c.name)) })).filter((c) => c.items.length);
+    const ok = allowedKey ? allowedKey.split('|') : null; // Free seller: only the approved categories
+    const list = SHOP_COLLECTIONS.filter((c) => !ok || ok.includes(c.name)).map((c) => ({ ...c, items: live.filter((p) => productInCollection(p, c.name)) })).filter((c) => c.items.length);
     const rest = live.filter((p) => !SHOP_COLLECTIONS.some((c) => productInCollection(p, c.name)));
-    if (rest.length) list.push({ name: '__other', label: 'Other', items: rest });
+    if (rest.length && !ok) list.push({ name: '__other', label: 'Other', items: rest });
     return list;
-  }, [live]);
+  }, [live, allowedKey]);
   // one category's products grouped by sub-category (product.category), in the same order as the store menu
   const groupsOf = (cat) => {
     const order = flatSubCategories(cat.name);
@@ -182,6 +190,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
 
   const toggle = (p) => {
     if (draft[p.id] === undefined && Object.keys(draft).length >= cap) { limitMsg(); return; }
+    if (draft[p.id] === undefined && allowed && !allowed.has(catOf(p))) { setMsg({ type: 'err', text: 'On the Free plan you can add products only from your approved categories.' }); return; }
     if (draft[p.id] === undefined && !catsOk([...Object.keys(draft), p.id])) { catMsg(); return; }
     setDraft((d) => { const n = { ...d }; if (n[p.id] !== undefined) delete n[p.id]; else n[p.id] = String(p.price); return n; });
   };
@@ -493,7 +502,8 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
       {/* stays at the bottom of the screen: nothing is written until Save */}
       <div className={`sticky bottom-3 z-20 rounded-lg border px-4 py-3 flex flex-wrap items-center justify-between gap-3 backdrop-blur shadow-[0_8px_30px_-10px_rgba(0,0,0,0.5)] ${dirty ? 'border-[#D4AF37]' : isDarkMode ? 'border-gray-800' : 'border-gray-200'} ${isDarkMode ? 'bg-[#0d0d0d]/95' : 'bg-white/95'}`}>
         <div className="min-w-0 text-xs">
-          <p className="font-bold">{count} product{count === 1 ? '' : 's'} selected{cap < SHOP_MAX_ITEMS ? ` (max ${cap})` : ''}</p>
+          <p className="font-bold">{cap < SHOP_MAX_ITEMS ? `Selected ${count} / ${cap}` : `${count} product${count === 1 ? '' : 's'} selected`}</p>
+          {allowed && <p className="text-[11px] text-gray-500">Free plan: from your approved categories ({appCats.join(', ')})</p>}
           {msg ? <p className={msg.type === 'ok' ? 'text-green-600' : 'text-red-500'}>{msg.text}</p> : <p className="text-gray-500">{dirty ? 'Unsaved changes' : 'All changes saved'}</p>}
         </div>
         <div className="flex gap-2">

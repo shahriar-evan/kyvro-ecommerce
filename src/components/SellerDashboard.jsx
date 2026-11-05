@@ -13,7 +13,7 @@ import SellPricing from './SellPricing';
 import { watchMySubscription } from '../storeSettings';
 import { watchShop } from '../shops';
 import { effectiveFeatures, httpsLinkOk } from '../data/shopBrand';
-import { flatSubCategories, subLabel } from '../data/catalog';
+import { flatSubCategories, subLabel, matchesCollectionPage } from '../data/catalog';
 
 // social links on the application (any of them, all optional; https only)
 const APPLY_SOCIALS = [
@@ -51,7 +51,15 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
   const [catMsg, setCatMsg] = useState(null);
   // my plan (for the Premium priority support link)
   const [mySub, setMySub] = useState(null);
-  const catList = SHOP_COLLECTIONS.filter((c) => products.some((p) => (p.status || 'approved') === 'approved' && productInCollection(p, c.name)));
+  // live products only (public product data: name / category; nothing about suppliers, costs or commission)
+  const liveProducts = products.filter((p) => (p.status || 'approved') === 'approved');
+  const catList = SHOP_COLLECTIONS.filter((c) => liveProducts.some((p) => productInCollection(p, c.name)));
+  // how many live products each category / sub-category has right now, e.g. "Men's (48)", "Shirt (24)"
+  const catCount = (label) => { const c = SHOP_COLLECTIONS.find((x) => x.label === label); return c ? liveProducts.filter((p) => productInCollection(p, c.name)).length : 0; };
+  const subCount = (col, sub) => liveProducts.filter((p) => matchesCollectionPage(p, col, sub)).length;
+  // the "only 3 categories" message: shown when the seller tries a 4th one (hides by itself), or on submit
+  const [catLimitMsg, setCatLimitMsg] = useState('');
+  useEffect(() => { if (!catLimitMsg) return undefined; const t = setTimeout(() => setCatLimitMsg(''), 5000); return () => clearTimeout(t); }, [catLimitMsg]);
   const catLabels = (catList.length ? catList : SHOP_COLLECTIONS).map((c) => c.label);
   const uid = customerUser ? customerUser.uid : '';
   const email = customerUser && customerUser.email ? customerUser.email.toLowerCase() : '';
@@ -141,9 +149,9 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
   }
   // the store's categories as tick boxes (same list as the shop's category picker)
   const toggleCat = (l) => {
-    setCatMsg(null); setFormMsg('');
+    setCatMsg(null); setFormMsg(''); setCatLimitMsg('');
     if (cats.includes(l)) { setCats((c) => c.filter((x) => x !== l)); setSubs((s) => s.filter((x) => x.split(' › ')[0] !== l)); return; }
-    if (cats.length >= catLimit) { const t = `The Free plan sells from up to ${catLimit} categories. Choose Pro / Premium for all categories.`; setFormMsg(t); setCatMsg({ type: 'err', text: t }); return; }
+    if (cats.length >= catLimit) { setCatLimitMsg(`The Free plan sells from up to ${catLimit} categories. Untick one first, or choose Pro / Premium for all categories.`); return; }
     setCats((c) => [...c, l]);
   };
   const toggleSub = (key) => setSubs((s) => (s.includes(key) ? s.filter((x) => x !== key) : [...s, key]));
@@ -154,10 +162,11 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
       <div className="flex flex-wrap gap-2">
         {catLabels.map((l) => {
           const on = cats.includes(l);
-          return <button key={l} type="button" aria-pressed={on} onClick={() => toggleCat(l)} className={chip(on, 'px-3 py-2 text-xs')}>{tick(on)}{l}</button>;
+          return <button key={l} type="button" aria-pressed={on} onClick={() => toggleCat(l)} className={chip(on, 'px-3 py-2 text-xs')}>{tick(on)}{l} <span className={on ? 'text-black/60' : 'text-gray-500'}>({catCount(l)})</span></button>;
         })}
       </div>
-      {catLimit !== Infinity && <p className="text-[11px] text-gray-500">Free plan: up to {catLimit} categories ({cats.length} / {catLimit} chosen). Pro / Premium: all categories.</p>}
+      {catLimit !== Infinity && <p className="text-[11px] text-gray-500">Free plan: up to {catLimit} categories and {plans.freeLimit} products in total (from one or many categories). Pro / Premium: all categories and all products. <span className="font-semibold">{cats.length} / {catLimit} categories chosen.</span></p>}
+      {catLimitMsg && <p className="text-xs text-red-500" role="alert">{catLimitMsg}</p>}
       {/* sub-categories of each chosen category (optional: none ticked = the whole category) */}
       {cats.map((l) => {
         const col = (SHOP_COLLECTIONS.find((c) => c.label === l) || {}).name;
@@ -170,7 +179,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
               {list.map((n) => {
                 const key = `${l} › ${n}`;
                 const on = subs.includes(key);
-                return <button key={key} type="button" aria-pressed={on} onClick={() => toggleSub(key)} className={chip(on, 'px-2.5 py-1.5 text-[11px]')}>{tick(on)}{subLabel(n)}</button>;
+                return <button key={key} type="button" aria-pressed={on} onClick={() => toggleSub(key)} className={chip(on, 'px-2.5 py-1.5 text-[11px]')}>{tick(on)}{subLabel(n)} <span className={on ? 'text-black/60' : 'text-gray-500'}>({subCount(col, n)})</span></button>;
               })}
             </div>
           </div>
@@ -216,7 +225,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
           <label className="block text-xs font-semibold text-gray-500">Email (from your login)
             <input className={`${inputCls} block mt-1 w-full opacity-70`} value={email} readOnly disabled />
           </label>
-          {field('whatsapp', 'WhatsApp number *', { inputMode: 'tel', placeholder: '01XXXXXXXXX or +8801XXXXXXXXX' })}
+          {field('whatsapp', 'WhatsApp number *', { inputMode: 'tel', placeholder: '+8801XXXXXXXXX' })}
           {field('district', 'District *', { maxLength: 40, placeholder: 'e.g. Dhaka' })}
           {field('area', 'Area *', { maxLength: 60, placeholder: 'e.g. Mirpur' })}
           <div className="sm:col-span-2">{field('address', 'Full address (optional)', { maxLength: 300 })}</div>
