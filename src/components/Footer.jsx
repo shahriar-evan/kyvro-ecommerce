@@ -7,7 +7,8 @@ export default function Footer({ onStartSelling, navHas = () => true, isDarkMode
       <footer className={`border-t pt-12 sm:pt-16 pb-12 mt-auto ${isDarkMode ? 'bg-[#121212] border-gray-800 text-gray-300' : 'bg-white border-gray-200 text-gray-700'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 sm:gap-10 text-xs">
           <div className="space-y-4">
-            <div className="flex items-center gap-3">
+            {/* logo + name: centered on a phone (one column), left from 640px (grid columns) */}
+            <div className="flex items-center justify-center sm:justify-start gap-3">
               <img src={logoImg} alt="Kyvro Logo" className="h-10 sm:h-12 w-auto object-contain" />
               <div className="flex flex-col items-start">
                 <span className={`text-lg sm:text-xl font-serif font-bold tracking-widest ${isDarkMode ? 'text-white' : 'text-black'}`}>KYVRO</span>
