@@ -1304,7 +1304,7 @@ export default function App() {
       {currentView !== 'home' && <BackButton onClick={goBack} />}
 
       {/* 2. HEADER */}
-      <Header shopBrand={shopBrand} onStartSelling={startSelling} cart={cart} curr={curr} currencyKey={currencyKey} currentView={currentView} isDarkMode={isDarkMode} setCurrencyKey={setCurrencyKey} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} setIsDarkMode={setIsDarkMode} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} navHas={navHas} customerUser={customerUser} displayName={displayName} photoURL={photoURL} goAccount={goAccount} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} />
+      <Header shopBrand={shopBrand} onStartSelling={startSelling} onAdminPanel={isAdminLoggedIn ? () => setCurrentView('admin') : null} cart={cart} curr={curr} currencyKey={currencyKey} currentView={currentView} isDarkMode={isDarkMode} setCurrencyKey={setCurrencyKey} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} setIsDarkMode={setIsDarkMode} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} navHas={navHas} customerUser={customerUser} displayName={displayName} photoURL={photoURL} goAccount={goAccount} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} />
       {/* a shop link: who sells it (a public seller is not Kyvro itself), Verified for Premium, the Pro / Premium page
           extras (tagline, contact, about, social links) and the Premium ones (announcement, brand color, top picks) */}
       {shopPreview && currentView !== 'admin' && (
