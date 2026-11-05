@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { auth } from '../firebase';
-import { watchMyShop, watchAllShops, watchShopOwners, createShop, saveShopItems, saveShopName, shopNameTaken, setShopActive, isPendingShop, acceptShop, rejectShop, shopLinkKey, cleanHandle, HANDLE_RE, handleTaken, setShopHandle } from '../shops';
+import { watchMyShop, watchAllShops, watchShopOwners, createShop, saveShopItems, saveShopName, shopNameTaken, setShopActive, isPendingShop, acceptShop, rejectShop, shopLinkKey, cleanHandle, HANDLE_RE, handleTaken, setShopHandle, nextHandleChange } from '../shops';
 import { askConfirm } from './AlertCenter';
 import { maxMarkupFor, shopPriceClamp, SHOP_COLLECTIONS, productInCollection } from '../data/shopConfig';
 import { flatSubCategories, subLabel } from '../data/catalog';
@@ -9,7 +9,7 @@ import { normalizePlans, toMillis, SHOP_MAX_ITEMS, effectiveTier, TIER_LABEL } f
 import PlanCards from './PlanCards';
 import ShopExtrasEditor from './ShopExtrasEditor';
 import { GOLD_BTN, OUTLINE_BTN, GHOST_BTN } from './ui';
-import { shopExtrasOf, httpsLinkOk, contactOk, cleanContact, effectiveFeatures, FEATURES } from '../data/shopBrand';
+import { shopExtrasOf, httpsLinkOk, contactOk, cleanContact, effectiveFeatures, FEATURES, shopDisplayName } from '../data/shopBrand';
 import { watchSellerRules, sellerNameBlocked, normalizeSellerRules, watchMySeller } from '../sellers';
 
 // key = a shop's link name (handle) or its id: both open the shop
@@ -88,7 +88,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   const [loadedFor, setLoadedFor] = useState('');
   useEffect(() => {
     if (shop && loadedFor !== shop.slug) {
-      setDraft(draftFrom(shop)); setName(shop.name || ''); setHandleDraft(shop.handle || ''); setExtras(shopExtrasOf(shop)); setLoadedFor(shop.slug);
+      setDraft(draftFrom(shop)); setName(shopDisplayName(shop) || shop.name || ''); setHandleDraft(shop.handle || ''); setExtras(shopExtrasOf(shop)); setLoadedFor(shop.slug);
     }
   }, [shop, loadedFor]);
 
@@ -248,7 +248,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   const saveName = async () => {
     setNameMsg(null);
     const n = name.trim();
-    if (n === String(shop.name || '').trim()) return;
+    if (!shop.autoName && n === String(shop.name || '').trim()) return;
     const shopTier = isOwner ? 'premium' : effectiveTier(shop);
     if (!feat.shopName) {
       setNameMsg({ type: 'err', text: shopTier === 'premium' ? 'Shop name is switched off for your shop.' : 'Upgrade to Premium to create your own website name. Until then your shop shows its link name.' });
@@ -274,12 +274,14 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
     setHandleMsg(null);
     const h = cleanHandle(handleDraft);
     if (h === (shop.handle || '')) return;
+    const next = isOwner ? 0 : nextHandleChange(shop);
+    if (next > Date.now()) { setHandleMsg({ type: 'err', text: `You can change your link once in 30 days. Next change: ${new Date(next).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.` }); return; }
     if (!HANDLE_RE.test(h)) { setHandleMsg({ type: 'err', text: 'Use 3 to 30 letters: a-z, 0-9 and - (not at the start or end).' }); return; }
     if (!isOwner) {
       const bad = sellerNameBlocked(h, '', sellerRules);
       if (bad) { setHandleMsg({ type: 'err', text: `Not available: "${bad}" cannot be used. Not allowed: ${normalizeSellerRules(sellerRules).blockedWords.join(', ')}.` }); return; }
     }
-    if (shop.handle && !(await askConfirm(`Change your link to kyvro.store/?shop=${h}? The old link kyvro.store/?shop=${shop.handle} stops working (someone else can take it). kyvro.store/?shop=${shop.slug} keeps working.`, { confirmText: 'Change link' }))) return;
+    if (!(await askConfirm(`Change your link to kyvro.store/?shop=${h}? Your old links keep working and open the new one. You can change it again after 30 days.`, { confirmText: 'Change link' }))) return;
     setHandleBusy(true);
     try {
       if (await handleTaken(h, shop.slug)) setHandleMsg({ type: 'err', text: `Not available: kyvro.store/?shop=${h} is already taken. Try another one.` });
@@ -289,7 +291,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   };
   const discard = async () => {
     if (!(await askConfirm('Discard your unsaved changes?', { danger: true, confirmText: 'Discard' }))) return;
-    setDraft(draftFrom(shop)); setName(shop.name || ''); setExtras(shopExtrasOf(shop)); setMsg(null);
+    setDraft(draftFrom(shop)); setName(shopDisplayName(shop) || shop.name || ''); setExtras(shopExtrasOf(shop)); setMsg(null);
   };
 
   const copy = async (text) => { try { await navigator.clipboard.writeText(text); setMsg({ type: 'ok', text: 'Link copied.' }); } catch { setMsg({ type: 'err', text: 'Could not copy. Select the link and copy it.' }); } };
@@ -435,14 +437,14 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
           </div>
           {handleMsg
             ? <p className={`mt-1 text-[11px] ${handleMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{handleMsg.text}</p>
-            : <p className="mt-1 text-[11px] text-gray-500">3 to 30 letters (a-z, 0-9, -). It is saved only if no other shop uses it.</p>}
+            : <p className="mt-1 text-[11px] text-gray-500">3 to 30 letters (a-z, 0-9, -), saved only if no other shop uses it. Change it once in 30 days; old links keep working.{!isOwner && nextHandleChange(shop) > Date.now() ? ` Next change: ${new Date(nextHandleChange(shop)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.` : ''}</p>}
         </div>
         {/* shop name shown on the website: Premium */}
         <div>
           <label htmlFor="shop-name" className="block text-xs font-semibold text-gray-500">Create Website Name <span className="font-normal">{feat.shopName ? '' : '🔒 Premium'}</span></label>
           <div className="mt-1 flex flex-col sm:flex-row sm:items-center gap-2">
-            <input id="shop-name" disabled={!feat.shopName} className={`${inputCls} w-full sm:w-80 !text-sm !py-2.5 !rounded-lg disabled:opacity-60`} maxLength={60} value={feat.shopName ? name : (shop.handle || name)} onChange={(e) => { setName(e.target.value); setNameMsg(null); }} />
-            <button type="button" disabled={nameBusy || !feat.shopName || name.trim() === String(shop.name || '').trim()} onClick={saveName} className={`${GOLD_BTN} w-full sm:w-auto`}>{nameBusy ? 'Checking...' : 'Save name'}</button>
+            <input id="shop-name" disabled={!feat.shopName} className={`${inputCls} w-full sm:w-80 !text-sm !py-2.5 !rounded-lg disabled:opacity-60`} maxLength={60} value={feat.shopName ? name : shopDisplayName(shop)} onChange={(e) => { setName(e.target.value); setNameMsg(null); }} />
+            <button type="button" disabled={nameBusy || !feat.shopName || (!shop.autoName && name.trim() === String(shop.name || '').trim())} onClick={saveName} className={`${GOLD_BTN} w-full sm:w-auto`}>{nameBusy ? 'Checking...' : 'Save name'}</button>
           </div>
           {nameMsg
             ? <p className={`mt-1 text-[11px] ${nameMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{nameMsg.text}</p>

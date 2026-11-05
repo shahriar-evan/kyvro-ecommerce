@@ -10,10 +10,21 @@ const rand = () => Math.random().toString(36).slice(2, 6).replace(/[^a-z0-9]/g, 
 
 // ---- Shop link name ("handle"): kyvro.store/?shop=<handle>. The shop document id (slug) never changes, because orders,
 // earnings and payouts point at it; the handle is a public nickname on top of it, kept unique by shopHandles/{handle}
-// ({ slug, uid }). Any plan can change its handle; the old one is freed. ?shop=<slug> always keeps working. ----
+// ({ slug, uid }). Any plan can change its handle, at most once in 30 days (handleChangedAt). Old handles are kept as
+// aliases that still open (and redirect to) the shop, so shared links never break and nobody else can take them.
+// ?shop=<slug> always keeps working. ----
 // 3 to 30 letters: a-z, 0-9 and "-" (not first or last). Same check in firestore.rules.
 export const HANDLE_RE = /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/;
 export const cleanHandle = (v) => String(v || "").toLowerCase().trim().replace(/[\s_]+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-+|-+$/g, "").slice(0, 30);
+// "rahim-fashion" -> "Rahim Fashion" (the name a shop shows until it creates its own Website Name)
+export const prettyHandle = (h) => String(h || "").split("-").filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
+export const HANDLE_COOLDOWN_DAYS = 30;
+// when this shop may change its link again (0 = now)
+export const nextHandleChange = (shop) => {
+  const t = shop && shop.handleChangedAt;
+  const ms = !t ? 0 : typeof t.toMillis === "function" ? t.toMillis() : typeof t.seconds === "number" ? t.seconds * 1000 : Date.parse(t) || 0;
+  return ms ? ms + HANDLE_COOLDOWN_DAYS * 86400000 : 0;
+};
 // the public link of a shop: its handle, else its id
 export const shopLinkKey = (shop) => (shop && (shop.handle || shop.slug)) || "";
 export const shopLinkUrl = (shop) => `${window.location.origin}/?shop=${shopLinkKey(shop)}`;
@@ -22,19 +33,20 @@ export async function resolveShopKey(key) {
   try { const h = await getDoc(doc(db, "shopHandles", key)); if (h.exists() && SLUG_RE.test(String(h.data().slug || ""))) return h.data().slug; } catch (e) { /* not a handle */ }
   return key;
 }
-// is this link name used by another shop (as a handle or as a shop id)?
+// is this link name used by another shop (as a handle, an old alias or a shop id)? My own old aliases are free for me.
 export async function handleTaken(handle, mySlug = "") {
   const h = await getDoc(doc(db, "shopHandles", handle));
   if (h.exists() && h.data().slug !== mySlug) return true;
   if (handle !== mySlug) { const s = await getDoc(doc(db, "shops", handle)); if (s.exists()) return true; }
   return false;
 }
-// change my shop's link name: claim the new handle, point the shop at it, free the old one (one batch)
+// change my shop's link name: claim the new handle (or reuse one of my old aliases) and point the shop at it. The old
+// handle stays as an alias of this shop. Allowed once in 30 days (the rules check handleChangedAt).
 export async function setShopHandle(shop, uid, handle) {
   const b = writeBatch(db);
-  b.set(doc(db, "shopHandles", handle), { slug: shop.slug, uid });
-  b.update(doc(db, "shops", shop.slug), { handle, updatedAt: new Date().toISOString() });
-  if (shop.handle && shop.handle !== handle) b.delete(doc(db, "shopHandles", shop.handle));
+  const mine = await getDoc(doc(db, "shopHandles", handle));
+  if (!mine.exists()) b.set(doc(db, "shopHandles", handle), { slug: shop.slug, uid });
+  b.update(doc(db, "shops", shop.slug), { handle, handleChangedAt: serverTimestamp(), updatedAt: new Date().toISOString() });
   await b.commit();
 }
 // Owner: free the handle of a shop that is being removed
@@ -116,8 +128,9 @@ export async function rejectShop(slug) {
 
 // extra: { planExempt: true } for the Owner's own shop (no plan limit; the rules allow it only for the Owner)
 // Shop name change (its own Save button in My Shop). The link (slug) never changes.
+// Website Name (Premium): from now on the shop shows this name instead of its pretty link name (autoName off)
 export const saveShopName = (slug, name) =>
-  updateDoc(doc(db, "shops", slug), { name: String(name || "").trim().slice(0, 60), updatedAt: new Date().toISOString() });
+  updateDoc(doc(db, "shops", slug), { name: String(name || "").trim().slice(0, 60), autoName: deleteField(), updatedAt: new Date().toISOString() });
 // is this name already used by another shop? (same letters, any upper / lower case; shops are public)
 export async function shopNameTaken(name, mySlug) {
   const n = String(name || "").trim().toLowerCase();

@@ -44,8 +44,15 @@ export const shopExtrasOf = (shop) => {
 export const PRO_EXTRAS = ['tagline', 'contactUrl', 'about', 'socialLinks'];
 export const PREMIUM_EXTRAS = ['brandColor', 'announcement', 'pinnedItems'];
 
-// The name shown on a shop's page: the shop name with "Shop name change" on (Premium), else the shop link name.
-export const shopDisplayName = (shop, feat) => (!shop ? '' : (feat && feat.shopName && shop.name) ? shop.name : (shop.handle || shop.name || ''));
+// The name shown on a shop's page (header wordmark, page title, "Sold by"): its Website Name once one was created
+// (Premium), else its link name made pretty ("rahim-fashion" -> "Rahim Fashion"). Shops from before link names keep
+// their name as the Website Name. autoName = the shop has no Website Name yet.
+const pretty = (h) => String(h || '').split('-').filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+export const shopDisplayName = (shop) => {
+  if (!shop) return '';
+  if (shop.autoName || (shop.handle && shop.name === shop.handle)) return pretty(shop.handle) || shop.name || '';
+  return shop.name || pretty(shop.handle);
+};
 
 // ---- Plan features: what each tier gets by default; the Owner / a Manager can switch any of them ON or OFF for a
 // shop (shops/{slug}.features). firestore.rules uses the same defaults (featOn).

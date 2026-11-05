@@ -11,7 +11,7 @@ import { normalizePlans, effectiveTier, TIER_LABEL } from '../data/priceCheck';
 import SellerStats from './SellerStats';
 import SellPricing from './SellPricing';
 import { watchMySubscription } from '../storeSettings';
-import { watchShop, cleanHandle, HANDLE_RE, handleTaken } from '../shops';
+import { watchShop, cleanHandle, HANDLE_RE, handleTaken, prettyHandle } from '../shops';
 import { effectiveFeatures, httpsLinkOk } from '../data/shopBrand';
 import { flatSubCategories, subLabel, matchesCollectionPage } from '../data/catalog';
 
@@ -252,11 +252,11 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
               <span className={`px-2 flex items-center text-[11px] whitespace-nowrap ${isDarkMode ? 'bg-[#1a1a1a] text-gray-400' : 'bg-gray-100 text-gray-500'}`}>kyvro.store/?shop=</span>
               <input className={`${inputCls} !border-0 !rounded-none flex-1 min-w-0`} value={form.handle} maxLength={30} placeholder="rahim-fashion" onChange={(e) => set('handle', cleanHandle(e.target.value))} />
             </div>
-            <span className="block mt-1 font-normal text-[11px]">Your shop's web address. Free on every plan, and you can change it later in My Shop.</span>
+            <span className="block mt-1 font-normal text-[11px]">Your shop's web address. Free on every plan. You can change it later in My Shop (once in 30 days; old links keep working).</span>
           </label>
           <label className="block text-xs font-semibold text-gray-500">Create Website Name <span className="font-normal">🔒 Premium</span>
-            <input className={`${inputCls} block mt-1 w-full opacity-60`} value={form.handle} readOnly disabled />
-            <span className="block mt-1 font-normal text-[11px]">Until you have Premium, your shop shows its link name. With Premium you can create your own website name in My Shop.</span>
+            <input className={`${inputCls} block mt-1 w-full opacity-60`} value={prettyHandle(form.handle)} placeholder="Rahim Fashion" readOnly disabled />
+            <span className="block mt-1 font-normal text-[11px]">Until you create one (Premium), your shop shows its link name like this. Upgrade to Premium to create your own Website Name.</span>
           </label>
           {field('name', 'Full name *', { maxLength: 80 })}
           <label className="block text-xs font-semibold text-gray-500">Email (from your login)
