@@ -308,9 +308,20 @@ service cloud.firestore {
     // The owner of a shop can change its name and items later; only the Owner can switch a shop on or off or accept it.
     // No email is stored here: the private "shopOwners" document says whose shop it is.
     match /shops/{slug} {
+      // handle = the shop link name (kyvro.store/?shop=<handle>): any plan may set or change it, but only to a handle it
+      // owns in shopHandles (written in the same batch), so two shops can never share one. The id (slug) never changes.
+      function handleOk() {
+        let d = request.resource.data;
+        return !('handle' in d)
+          || (resource != null && resource.data.get('handle', '') == d.handle)
+          || (d.handle is string && d.handle.matches('^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$')
+              && existsAfter(/databases/$(database)/documents/shopHandles/$(d.handle))
+              && getAfter(/databases/$(database)/documents/shopHandles/$(d.handle)).data.slug == slug);
+      }
       allow read: if true;
       allow create: if slug.matches('^[a-z0-9-]{3,40}$')
-        && request.resource.data.keys().hasOnly(['name', 'ownerUid', 'active', 'status', 'items', 'createdAt', 'updatedAt', 'planExempt', 'kind'])
+        && request.resource.data.keys().hasOnly(['name', 'ownerUid', 'active', 'status', 'items', 'createdAt', 'updatedAt', 'planExempt', 'kind', 'handle'])
+        && handleOk()
         // "no plan limit" is only for the Owner's own shop
         && (!('planExempt' in request.resource.data) || isOwner())
         && request.resource.data.ownerUid == request.auth.uid
@@ -329,13 +340,14 @@ service cloud.firestore {
                 && getAfter(sellerPath(request.auth.uid)).data.status == 'pending'
                 && sellersOpen() && sellerNameOk(request.resource.data.name, slug)));
       allow update: if request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 60
+        && handleOk()
         && request.resource.data.items is map && request.resource.data.items.size() <= 300
         // the Owner: everything, also the seller kill switch (killed: the seller can never switch the shop on again)
-        && ((isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'active', 'status', 'updatedAt', 'planExempt', 'killed', 'killNote', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'features', 'logo', 'logoPending', 'logoPendingAt', 'logoReject', 'logoRequest', 'banner', 'bannerPending', 'bannerPendingAt', 'bannerReject'])
+        && ((isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'active', 'status', 'updatedAt', 'planExempt', 'killed', 'killNote', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'features', 'logo', 'logoPending', 'logoPendingAt', 'logoReject', 'logoRequest', 'banner', 'bannerPending', 'bannerPendingAt', 'bannerReject', 'handle'])
                 && request.resource.data.get('status', 'approved') in ['pending', 'approved'])
             || ((isManager() || canShopNow())
                 && resource.data.ownerUid == request.auth.uid
-                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'logoRequest', 'logoPending', 'logoPendingAt', 'logoReject', 'bannerPending', 'bannerPendingAt', 'bannerReject'])
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'logoRequest', 'logoPending', 'logoPendingAt', 'logoReject', 'bannerPending', 'bannerPendingAt', 'bannerReject', 'handle'])
                 && shopExtrasOk()
                 && shopSizeOk())
             // a Manager (Plan Members): feature ON / OFF, logo grant / approve / reject and shop ON / OFF on other people's
@@ -354,7 +366,7 @@ service cloud.firestore {
             || (signedIn() && !isStaff() && resource.data.get('kind', '') == 'seller'
                 && resource.data.ownerUid == request.auth.uid
                 && resource.data.get('killed', false) != true
-                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'logoRequest', 'logoPending', 'logoPendingAt', 'logoReject', 'bannerPending', 'bannerPendingAt', 'bannerReject'])
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'logoRequest', 'logoPending', 'logoPendingAt', 'logoReject', 'bannerPending', 'bannerPendingAt', 'bannerReject', 'handle'])
                 && shopExtrasOk()
                 && shopSizeOk()));
       // the Owner deletes a shop (also what "Reject" does with a request)
@@ -422,6 +434,25 @@ service cloud.firestore {
         && request.resource.data.updatedAt is string && request.resource.data.updatedAt.size() <= 40;
     }
 
+    // Shop link names: shopHandles/{handle} = { slug, uid }. Public (a visitor's ?shop=<handle> is turned into the shop id).
+    // The owner of a shop claims a free handle for their own shop (create fails if it is taken) and frees their old one
+    // once the shop points elsewhere. A handle can not be another shop's id and can not hold a blocked word.
+    match /shopHandles/{h} {
+      allow read: if true;
+      allow create: if signedIn() && h.matches('^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$')
+        && request.resource.data.keys().hasOnly(['slug', 'uid'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.slug is string
+        && (!exists(/databases/$(database)/documents/shops/$(h)) || h == request.resource.data.slug)
+        && (isOwner() || !h.matches(blockedRe()))
+        && existsAfter(/databases/$(database)/documents/shops/$(request.resource.data.slug))
+        && getAfter(/databases/$(database)/documents/shops/$(request.resource.data.slug)).data.ownerUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/shops/$(request.resource.data.slug)).data.get('handle', '') == h;
+      allow delete: if isOwner()
+        || (signedIn() && resource.data.uid == request.auth.uid
+            && (!existsAfter(/databases/$(database)/documents/shops/$(resource.data.slug))
+                || getAfter(/databases/$(database)/documents/shops/$(resource.data.slug)).data.get('handle', '') != h));
+    }
     match /shopOwners/{slug} {
       // Managers can read whose shop is whose too (they see the Admins' shop earnings in Team Stats)
       allow read: if isOwner() || isManager() || (signedIn() && resource.data.email == myEmail());

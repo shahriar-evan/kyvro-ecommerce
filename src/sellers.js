@@ -1,6 +1,7 @@
 import { getApp } from "firebase/app";
 import { getFirestore, doc, collection, onSnapshot, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp } from "firebase/firestore";
 import "./firebase"; // makes sure the default Firebase app exists
+import { releaseShopHandle } from "./shops";
 
 const db = getFirestore(getApp());
 
@@ -64,12 +65,16 @@ const cleanSubs = (list) => (Array.isArray(list) ? list : []).map((c) => String(
 
 // Apply to sell: one batch writes the shop (OFF, 'pending') and the application (sellers/{uid}, 'pending').
 // The rules allow it once per account, and again only after the Owner rejected the last application.
-export async function applyAsSeller({ uid, email, shopName, details }) {
-  const name = String(shopName || "").trim().slice(0, 60);
+// handle = the shop link name (kyvro.store/?shop=<handle>); the shop name shown on the website starts as the same text and
+// can be changed later on Premium. The shop id (slug) is the handle plus 4 random letters and never changes.
+export async function applyAsSeller({ uid, email, handle, details }) {
+  const name = String(handle || "").trim().slice(0, 60);
   const slug = `${slugify(name)}-${rand()}`;
   const b = writeBatch(db);
+  b.set(doc(db, "shopHandles", handle), { slug, uid });
   b.set(doc(db, "shops", slug), {
     name,
+    handle,
     ownerUid: uid,
     kind: "seller",
     active: false,
@@ -136,6 +141,7 @@ export async function approveSeller(seller, staff) {
   await b.commit();
 }
 export async function rejectSeller(seller, note, staff) {
+  await releaseShopHandle(seller.slug);
   const b = writeBatch(db);
   b.delete(doc(db, "shops", seller.slug));
   b.update(doc(db, "sellers", seller.uid), { status: "rejected", rejectNote: String(note || "").slice(0, 300), decidedAt: new Date().toISOString(), decidedBy: (staff && staff.email) || "" });
@@ -147,7 +153,7 @@ export const killSellerShop = (slug, note) => updateDoc(doc(db, "shops", slug), 
 export const reviveSellerShop = (slug) => updateDoc(doc(db, "shops", slug), { active: true, killed: false, killNote: "", updatedAt: new Date().toISOString() });
 // remove a seller completely (shop + entry), so the account could open a new shop later
 export async function removeSeller(seller) {
-  if (seller.slug) await deleteDoc(doc(db, "shops", seller.slug));
+  if (seller.slug) { await releaseShopHandle(seller.slug); await deleteDoc(doc(db, "shops", seller.slug)); }
   await deleteDoc(doc(db, "sellers", seller.uid));
   try { await deleteDoc(doc(db, "sellerPayout", seller.uid)); } catch (e) { /* nothing saved */ }
 }

@@ -1,5 +1,5 @@
 import { getApp } from "firebase/app";
-import { getFirestore, doc, collection, query, where, onSnapshot, setDoc, updateDoc, deleteDoc, deleteField, serverTimestamp, getDocs } from "firebase/firestore";
+import { getFirestore, doc, collection, query, where, onSnapshot, setDoc, updateDoc, deleteDoc, deleteField, serverTimestamp, getDocs, getDoc, writeBatch } from "firebase/firestore";
 import "./firebase"; // makes sure the default Firebase app exists
 
 const db = getFirestore(getApp());
@@ -7,6 +7,44 @@ const db = getFirestore(getApp());
 export const SLUG_RE = /^[a-z0-9-]{3,40}$/;
 const slugify = (s) => String(s || "shop").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 28) || "shop";
 const rand = () => Math.random().toString(36).slice(2, 6).replace(/[^a-z0-9]/g, "x");
+
+// ---- Shop link name ("handle"): kyvro.store/?shop=<handle>. The shop document id (slug) never changes, because orders,
+// earnings and payouts point at it; the handle is a public nickname on top of it, kept unique by shopHandles/{handle}
+// ({ slug, uid }). Any plan can change its handle; the old one is freed. ?shop=<slug> always keeps working. ----
+// 3 to 30 letters: a-z, 0-9 and "-" (not first or last). Same check in firestore.rules.
+export const HANDLE_RE = /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/;
+export const cleanHandle = (v) => String(v || "").toLowerCase().trim().replace(/[\s_]+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-+|-+$/g, "").slice(0, 30);
+// the public link of a shop: its handle, else its id
+export const shopLinkKey = (shop) => (shop && (shop.handle || shop.slug)) || "";
+export const shopLinkUrl = (shop) => `${window.location.origin}/?shop=${shopLinkKey(shop)}`;
+// ?shop=<key>: a handle or a shop id -> the shop id
+export async function resolveShopKey(key) {
+  try { const h = await getDoc(doc(db, "shopHandles", key)); if (h.exists() && SLUG_RE.test(String(h.data().slug || ""))) return h.data().slug; } catch (e) { /* not a handle */ }
+  return key;
+}
+// is this link name used by another shop (as a handle or as a shop id)?
+export async function handleTaken(handle, mySlug = "") {
+  const h = await getDoc(doc(db, "shopHandles", handle));
+  if (h.exists() && h.data().slug !== mySlug) return true;
+  if (handle !== mySlug) { const s = await getDoc(doc(db, "shops", handle)); if (s.exists()) return true; }
+  return false;
+}
+// change my shop's link name: claim the new handle, point the shop at it, free the old one (one batch)
+export async function setShopHandle(shop, uid, handle) {
+  const b = writeBatch(db);
+  b.set(doc(db, "shopHandles", handle), { slug: shop.slug, uid });
+  b.update(doc(db, "shops", shop.slug), { handle, updatedAt: new Date().toISOString() });
+  if (shop.handle && shop.handle !== handle) b.delete(doc(db, "shopHandles", shop.handle));
+  await b.commit();
+}
+// Owner: free the handle of a shop that is being removed
+export async function releaseShopHandle(slug) {
+  try {
+    const s = await getDoc(doc(db, "shops", slug));
+    const h = s.exists() ? s.data().handle : "";
+    if (h) await deleteDoc(doc(db, "shopHandles", h));
+  } catch (e) { /* nothing to free */ }
+}
 
 // A visitor opens kyvro.store/?shop=<slug>: read that shop (public). null = not found.
 export function watchShop(slug, onData, onError) {
@@ -71,6 +109,7 @@ export const isPendingShop = (s) => !!s && s.status === "pending";
 // Owner: accept an Admin's shop request (it goes live) or reject it (the shop is removed)
 export const acceptShop = (slug) => updateDoc(doc(db, "shops", slug), { status: "approved", active: true, updatedAt: new Date().toISOString() });
 export async function rejectShop(slug) {
+  await releaseShopHandle(slug);
   await deleteDoc(doc(db, "shops", slug));
   try { await deleteDoc(doc(db, "shopOwners", slug)); } catch (err) { /* nothing stored */ }
 }

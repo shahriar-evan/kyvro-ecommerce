@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { auth } from '../firebase';
-import { watchMyShop, watchAllShops, watchShopOwners, createShop, saveShopItems, saveShopName, shopNameTaken, setShopActive, isPendingShop, acceptShop, rejectShop } from '../shops';
+import { watchMyShop, watchAllShops, watchShopOwners, createShop, saveShopItems, saveShopName, shopNameTaken, setShopActive, isPendingShop, acceptShop, rejectShop, shopLinkKey, cleanHandle, HANDLE_RE, handleTaken, setShopHandle } from '../shops';
 import { askConfirm } from './AlertCenter';
 import { maxMarkupFor, shopPriceClamp, SHOP_COLLECTIONS, productInCollection } from '../data/shopConfig';
 import { flatSubCategories, subLabel } from '../data/catalog';
@@ -12,7 +12,8 @@ import { GOLD_BTN, OUTLINE_BTN, GHOST_BTN } from './ui';
 import { shopExtrasOf, httpsLinkOk, contactOk, cleanContact, effectiveFeatures, FEATURES } from '../data/shopBrand';
 import { watchSellerRules, sellerNameBlocked, normalizeSellerRules, watchMySeller } from '../sellers';
 
-const shopUrl = (slug) => `${window.location.origin}/?shop=${slug}`;
+// key = a shop's link name (handle) or its id: both open the shop
+const shopUrl = (key) => `${window.location.origin}/?shop=${key}`;
 
 // Premium ON / OFF switch (a real button, so Space / Enter work and screen readers hear "switch, on / off")
 function ShopSwitch({ on, busy, onToggle, isDarkMode, label }) {
@@ -87,7 +88,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   const [loadedFor, setLoadedFor] = useState('');
   useEffect(() => {
     if (shop && loadedFor !== shop.slug) {
-      setDraft(draftFrom(shop)); setName(shop.name || ''); setExtras(shopExtrasOf(shop)); setLoadedFor(shop.slug);
+      setDraft(draftFrom(shop)); setName(shop.name || ''); setHandleDraft(shop.handle || ''); setExtras(shopExtrasOf(shop)); setLoadedFor(shop.slug);
     }
   }, [shop, loadedFor]);
 
@@ -155,7 +156,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   };
 
   const live = useMemo(() => products.filter((p) => (p.status || 'approved') === 'approved'), [products]);
-  const link = shop ? shopUrl(shop.slug) : '';
+  const link = shop ? shopUrl(shopLinkKey(shop)) : '';
   const card = `p-4 sm:p-6 rounded-2xl border space-y-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`;
   const inputCls = `border p-2 text-xs rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`;
 
@@ -250,7 +251,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
     if (n === String(shop.name || '').trim()) return;
     const shopTier = isOwner ? 'premium' : effectiveTier(shop);
     if (!feat.shopName) {
-      setNameMsg({ type: 'err', text: shopTier === 'free' ? 'Upgrade to Pro / Premium to change your shop name.' : 'Name change is part of Premium. Upgrade to Premium (or ask Kyvro to switch it on for your shop).' });
+      setNameMsg({ type: 'err', text: shopTier === 'premium' ? 'Shop name is switched off for your shop.' : 'Upgrade to Premium to set your own shop name. Until then your shop shows its link name.' });
       return;
     }
     if (n.length < 2) { setNameMsg({ type: 'err', text: 'The shop name needs at least 2 letters.' }); return; }
@@ -261,9 +262,30 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
     setNameBusy(true);
     try {
       if (await shopNameTaken(n, shop.slug)) { setNameMsg({ type: 'err', text: `Not available: another shop is already called "${n}". Try another name.` }); }
-      else { await saveShopName(shop.slug, n); setName(n); setNameMsg({ type: 'ok', text: `Saved: your shop is now "${n}". The link stays the same.` }); }
+      else { await saveShopName(shop.slug, n); setName(n); setNameMsg({ type: 'ok', text: `Saved: your shop now shows "${n}". Your link stays the same.` }); }
     } catch (err) { setNameMsg({ type: 'err', text: err.code === 'permission-denied' ? 'Could not save the name (plan or blocked word).' : err.message }); }
     setNameBusy(false);
+  };
+  // shop link name: any plan. Checks the format, the blocked words and that no other shop uses it, then saves at once.
+  const [handleDraft, setHandleDraft] = useState('');
+  const [handleMsg, setHandleMsg] = useState(null);
+  const [handleBusy, setHandleBusy] = useState(false);
+  const saveHandle = async () => {
+    setHandleMsg(null);
+    const h = cleanHandle(handleDraft);
+    if (h === (shop.handle || '')) return;
+    if (!HANDLE_RE.test(h)) { setHandleMsg({ type: 'err', text: 'Use 3 to 30 letters: a-z, 0-9 and - (not at the start or end).' }); return; }
+    if (!isOwner) {
+      const bad = sellerNameBlocked(h, '', sellerRules);
+      if (bad) { setHandleMsg({ type: 'err', text: `Not available: "${bad}" cannot be used. Not allowed: ${normalizeSellerRules(sellerRules).blockedWords.join(', ')}.` }); return; }
+    }
+    if (shop.handle && !(await askConfirm(`Change your link to kyvro.store/?shop=${h}? The old link kyvro.store/?shop=${shop.handle} stops working (someone else can take it). kyvro.store/?shop=${shop.slug} keeps working.`, { confirmText: 'Change link' }))) return;
+    setHandleBusy(true);
+    try {
+      if (await handleTaken(h, shop.slug)) setHandleMsg({ type: 'err', text: `Not available: kyvro.store/?shop=${h} is already taken. Try another one.` });
+      else { await setShopHandle(shop, uid, h); setHandleDraft(h); setHandleMsg({ type: 'ok', text: `Saved: your link is now kyvro.store/?shop=${h}` }); }
+    } catch (err) { setHandleMsg({ type: 'err', text: err.code === 'permission-denied' ? 'Not available: this link is taken or not allowed.' : err.message }); }
+    setHandleBusy(false);
   };
   const discard = async () => {
     if (!(await askConfirm('Discard your unsaved changes?', { danger: true, confirmText: 'Discard' }))) return;
@@ -306,7 +328,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
                       <p className="text-gray-500 break-all">{owners[s.slug] ? owners[s.slug].email : ''} · {Object.keys(s.items || {}).length} products so far</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {linkButtons(s.slug)}
+                      {linkButtons(shopLinkKey(s))}
                       <button type="button" onClick={async () => { try { await acceptShop(s.slug); setMsg({ type: 'ok', text: `"${s.name}" is live now.` }); } catch (e) { setMsg({ type: 'err', text: e.code === 'permission-denied' ? 'Could not accept: publish the latest Firestore rules first.' : e.message }); } }} className="px-3 py-1.5 rounded bg-green-600 text-white font-semibold">Accept</button>
                       <button type="button" onClick={async () => { if (!(await askConfirm(`Reject the shop "${s.name}"? It is removed and the Admin can request again.`, { danger: true, confirmText: 'Reject' }))) return; try { await rejectShop(s.slug); setMsg({ type: 'ok', text: `"${s.name}" was rejected.` }); } catch (e) { setMsg({ type: 'err', text: e.message }); } }} className="px-3 py-1.5 rounded border border-red-500 text-red-500 font-semibold">Reject</button>
                     </div>
@@ -321,10 +343,10 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
                 <div key={s.slug} className="py-3 flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-bold">{s.name || s.slug} <span className="font-normal text-gray-500">· {owners[s.slug] ? (owners[s.slug].name || owners[s.slug].email) : ''}</span></p>
-                    <p className="text-gray-500 break-all">{shopUrl(s.slug)} · {Object.keys(s.items || {}).length} products</p>
+                    <p className="text-gray-500 break-all">{shopUrl(shopLinkKey(s))} · {Object.keys(s.items || {}).length} products</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    {linkButtons(s.slug)}
+                    {linkButtons(shopLinkKey(s))}
                     <ShopSwitch on={s.active !== false} busy={switching === s.slug} onToggle={() => flipShop(s)} isDarkMode={isDarkMode} label={`Shop ${s.name || s.slug} on or off`} />
                   </div>
                 </div>
@@ -347,9 +369,9 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
               <div key={x.slug} className="py-3 flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-bold">{x.name || x.slug}</p>
-                  <p className="text-gray-500 break-all">{shopUrl(x.slug)} · {Object.keys(x.items || {}).length} products</p>
+                  <p className="text-gray-500 break-all">{shopUrl(shopLinkKey(x))} · {Object.keys(x.items || {}).length} products</p>
                 </div>
-                <div className="flex flex-wrap gap-2">{linkButtons(x.slug)}</div>
+                <div className="flex flex-wrap gap-2">{linkButtons(shopLinkKey(x))}</div>
               </div>
             ))}
           </div>
@@ -399,17 +421,32 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
             {shop.killed && <p className="text-xs text-red-500 mt-1 font-semibold">Kyvro switched this shop off{shop.killNote ? `: ${shop.killNote}` : ''}. It cannot be changed or switched on again. Contact kyvrofashion@gmail.com if you think this is a mistake.</p>}
             <p className="text-xs text-gray-500 break-all mt-1">{link}</p>
           </div>
-          <div className="grid grid-cols-2 sm:flex gap-2 shrink-0">{linkButtons(shop.slug, GOLD_BTN)}</div>
+          <div className="grid grid-cols-2 sm:flex gap-2 shrink-0">{linkButtons(shopLinkKey(shop), GOLD_BTN)}</div>
         </div>
+        {/* shop link name: any plan */}
         <div>
-          <label htmlFor="shop-name" className="block text-xs font-semibold text-gray-500">Shop name</label>
+          <label htmlFor="shop-link" className="block text-xs font-semibold text-gray-500">Shop link <span className="font-normal">(every plan)</span></label>
           <div className="mt-1 flex flex-col sm:flex-row sm:items-center gap-2">
-            <input id="shop-name" className={`${inputCls} w-full sm:w-80 !text-sm !py-2.5 !rounded-lg`} maxLength={60} value={name} onChange={(e) => { setName(e.target.value); setNameMsg(null); }} />
-            <button type="button" disabled={nameBusy || name.trim() === String(shop.name || '').trim()} onClick={saveName} className={`${GOLD_BTN} w-full sm:w-auto`}>{nameBusy ? 'Checking...' : 'Save name'}</button>
+            <div className={`flex items-stretch w-full sm:w-auto rounded-lg border overflow-hidden ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>
+              <span className={`px-2 flex items-center text-[11px] whitespace-nowrap ${isDarkMode ? 'bg-[#1a1a1a] text-gray-400' : 'bg-gray-100 text-gray-500'}`}>kyvro.store/?shop=</span>
+              <input id="shop-link" className={`${inputCls} !border-0 !rounded-none flex-1 min-w-0 sm:w-56 !text-sm !py-2.5`} maxLength={30} placeholder="your-shop" value={handleDraft} onChange={(e) => { setHandleDraft(cleanHandle(e.target.value)); setHandleMsg(null); }} />
+            </div>
+            <button type="button" disabled={handleBusy || cleanHandle(handleDraft) === (shop.handle || '')} onClick={saveHandle} className={`${GOLD_BTN} w-full sm:w-auto`}>{handleBusy ? 'Checking...' : 'Save link'}</button>
+          </div>
+          {handleMsg
+            ? <p className={`mt-1 text-[11px] ${handleMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{handleMsg.text}</p>
+            : <p className="mt-1 text-[11px] text-gray-500">3 to 30 letters (a-z, 0-9, -). It is saved only if no other shop uses it.</p>}
+        </div>
+        {/* shop name shown on the website: Premium */}
+        <div>
+          <label htmlFor="shop-name" className="block text-xs font-semibold text-gray-500">Shop name on the website <span className="font-normal">{feat.shopName ? '' : '🔒 Premium'}</span></label>
+          <div className="mt-1 flex flex-col sm:flex-row sm:items-center gap-2">
+            <input id="shop-name" disabled={!feat.shopName} className={`${inputCls} w-full sm:w-80 !text-sm !py-2.5 !rounded-lg disabled:opacity-60`} maxLength={60} value={feat.shopName ? name : (shop.handle || name)} onChange={(e) => { setName(e.target.value); setNameMsg(null); }} />
+            <button type="button" disabled={nameBusy || !feat.shopName || name.trim() === String(shop.name || '').trim()} onClick={saveName} className={`${GOLD_BTN} w-full sm:w-auto`}>{nameBusy ? 'Checking...' : 'Save name'}</button>
           </div>
           {nameMsg
             ? <p className={`mt-1 text-[11px] ${nameMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{nameMsg.text}</p>
-            : <p className="mt-1 text-[11px] text-gray-500">{feat.shopName ? 'The new name shows at once. Your shop link never changes.' : '🔒 Name change: Premium (Pro if Kyvro switches it on). Your shop link never changes.'}</p>}
+            : <p className="mt-1 text-[11px] text-gray-500">{feat.shopName ? 'Shown on top of your shop and in "Sold by". It shows at once.' : 'Your shop shows its link name. Upgrade to Premium to set your own shop name.'}</p>}
         </div>
       </div>
 
