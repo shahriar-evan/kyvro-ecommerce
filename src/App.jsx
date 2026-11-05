@@ -369,7 +369,7 @@ export default function App() {
   const [adminCanCreateShop, setAdminCanCreateShop] = useState(false); // the Owner allowed this Admin to create their own shop
   const [adminEditAll, setAdminEditAll] = useState(false); // the Owner allowed this person to edit every product
   const [adminName, setAdminName] = useState('');
-  const [adminTab, setAdminTab] = useState('products');
+  const [adminTab, setAdminTab] = useState('dashboard');
 
   // Checks whether an email has access (role + access ON/OFF)
   const checkAccess = async (email) => {
