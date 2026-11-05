@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { askConfirm, askInput } from './AlertCenter';
-import { watchAllShops } from '../shops';
-import { watchSellers, watchSellerPayouts, watchSubscriptions, killSellerShop, reviveSellerShop, removeSeller, watchSellerRules, saveSellerRules, sellerStatus, approveSeller, rejectSeller } from '../sellers';
+import { watchAllShops, acceptShop } from '../shops';
+import { watchSellers, watchSellerPayouts, watchSubscriptions, killSellerShop, reviveSellerShop, removeSeller, watchSellerRules, saveSellerRules, sellerStatus, approveSeller, rejectSeller, rejectSellerShop } from '../sellers';
 import { formatDateTime } from '../utils/dates';
 import { watchPayouts, addPayout } from '../payouts';
 import { toMillis, effectiveTier, normalizePlans } from '../data/priceCheck';
@@ -109,6 +109,37 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
         </label>
         {msg && <p className={`text-xs ${msg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{msg.text}</p>}
       </div>
+
+      {/* an approved seller asked for one more shop (Pro 2, Premium 3): it stays off until you approve it */}
+      {(() => {
+        const reqs = Object.values(shops).filter((x) => x.kind === 'seller' && x.extra && x.status === 'pending');
+        if (!reqs.length) return null;
+        return (
+          <div className={`${card} border-[#D4AF37]/60`}>
+            <h3 className="text-lg font-bold">New shop requests <span className="ml-1 px-2 py-0.5 rounded-full bg-red-600 text-white text-xs align-middle">{reqs.length}</span></h3>
+            <p className="text-xs text-gray-500">An approved seller asked for another shop. It stays off until you approve it. Reject removes it (and its link); the seller can ask again.</p>
+            <div className="divide-y text-xs">
+              {reqs.map((x) => {
+                const owner = sellers.find((s) => s.uid === x.ownerUid) || null;
+                const link = `${window.location.origin}/${x.handle || x.slug}`;
+                return (
+                  <div key={x.slug} className="py-3 flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-bold">{x.name} <span className="font-normal text-gray-500">· {owner ? `${owner.name || ''} (${owner.email || ''})` : 'Seller'}</span></p>
+                      <p className="text-gray-500 break-all">{link}{Array.isArray(x.categories) && x.categories.length ? ` · ${x.categories.join(', ')}` : ''}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <a href={link} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded border border-gray-400 font-semibold">Open link</a>
+                      <button type="button" disabled={!!busy} onClick={() => act(x.slug, () => acceptShop(x.slug), `"${x.name}" is live now.`)} className="px-3 py-1.5 rounded bg-green-600 text-white font-semibold disabled:opacity-50">Approve</button>
+                      <button type="button" disabled={!!busy} onClick={async () => { if (!(await askConfirm(`Reject the shop "${x.name}"? It and its link are removed; the seller can ask again.`, { danger: true, confirmText: 'Reject' }))) return; act(x.slug, () => rejectSellerShop(owner, x.slug), `"${x.name}" was rejected.`); }} className="px-3 py-1.5 rounded border border-red-500 text-red-500 font-semibold disabled:opacity-50">Reject</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {pending.length > 0 && (
         <div className={`${card} border-[#D4AF37]/60`}>

@@ -32,6 +32,8 @@ export const shopPriceClamp = (base, wanted) => {
 // ---------------------------------------------------------------------------
 export const DEFAULT_PLANS = {
   enabled: true, freeLimit: 10, freeCategoryLimit: 3, periodDays: 30, reminderDays: 3,
+  // how many shops one seller account may have, by its plan (also checked in firestore.rules: shopLimitFor)
+  shopLimits: { free: 1, pro: 2, premium: 3 },
   pro: { price: 999, discount: 40 },
   premium: { price: 2999, discount: 40 },
   supportWhatsapp: '',
@@ -63,6 +65,7 @@ export const normalizePlans = (p) => {
     // Free plan: products from at most this many categories (Pro / Premium: all categories)
     freeCategoryLimit: num(x.freeCategoryLimit, DEFAULT_PLANS.freeCategoryLimit, 1, 20),
     tierFeatures: cleanTierFeatures(x.tierFeatures),
+    shopLimits: Object.fromEntries(['free', 'pro', 'premium'].map((t) => [t, num(x.shopLimits && x.shopLimits[t], DEFAULT_PLANS.shopLimits[t], 1, 5)])),
     periodDays: num(x.periodDays, DEFAULT_PLANS.periodDays, 1, 366),
     reminderDays: num(x.reminderDays, DEFAULT_PLANS.reminderDays, 0, 30),
     pro,
@@ -73,6 +76,8 @@ export const normalizePlans = (p) => {
     discountPercent: pro.discount,
   };
 };
+// how many shops a seller account may have on this tier ('free' | 'pro' | 'premium')
+export const shopLimitFor = (plans, tier) => normalizePlans(plans).shopLimits[tier === 'premium' ? 'premium' : tier === 'pro' ? 'pro' : 'free'];
 // what a seller pays for one period of a tier, e.g. Pro 999 with 40% off = 599, Premium 2999 - 40% = 1799
 export const planPrice = (plans, tier = 'pro') => {
   const c = normalizePlans(plans)[tier === 'premium' ? 'premium' : 'pro'];

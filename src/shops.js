@@ -78,6 +78,15 @@ export function watchMyShop(uid, onData, onError) {
   );
 }
 
+// every shop of one account (a seller can have more than one, by plan)
+export function watchMyShops(uid, onData, onError) {
+  return onSnapshot(
+    query(collection(db, "shops"), where("ownerUid", "==", uid)),
+    (snap) => onData(snap.docs.map((d) => ({ slug: d.id, ...d.data() }))),
+    (err) => onError && onError(err)
+  );
+}
+
 // Owner: every shop
 export function watchAllShops(onData, onError) {
   return onSnapshot(

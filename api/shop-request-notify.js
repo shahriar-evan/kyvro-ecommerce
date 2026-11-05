@@ -1,5 +1,6 @@
 // Vercel serverless function: tells the Owner(s) that an Admin made their own shop and it waits for Accept / Reject,
-// or (?action=seller) that a customer applied to sell on Kyvro
+// or (?action=seller) that a customer applied to sell on Kyvro, or (?action=seller-shop) that an approved seller asked
+// for one more shop (Pro / Premium)
 // (phone / browser notification + email). The shop itself is saved by the website, protected by Firestore rules.
 //
 // Safe to call without a login: the text always comes from the saved shop (never from the caller), it only
@@ -99,10 +100,51 @@ async function logoPending(req, res) {
   return res.status(200).json({ sent: pushed, emailed });
 }
 
+// ?action=seller-shop: an approved seller asked for another shop (shops/{slug} kind 'seller', extra, 'pending').
+// Same safety: text from the saved shop, only for a waiting one, once per shop (notified).
+async function sellerShopRequested(req, res) {
+  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  const slug = String(body.slug || '');
+  if (!/^[a-z0-9-]{3,40}$/.test(slug)) return res.status(400).json({ error: 'Bad shop.' });
+  const token = await accessToken();
+  const shop = await readDoc(token, `shops/${slug}`);
+  if (!shop || shop.kind !== 'seller' || shop.extra !== true || shop.status !== 'pending') return res.status(200).json({ sent: 0, reason: 'no waiting shop request' });
+  if (shop.notified) return res.status(200).json({ sent: 0, reason: 'already notified' });
+  const mark = await fetch(`${FS}/documents:commit`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ writes: [{
+      update: { name: `projects/${PROJECT}/databases/(default)/documents/shops/${slug}`, fields: { notified: { booleanValue: true } } },
+      updateMask: { fieldPaths: ['notified'] },
+      currentDocument: { exists: true },
+    }] }),
+  });
+  if (!mark.ok) return res.status(200).json({ sent: 0, reason: 'could not mark' });
+  const seller = (shop.ownerUid && (await readDoc(token, `sellers/${shop.ownerUid}`))) || {};
+  const person = String(seller.name || seller.email || 'A seller').slice(0, 80);
+  const shopName = String(shop.name || slug).slice(0, 60);
+  const link = `${SITE}/${String(shop.handle || slug)}`;
+  const cats = Array.isArray(shop.categories) ? shop.categories.join(', ') : '';
+  const owners = await ownerEmails(token);
+  const title = `New shop request: ${shopName}`;
+  const text = `${person} asked for another shop (${link}). Admin Portal -> Sellers -> New shop requests.`;
+  const pushed = await pushToOwners(token, owners, title, text);
+  const html = `<!doctype html><html><body style="font-family:Arial,Helvetica,sans-serif;color:#111"><div style="max-width:560px;margin:0 auto;padding:24px;line-height:1.7">
+    <p><strong>${esc(person)}</strong> asked for another shop: <strong>${esc(shopName)}</strong> (${esc(link)}).</p>
+    ${cats ? `<p>Categories: ${esc(cats)}</p>` : ''}
+    <p>It stays off until you approve it. Admin Portal &rarr; <strong>Sellers</strong> &rarr; New shop requests &rarr; Approve or Reject.</p>
+    <p><a href="${esc(SITE)}">${esc(SITE)}</a></p></div></body></html>`;
+  const emailed = await emailOwners(owners, title, html, `${text}\n${cats ? `Categories: ${cats}\n` : ''}${SITE}`);
+  return res.status(200).json({ sent: pushed, emailed });
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only.' });
   if (String((req.query && req.query.action) || '') === 'logo') {
     try { return await logoPending(req, res); } catch (err) { return res.status(200).json({ sent: 0, error: err.message || 'failed' }); }
+  }
+  if (String((req.query && req.query.action) || '') === 'seller-shop') {
+    try { return await sellerShopRequested(req, res); } catch (err) { return res.status(200).json({ sent: 0, error: err.message || 'failed' }); }
   }
   if (String((req.query && req.query.action) || '') === 'seller') {
     try { return await sellerApplied(req, res); } catch (err) { return res.status(200).json({ sent: 0, error: err.message || 'failed' }); }

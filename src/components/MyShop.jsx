@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { auth } from '../firebase';
-import { watchMyShop, watchAllShops, watchShopOwners, createShop, saveShopItems, saveShopName, shopNameTaken, setShopActive, isPendingShop, acceptShop, rejectShop, shopLinkKey, cleanHandle, HANDLE_RE, handleTaken, setShopHandle, nextHandleChange } from '../shops';
+import { watchMyShop, watchMyShops, watchAllShops, watchShopOwners, createShop, saveShopItems, saveShopName, shopNameTaken, setShopActive, isPendingShop, acceptShop, rejectShop, shopLinkKey, cleanHandle, HANDLE_RE, handleTaken, setShopHandle, nextHandleChange } from '../shops';
 import { askConfirm } from './AlertCenter';
 import { maxMarkupFor, shopPriceClamp, SHOP_COLLECTIONS, productInCollection } from '../data/shopConfig';
 import { flatSubCategories, subLabel } from '../data/catalog';
@@ -78,8 +78,17 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
       return () => { a(); c(); };
     }
     if (!uid) { setShop(null); return undefined; }
+    if (sellerMode) return undefined; // a public seller: below (their first shop; more shops on Pro / Premium)
     return watchMyShop(uid, (s) => setShop(s), () => setShop(null));
-  }, [isOwner, adminRole, uid, canCreateShop]);
+  }, [isOwner, adminRole, uid, canCreateShop, sellerMode]);
+  // a public seller: every shop of the account; My Shop edits the first one (the application's shop)
+  const [myShops, setMyShops] = useState(null); // null = loading
+  useEffect(() => (sellerMode && uid ? watchMyShops(uid, setMyShops, () => setMyShops([])) : undefined), [sellerMode, uid]);
+  useEffect(() => {
+    if (!sellerMode || myShops === null) return;
+    const first = mySeller && mySeller.slug ? myShops.find((x) => x.slug === mySeller.slug) : null;
+    setShop(first || myShops.find((x) => !x.extra) || myShops[0] || null);
+  }, [sellerMode, myShops, mySeller && mySeller.slug]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => watchPlans(setPlans), []);
   useEffect(() => (isOwner ? undefined : watchMySubscription(uid, setSub)), [uid, isOwner]);
@@ -122,10 +131,12 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   const allOverride = shop && shop.features && typeof shop.features.allProducts === 'boolean' ? shop.features.allProducts : null;
   const planLimit = isOwner || !plans.enabled || (allOverride === null ? paid : allOverride) ? SHOP_MAX_ITEMS : plans.freeLimit;
   // a shop whose plan ran out may keep (or reduce) what it already has, but not add more
-  const cap = Math.max(planLimit, Object.keys(savedItems).length);
+  // Free plan: the products count across ALL the seller's shops (so it stays right after Pro / Premium ends)
+  const otherItems = sellerMode && shop && myShops ? myShops.filter((x) => x.slug !== shop.slug).reduce((n, x) => n + Object.keys(x.items || {}).length, 0) : 0;
+  const cap = Math.max(planLimit === SHOP_MAX_ITEMS ? planLimit : Math.max(0, planLimit - otherItems), Object.keys(savedItems).length);
   const daysLeft = paidUntil ? Math.ceil((paidUntil - Date.now()) / 86400000) : null;
   const fmtDate = (ms) => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  const limitMsg = () => setMsg({ type: 'err', text: `The Free plan shows up to ${plans.freeLimit} products. Upgrade to add all products.` });
+  const limitMsg = () => setMsg({ type: 'err', text: `The Free plan shows up to ${plans.freeLimit} products${otherItems ? ' across all your shops' : ''}. Upgrade to add all products.` });
   // Free plan: products from at most plans.freeCategoryLimit categories (Pro / Premium / "All products": every category)
   const catLimit = planLimit === SHOP_MAX_ITEMS ? Infinity : plans.freeCategoryLimit;
   const catOf = (p) => (SHOP_COLLECTIONS.find((c) => productInCollection(p, c.name)) || {}).name || 'Other';

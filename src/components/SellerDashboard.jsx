@@ -1,17 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import MyShop from './MyShop';
-import { updateSellerCategories, watchMySeller, saveSellerBkash, loadSellerEarnings, applyAsSeller, sellerStatus, normalizeWhatsapp, watchSellerRules, sellerNameBlocked } from '../sellers';
+import { requestSellerShop, sellerShopList, updateSellerCategories, watchMySeller, saveSellerBkash, loadSellerEarnings, applyAsSeller, sellerStatus, normalizeWhatsapp, watchSellerRules, sellerNameBlocked } from '../sellers';
 import { watchPayouts } from '../payouts';
 import { formatDateTime, toDate } from '../utils/dates';
 import { getAdminStatus } from '../adminAuth';
 import { isOwnerEmail } from '../adminEmails';
 import { SHOP_COLLECTIONS, productInCollection } from '../data/shopConfig';
 import { watchPlans } from '../storeSettings';
-import { normalizePlans, effectiveTier, TIER_LABEL } from '../data/priceCheck';
+import { normalizePlans, effectiveTier, TIER_LABEL, shopLimitFor } from '../data/priceCheck';
 import SellerStats from './SellerStats';
 import SellPricing from './SellPricing';
 import { watchMySubscription } from '../storeSettings';
-import { watchShop, cleanHandle, HANDLE_RE, handleTaken, prettyHandle } from '../shops';
+import { watchShop, watchMyShops, cleanHandle, HANDLE_RE, handleTaken, prettyHandle } from '../shops';
+import { GOLD_BTN, OUTLINE_BTN } from './ui';
 import { isReservedLink } from '../data/reservedLinks';
 import { effectiveFeatures, httpsLinkOk } from '../data/shopBrand';
 import { flatSubCategories, subLabel, matchesCollectionPage } from '../data/catalog';
@@ -69,6 +70,14 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
   useEffect(() => watchMySubscription(uid, setMySub), [uid]);
   const [myShop, setMyShop] = useState(null);
   useEffect(() => (seller && seller.slug ? watchShop(seller.slug, setMyShop, () => setMyShop(null)) : undefined), [seller && seller.slug]); // eslint-disable-line react-hooks/exhaustive-deps
+  // every shop of this account (more than one on Pro / Premium) and the "New shop" request form
+  const [myShops, setMyShops] = useState([]);
+  useEffect(() => (uid ? watchMyShops(uid, setMyShops, () => setMyShops([])) : undefined), [uid]);
+  const [nsOpen, setNsOpen] = useState(false);
+  const [nsHandle, setNsHandle] = useState('');
+  const [nsCats, setNsCats] = useState([]);
+  const [nsMsg, setNsMsg] = useState(null);
+  const [nsBusy, setNsBusy] = useState(false);
   // a team member (Owner / Manager / Admin) signed in with their team email cannot become a seller
   const [teamMember, setTeamMember] = useState(false);
   useEffect(() => {
@@ -321,6 +330,71 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
           </div>
         </div>
       )}
+      {approved && (() => {
+        // ---- My shops: Free 1, Pro 2, Premium 3 (the Owner can change the numbers); every new shop waits for approval ----
+        const acctTier = effectiveTier(mySub);
+        const limit = shopLimitFor(plans, acctTier);
+        const list = sellerShopList(seller).map((slug) => myShops.find((x) => x.slug === slug) || { slug, missing: true });
+        const used = sellerShopList(seller).length;
+        const canAdd = used < limit;
+        const sendShop = async () => {
+          setNsMsg(null);
+          const h = cleanHandle(nsHandle);
+          if (!HANDLE_RE.test(h)) return setNsMsg({ type: 'err', text: 'Shop link: 3 to 30 letters (a-z, 0-9 and -), e.g. rahim-shoes.' });
+          if (isReservedLink(h)) return setNsMsg({ type: 'err', text: `kyvro.store/${h} is used by the website itself. Try another one.` });
+          const bad = sellerNameBlocked(h, '', rules);
+          if (bad) return setNsMsg({ type: 'err', text: `The shop link cannot contain "${bad}".` });
+          if (!nsCats.length) return setNsMsg({ type: 'err', text: 'Tick at least one category for this shop.' });
+          setNsBusy(true);
+          try {
+            if (await handleTaken(h)) setNsMsg({ type: 'err', text: `kyvro.store/${h} is already taken. Try another one.` });
+            else { await requestSellerShop({ uid, seller, handle: h, categories: nsCats }); setNsMsg({ type: 'ok', text: `Sent. kyvro.store/${h} goes live after Kyvro approves it.` }); setNsHandle(''); setNsCats([]); setNsOpen(false); }
+          } catch (e) { setNsMsg({ type: 'err', text: e.code === 'permission-denied' ? 'Could not send: your plan allows no more shops, or the link is taken.' : e.message }); }
+          setNsBusy(false);
+        };
+        const upgradeText = acctTier === 'premium' ? `Premium: up to ${limit} shops.` : acctTier === 'pro' ? `Pro: ${limit} shops. Upgrade to Premium for ${shopLimitFor(plans, 'premium')}.` : `Free plan: ${limit} shop. Upgrade to Pro (${shopLimitFor(plans, 'pro')} shops) or Premium (${shopLimitFor(plans, 'premium')} shops) for more.`;
+        return (
+          <div className={card}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#B8921F]">My shops <span className="text-gray-500 normal-case tracking-normal font-semibold">({used} / {limit})</span></p>
+              {canAdd
+                ? <button type="button" onClick={() => { setNsOpen((v) => !v); setNsMsg(null); }} className={`${OUTLINE_BTN} !py-1.5`}>{nsOpen ? 'Close' : '+ New shop'}</button>
+                : <span className="text-[11px] font-semibold text-[#B8921F]">{upgradeText}</span>}
+            </div>
+            <div className="divide-y divide-gray-500/15 text-xs">
+              {list.map((x) => (
+                <div key={x.slug} className="py-2 flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-semibold">{x.missing ? x.slug : (x.handle ? prettyHandle(x.handle) : x.name)} <span className="font-normal text-gray-500">· kyvro.store/{x.handle || x.slug}</span></span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${x.status === 'pending' ? 'bg-amber-500/15 text-amber-600' : x.active === false ? 'bg-gray-500/15 text-gray-500' : 'bg-green-600/15 text-green-600'}`}>{x.status === 'pending' ? 'Waiting for Kyvro' : x.active === false ? 'Off' : 'Live'}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-gray-500">{acctTier === 'free' ? `The Free plan's ${plans.freeLimit} products count across all your shops.` : 'Your plan covers all your shops.'} Editing a second shop comes soon; for now My Shop below edits your first shop.</p>
+            {nsMsg && <p className={`text-xs ${nsMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{nsMsg.text}</p>}
+            {nsOpen && canAdd && (
+              <div className={`rounded-xl border p-4 space-y-3 ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
+                <label className="block text-xs font-semibold text-gray-500">Shop link *
+                  <div className={`mt-1 flex items-stretch rounded border overflow-hidden ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>
+                    <span className={`px-2 flex items-center text-[11px] whitespace-nowrap ${isDarkMode ? 'bg-[#1a1a1a] text-gray-400' : 'bg-gray-100 text-gray-500'}`}>kyvro.store/</span>
+                    <input className={`${inputCls} !border-0 !rounded-none flex-1 min-w-0`} value={nsHandle} maxLength={30} placeholder="rahim-shoes" onChange={(e) => setNsHandle(cleanHandle(e.target.value))} />
+                  </div>
+                </label>
+                <div>
+                  <p className="text-xs font-semibold text-gray-500">Categories for this shop *</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {catLabels.map((l) => {
+                      const on = nsCats.includes(l);
+                      return <button key={l} type="button" aria-pressed={on} onClick={() => setNsCats((c) => (on ? c.filter((x) => x !== l) : [...c, l]))} className={chip(on, 'px-3 py-1.5 text-xs')}>{tick(on)}{l}</button>;
+                    })}
+                  </div>
+                </div>
+                <button type="button" disabled={nsBusy} onClick={sendShop} className={`${GOLD_BTN} w-full sm:w-auto`}>{nsBusy ? 'Sending...' : 'Send shop request'}</button>
+                <p className="text-[11px] text-gray-500">Kyvro checks every new shop; it goes live after approval.</p>
+              </div>
+            )}
+          </div>
+        );
+      })()}
       <MyShop sellerMode showPlan={approved} adminRole="seller" isOwner={false} products={products} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={customerUser.displayName || email} loggedInUserEmail={email} />
 
       {approved && (

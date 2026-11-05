@@ -98,6 +98,8 @@ export async function applyAsSeller({ uid, email, handle, details }) {
     subCategories: cleanSubs(details.subCategories),
     productNote: String(details.productNote || "").trim().slice(0, 300),
     agreed: details.agreed === true,
+    // every shop of this seller (the first one is this application's shop; more by plan: Free 1, Pro 2, Premium 3)
+    shops: [slug],
     status: "pending",
     createdAt: serverTimestamp(),
   });
@@ -105,6 +107,41 @@ export async function applyAsSeller({ uid, email, handle, details }) {
   // phone notification + email to the Owner (best effort; the application also shows in the Owner's Sellers tab)
   try { await fetch("/api/shop-request-notify?action=seller", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uid }) }); } catch (e) { /* ignore */ }
   return slug;
+}
+
+// ---- More shops (Pro 2, Premium 3): an approved seller asks for another shop. It starts OFF and 'pending' until the
+// Owner approves it (Sellers tab -> New shop requests); the Owner gets a phone notification. ----
+export const sellerShopList = (seller) => (seller && Array.isArray(seller.shops) && seller.shops.length ? seller.shops : seller && seller.slug ? [seller.slug] : []);
+export async function requestSellerShop({ uid, seller, handle, categories }) {
+  const slug = `${slugify(handle)}-${rand()}`;
+  const b = writeBatch(db);
+  b.set(doc(db, "shopHandles", handle), { slug, uid });
+  b.set(doc(db, "shops", slug), {
+    name: (prettyHandle(handle) || handle).slice(0, 60),
+    handle,
+    autoName: true,
+    ownerUid: uid,
+    kind: "seller",
+    extra: true,
+    categories: (Array.isArray(categories) ? categories : []).map((c) => String(c).slice(0, 60)).slice(0, 20),
+    active: false,
+    status: "pending",
+    items: {},
+    createdAt: serverTimestamp(),
+    updatedAt: new Date().toISOString(),
+  });
+  b.update(doc(db, "sellers", uid), { shops: [...sellerShopList(seller), slug] });
+  await b.commit();
+  try { await fetch("/api/shop-request-notify?action=seller-shop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug }) }); } catch (e) { /* ignore */ }
+  return slug;
+}
+// Owner: reject a seller's extra shop request (the shop and its link are removed; the seller can ask again)
+export async function rejectSellerShop(seller, slug) {
+  await releaseShopHandle(slug);
+  const b = writeBatch(db);
+  b.delete(doc(db, "shops", slug));
+  if (seller && seller.uid) b.update(doc(db, "sellers", seller.uid), { shops: sellerShopList(seller).filter((x) => x !== slug) });
+  await b.commit();
 }
 
 // where my markup is paid (the seller cannot read it back, only the Owner)
@@ -154,7 +191,7 @@ export const killSellerShop = (slug, note) => updateDoc(doc(db, "shops", slug), 
 export const reviveSellerShop = (slug) => updateDoc(doc(db, "shops", slug), { active: true, killed: false, killNote: "", updatedAt: new Date().toISOString() });
 // remove a seller completely (shop + entry), so the account could open a new shop later
 export async function removeSeller(seller) {
-  if (seller.slug) { await releaseShopHandle(seller.slug); await deleteDoc(doc(db, "shops", seller.slug)); }
+  for (const slug of sellerShopList(seller)) { await releaseShopHandle(slug); try { await deleteDoc(doc(db, "shops", slug)); } catch (e) { /* already gone */ } }
   await deleteDoc(doc(db, "sellers", seller.uid));
   try { await deleteDoc(doc(db, "sellerPayout", seller.uid)); } catch (e) { /* nothing saved */ }
 }

@@ -227,6 +227,32 @@ service cloud.firestore {
       let all = ('allProducts' in f) ? f.allProducts == true : hasPaid();
       return !plansOn() || n <= (all ? 300 : freeLimit()) || n <= resource.data.items.size();
     }
+    // How many shops a seller account may have: settings/plans.shopLimits by the account's plan (subscriptions/{uid},
+    // written by the server only); default Free 1, Pro 2, Premium 3.
+    function shopLimitFor(uid) {
+      let s = /databases/$(database)/documents/subscriptions/$(uid);
+      let paid = exists(s) && get(s).data.get('paidUntil', null) is timestamp && get(s).data.paidUntil > request.time;
+      let tier = paid ? (get(s).data.get('tier', 'pro') == 'premium' ? 'premium' : 'pro') : 'free';
+      let lim = exists(plansPath()) ? get(plansPath()).data.get('shopLimits', {}) : {};
+      return lim.get(tier, tier == 'premium' ? 3 : (tier == 'pro' ? 2 : 1));
+    }
+    // A public seller on the Free plan: the free product limit counts across ALL their shops (sellers/{uid}.shops, up
+    // to 5), so it stays right after a paid plan ends. Paid (or "All products" on): up to 300 per shop.
+    function sellerShops() {
+      let s = get(sellerPath(request.auth.uid)).data;
+      return s.get('shops', [s.slug]);
+    }
+    function itemsOf(list, i, slug) {
+      return (list.size() > i && list[i] != slug) ? get(/databases/$(database)/documents/shops/$(list[i])).data.items.size() : 0;
+    }
+    function sellerSizeOk(slug) {
+      let n = request.resource.data.items.size();
+      let f = resource.data.get('features', {});
+      let all = ('allProducts' in f) ? f.allProducts == true : hasPaid();
+      let list = sellerShops();
+      let total = n + itemsOf(list, 0, slug) + itemsOf(list, 1, slug) + itemsOf(list, 2, slug) + itemsOf(list, 3, slug) + itemsOf(list, 4, slug);
+      return !plansOn() || (all ? n <= 300 : total <= freeLimit()) || n <= resource.data.items.size();
+    }
 
     // ---- Public sellers ("Sell on Kyvro"): any signed-in customer who is NOT on the team can open ONE shop ----
     // settings/sellerRules (Owner): open = new sellers allowed; blockedRegex = shop names / links that are refused
@@ -330,7 +356,7 @@ service cloud.firestore {
       }
       allow read: if true;
       allow create: if slug.matches('^[a-z0-9-]{3,40}$')
-        && request.resource.data.keys().hasOnly(['name', 'ownerUid', 'active', 'status', 'items', 'createdAt', 'updatedAt', 'planExempt', 'kind', 'handle', 'autoName'])
+        && request.resource.data.keys().hasOnly(['name', 'ownerUid', 'active', 'status', 'items', 'createdAt', 'updatedAt', 'planExempt', 'kind', 'handle', 'autoName', 'extra', 'categories'])
         && (!('autoName' in request.resource.data) || request.resource.data.autoName == true)
         && handleOk()
         // "no plan limit" is only for the Owner's own shop
@@ -349,7 +375,18 @@ service cloud.firestore {
                 && existsAfter(sellerPath(request.auth.uid))
                 && getAfter(sellerPath(request.auth.uid)).data.slug == slug
                 && getAfter(sellerPath(request.auth.uid)).data.status == 'pending'
-                && sellersOpen() && sellerNameOk(request.resource.data.name, slug)));
+                && sellersOpen() && sellerNameOk(request.resource.data.name, slug))
+            // an approved seller asks for one more shop (extra): OFF and 'pending' until the Owner approves it; the shop
+            // is added to sellers/{uid}.shops in the same batch, within the plan's shop limit (checked there)
+            || (signedIn() && !isStaff() && request.resource.data.get('kind', '') == 'seller'
+                && request.resource.data.get('extra', false) == true
+                && request.resource.data.active == false && request.resource.data.status == 'pending'
+                && exists(sellerPath(request.auth.uid))
+                && get(sellerPath(request.auth.uid)).data.get('status', 'approved') == 'approved'
+                && !(slug in get(sellerPath(request.auth.uid)).data.get('shops', [get(sellerPath(request.auth.uid)).data.slug]))
+                && getAfter(sellerPath(request.auth.uid)).data.get('shops', []).hasAny([slug])
+                && request.resource.data.get('categories', []) is list && request.resource.data.get('categories', []).size() <= 20
+                && sellerNameOk(request.resource.data.name, slug)));
       allow update: if request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 60
         && handleOk()
         && request.resource.data.items is map && request.resource.data.items.size() <= 300
@@ -379,7 +416,7 @@ service cloud.firestore {
                 && resource.data.get('killed', false) != true
                 && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'logoRequest', 'logoPending', 'logoPendingAt', 'logoReject', 'bannerPending', 'bannerPendingAt', 'bannerReject', 'handle', 'handleChangedAt', 'autoName'])
                 && shopExtrasOk()
-                && shopSizeOk()));
+                && sellerSizeOk(slug)));
       // the Owner deletes a shop (also what "Reject" does with a request)
       allow delete: if isOwner();
     }
@@ -394,7 +431,9 @@ service cloud.firestore {
       }
       function applicationOk() {
         let d = request.resource.data;
-        return d.keys().hasOnly(['slug', 'email', 'name', 'whatsapp', 'district', 'area', 'address', 'pageLink', 'socialLinks', 'productNote', 'categories', 'subCategories', 'agreed', 'status', 'createdAt'])
+        return d.keys().hasOnly(['slug', 'email', 'name', 'whatsapp', 'district', 'area', 'address', 'pageLink', 'socialLinks', 'productNote', 'categories', 'subCategories', 'agreed', 'status', 'createdAt', 'shops'])
+          // shops = every shop of this seller; an application starts with just its own shop
+          && d.get('shops', [d.slug]) == [d.slug]
           && d.email == myEmail()
           && d.name is string && d.name.size() >= 2 && d.name.size() <= 80
           && d.whatsapp is string && d.whatsapp.matches('^(\\+?8801[3-9][0-9]{8}|01[3-9][0-9]{8}|\\+[1-9][0-9]{7,14})$')
@@ -429,6 +468,19 @@ service cloud.firestore {
                         && resource.data.get('status', 'approved') == 'pending'
                         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['categories', 'subCategories'])
                         && categoriesOk(request.resource.data))
+                    // an approved seller adds one more shop to the list (the new shop is created in the same batch),
+                    // never more than the plan's shop limit; earlier shops stay in the list
+                    || (signedIn() && request.auth.uid == uid && !isStaff()
+                        && resource.data.get('status', 'approved') == 'approved'
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['shops'])
+                        && request.resource.data.shops is list
+                        && request.resource.data.shops.size() == resource.data.get('shops', [resource.data.slug]).size() + 1
+                        && request.resource.data.shops.hasAll(resource.data.get('shops', [resource.data.slug]))
+                        && request.resource.data.shops.size() <= shopLimitFor(uid))
+                    // the Owner removes a rejected extra shop from the list
+                    || (isOwner()
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['shops'])
+                        && request.resource.data.shops is list && request.resource.data.shops.size() <= 5)
                     // the Owner decides
                     || (isOwner()
                         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'rejectNote', 'decidedAt', 'decidedBy'])
@@ -519,7 +571,12 @@ service cloud.firestore {
         && request.resource.data.blockedRegex is string && request.resource.data.blockedRegex.size() <= 3000;
       // Shop plans (Free limit, paid price, period, reminder days). Only the Owner. Must match normalizePlans() in src/data/priceCheck.js
       allow create, update: if docId == 'plans' && isOwner()
-        && request.resource.data.keys().hasOnly(['enabled', 'originalPrice', 'discountPercent', 'freeLimit', 'freeCategoryLimit', 'tierFeatures', 'periodDays', 'reminderDays', 'pro', 'premium', 'supportWhatsapp', 'updatedAt', 'updatedByName'])
+        && request.resource.data.keys().hasOnly(['enabled', 'originalPrice', 'discountPercent', 'freeLimit', 'freeCategoryLimit', 'tierFeatures', 'shopLimits', 'periodDays', 'reminderDays', 'pro', 'premium', 'supportWhatsapp', 'updatedAt', 'updatedByName'])
+        // shops per seller account by plan (1 to 5 each)
+        && request.resource.data.get('shopLimits', {}) is map && request.resource.data.get('shopLimits', {}).keys().hasOnly(['free', 'pro', 'premium'])
+        && request.resource.data.get('shopLimits', {}).get('free', 1) is int && request.resource.data.get('shopLimits', {}).get('free', 1) >= 1 && request.resource.data.get('shopLimits', {}).get('free', 1) <= 5
+        && request.resource.data.get('shopLimits', {}).get('pro', 2) is int && request.resource.data.get('shopLimits', {}).get('pro', 2) >= 1 && request.resource.data.get('shopLimits', {}).get('pro', 2) <= 5
+        && request.resource.data.get('shopLimits', {}).get('premium', 3) is int && request.resource.data.get('shopLimits', {}).get('premium', 3) >= 1 && request.resource.data.get('shopLimits', {}).get('premium', 3) <= 5
         // Free plan: products from at most freeCategoryLimit categories; tierFeatures = the Owner's ON / OFF per plan
         && request.resource.data.get('freeCategoryLimit', 3) is int && request.resource.data.get('freeCategoryLimit', 3) >= 1 && request.resource.data.get('freeCategoryLimit', 3) <= 20
         && request.resource.data.get('tierFeatures', {}) is map && request.resource.data.get('tierFeatures', {}).keys().hasOnly(['free', 'pro', 'premium'])
