@@ -4,6 +4,7 @@ import { ChevronDown, Lock, Menu, X } from 'lucide-react';
 // Seller dashboard frame: a menu on the left (desktop) or a drop-down menu (phone), the chosen page on the right.
 // nav = [{ title, items: [{ key, label, icon, badge, children: [{ key, label }] }] }]
 // badge: 'Pro' / 'Premium' (locked on this plan) or 'Soon'; a locked item still opens (it shows the upgrade page).
+// count: a red number (things waiting, e.g. new orders).
 export default function SellerDashLayout({ nav, active, onSelect, isDarkMode, head, children }) {
   const [open, setOpen] = useState(false); // phone menu
   const [expanded, setExpanded] = useState(() => new Set());
@@ -41,6 +42,7 @@ export default function SellerDashLayout({ nav, active, onSelect, isDarkMode, he
                     className={itemCls(on || (kids.length > 0 && kids.some((c) => c.key === active)))}>
                     {Icon && <Icon size={18} className="shrink-0" />}
                     <span className="truncate">{it.label}</span>
+                    {it.count > 0 && <span className="ml-auto shrink-0 min-w-[1.25rem] px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold text-center">{it.count}</span>}
                     {badge(it.badge)}
                     {kids.length > 0 && <ChevronDown size={16} className={`shrink-0 transition-transform ${it.badge ? '' : 'ml-auto'} ${isOpen ? 'rotate-180' : ''}`} />}
                   </button>
