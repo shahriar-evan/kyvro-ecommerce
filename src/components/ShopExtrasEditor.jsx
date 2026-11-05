@@ -2,17 +2,17 @@ import React, { useMemo, useState } from 'react';
 import qrcode from 'qrcode-generator';
 import { BRAND_COLORS, SOCIALS } from '../data/shopBrand';
 import { imageFileToDataURL } from '../utils/imageUpload';
-import { requestLogo, uploadLogo, uploadBanner } from '../shops';
+import { uploadLogo, uploadBanner } from '../shops';
 import { GOLD_BTN, OUTLINE_BTN, planBadge } from './ui';
 
-// My Shop: the shop page extras, in plan order. Pro + Premium: tagline, contact button, about, social links, logo, banner
-// and the share kit (link, QR code, ready caption). Premium only (last): brand color, announcement strip, pinned products.
+// My Shop: the shop page extras, in plan order. Pro + Premium: social links and the share kit (link, QR code, caption).
+// Premium (after the divider): tagline + contact button, about, logo, banner, brand color, announcement, pinned products.
 // Locked parts are shown greyed with what unlocks them. Saving happens with the shop's Save button.
 export default function ShopExtrasEditor({ extras, setExtras, feat, shop, tier = 'free', shopName, link, pinChoices = [], isDarkMode, inputCls }) {
   const [copied, setCopied] = useState('');
   const [logoMsg, setLogoMsg] = useState(null);
   const [logoBusy, setLogoBusy] = useState(false);
-  const proOn = feat.tagline || feat.about || feat.social;
+  const proOn = feat.tagline || feat.about; // the "Shop page" box (tagline, contact button, about)
   const premiumOn = feat.brandColor || feat.announcement || feat.pinned;
   // logo: png / jpg / webp up to 500 KB, made into a small square picture that waits for approval
   const pickLogo = async (file) => {
@@ -46,7 +46,6 @@ export default function ShopExtrasEditor({ extras, setExtras, feat, shop, tier =
     } catch (e) { setBannerMsg({ type: 'err', text: e.code === 'permission-denied' ? 'Banner upload is not on for your shop.' : e.message }); }
     setBannerBusy(false);
   };
-  const askLogo = async () => { setLogoMsg(null); try { await requestLogo(shop.slug); setLogoMsg({ type: 'ok', text: 'Request sent to Kyvro.' }); } catch (e) { setLogoMsg({ type: 'err', text: e.message }); } };
   const set = (k, v) => setExtras((e) => ({ ...e, [k]: v }));
   const setSocial = (k, v) => setExtras((e) => ({ ...e, socialLinks: { ...e.socialLinks, [k]: v } }));
   const box = `rounded-xl border p-4 space-y-3 ${isDarkMode ? 'border-gray-800 bg-[#121212]' : 'border-gray-200 bg-gray-50'}`;
@@ -83,68 +82,26 @@ export default function ShopExtrasEditor({ extras, setExtras, feat, shop, tier =
     </label>
   );
 
+  const field = `${inputCls} block mt-1 w-full !text-sm !rounded-lg`;
+  const lockNote = (on, what) => (on ? null : <p className="text-[11px] text-gray-500">{what}</p>);
+
   return (
     <div className="space-y-4">
-      {/* ---- Pro / Premium ---- */}
-      <div className={`${box} ${proOn ? '' : 'opacity-60'}`}>
-        {head('Shop page', 'Pro / Premium', proOn)}
-        <fieldset disabled={!proOn} className="space-y-3">
-          <div className={`grid sm:grid-cols-2 gap-3 ${feat.tagline ? '' : 'opacity-50 pointer-events-none'}`}>
-            <label className={label}>Tagline <span className="font-normal">(max 80)</span>
-              <input className={`${inputCls} block mt-1 w-full !text-sm !rounded-lg`} maxLength={80} value={extras.tagline} onChange={(e) => set('tagline', e.target.value)} placeholder="e.g. Trendy panjabi at the best price" />
-            </label>
-            <label className={label}>Contact button <span className="font-normal">(WhatsApp number or https link)</span>
-              <input className={`${inputCls} block mt-1 w-full !text-sm !rounded-lg`} maxLength={200} value={extras.contactUrl} onChange={(e) => set('contactUrl', e.target.value)} placeholder="+8801712345678 or https://facebook.com/..." />
-            </label>
-          </div>
-          <label className={`${label} ${feat.about ? '' : 'opacity-50 pointer-events-none'}`}>About your shop <span className="font-normal">(max 300, shown at the top of your shop)</span>
-            <textarea className={`${inputCls} block mt-1 w-full !text-sm !rounded-lg`} rows={3} maxLength={300} value={extras.about} onChange={(e) => set('about', e.target.value)} placeholder="Who you are and why people should buy from you" />
-          </label>
-          <div className={`grid sm:grid-cols-2 gap-3 ${feat.social ? '' : 'opacity-50 pointer-events-none'}`}>
+      {/* ---- Pro / Premium: social links + share kit ---- */}
+      <div className={`${box} ${feat.social ? '' : 'opacity-60'}`}>
+        {head('Social links', 'Pro / Premium', feat.social)}
+        <fieldset disabled={!feat.social} className="space-y-3">
+          <p className="text-[11px] text-gray-500">Connect your pages: the buttons show on your shop.</p>
+          <div className="grid sm:grid-cols-2 gap-3">
             {SOCIALS.map((x) => (
               <label key={x.key} className={label}>{x.label}
-                <input className={`${inputCls} block mt-1 w-full !text-sm !rounded-lg`} maxLength={200} value={extras.socialLinks[x.key]} onChange={(e) => setSocial(x.key, e.target.value)} placeholder={x.placeholder} />
+                <input className={field} maxLength={200} value={extras.socialLinks[x.key]} onChange={(e) => setSocial(x.key, e.target.value)} placeholder={x.placeholder} />
               </label>
             ))}
           </div>
           <p className="text-[11px] text-gray-500">Links must start with https://</p>
         </fieldset>
       </div>
-
-      {shop && (
-        <div className={`${box} ${feat.logo ? '' : 'opacity-60'}`}>
-          {head('Shop logo', 'Pro / Premium', feat.logo, tier === 'free' ? 'Pro / Premium' : 'On request')}
-          {shop.logo && <div className="flex items-center gap-3 text-xs"><img src={shop.logo} alt="" className="w-14 h-14 rounded-xl object-cover border" /><span className="text-green-600 font-semibold">Approved logo (shown on your shop)</span></div>}
-          {shop.logoPending && <div className="flex items-center gap-3 text-xs"><img src={shop.logoPending} alt="" className="w-14 h-14 rounded-xl object-cover border" /><span className="text-amber-600 font-semibold">Waiting for Kyvro's approval</span></div>}
-          {shop.logoReject && <p className="text-xs text-red-500">{shop.logoReject.kind === 'request' ? 'Logo request rejected' : 'Logo rejected'}{shop.logoReject.note ? `: ${shop.logoReject.note}` : ''}</p>}
-          {feat.logo ? (
-            <>
-              {uploadBtn(logoBusy, shop.logo || shop.logoPending ? 'Upload a new logo' : 'Upload logo', pickLogo)}
-              <p className="text-[11px] text-gray-500">PNG / JPG / WebP, max 500 KB, shown square. Kyvro approves it first.</p>
-            </>
-          ) : tier === 'pro' ? (
-            shop.logoRequest ? <p className="text-xs text-amber-600 font-semibold">Logo permission requested. Kyvro will decide soon.</p>
-              : <button type="button" onClick={askLogo} className={`${OUTLINE_BTN} w-full sm:w-auto`}>Request logo permission</button>
-          ) : <p className="text-[11px] text-gray-500">{tier === 'free' ? 'Your own logo on your shop page.' : 'Logo upload is switched off for your shop.'}</p>}
-          {logoMsg && <p className={`text-xs ${logoMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{logoMsg.text}</p>}
-        </div>
-      )}
-
-      {shop && (
-        <div className={`${box} ${feat.banner ? '' : 'opacity-60'}`}>
-          {head('Shop banner', 'Pro / Premium', feat.banner, tier === 'free' ? 'Pro / Premium' : 'Off for your shop')}
-          {shop.banner && <div className="space-y-1 text-xs"><img src={shop.banner} alt="" className="w-full max-h-36 object-cover rounded-xl border" /><span className="text-green-600 font-semibold">Approved banner (shown on top of your shop)</span></div>}
-          {shop.bannerPending && <div className="space-y-1 text-xs"><img src={shop.bannerPending} alt="" className="w-full max-h-36 object-cover rounded-xl border" /><span className="text-amber-600 font-semibold">Waiting for Kyvro's approval</span></div>}
-          {shop.bannerReject && <p className="text-xs text-red-500">Banner rejected{shop.bannerReject.note ? `: ${shop.bannerReject.note}` : ''}</p>}
-          {feat.banner ? (
-            <>
-              {uploadBtn(bannerBusy, shop.banner || shop.bannerPending ? 'Upload a new banner' : 'Upload banner', pickBanner)}
-              <p className="text-[11px] text-gray-500">Wide picture (about 3:1), PNG / JPG / WebP, max 2 MB. Kyvro approves it first.</p>
-            </>
-          ) : <p className="text-[11px] text-gray-500">A wide picture on top of your shop.</p>}
-          {bannerMsg && <p className={`text-xs ${bannerMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{bannerMsg.text}</p>}
-        </div>
-      )}
 
       <div className={`${box} ${feat.shareKit ? '' : 'opacity-60'}`}>
         {head('Share kit', 'Pro / Premium', feat.shareKit)}
@@ -168,12 +125,62 @@ export default function ShopExtrasEditor({ extras, setExtras, feat, shop, tier =
         ) : <p className="text-[11px] text-gray-500">QR code of your shop link and a ready caption to post.</p>}
       </div>
 
-      {/* ---- Premium only ---- */}
+      {/* ---- Premium ---- */}
       <div className="flex items-center gap-3 pt-2" aria-hidden="true">
         <span className="h-px flex-1 bg-gradient-to-r from-transparent to-[#D4AF37]/60" />
         <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#B8921F]">Premium</span>
         <span className="h-px flex-1 bg-gradient-to-l from-transparent to-[#D4AF37]/60" />
       </div>
+
+      <div className={`${box} ${proOn ? '' : 'opacity-60'}`}>
+        {head('Shop page', 'Premium', proOn)}
+        <fieldset disabled={!proOn} className="space-y-3">
+          <div className={`grid sm:grid-cols-2 gap-3 ${feat.tagline ? '' : 'opacity-50 pointer-events-none'}`}>
+            <label className={label}>Tagline <span className="font-normal">(max 80)</span>
+              <input className={field} maxLength={80} value={extras.tagline} onChange={(e) => set('tagline', e.target.value)} placeholder="e.g. Trendy panjabi at the best price" />
+            </label>
+            <label className={label}>Contact button <span className="font-normal">(WhatsApp number or https link)</span>
+              <input className={field} maxLength={200} value={extras.contactUrl} onChange={(e) => set('contactUrl', e.target.value)} placeholder="+8801712345678 or https://facebook.com/..." />
+            </label>
+          </div>
+          <label className={`${label} ${feat.about ? '' : 'opacity-50 pointer-events-none'}`}>About your shop <span className="font-normal">(max 300, shown at the top of your shop)</span>
+            <textarea className={field} rows={3} maxLength={300} value={extras.about} onChange={(e) => set('about', e.target.value)} placeholder="Who you are and why people should buy from you" />
+          </label>
+        </fieldset>
+      </div>
+
+      {shop && (
+        <div className={`${box} ${feat.logo ? '' : 'opacity-60'}`}>
+          {head('Shop logo', 'Premium', feat.logo)}
+          {shop.logo && <div className="flex items-center gap-3 text-xs"><img src={shop.logo} alt="" className="w-14 h-14 rounded-xl object-cover border" /><span className="text-green-600 font-semibold">Approved logo (shown on your shop)</span></div>}
+          {shop.logoPending && <div className="flex items-center gap-3 text-xs"><img src={shop.logoPending} alt="" className="w-14 h-14 rounded-xl object-cover border" /><span className="text-amber-600 font-semibold">Waiting for Kyvro's approval</span></div>}
+          {shop.logoReject && <p className="text-xs text-red-500">{shop.logoReject.kind === 'request' ? 'Logo request rejected' : 'Logo rejected'}{shop.logoReject.note ? `: ${shop.logoReject.note}` : ''}</p>}
+          {feat.logo ? (
+            <>
+              {uploadBtn(logoBusy, shop.logo || shop.logoPending ? 'Upload a new logo' : 'Upload logo', pickLogo)}
+              <p className="text-[11px] text-gray-500">PNG / JPG / WebP, max 500 KB, shown square. Kyvro approves it first.</p>
+            </>
+          ) : lockNote(false, 'Your own logo on your shop page.')}
+          {logoMsg && <p className={`text-xs ${logoMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{logoMsg.text}</p>}
+        </div>
+      )}
+
+      {shop && (
+        <div className={`${box} ${feat.banner ? '' : 'opacity-60'}`}>
+          {head('Shop banner', 'Premium', feat.banner)}
+          {shop.banner && <div className="space-y-1 text-xs"><img src={shop.banner} alt="" className="w-full max-h-36 object-cover rounded-xl border" /><span className="text-green-600 font-semibold">Approved banner (shown on top of your shop)</span></div>}
+          {shop.bannerPending && <div className="space-y-1 text-xs"><img src={shop.bannerPending} alt="" className="w-full max-h-36 object-cover rounded-xl border" /><span className="text-amber-600 font-semibold">Waiting for Kyvro's approval</span></div>}
+          {shop.bannerReject && <p className="text-xs text-red-500">Banner rejected{shop.bannerReject.note ? `: ${shop.bannerReject.note}` : ''}</p>}
+          {feat.banner ? (
+            <>
+              {uploadBtn(bannerBusy, shop.banner || shop.bannerPending ? 'Upload a new banner' : 'Upload banner', pickBanner)}
+              <p className="text-[11px] text-gray-500">Wide picture (about 3:1), PNG / JPG / WebP, max 2 MB. Kyvro approves it first.</p>
+            </>
+          ) : lockNote(false, 'A wide picture on top of your shop.')}
+          {bannerMsg && <p className={`text-xs ${bannerMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{bannerMsg.text}</p>}
+        </div>
+      )}
+
       <div className={`${box} ${premiumOn ? '!border-[#D4AF37]/40' : 'opacity-60'}`}>
         {head('Premium look', 'Premium', premiumOn)}
         <fieldset disabled={!premiumOn} className="space-y-3">
@@ -192,7 +199,7 @@ export default function ShopExtrasEditor({ extras, setExtras, feat, shop, tier =
             </div>
           </div>
           <label className={`${label} ${feat.announcement ? '' : 'opacity-50 pointer-events-none'}`}>Announcement strip <span className="font-normal">(max 100, shown on top of your shop)</span>
-            <input className={`${inputCls} block mt-1 w-full !text-sm !rounded-lg`} maxLength={100} value={extras.announcement} onChange={(e) => set('announcement', e.target.value)} placeholder="e.g. Eid offer: free delivery this week" />
+            <input className={field} maxLength={100} value={extras.announcement} onChange={(e) => set('announcement', e.target.value)} placeholder="e.g. Eid offer: free delivery this week" />
           </label>
           <div className={feat.pinned ? '' : 'opacity-50 pointer-events-none'}>
             <p className={label}>Pin top products <span className="font-normal">(up to 3, shown first on your shop; tick products above first)</span></p>

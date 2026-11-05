@@ -112,7 +112,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   const paidUntil = toMillis(sub && sub.paidUntil);
   const paid = paidUntil > Date.now();
   const tier = isOwner ? 'premium' : effectiveTier(sub); // free / pro / premium right now
-  // shop page extras: Pro / Premium (tagline, contact, about, social links, share kit), Premium only (brand color,
+  // shop page extras: Pro / Premium (social links, share kit), Premium (tagline, contact, about, logo, banner, brand color,
   // announcement, pinned products). The rules check the tier the server wrote on the shop.
   const feat = isOwner ? Object.fromEntries(FEATURES.map((f) => [f.key, true])) : effectiveFeatures(shop, shop ? effectiveTier(shop) : 'free', plans.tierFeatures);
   const extrasAllowed = feat.tagline || feat.about || feat.social || feat.shareKit;

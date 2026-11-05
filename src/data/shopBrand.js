@@ -47,13 +47,14 @@ export const PREMIUM_EXTRAS = ['brandColor', 'announcement', 'pinnedItems'];
 // ---- Plan features: what each tier gets by default; the Owner / a Manager can switch any of them ON or OFF for a
 // shop (shops/{slug}.features). firestore.rules uses the same defaults (featOn).
 // paid: true = shop identity (name change, logo, banner): never on Free (even with an override; rules: paidFeatOn).
-// Logo and banner: Pro + Premium ON (uploads wait for Kyvro's approval). Name change: Premium ON, Pro OFF unless switched on. The shop link (slug) never changes. ----
+// Name change, logo and banner: Premium ON (uploads wait for Kyvro's approval); Pro OFF unless switched on.
+// Pro by default: all products, priority approval, social links and the share kit. The rest is Premium. The shop link (slug) never changes. ----
 export const FEATURES = [
   { key: 'allProducts', label: 'All products', pro: true },
   { key: 'priorityApproval', label: 'Priority approval', pro: true },
-  { key: 'tagline', label: 'Tagline + contact button', pro: true },
+  { key: 'tagline', label: 'Tagline + contact button', pro: false },
   { key: 'social', label: 'Social links', pro: true },
-  { key: 'about', label: 'About section', pro: true },
+  { key: 'about', label: 'About section', pro: false },
   { key: 'shareKit', label: 'Share kit (QR + caption)', pro: true },
   { key: 'brandColor', label: 'Brand color', pro: false },
   { key: 'announcement', label: 'Announcement strip', pro: false },
@@ -62,8 +63,8 @@ export const FEATURES = [
   { key: 'weeklyPayout', label: 'Weekly payout', pro: false },
   { key: 'prioritySupport', label: 'Priority support', pro: false },
   { key: 'shopName', label: 'Shop name change', pro: false, paid: true },
-  { key: 'logo', label: 'Logo upload', pro: true, paid: true },
-  { key: 'banner', label: 'Banner upload', pro: true, paid: true },
+  { key: 'logo', label: 'Logo upload', pro: false, paid: true },
+  { key: 'banner', label: 'Banner upload', pro: false, paid: true },
   { key: 'salesStats', label: 'Sales stats', pro: false },
   { key: 'earningsCsv', label: 'Monthly earnings CSV', pro: false },
 ];

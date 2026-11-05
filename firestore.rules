@@ -239,9 +239,10 @@ service cloud.firestore {
 
     // Pro / Premium shop extras, shown on the storefront. Allowed only while the shop's paid plan runs; tier and paidUntil
     // on the shop are written by the server only, so a client cannot fake them.
-    //   Pro + Premium: tagline (80), contactUrl (WhatsApp number or https link), about (300),
-    //                  socialLinks {facebook, instagram, tiktok, youtube} (https links only)
-    //   Premium only : brandColor (one of the presets), announcement (100), pinnedItems (up to 3 product ids)
+    //   Pro + Premium: socialLinks {facebook, instagram, tiktok, youtube} (https links only); share kit (client only)
+    //   Premium only : tagline (80), contactUrl (WhatsApp number or https link), about (300), brandColor (one of the
+    //                  presets), announcement (100), pinnedItems (up to 3 product ids), logo, banner, name change
+    //   (defaults; the Owner can change them per plan in Shop plans, or per shop in Plan Members)
     // Every link must start with https:// (so javascript: and data: links are impossible).
     function shopPaidNow() {
       return resource.data.get('tier', '') in ['pro', 'premium'] && resource.data.get('paidUntil', null) is timestamp && resource.data.paidUntil > request.time;
@@ -259,8 +260,8 @@ service cloud.firestore {
       let t = tierFeat();
       return (k in f) ? f[k] == true : ((k in t) ? t[k] == true : (shopPremiumNow() || (onPro && shopPaidNow())));
     }
-    // shop identity (shopName, logo, banner): Free never (not even with an override). Logo + banner: Pro and Premium ON;
-    // shopName: Premium ON, Pro OFF unless the Owner / a Manager switched it on
+    // shop identity (shopName, logo, banner): Free never (not even with an override); Premium ON; Pro OFF unless the
+    // Owner / a Manager switched it on
     function paidFeatOn(k, onPro) { return shopPaidNow() && featOn(k, onPro); }
     function httpsOk(v) { return v is string && v.size() <= 200 && (v == '' || v.matches('^https://[^ <>"]+$')); }
     function shopExtrasOk() {
@@ -270,11 +271,11 @@ service cloud.firestore {
       // and can never change)
       return (!changed.hasAny(['name']) || (paidFeatOn('shopName', false) && !d.name.lower().matches(blockedRe())))
         && (!changed.hasAny(['tagline', 'contactUrl'])
-          || (featOn('tagline', true)
+          || (featOn('tagline', false)
               && d.get('tagline', '') is string && d.get('tagline', '').size() <= 80
               && d.get('contactUrl', '') is string && d.get('contactUrl', '').size() <= 200
               && (d.get('contactUrl', '') == '' || d.get('contactUrl', '').matches('^(https://[^ <>"]+|[+]?[0-9]{8,15})$'))))
-        && (!changed.hasAny(['about']) || (featOn('about', true) && d.get('about', '') is string && d.get('about', '').size() <= 300))
+        && (!changed.hasAny(['about']) || (featOn('about', false) && d.get('about', '') is string && d.get('about', '').size() <= 300))
         && (!changed.hasAny(['socialLinks'])
           || (featOn('social', true)
               && d.get('socialLinks', {}) is map && d.get('socialLinks', {}).keys().hasOnly(['facebook', 'instagram', 'tiktok', 'youtube'])
@@ -285,16 +286,16 @@ service cloud.firestore {
         && (!changed.hasAny(['pinnedItems']) || (featOn('pinned', false) && d.get('pinnedItems', []) is list && d.get('pinnedItems', []).size() <= 3))
         // logo: a Pro shop may ask for permission; with the logo feature on, upload one that waits for approval
         && (!changed.hasAny(['logoRequest'])
-          || (!('logoRequest' in d) || (shopPaidNow() && !paidFeatOn('logo', true) && d.logoRequest is map && d.logoRequest.keys().hasOnly(['at']) && d.logoRequest.at is string && d.logoRequest.at.size() <= 40)))
+          || (!('logoRequest' in d) || (shopPaidNow() && !paidFeatOn('logo', false) && d.logoRequest is map && d.logoRequest.keys().hasOnly(['at']) && d.logoRequest.at is string && d.logoRequest.at.size() <= 40)))
         && (!changed.hasAny(['logoPending', 'logoPendingAt', 'logoReject'])
-          || (paidFeatOn('logo', true)
+          || (paidFeatOn('logo', false)
               && !('logoReject' in d)
               && d.get('logoPending', '') is string && d.get('logoPending', '').size() <= 200000
               && (d.get('logoPending', '') == '' || d.get('logoPending', '').matches('^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$'))
               && d.get('logoPendingAt', '') is string && d.get('logoPendingAt', '').size() <= 40))
-        // banner: Pro and Premium; uploaded banners wait for approval like the logo
+        // banner: Premium (or switched on for Pro); uploaded banners wait for approval like the logo
         && (!changed.hasAny(['bannerPending', 'bannerPendingAt', 'bannerReject'])
-          || (paidFeatOn('banner', true)
+          || (paidFeatOn('banner', false)
               && !('bannerReject' in d)
               && d.get('bannerPending', '') is string && d.get('bannerPending', '').size() <= 300000
               && (d.get('bannerPending', '') == '' || d.get('bannerPending', '').matches('^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$'))
