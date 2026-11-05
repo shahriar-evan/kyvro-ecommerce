@@ -3,7 +3,7 @@ import { ShoppingBag, Search, User, Menu, Sun, Moon, Truck } from 'lucide-react'
 import logoImg from '../assets/logo.png';
 import { CURRENCIES } from '../data/currencies';
 
-export default function Header({ shopBrand = null, onStartSelling, cart, curr, currencyKey, currentView, isDarkMode, setCurrencyKey, setCurrentView, setIsCartOpen, setIsDarkMode, setIsMobileMenuOpen, setSelectedCategory, navHas = () => true, customerUser, displayName, photoURL, goAccount, onSignIn, onSignOut }) {
+export default function Header({ shopBrand = null, onStartSelling, onAdminPanel = null, cart, curr, currencyKey, currentView, isDarkMode, setCurrencyKey, setCurrentView, setIsCartOpen, setIsDarkMode, setIsMobileMenuOpen, setSelectedCategory, navHas = () => true, customerUser, displayName, photoURL, goAccount, onSignIn, onSignOut }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
@@ -129,6 +129,8 @@ export default function Header({ shopBrand = null, onStartSelling, cart, curr, c
                     <button onClick={() => go(() => goAccount('saved'))} className={itemCls}>My Saved Items</button>
                     {customerUser && <button onClick={() => go(onSignOut)} className={itemCls}>Sign Out</button>}
                     {onStartSelling && <button onClick={() => go(onStartSelling)} className={`${itemCls} border-t border-gray-200/20 mt-1 text-[#D4AF37] font-semibold`}>Start your own business</button>}
+                    {/* only the team (Owner / Manager / Admin): straight to the Admin Panel */}
+                    {onAdminPanel && <button onClick={() => go(onAdminPanel)} className={`${itemCls} border-t border-gray-200/20 mt-1 font-semibold`}>Admin Panel</button>}
                   </div>
                 </>
               )}
