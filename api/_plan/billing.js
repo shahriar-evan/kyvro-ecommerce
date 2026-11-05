@@ -1,7 +1,7 @@
 // /api/plan?action=billing (see api/plan.js): the signed-in person's own plan payments (subscriptionPayments is
 // server-only in firestore.rules). Only their own rows: date, plan, amount, days, method, invoice id.
 import { FS, accessToken, val } from '../_sslc.js';
-import { planCaller } from '../_plans.js';
+import { planCaller, ownerViewer } from '../_plans.js';
 
 export const config = { maxDuration: 30 };
 
@@ -9,7 +9,9 @@ export default async function billing(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   try {
-    const me = await planCaller(req);
+    // ?uid=<seller uid>: the Owner viewing that seller's dashboard (read-only)
+    const viewUid = String((req.query && req.query.uid) || '');
+    const me = viewUid ? await ownerViewer(req, viewUid) : await planCaller(req);
     if (me.error) return res.status(me.status).json({ error: me.error });
     const token = await accessToken();
     const r = await fetch(`${FS}/documents:runQuery`, {

@@ -13,6 +13,11 @@ import { isReservedLink } from '../data/reservedLinks';
 import { shopExtrasOf, httpsLinkOk, contactOk, cleanContact, effectiveFeatures, FEATURES, shopDisplayName } from '../data/shopBrand';
 import { watchSellerRules, sellerNameBlocked, normalizeSellerRules, watchMySeller } from '../sellers';
 
+// read-only (the Owner viewing a seller): a disabled fieldset switches off every button and field inside it
+function ReadOnlyBox({ children }) {
+  return <fieldset disabled className="min-w-0 m-0 p-0 border-0 space-y-5">{children}</fieldset>;
+}
+
 // key = a shop's link name (handle) or its id: both open the shop at kyvro.store/<key>
 const shopUrl = (key) => `${window.location.origin}/${key}`;
 
@@ -41,7 +46,8 @@ function ShopSwitch({ on, busy, onToggle, isDarkMode, label }) {
 // An Admin the Owner switched "Shop create" ON for can make one too: it stays switched off until the Owner accepts it.
 // Payments (online, delivery charge, cash on delivery) all stay with the store; the Owner pays the markup out later.
 // view (seller dashboard): 'all' (default), 'products', 'manage', 'theme', 'plan' or 'none' (stays mounted so unsaved ticks survive)
-export default function MyShop({ view = 'all', sellerMode = false, showPlan = true, canCreateShop = false, adminRole, products, isOwner, isDarkMode, formatPrice, adminName, loggedInUserEmail, onDirtyChange }) {
+// readOnly + asUid: the Owner viewing a seller's dashboard (every control disabled, the seller's shops read by uid)
+export default function MyShop({ view = 'all', readOnly = false, asUid = '', sellerMode = false, showPlan = true, canCreateShop = false, adminRole, products, isOwner, isDarkMode, formatPrice, adminName, loggedInUserEmail, onDirtyChange }) {
   const [shop, setShop] = useState(undefined); // undefined = loading, null = none yet
   const [draft, setDraft] = useState({}); // productId -> price text (only the products that are in the shop)
   const [name, setName] = useState('');
@@ -61,7 +67,7 @@ export default function MyShop({ view = 'all', sellerMode = false, showPlan = tr
   const [sellerRules, setSellerRules] = useState(null);
   useEffect(() => (isOwner ? undefined : watchSellerRules(setSellerRules)), [isOwner]);
 
-  const uid = auth.currentUser ? auth.currentUser.uid : '';
+  const uid = asUid || (auth.currentUser ? auth.currentUser.uid : '');
   // a public seller's application: on the Free plan they pick products only from the categories Kyvro approved
   const [mySeller, setMySeller] = useState(null);
   useEffect(() => (sellerMode && uid ? watchMySeller(uid, setMySeller) : undefined), [sellerMode, uid]);
@@ -159,10 +165,10 @@ export default function MyShop({ view = 'all', sellerMode = false, showPlan = tr
   // (once per shop: a seller's 2nd / 3rd shop made after paying gets it when it is opened; the server syncs all shops)
   const [synced, setSynced] = useState('');
   useEffect(() => {
-    if (isOwner || !shop || synced === shop.slug || !paidUntil || (toMillis(shop.paidUntil) === paidUntil && (shop.tier || 'pro') === (sub.tier || 'pro')) || !auth.currentUser) return;
+    if (readOnly || isOwner || !shop || synced === shop.slug || !paidUntil || (toMillis(shop.paidUntil) === paidUntil && (shop.tier || 'pro') === (sub.tier || 'pro')) || !auth.currentUser) return;
     setSynced(shop.slug);
     auth.currentUser.getIdToken().then((t) => fetch('/api/plan?action=sync', { method: 'POST', headers: { Authorization: `Bearer ${t}` } })).catch(() => {});
-  }, [isOwner, synced, shop, paidUntil]);
+  }, [readOnly, isOwner, synced, shop, paidUntil]);
   const buyPlan = async (want) => {
     const buy = want === 'premium' ? 'premium' : 'pro';
     setMsg(null); setPaying(buy);
@@ -404,6 +410,8 @@ export default function MyShop({ view = 'all', sellerMode = false, showPlan = tr
   ) : null;
   if (adminRole === 'admin' && !canCreateShop) return links;
   if (view === 'none') return null;
+  // read-only: a disabled fieldset switches off every button and field (the shop switcher above it still works)
+  const RO = readOnly ? ReadOnlyBox : React.Fragment;
   const show = (...ks) => view === 'all' || ks.includes(view);
 
   // ---------- Manager (and an Admin with "Shop create" ON) ----------
@@ -463,6 +471,7 @@ export default function MyShop({ view = 'all', sellerMode = false, showPlan = tr
           </div>
         </div>
       )}
+      <RO>
       {show('products', 'manage') && extraHidden && (
         <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-4 text-xs text-amber-600 font-semibold">
           Your paid plan has ended, so this shop is hidden from customers (nothing is deleted). Your first shop stays on the Free plan. Renew Pro / Premium below and this shop shows again.
@@ -623,7 +632,8 @@ export default function MyShop({ view = 'all', sellerMode = false, showPlan = tr
       )}
 
       {/* stays at the bottom of the screen: nothing is written until Save */}
-      {show('products', 'manage', 'theme') && <div className={`sticky bottom-2 sm:bottom-3 z-20 rounded-2xl border px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 backdrop-blur shadow-[0_8px_30px_-10px_rgba(0,0,0,0.5)] ${dirty ? 'border-[#D4AF37]' : isDarkMode ? 'border-gray-800' : 'border-gray-200'} ${isDarkMode ? 'bg-[#0d0d0d]/95' : 'bg-white/95'}`}>
+      </RO>
+      {show('products', 'manage', 'theme') && !readOnly && <div className={`sticky bottom-2 sm:bottom-3 z-20 rounded-2xl border px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 backdrop-blur shadow-[0_8px_30px_-10px_rgba(0,0,0,0.5)] ${dirty ? 'border-[#D4AF37]' : isDarkMode ? 'border-gray-800' : 'border-gray-200'} ${isDarkMode ? 'bg-[#0d0d0d]/95' : 'bg-white/95'}`}>
         <div className="min-w-0 text-xs">
           <p className="font-bold text-sm">{cap < SHOP_MAX_ITEMS ? `Selected ${count} / ${cap}` : `${count} product${count === 1 ? '' : 's'} selected`}</p>
           {allowed && <p className="text-[11px] text-gray-500">Free plan: from your approved categories ({appCats.join(', ')})</p>}

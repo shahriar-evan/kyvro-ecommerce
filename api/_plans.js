@@ -8,6 +8,7 @@
 
 import { PROJECT, FS, accessToken, val } from './_sslc.js';
 import { UDDOKTA_BASE, UDDOKTA_KEY } from './_uddokta.js';
+import { ownerEmails } from './_owners.js';
 import { normalizePlans, planPrice, toMillis, effectiveTier } from '../src/data/priceCheck.js';
 
 const DOCS = `projects/${PROJECT}/databases/(default)/documents`;
@@ -54,6 +55,31 @@ export async function planCaller(req) {
   const me = fields(await r.json());
   if (me.active === false || !['manager', 'admin'].includes(me.role || 'admin')) return { error: 'Only Managers and Admins buy a plan.', status: 403 };
   return { uid, email, name: String(me.name || '') };
+}
+
+// The Owner looking at one seller's dashboard (Sellers > View dashboard, read-only). No impersonation: the Owner's own
+// login token must be able to read sellers/{uid} (firestore.rules: only that seller or the Owner), and the email must be
+// an Owner. Returns the SELLER as { uid, email, name, seller, slug, shops, viewer } or { error, status }.
+export async function ownerViewer(req, targetUid) {
+  const uid = String(targetUid || '');
+  if (!/^[A-Za-z0-9]{10,128}$/.test(uid)) return { error: 'Bad seller id.', status: 400 };
+  const auth = req.headers.authorization || '';
+  const idToken = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  let claims = {};
+  try { claims = JSON.parse(Buffer.from(idToken.split('.')[1], 'base64url').toString('utf8')); } catch (e) { /* bad token */ }
+  const email = String(claims.email || '').toLowerCase();
+  const me = String(claims.sub || claims.user_id || '');
+  if (!email || !me) return { error: 'Please sign in.', status: 401 };
+  if (me === uid) return { error: 'Use your own dashboard.', status: 400 };
+  const sr = await fetch(`${FS}/documents/sellers/${encodeURIComponent(uid)}`, { headers: { Authorization: `Bearer ${idToken}` } });
+  if (sr.status === 404) return { error: 'No such seller.', status: 404 };
+  if (!sr.ok) return { error: 'Only the Owner can view a seller.', status: 403 };
+  const owners = await ownerEmails(await accessToken());
+  if (!owners.has(email)) return { error: 'Only the Owner can view a seller.', status: 403 };
+  const sd = fields(await sr.json());
+  const slug = String(sd.slug || '');
+  const shops = (Array.isArray(sd.shops) && sd.shops.length ? sd.shops : [slug]).map(String).filter((x) => /^[a-z0-9-]{3,40}$/.test(x)).slice(0, 10);
+  return { uid, email: String(sd.email || ''), name: String(sd.name || ''), seller: true, slug, shops, viewer: email };
 }
 
 // The caller's current plan (subscriptions/{uid}) as { tier: 'free'|'pro'|'premium', paidUntil }

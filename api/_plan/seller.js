@@ -3,7 +3,7 @@
 // Only what the seller needs: order number, date, status, products, markup. NEVER the customer's name, phone,
 // address or email, and nothing about suppliers. The caller must be signed in as that seller.
 import { FS, accessToken, val } from '../_sslc.js';
-import { planCaller } from '../_plans.js';
+import { planCaller, ownerViewer } from '../_plans.js';
 
 export const config = { maxDuration: 30 };
 
@@ -13,7 +13,9 @@ export default async function earnings(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   try {
-    const me = await planCaller(req);
+    // ?uid=<seller uid>: the Owner viewing that seller's dashboard (read-only); otherwise the seller themself
+    const viewUid = String((req.query && req.query.uid) || '');
+    const me = viewUid ? await ownerViewer(req, viewUid) : await planCaller(req);
     if (me.error) return res.status(me.status).json({ error: me.error });
     if (!me.seller || !/^[a-z0-9-]{3,40}$/.test(me.slug)) return res.status(403).json({ error: 'Only sellers have this page.' });
     const token = await accessToken();
