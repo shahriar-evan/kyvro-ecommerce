@@ -16,3 +16,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+// Google always shows the account chooser, so customers, sellers and the team can switch accounts
+// (without it Google signs in with the last account straight away)
+googleProvider.setCustomParameters({ prompt: 'select_account' });
