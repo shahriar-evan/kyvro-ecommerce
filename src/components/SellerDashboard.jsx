@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import MyShop from './MyShop';
 import { auth } from '../firebase';
 import { requestSellerShop, sellerShopList, updateSellerCategories, watchMySeller, saveSellerBkash, loadSellerEarnings, applyAsSeller, sellerStatus, normalizeWhatsapp, watchSellerRules, sellerNameBlocked } from '../sellers';
@@ -31,7 +31,11 @@ const NO_SOCIALS = { facebook: '', instagram: '', tiktok: '' };
 
 // "Sell on Kyvro": a signed-in customer's own shop. The shop editor is the same as the team's (My Shop, plan,
 // markup cap). Earnings come from the server without any customer details; payouts are what the Owner already paid.
-export default function SellerDashboard({ customerUser, isStaff, products, formatPrice, isDarkMode, onSignIn, initialPlan = '' }) {
+// viewAs = { uid, email, name, onExit }: the Owner looking at this seller's dashboard (Sellers > View dashboard). READ-ONLY:
+// nothing can be saved (every control is disabled) and the Owner's own login reads the data; no seller login is used.
+export default function SellerDashboard({ customerUser: signedIn, viewAs = null, isStaff, products, formatPrice, isDarkMode, onSignIn, initialPlan = '' }) {
+  const ro = !!viewAs;
+  const customerUser = useMemo(() => (ro ? { uid: viewAs.uid, email: viewAs.email || '', displayName: viewAs.name || '' } : signedIn), [ro, viewAs && viewAs.uid, signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
   const [seller, setSeller] = useState(undefined); // undefined = loading, null = no shop yet
   const [earn, setEarn] = useState(null);
   const [earnErr, setEarnErr] = useState('');
@@ -94,7 +98,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
   const status = sellerStatus(seller);
   const approved = status === 'approved';
   useEffect(() => (approved && email ? watchPayouts(false, email, setPayouts, () => {}) : undefined), [approved, email]);
-  const refresh = () => { setEarnErr(''); loadSellerEarnings(customerUser).then(setEarn).catch((e) => setEarnErr(e.message)); };
+  const refresh = () => { setEarnErr(''); loadSellerEarnings(customerUser, ro ? viewAs.uid : '').then(setEarn).catch((e) => setEarnErr(e.message)); };
   useEffect(() => { if (approved && customerUser) refresh(); }, [approved, seller && seller.slug]); // eslint-disable-line react-hooks/exhaustive-deps
   // a rejected seller applies again with their last details filled in
   useEffect(() => {
@@ -111,7 +115,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
     let live = true;
     setBilling(null);
     Promise.resolve(auth.currentUser ? auth.currentUser.getIdToken() : Promise.reject(new Error('signed out')))
-      .then((t) => fetch('/api/plan?action=billing', { method: 'POST', headers: { Authorization: `Bearer ${t}` } }))
+      .then((t) => fetch(`/api/plan?action=billing${ro ? `&uid=${encodeURIComponent(viewAs.uid)}` : ''}`, { method: 'POST', headers: { Authorization: `Bearer ${t}` } }))
       .then(async (r) => { const j = await r.json().catch(() => ({})); if (live) setBilling(r.ok ? { payments: Array.isArray(j.payments) ? j.payments : [] } : { error: j.error || 'Could not load your payments.' }); })
       .catch(() => { if (live) setBilling({ error: 'Could not load your payments.' }); });
     return () => { live = false; };
@@ -120,6 +124,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
   const card = `p-5 sm:p-6 rounded-lg border space-y-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`;
   const inputCls = `border p-2 text-sm rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`;
 
+  if (ro && seller === null) return <div className={card}><p className="text-sm text-gray-500">This seller has no shop any more.</p>{viewAs.onExit && <button type="button" onClick={viewAs.onExit} className={OUTLINE_BTN}>Back to Sellers</button>}</div>;
   if (!customerUser) {
     return (
       <div className={card}>
@@ -129,7 +134,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
       </div>
     );
   }
-  if (isStaff || teamMember) {
+  if (!ro && (isStaff || teamMember)) {
     return (
       <div className={card}>
         <h3 className="text-lg font-bold">Sell on Kyvro</h3>
@@ -693,8 +698,15 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
 
   return (
     <SellerDashLayout nav={nav} active={section} onSelect={go} isDarkMode={isDarkMode} head={head}>
-      {before}
-      <MyShop view={shopView} sellerMode showPlan={approved} adminRole="seller" isOwner={false} products={products} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={customerUser.displayName || email} loggedInUserEmail={email} />
+      {ro && (
+        <div className="rounded-2xl border border-amber-500/60 bg-amber-400 text-black px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span>Viewing <strong>{myShop ? shopDisplayName(myShop) : (viewAs.name || viewAs.email || 'this seller')}</strong> as Owner <span className="font-semibold">(read-only)</span>. Nothing here can be changed.</span>
+          {viewAs.onExit && <button type="button" onClick={viewAs.onExit} className="px-4 py-1.5 rounded-full bg-black text-[#D4AF37] text-xs font-bold uppercase tracking-wider">← Back to Sellers</button>}
+        </div>
+      )}
+      {/* read-only: a disabled fieldset switches off every button and field inside it (the menu on the left still works) */}
+      {ro ? <fieldset disabled className="min-w-0 m-0 p-0 border-0 space-y-5">{before}</fieldset> : before}
+      <MyShop view={shopView} readOnly={ro} asUid={ro ? viewAs.uid : ''} sellerMode showPlan={approved} adminRole="seller" isOwner={false} products={products} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={customerUser.displayName || email} loggedInUserEmail={email} />
     </SellerDashLayout>
   );
 }

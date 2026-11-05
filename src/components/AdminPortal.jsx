@@ -346,7 +346,7 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
               </div>
 
               {adminTab === 'plan-members' && canManageTeam && <PlanMembers isOwner={isOwner} isDarkMode={isDarkMode} />}
-              {adminTab === 'sellers' && isOwner && <SellersPanel orders={orders} isDarkMode={isDarkMode} formatPrice={formatPrice} loggedInUserEmail={loggedInUserEmail} adminName={adminName} />}
+              {adminTab === 'sellers' && isOwner && <SellersPanel orders={orders} products={products} isDarkMode={isDarkMode} formatPrice={formatPrice} loggedInUserEmail={loggedInUserEmail} adminName={adminName} />}
               {adminTab === 'settings' && isOwner && <StoreSettings products={products} settings={storeSettings} isDarkMode={isDarkMode} formatPrice={formatPrice} staff={{ email: loggedInUserEmail, name: adminName }} />}
               {adminTab === 'settings' && isOwner && <div className="mt-5"><PlanSettings isDarkMode={isDarkMode} formatPrice={formatPrice} staff={{ email: loggedInUserEmail, name: adminName }} /></div>}
               {adminTab === 'settings' && isOwner && <div className="mt-5"><SellerDashBannerSettings isDarkMode={isDarkMode} staff={{ email: loggedInUserEmail, name: adminName }} /></div>}

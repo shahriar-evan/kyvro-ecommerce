@@ -167,12 +167,13 @@ export const saveSellerBkash = (uid, bkash) =>
   setDoc(doc(db, "sellerPayout", uid), { bkash: String(bkash || "").replace(/\D/g, ""), updatedAt: new Date().toISOString() });
 
 // my markup per order, from the server (no customer names, phones or addresses)
-export async function loadSellerEarnings(user) {
+// asUid: the Owner viewing that seller's dashboard (read-only; the server checks the Owner)
+export async function loadSellerEarnings(user, asUid = "") {
   // the app keeps a plain copy of the user (no getIdToken), so the token comes from Firebase Auth
   const u = user && typeof user.getIdToken === "function" ? user : auth.currentUser;
   if (!u) throw new Error("Please sign in again.");
   const t = await u.getIdToken();
-  const r = await fetch("/api/plan?action=seller-earnings", { method: "POST", headers: { Authorization: `Bearer ${t}` } });
+  const r = await fetch(`/api/plan?action=seller-earnings${asUid ? `&uid=${encodeURIComponent(asUid)}` : ""}`, { method: "POST", headers: { Authorization: `Bearer ${t}` } });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || "Could not load your earnings.");
   return j;

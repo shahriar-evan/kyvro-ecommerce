@@ -10,13 +10,16 @@ import { watchPayouts, addPayout } from '../payouts';
 import { toMillis, effectiveTier, normalizePlans } from '../data/priceCheck';
 import { watchPlans } from '../storeSettings';
 import { effectiveFeatures } from '../data/shopBrand';
+import SellerDashboard from './SellerDashboard';
 
 // a shop's markup on one order = (price the customer paid - store price) x pieces
 const markupOf = (o) => (o.items || []).reduce((n, it) => n + Math.max(0, (Number(it.price) || 0) - (it.basePrice !== undefined ? Number(it.basePrice) || 0 : Number(it.price) || 0)) * (parseInt(it.quantity, 10) || 0), 0);
 
 // Owner: every public seller ("Sell on Kyvro") with their shop, plan, earnings (markup on delivered orders), what was
 // paid, what is due, their bKash, Mark as paid, and the kill switch. Plus who may open a shop and the blocked names.
-export default function SellersPanel({ orders = [], isDarkMode, formatPrice, loggedInUserEmail, adminName }) {
+export default function SellersPanel({ orders = [], products = [], isDarkMode, formatPrice, loggedInUserEmail, adminName }) {
+  // View dashboard: the seller's own dashboard, read-only, read with the Owner's login
+  const [viewing, setViewing] = useState(null);
   const [sellers, setSellers] = useState([]);
   const [shops, setShops] = useState({});
   const [bkash, setBkash] = useState({});
@@ -87,9 +90,9 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
     act(r.uid, () => addPayout(r.email, r.name || r.shop?.name || '', Number(a), note || '', { email: loggedInUserEmail }), 'Payment saved.');
   };
   const kill = async (r) => {
-    const note = await askInput(`Switch off "${r.shop ? r.shop.name : r.slug}" for good? The seller cannot switch it on again. Reason (the seller sees it):`, { placeholder: 'e.g. uses the Kyvro name' });
+    const note = await askInput(`Page off: switch off "${r.shop ? r.shop.name : r.slug}"? Nothing is deleted. The seller cannot switch it on again; only you can, with Page on. Reason (the seller sees it):`, { placeholder: 'e.g. uses the Kyvro name' });
     if (note === null || note === undefined) return;
-    act(r.uid, () => killSellerShop(r.slug, note), 'Shop switched off.');
+    act(r.uid, () => killSellerShop(r.slug, note), 'Page off: the shop is switched off.');
   };
   const remove = async (r) => {
     if (!(await askConfirm(`Remove the seller ${r.email} and all their shops now? Their orders stay. The account could open a new shop later.`, { danger: true, confirmText: 'Remove' }))) return;
@@ -107,6 +110,9 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
   };
   const saveRules = (open) => act('rules', () => saveSellerRules({ open: open === undefined ? rules.open : open, blockedWords: words.split(',') }, { email: loggedInUserEmail, name: adminName }), 'Seller settings saved.');
 
+  if (viewing) {
+    return <SellerDashboard viewAs={{ ...viewing, onExit: () => setViewing(null) }} products={products} formatPrice={formatPrice} isDarkMode={isDarkMode} />;
+  }
   return (
     <div className="space-y-5">
       <div className={card}>
@@ -223,10 +229,11 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
                     <span>Earned <strong className="text-[#D4AF37]">{formatPrice(r.earned)}</strong> · Paid <strong className="text-green-600">{formatPrice(r.paid)}</strong> · {r.due >= 0 ? 'Due' : 'Overpaid'} <strong className={r.due > 0 ? 'text-red-500' : 'text-green-600'}>{formatPrice(Math.abs(r.due))}</strong></span>
                     <div className="flex flex-wrap gap-2">
                       <a href={`${window.location.origin}/${(r.shop && r.shop.handle) || r.slug}`} target="_blank" rel="noopener noreferrer" className={`${btn} border border-gray-400`}>Open link</a>
+                      <button type="button" onClick={() => { setViewing({ uid: r.uid, email: r.email || '', name: r.name || '' }); try { window.scrollTo({ top: 0 }); } catch (e) { /* old browser */ } }} className={`${btn} border border-[#D4AF37] text-[#B8921F]`}>View dashboard</button>
                       <button type="button" disabled={busy === r.uid} onClick={() => pay(r)} className={`${btn} bg-green-600 text-white disabled:opacity-50`}>Mark as paid</button>
                       {r.shop && (r.shop.killed
-                        ? <button type="button" disabled={busy === r.uid} onClick={() => act(r.uid, () => reviveSellerShop(r.slug), 'Shop is live again.')} className={`${btn} border border-green-600 text-green-600 disabled:opacity-50`}>Revive</button>
-                        : <button type="button" disabled={busy === r.uid} onClick={() => kill(r)} className={`${btn} bg-red-600 text-white disabled:opacity-50`}>Kill switch</button>)}
+                        ? <button type="button" disabled={busy === r.uid} onClick={() => act(r.uid, () => reviveSellerShop(r.slug), 'Page on: the shop is live again.')} className={`${btn} border border-green-600 text-green-600 disabled:opacity-50`}>Page on</button>
+                        : <button type="button" disabled={busy === r.uid} onClick={() => kill(r)} className={`${btn} bg-red-600 text-white disabled:opacity-50`}>Page off</button>)}
                       <button type="button" disabled={busy === r.uid} onClick={() => remove(r)} className={`${btn} border border-red-500 text-red-500 disabled:opacity-50`}>Remove</button>
                     </div>
                   </div>
@@ -243,7 +250,7 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
                             {x.warning && x.warning.note && <p className="text-amber-600">Warned {String(x.warning.at || '').slice(0, 10)}: {x.warning.note}</p>}
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            <button type="button" disabled={!!busy} onClick={() => warnShop(x)} className={`${btn} border border-amber-500 text-amber-600 disabled:opacity-50`}>Warn</button>
+                            <button type="button" disabled={!!busy} onClick={() => warnShop(x)} className={`${btn} border border-amber-500 text-amber-600 disabled:opacity-50`}>Warning</button>
                             {x.inactiveHold && <button type="button" disabled={!!busy} onClick={() => unholdShop(x)} className={`${btn} border border-green-600 text-green-600 disabled:opacity-50`}>Make live</button>}
                             <button type="button" disabled={!!busy} onClick={async () => {
                               if (first) { remove(r); return; }
