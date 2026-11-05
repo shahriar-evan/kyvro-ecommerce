@@ -5,7 +5,7 @@ import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, signOu
 import { auth, googleProvider } from './firebase';
 import { isOwnerEmail } from './adminEmails';
 import { getAdminStatus, watchAdminAccess, MAX_COMMISSION } from './adminAuth';
-import { watchShop, watchMyShop, watchShopOwners, SLUG_RE } from './shops';
+import { watchShop, watchMyShop, watchShopOwners, SLUG_RE, resolveShopKey } from './shops';
 import { shopPriceClamp, productInCollection } from './data/shopConfig';
 import { placeOrder, watchOrders, cancelMyOrder } from './orders';
 import { watchProfile, saveProfile, watchMyOrders } from './customerData';
@@ -14,7 +14,7 @@ import PushPrompt from './components/PushPrompt';
 import { watchProducts, watchProductCosts, watchProductCommissions, setProductCommission, saveProductCost, removeProductCost, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
 import { watchStoreSettings, watchPlans } from './storeSettings';
 import { visibleShopIds, normalizePlans, effectiveTier } from './data/priceCheck';
-import { shopExtrasOf, brandHex, SOCIALS, httpsLinkOk, contactOk, contactHref, contactLabel, effectiveFeatures, FEATURES } from './data/shopBrand';
+import { shopExtrasOf, brandHex, SOCIALS, httpsLinkOk, contactOk, contactHref, contactLabel, effectiveFeatures, FEATURES, shopDisplayName } from './data/shopBrand';
 import { cleanPhone, ONLINE_PAY_ON, DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
 import { INITIAL_PRODUCTS } from './data/products';
 import { CURRENCIES } from './data/currencies';
@@ -79,7 +79,8 @@ export default function App() {
   const pendingCount = products.filter(p => !isApproved(p)).length;
 
   // ---- Admin shop link: kyvro.store/?shop=name shows only that shop's products, at that shop's prices ----
-  const [shopSlug] = useState(() => {
+  // ?shop=<key>: the shop's link name (handle) or its id; shopSlug below is the shop id it points to
+  const [shopKey] = useState(() => {
     try {
       const q = String(new URLSearchParams(window.location.search).get('shop') || '').toLowerCase();
       if (SLUG_RE.test(q)) { sessionStorage.setItem('kyvro_shop', q); return q; }
@@ -87,13 +88,20 @@ export default function App() {
       return SLUG_RE.test(saved) ? saved : '';
     } catch (e) { return ''; }
   });
+  const [shopSlug, setShopSlug] = useState('');
+  useEffect(() => {
+    if (!shopKey) return undefined;
+    let live = true;
+    resolveShopKey(shopKey).then((id) => { if (live) setShopSlug(id); });
+    return () => { live = false; };
+  }, [shopKey]);
   const [shopDoc, setShopDoc] = useState(undefined); // undefined = loading, null = not found or switched off
   useEffect(() => {
     if (!shopSlug) return undefined;
     return watchShop(shopSlug, (d) => setShopDoc(d && d.active !== false ? d : null), () => setShopDoc(null));
   }, [shopSlug]);
   const shopCtx = shopSlug && shopDoc ? shopDoc : null; // the active shop (null = the main store)
-  const shopLoading = !!shopSlug && shopDoc === undefined;
+  const shopLoading = !!shopKey && (!shopSlug || shopDoc === undefined);
   // shop plans: a shop whose paid plan ran out shows only its best sellers (the rest are hidden, not deleted)
   const [plans, setPlans] = useState(() => normalizePlans(null));
   useEffect(() => (shopSlug ? watchPlans(setPlans) : undefined), [shopSlug]);
@@ -102,7 +110,7 @@ export default function App() {
   const shopTier = shopCtx ? (shopCtx.planExempt ? 'premium' : effectiveTier(shopCtx)) : 'free';
   // what the shop may show right now: tier defaults, or the Owner's / a Manager's ON / OFF for this shop
   const shopFeat = shopCtx ? (shopCtx.planExempt ? Object.fromEntries(FEATURES.map((f) => [f.key, true])) : effectiveFeatures(shopCtx, shopTier, plans.tierFeatures)) : {};
-  const shopBrand = shopCtx ? { name: shopCtx.name, wordmark: shopTier === 'premium', color: shopFeat.brandColor ? brandHex(shopCtx.brandColor) : '#D4AF37', logo: shopFeat.logo && shopCtx.logo ? shopCtx.logo : '' } : null;
+  const shopBrand = shopCtx ? { name: shopDisplayName(shopCtx, shopFeat), wordmark: shopTier === 'premium', color: shopFeat.brandColor ? brandHex(shopCtx.brandColor) : '#D4AF37', logo: shopFeat.logo && shopCtx.logo ? shopCtx.logo : '' } : null;
   const storefrontProducts = shopLoading ? [] : shopCtx
     ? shopProducts.filter((p) => shopCtx.items && shopCtx.items[String(p.id)] !== undefined && (!shopVisible || shopVisible.has(String(p.id)))).map((p) => {
         const price = shopPriceClamp(p.price, shopCtx.items[String(p.id)]);
@@ -1275,11 +1283,11 @@ export default function App() {
         if (!seller && !showTagline && !showAbout && !showContact && !socials.length && !picks.length && !showAnn && !showBanner) return null;
         return (
           <>
-            {showBanner && <img src={shopCtx.banner} alt={`${shopCtx.name} banner`} className="w-full max-h-56 sm:max-h-72 object-cover" />}
+            {showBanner && <img src={shopCtx.banner} alt={`${shopDisplayName(shopCtx, f)} banner`} className="w-full max-h-56 sm:max-h-72 object-cover" />}
             {showAnn && <div className="px-4 py-2 text-center text-xs font-semibold text-white" style={{ background: accent }}>{ex.announcement}</div>}
             <div className={`border-b px-4 py-3 text-center text-xs space-y-1.5 ${isDarkMode ? 'bg-[#121212] border-gray-800 text-gray-300' : 'bg-[#D4AF37]/10 border-[#D4AF37]/30 text-gray-700'}`}>
               <p>
-                {seller ? 'Sold by ' : ''}<strong style={{ color: accent }}>{shopCtx.name}</strong>
+                {seller ? 'Sold by ' : ''}<strong style={{ color: accent }}>{shopDisplayName(shopCtx, f)}</strong>
                 {seller && f.verified && !shopCtx.planExempt && <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-white text-[10px] font-bold align-middle" style={{ background: accent }}>✓ Verified</span>}
                 {seller && <span className="text-gray-500"> · Independent seller, not official Kyvro. Kyvro delivers the order and takes the payment.</span>}
               </p>
@@ -1360,7 +1368,7 @@ export default function App() {
         </div>
       )}
       {/* home page of the main store only (not on a shop link): invite visitors to sell */}
-      {currentView === 'home' && !shopSlug && (
+      {currentView === 'home' && !shopKey && (
         <section className={`border-t ${isDarkMode ? 'bg-[#0d0d0d] border-gray-800' : 'bg-[#111] border-gray-800'}`}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
             <div>

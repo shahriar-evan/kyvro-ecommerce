@@ -44,6 +44,9 @@ export const shopExtrasOf = (shop) => {
 export const PRO_EXTRAS = ['tagline', 'contactUrl', 'about', 'socialLinks'];
 export const PREMIUM_EXTRAS = ['brandColor', 'announcement', 'pinnedItems'];
 
+// The name shown on a shop's page: the shop name with "Shop name change" on (Premium), else the shop link name.
+export const shopDisplayName = (shop, feat) => (!shop ? '' : (feat && feat.shopName && shop.name) ? shop.name : (shop.handle || shop.name || ''));
+
 // ---- Plan features: what each tier gets by default; the Owner / a Manager can switch any of them ON or OFF for a
 // shop (shops/{slug}.features). firestore.rules uses the same defaults (featOn).
 // paid: true = shop identity (name change, logo, banner): never on Free (even with an override; rules: paidFeatOn).

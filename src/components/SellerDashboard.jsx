@@ -11,7 +11,7 @@ import { normalizePlans, effectiveTier, TIER_LABEL } from '../data/priceCheck';
 import SellerStats from './SellerStats';
 import SellPricing from './SellPricing';
 import { watchMySubscription } from '../storeSettings';
-import { watchShop } from '../shops';
+import { watchShop, cleanHandle, HANDLE_RE, handleTaken } from '../shops';
 import { effectiveFeatures, httpsLinkOk } from '../data/shopBrand';
 import { flatSubCategories, subLabel, matchesCollectionPage } from '../data/catalog';
 
@@ -34,7 +34,7 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
   const [bkashMsg, setBkashMsg] = useState(null);
   const [saving, setSaving] = useState(false);
   // application form (no NID, passport, bank or bKash: bKash is asked after approval)
-  const [form, setForm] = useState({ shopName: '', name: '', whatsapp: '', district: '', area: '', address: '', socialLinks: NO_SOCIALS, productNote: '', agreed: false });
+  const [form, setForm] = useState({ handle: '', name: '', whatsapp: '', district: '', area: '', address: '', socialLinks: NO_SOCIALS, productNote: '', agreed: false });
   const [formMsg, setFormMsg] = useState('');
   const [applying, setApplying] = useState(false);
   const [rules, setRules] = useState(null);
@@ -120,9 +120,11 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
     setFormMsg('');
     const f = form;
     if (rules && !rules.open) return setFormMsg('Kyvro is not taking new sellers right now. Please try again later.');
-    if (f.shopName.trim().length < 2) return setFormMsg('Write a shop name (at least 2 letters).');
-    const bad = sellerNameBlocked(f.shopName, '', rules);
-    if (bad) return setFormMsg(`The shop name cannot contain "${bad}". Please choose another name.`);
+    // shop link name: kyvro.store/?shop=<handle> (3 to 30 letters a-z, 0-9, "-"; free; can be changed later)
+    const handle = cleanHandle(f.handle);
+    if (!HANDLE_RE.test(handle)) return setFormMsg('Write a shop link name: 3 to 30 letters (a-z, 0-9 and -), e.g. rahim-fashion.');
+    const bad = sellerNameBlocked(handle, '', rules);
+    if (bad) return setFormMsg(`The shop link cannot contain "${bad}". Please choose another one.`);
     if (f.name.trim().length < 2) return setFormMsg('Write your full name.');
     if (!normalizeWhatsapp(f.whatsapp)) return setFormMsg('Write a valid WhatsApp number: 01XXXXXXXXX, +8801XXXXXXXXX or an international number starting with +.');
     if (f.district.trim().length < 2 || f.area.trim().length < 2) return setFormMsg('Write your district and area.');
@@ -132,8 +134,10 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
     if (cats.length > catLimit) return setFormMsg(`The Free plan sells from up to ${catLimit} categories. Untick some, or choose Pro / Premium for all categories.`);
     if (!f.agreed) return setFormMsg('Please tick the box to confirm you are an independent seller.');
     setApplying(true);
-    try { await applyAsSeller({ uid, email, shopName: f.shopName, details: { ...f, categories: cats, subCategories: subs.filter((x) => cats.includes(x.split(' › ')[0])), productNote: plan === 'pro' || plan === 'premium' ? `Chose the ${TIER_LABEL[plan]} plan` : '' } }); }
-    catch (e) { setFormMsg(e.code === 'permission-denied' ? 'Could not send the application. You may already have a shop, the name may not be allowed, or new sellers are paused.' : e.message); }
+    try { if (await handleTaken(handle)) { setApplying(false); return setFormMsg(`kyvro.store/?shop=${handle} is already taken. Try another link name.`); } }
+    catch (e) { /* checked again by the rules */ }
+    try { await applyAsSeller({ uid, email, handle, details: { ...f, categories: cats, subCategories: subs.filter((x) => cats.includes(x.split(' › ')[0])), productNote: plan === 'pro' || plan === 'premium' ? `Chose the ${TIER_LABEL[plan]} plan` : '' } }); }
+    catch (e) { setFormMsg(e.code === 'permission-denied' ? 'Could not send the application. The link name may be taken or not allowed, you may already have a shop, or new sellers are paused.' : e.message); }
     setApplying(false);
   };
 
@@ -231,7 +235,18 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
         {(plan === 'pro' || plan === 'premium') && !seller && <p className="text-xs p-3 rounded border border-[#D4AF37]/50 text-[#D4AF37] bg-[#D4AF37]/10 font-semibold">{TIER_LABEL[plan]} plan: you pay after your shop is approved (Sell on Kyvro → plan card). Until then your shop is on the Free plan.</p>}
         <p className="text-xs text-gray-500">Open your own shop link with Kyvro products, set your price (within the limit) and earn the markup on delivered orders. Kyvro takes the payment and delivers every order. Your shop goes live after Kyvro approves your application. We never ask for NID, passport or bank details.</p>
         <div className="grid sm:grid-cols-2 gap-3">
-          {field('shopName', 'Shop name *', { maxLength: 60, placeholder: 'e.g. Rahim Fashion' })}
+          {/* shop link name (any plan) + the shop name shown on the website (Premium) */}
+          <label className="block text-xs font-semibold text-gray-500">Shop link *
+            <div className={`mt-1 flex items-stretch rounded border overflow-hidden ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>
+              <span className={`px-2 flex items-center text-[11px] whitespace-nowrap ${isDarkMode ? 'bg-[#1a1a1a] text-gray-400' : 'bg-gray-100 text-gray-500'}`}>kyvro.store/?shop=</span>
+              <input className={`${inputCls} !border-0 !rounded-none flex-1 min-w-0`} value={form.handle} maxLength={30} placeholder="rahim-fashion" onChange={(e) => set('handle', cleanHandle(e.target.value))} />
+            </div>
+            <span className="block mt-1 font-normal text-[11px]">Your shop's web address. Free on every plan, and you can change it later in My Shop.</span>
+          </label>
+          <label className="block text-xs font-semibold text-gray-500">Shop name on the website <span className="font-normal">🔒 Premium</span>
+            <input className={`${inputCls} block mt-1 w-full opacity-60`} value={form.handle} readOnly disabled />
+            <span className="block mt-1 font-normal text-[11px]">Until you have Premium, your shop shows its link name. With Premium you can set your own shop name in My Shop.</span>
+          </label>
           {field('name', 'Full name *', { maxLength: 80 })}
           <label className="block text-xs font-semibold text-gray-500">Email (from your login)
             <input className={`${inputCls} block mt-1 w-full opacity-70`} value={email} readOnly disabled />
