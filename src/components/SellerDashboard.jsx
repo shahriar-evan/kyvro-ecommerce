@@ -174,7 +174,18 @@ export default function SellerDashboard({ customerUser, isStaff, products, forma
         if (!list.length) return null;
         return (
           <div key={l} className={`rounded-lg border p-3 ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
-            <p className="text-[11px] font-semibold text-gray-500 mb-2">{l}: which ones? <span className="font-normal">(optional, none = all of {l})</span></p>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <p className="text-[11px] font-semibold text-gray-500">{l}: which ones? <span className="font-normal">(optional, none = all of {l})</span></p>
+              {/* All: tick every sub-category of this category at once (press again to untick them) */}
+              {(() => {
+                const keys = list.map((n) => `${l} › ${n}`);
+                const allOn = keys.every((k) => subs.includes(k));
+                return (
+                  <button type="button" aria-pressed={allOn} onClick={() => setSubs((s) => (allOn ? s.filter((x) => !keys.includes(x)) : [...new Set([...s, ...keys])]))}
+                    className={chip(allOn, 'px-3 py-1 text-[11px]')}>{tick(allOn)}All ({catCount(l)})</button>
+                );
+              })()}
+            </div>
             <div className="flex flex-wrap gap-2">
               {list.map((n) => {
                 const key = `${l} › ${n}`;
