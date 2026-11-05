@@ -1312,6 +1312,17 @@ export default function App() {
           Preview: this shop is not live yet{shopRaw.status === 'pending' ? ' (waiting for Kyvro\'s approval)' : shopRaw.killed ? ' (switched off by Kyvro)' : shopRaw.active === false ? ' (switched off)' : ' (hidden: the paid plan has ended)'}. Only you can see it; customers get "page not found".
         </div>
       )}
+      {/* the team and the shop's own owner can leave the shop link and go back to the main store (customers stay in the shop,
+          so the seller keeps the sale) */}
+      {shopCtx && currentView !== 'admin' && (isAdminLoggedIn || (!!customerUser && customerUser.uid === shopCtx.ownerUid)) && (
+        <div className={`px-4 py-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs ${isDarkMode ? 'bg-[#1a1a1a] text-gray-300' : 'bg-gray-900 text-gray-200'}`}>
+          <span>You are on the shop link of <strong className="text-white">{shopDisplayName(shopCtx, shopFeat)}</strong>.</span>
+          <button type="button" onClick={() => { try { sessionStorage.removeItem('kyvro_shop'); } catch (e) { /* ignore */ } window.location.href = '/'; }}
+            className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-[#D4AF37] text-[#D4AF37] font-bold hover:bg-[#D4AF37] hover:text-black transition">
+            ← Kyvro main site
+          </button>
+        </div>
+      )}
       {shopCtx && currentView !== 'admin' && (() => {
         const ex = shopExtrasOf(shopCtx);
         const f = shopFeat;
