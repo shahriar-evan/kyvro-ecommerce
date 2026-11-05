@@ -81,14 +81,21 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
     if (sellerMode) return undefined; // a public seller: below (their first shop; more shops on Pro / Premium)
     return watchMyShop(uid, (s) => setShop(s), () => setShop(null));
   }, [isOwner, adminRole, uid, canCreateShop, sellerMode]);
-  // a public seller: every shop of the account; My Shop edits the first one (the application's shop)
+  // a public seller: every shop of the account. The switcher on top picks the one My Shop edits (first shop by default;
+  // the choice is remembered on this device).
   const [myShops, setMyShops] = useState(null); // null = loading
   useEffect(() => (sellerMode && uid ? watchMyShops(uid, setMyShops, () => setMyShops([])) : undefined), [sellerMode, uid]);
+  const [pick, setPick] = useState(() => { try { return localStorage.getItem('kyvro_myshop') || ''; } catch (e) { return ''; } });
+  const choose = (slug) => { setPick(slug); try { localStorage.setItem('kyvro_myshop', slug); } catch (e) { /* no storage */ } };
+  // the application's shop first, then the extra shops in the order they were asked for
+  const shopOrder = (mySeller && Array.isArray(mySeller.shops) && mySeller.shops.length ? mySeller.shops : mySeller && mySeller.slug ? [mySeller.slug] : []);
+  const sortedShops = (myShops || []).slice().sort((a, b) => ((shopOrder.indexOf(a.slug) + 1) || 99) - ((shopOrder.indexOf(b.slug) + 1) || 99));
   useEffect(() => {
     if (!sellerMode || myShops === null) return;
+    const chosen = pick ? myShops.find((x) => x.slug === pick) : null;
     const first = mySeller && mySeller.slug ? myShops.find((x) => x.slug === mySeller.slug) : null;
-    setShop(first || myShops.find((x) => !x.extra) || myShops[0] || null);
-  }, [sellerMode, myShops, mySeller && mySeller.slug]); // eslint-disable-line react-hooks/exhaustive-deps
+    setShop(chosen || first || myShops.find((x) => !x.extra) || myShops[0] || null);
+  }, [sellerMode, myShops, pick, mySeller && mySeller.slug]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => watchPlans(setPlans), []);
   useEffect(() => (isOwner ? undefined : watchMySubscription(uid, setSub)), [uid, isOwner]);
@@ -148,10 +155,11 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
   const allowedKey = appCats.map((l) => (SHOP_COLLECTIONS.find((c) => c.label === l) || {}).name).filter(Boolean).sort().join('|');
   const allowed = allowedKey ? new Set(allowedKey.split('|')) : null;
   // the plan end date is copied onto the shop for the storefront; a shop made after paying gets it here
-  const [synced, setSynced] = useState(false);
+  // (once per shop: a seller's 2nd / 3rd shop made after paying gets it when it is opened; the server syncs all shops)
+  const [synced, setSynced] = useState('');
   useEffect(() => {
-    if (isOwner || synced || !shop || !paidUntil || (toMillis(shop.paidUntil) === paidUntil && (shop.tier || 'pro') === (sub.tier || 'pro')) || !auth.currentUser) return;
-    setSynced(true);
+    if (isOwner || !shop || synced === shop.slug || !paidUntil || (toMillis(shop.paidUntil) === paidUntil && (shop.tier || 'pro') === (sub.tier || 'pro')) || !auth.currentUser) return;
+    setSynced(shop.slug);
     auth.currentUser.getIdToken().then((t) => fetch('/api/plan?action=sync', { method: 'POST', headers: { Authorization: `Bearer ${t}` } })).catch(() => {});
   }, [isOwner, synced, shop, paidUntil]);
   const buyPlan = async (want) => {
@@ -424,8 +432,39 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
       {hint && <p className="text-[11px] text-gray-500">{hint}</p>}
     </div>
   );
+  // an extra shop (2nd / 3rd) while the paid plan has ended: hidden from customers, not deleted
+  const extraHidden = sellerMode && !!shop.extra && !(toMillis(shop.paidUntil) > Date.now());
+  const switchTo = async (slug) => {
+    if (slug === shop.slug) return;
+    if (dirty && !(await askConfirm('Switch shop? Your unsaved changes in this shop are lost.', { danger: true, confirmText: 'Switch' }))) return;
+    setMsg(null); setNameMsg(null); setHandleMsg(null); choose(slug);
+  };
   return wrap(
     <div className="space-y-5">
+      {/* shop switcher: a seller with more than one shop (Pro 2, Premium 3) */}
+      {sellerMode && sortedShops.length > 1 && (
+        <div className={`${card} !space-y-2`}>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#B8921F]">My shops</p>
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Choose the shop to edit">
+            {sortedShops.map((x) => {
+              const on = x.slug === shop.slug;
+              const hidden = x.extra && !(toMillis(x.paidUntil) > Date.now());
+              return (
+                <button key={x.slug} type="button" role="tab" aria-selected={on} onClick={() => switchTo(x.slug)}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-bold transition ${on ? 'border-[#D4AF37] bg-[#D4AF37] text-black' : isDarkMode ? 'border-gray-700 text-gray-300 hover:border-[#D4AF37]/60' : 'border-gray-300 text-gray-700 hover:border-[#D4AF37]/60'}`}>
+                  {shopDisplayName(x)}
+                  {x.status === 'pending' ? <span className="text-[10px] font-semibold opacity-70">· waiting</span> : hidden ? <span className="text-[10px] font-semibold opacity-70">· hidden</span> : x.active === false ? <span className="text-[10px] font-semibold opacity-70">· off</span> : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {extraHidden && (
+        <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-4 text-xs text-amber-600 font-semibold">
+          Your paid plan has ended, so this shop is hidden from customers (nothing is deleted). Your first shop stays on the Free plan. Renew Pro / Premium below and this shop shows again.
+        </div>
+      )}
       {/* 1. the shop: link + name */}
       <div className={section}>
         {goldLine}

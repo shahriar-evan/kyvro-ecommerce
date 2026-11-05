@@ -14,7 +14,7 @@ import { ensureSubscribed } from './subscribers';
 import PushPrompt from './components/PushPrompt';
 import { watchProducts, watchProductCosts, watchProductCommissions, setProductCommission, saveProductCost, removeProductCost, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
 import { watchStoreSettings, watchPlans } from './storeSettings';
-import { visibleShopIds, normalizePlans, effectiveTier } from './data/priceCheck';
+import { visibleShopIds, normalizePlans, effectiveTier, shopIsPaid } from './data/priceCheck';
 import { shopExtrasOf, brandHex, SOCIALS, httpsLinkOk, contactOk, contactHref, contactLabel, effectiveFeatures, FEATURES, shopDisplayName } from './data/shopBrand';
 import { cleanPhone, ONLINE_PAY_ON, DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
 import { INITIAL_PRODUCTS } from './data/products';
@@ -107,7 +107,9 @@ export default function App() {
   const [shopDoc, setShopDoc] = useState(undefined); // undefined = loading, null = not found or switched off
   useEffect(() => {
     if (!shopSlug) return undefined;
-    return watchShop(shopSlug, (d) => setShopDoc(d && d.active !== false ? d : null), () => setShopDoc(null));
+    // a seller's extra shop (2nd / 3rd) is hidden while the account's paid plan has ended (not deleted; shows again after renewing)
+    const visible = (d) => !!d && d.active !== false && !(d.extra && !(shopIsPaid(d)));
+    return watchShop(shopSlug, (d) => setShopDoc(visible(d) ? d : null), () => setShopDoc(null));
   }, [shopSlug]);
   const shopCtx = shopSlug && shopDoc ? shopDoc : null; // the active shop (null = the main store)
   const shopLoading = !!shopKey && (!shopSlug || shopDoc === undefined);

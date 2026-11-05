@@ -33,7 +33,7 @@ export default function SellPricing({ formatPrice, isDarkMode, onChoose, busy = 
         <p className="text-sm text-gray-500 mt-2">{T.subtitle}</p>
       </div>
       <PlanCards plans={plans} formatPrice={formatPrice} isDarkMode={isDarkMode} mode="apply" onChoose={onChoose} busy={busy} lang={lang} />
-      <PlanCompare lang={lang} isDarkMode={isDarkMode} freeLimit={plans.freeLimit} />
+      <PlanCompare lang={lang} isDarkMode={isDarkMode} freeLimit={plans.freeLimit} shopLimits={plans.shopLimits} />
       <PlanFaq lang={lang} isDarkMode={isDarkMode} />
     </div>
   );
