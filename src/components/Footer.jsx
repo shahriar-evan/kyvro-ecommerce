@@ -9,11 +9,11 @@ export default function Footer({ onStartSelling, navHas = () => true, isDarkMode
           <div className="space-y-4">
             {/* logo + name: centered on a phone (one column), left from 640px (grid columns) */}
             <div className="flex items-center justify-center sm:justify-start gap-2">
-              <KyvroMark dark={isDarkMode} title="Kyvro logo" className="h-14 sm:h-16 xl:h-12 w-auto shrink-0" />
+              <KyvroMark dark={isDarkMode} title="Kyvro logo" className="h-11 sm:h-12 xl:h-10 w-auto shrink-0" />
               <span className={`flex items-center gap-2 whitespace-nowrap leading-none ${isDarkMode ? 'text-white' : 'text-black'}`}>
-                <span className="text-3xl sm:text-4xl xl:text-2xl font-serif font-bold tracking-widest xl:tracking-wider">KYVRO</span>
-                <span className={`${isDarkMode ? 'text-[#D4AF37]' : 'text-black'} text-3xl sm:text-4xl xl:text-2xl leading-none`} aria-hidden="true">&bull;</span>
-                <span className="text-[28px] sm:text-[34px] xl:text-[22px] font-bold" lang="bn">কাইভ্রো</span>
+                <span className="text-2xl sm:text-3xl xl:text-xl font-serif font-bold tracking-widest xl:tracking-wider">KYVRO</span>
+                <span className={`${isDarkMode ? 'text-[#D4AF37]' : 'text-black'} text-2xl sm:text-3xl xl:text-xl leading-none`} aria-hidden="true">&bull;</span>
+                <span className="text-[22px] sm:text-[26px] xl:text-[18px] font-bold" lang="bn">কাইভ্রো</span>
               </span>
             </div>
             <p className="leading-relaxed">

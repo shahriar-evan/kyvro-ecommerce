@@ -37,17 +37,17 @@ export default function Header({ shopBrand = null, onStartSelling, onAdminPanel 
             >
               {/* the Kyvro logo is always there; a Premium shop shows its own name as a wordmark next to it; otherwise one line "KYVRO • কাইভ্রো" centred on the logo */}
               {shopBrand && shopBrand.logo && <img src={shopBrand.logo} alt="" className="h-9 w-9 sm:h-11 sm:w-11 rounded object-cover border border-gray-300/40" />}
-              <KyvroMark dark={isDarkMode} title="Kyvro logo" className={`${shopBrand && shopBrand.wordmark ? 'h-7 sm:h-9' : 'h-9 min-[400px]:h-10 sm:h-12 xl:h-14'} w-auto shrink-0`} />
+              <KyvroMark dark={isDarkMode} title="Kyvro logo" className={`${shopBrand && shopBrand.wordmark ? 'h-7 sm:h-9' : 'h-8 min-[400px]:h-9 sm:h-10 xl:h-11'} w-auto shrink-0`} />
               {shopBrand && shopBrand.wordmark ? (
                 <div className="flex flex-col items-start min-w-0">
                   <span className="text-lg sm:text-2xl font-serif font-bold tracking-wide truncate max-w-[9rem] sm:max-w-[16rem]" style={{ color: shopBrand.color }}>{shopBrand.name}</span>
                   <span className="text-[9px] tracking-[0.2em] font-sans -mt-0.5 text-gray-500">POWERED BY KYVRO</span>
                 </div>
               ) : (
-                <span className={`flex items-center gap-1 sm:gap-2 lg:gap-2.5 whitespace-nowrap leading-none max-[349px]:hidden ${isDarkMode ? 'text-white' : 'text-black'}`}>
-                  <span className="text-[17px] min-[400px]:text-[20px] sm:text-[28px] xl:text-[32px] font-serif font-bold tracking-[0.03em] min-[400px]:tracking-wider xl:tracking-widest">KYVRO</span>
-                  <span className={`${isDarkMode ? 'text-[#D4AF37]' : 'text-black'} text-[16px] sm:text-[24px] xl:text-[28px] leading-none`} aria-hidden="true">&bull;</span>
-                  <span className="text-[15px] min-[400px]:text-[18px] sm:text-[26px] xl:text-[30px] font-bold" lang="bn">কাইভ্রো</span>
+                <span className={`flex items-center gap-1 sm:gap-1.5 lg:gap-2 whitespace-nowrap leading-none max-[349px]:hidden ${isDarkMode ? 'text-white' : 'text-black'}`}>
+                  <span className="text-[16px] min-[400px]:text-[18px] sm:text-[22px] xl:text-[24px] font-serif font-bold tracking-[0.03em] min-[400px]:tracking-wider xl:tracking-widest">KYVRO</span>
+                  <span className={`${isDarkMode ? 'text-[#D4AF37]' : 'text-black'} text-[15px] sm:text-[20px] xl:text-[22px] leading-none`} aria-hidden="true">&bull;</span>
+                  <span className="text-[14px] min-[400px]:text-[16px] sm:text-[20px] xl:text-[22px] font-bold" lang="bn">কাইভ্রো</span>
                 </span>
               )}
             </div>
