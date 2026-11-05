@@ -110,7 +110,7 @@ export default function PlanMembers({ isOwner, isDarkMode }) {
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <h3 className="text-lg font-bold">{cur.name} {tierBadge(cur.tier)}</h3>
-              <p className="text-xs text-gray-500 break-all">{window.location.origin}/?shop={cur.slug} · {Object.keys(cur.items || {}).length} products</p>
+              <p className="text-xs text-gray-500 break-all">{window.location.origin}/{cur.handle || cur.slug} · {Object.keys(cur.items || {}).length} products</p>
             </div>
             <button type="button" onClick={() => setOpen('')} className="text-xs underline text-gray-500">Close</button>
           </div>

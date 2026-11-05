@@ -8,7 +8,7 @@ export const SLUG_RE = /^[a-z0-9-]{3,40}$/;
 const slugify = (s) => String(s || "shop").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 28) || "shop";
 const rand = () => Math.random().toString(36).slice(2, 6).replace(/[^a-z0-9]/g, "x");
 
-// ---- Shop link name ("handle"): kyvro.store/?shop=<handle>. The shop document id (slug) never changes, because orders,
+// ---- Shop link name ("handle"): kyvro.store/<handle> (old form kyvro.store/?shop=<handle> still works). The shop document id (slug) never changes, because orders,
 // earnings and payouts point at it; the handle is a public nickname on top of it, kept unique by shopHandles/{handle}
 // ({ slug, uid }). Any plan can change its handle, at most once in 30 days (handleChangedAt). Old handles are kept as
 // aliases that still open (and redirect to) the shop, so shared links never break and nobody else can take them.
@@ -27,7 +27,9 @@ export const nextHandleChange = (shop) => {
 };
 // the public link of a shop: its handle, else its id
 export const shopLinkKey = (shop) => (shop && (shop.handle || shop.slug)) || "";
-export const shopLinkUrl = (shop) => `${window.location.origin}/?shop=${shopLinkKey(shop)}`;
+export const shopLinkUrl = (shop) => `${window.location.origin}/${shopLinkKey(shop)}`;
+// what the visitor sees in links and previews: kyvro.store/<link>
+export const shopLinkText = (key) => `kyvro.store/${key}`;
 // ?shop=<key>: a handle or a shop id -> the shop id
 export async function resolveShopKey(key) {
   try { const h = await getDoc(doc(db, "shopHandles", key)); if (h.exists() && SLUG_RE.test(String(h.data().slug || ""))) return h.data().slug; } catch (e) { /* not a handle */ }

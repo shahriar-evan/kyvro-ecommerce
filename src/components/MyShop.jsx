@@ -9,11 +9,12 @@ import { normalizePlans, toMillis, SHOP_MAX_ITEMS, effectiveTier, TIER_LABEL } f
 import PlanCards from './PlanCards';
 import ShopExtrasEditor from './ShopExtrasEditor';
 import { GOLD_BTN, OUTLINE_BTN, GHOST_BTN } from './ui';
+import { isReservedLink } from '../data/reservedLinks';
 import { shopExtrasOf, httpsLinkOk, contactOk, cleanContact, effectiveFeatures, FEATURES, shopDisplayName } from '../data/shopBrand';
 import { watchSellerRules, sellerNameBlocked, normalizeSellerRules, watchMySeller } from '../sellers';
 
-// key = a shop's link name (handle) or its id: both open the shop
-const shopUrl = (key) => `${window.location.origin}/?shop=${key}`;
+// key = a shop's link name (handle) or its id: both open the shop at kyvro.store/<key>
+const shopUrl = (key) => `${window.location.origin}/${key}`;
 
 // Premium ON / OFF switch (a real button, so Space / Enter work and screen readers hear "switch, on / off")
 function ShopSwitch({ on, busy, onToggle, isDarkMode, label }) {
@@ -35,7 +36,7 @@ function ShopSwitch({ on, busy, onToggle, isDarkMode, label }) {
   );
 }
 
-// "My Shop": every Manager gets their own link (kyvro.store/?shop=name). They choose which products to show
+// "My Shop": every Manager gets their own link (kyvro.store/<link>). They choose which products to show
 // (by collection or one by one) and the price they sell at, up to the limit for that product. The whole markup is theirs.
 // An Admin the Owner switched "Shop create" ON for can make one too: it stays switched off until the Owner accepts it.
 // Payments (online, delivery charge, cash on delivery) all stay with the store; the Owner pays the markup out later.
@@ -277,15 +278,16 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
     const next = isOwner ? 0 : nextHandleChange(shop);
     if (next > Date.now()) { setHandleMsg({ type: 'err', text: `You can change your link once in 30 days. Next change: ${new Date(next).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.` }); return; }
     if (!HANDLE_RE.test(h)) { setHandleMsg({ type: 'err', text: 'Use 3 to 30 letters: a-z, 0-9 and - (not at the start or end).' }); return; }
+    if (isReservedLink(h)) { setHandleMsg({ type: 'err', text: `Not available: kyvro.store/${h} is used by the website itself. Try another one.` }); return; }
     if (!isOwner) {
       const bad = sellerNameBlocked(h, '', sellerRules);
       if (bad) { setHandleMsg({ type: 'err', text: `Not available: "${bad}" cannot be used. Not allowed: ${normalizeSellerRules(sellerRules).blockedWords.join(', ')}.` }); return; }
     }
-    if (!(await askConfirm(`Change your link to kyvro.store/?shop=${h}? Your old links keep working and open the new one. You can change it again after 30 days.`, { confirmText: 'Change link' }))) return;
+    if (!(await askConfirm(`Change your link to kyvro.store/${h}? Your old links keep working and open the new one. You can change it again after 30 days.`, { confirmText: 'Change link' }))) return;
     setHandleBusy(true);
     try {
-      if (await handleTaken(h, shop.slug)) setHandleMsg({ type: 'err', text: `Not available: kyvro.store/?shop=${h} is already taken. Try another one.` });
-      else { await setShopHandle(shop, uid, h); setHandleDraft(h); setHandleMsg({ type: 'ok', text: `Saved: your link is now kyvro.store/?shop=${h}` }); }
+      if (await handleTaken(h, shop.slug)) setHandleMsg({ type: 'err', text: `Not available: kyvro.store/${h} is already taken. Try another one.` });
+      else { await setShopHandle(shop, uid, h); setHandleDraft(h); setHandleMsg({ type: 'ok', text: `Saved: your link is now kyvro.store/${h}` }); }
     } catch (err) { setHandleMsg({ type: 'err', text: err.code === 'permission-denied' ? 'Not available: this link is taken or not allowed.' : err.message }); }
     setHandleBusy(false);
   };
@@ -430,7 +432,7 @@ export default function MyShop({ sellerMode = false, showPlan = true, canCreateS
           <label htmlFor="shop-link" className="block text-xs font-semibold text-gray-500">Shop link <span className="font-normal">(every plan)</span></label>
           <div className="mt-1 flex flex-col sm:flex-row sm:items-center gap-2">
             <div className={`flex items-stretch w-full sm:w-auto rounded-lg border overflow-hidden ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>
-              <span className={`px-2 flex items-center text-[11px] whitespace-nowrap ${isDarkMode ? 'bg-[#1a1a1a] text-gray-400' : 'bg-gray-100 text-gray-500'}`}>kyvro.store/?shop=</span>
+              <span className={`px-2 flex items-center text-[11px] whitespace-nowrap ${isDarkMode ? 'bg-[#1a1a1a] text-gray-400' : 'bg-gray-100 text-gray-500'}`}>kyvro.store/</span>
               <input id="shop-link" className={`${inputCls} !border-0 !rounded-none flex-1 min-w-0 sm:w-56 !text-sm !py-2.5`} maxLength={30} placeholder="your-shop" value={handleDraft} onChange={(e) => { setHandleDraft(cleanHandle(e.target.value)); setHandleMsg(null); }} />
             </div>
             <button type="button" disabled={handleBusy || cleanHandle(handleDraft) === (shop.handle || '')} onClick={saveHandle} className={`${GOLD_BTN} w-full sm:w-auto`}>{handleBusy ? 'Checking...' : 'Save link'}</button>

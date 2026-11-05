@@ -136,7 +136,7 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
                     {row('Independent seller confirmed', s.agreed ? 'Yes' : 'No')}
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <a href={`${window.location.origin}/?shop=${s.slug}`} target="_blank" rel="noopener noreferrer" className={`${btn} border border-gray-400`}>Open link</a>
+                    <a href={`${window.location.origin}/${(shops[s.slug] && shops[s.slug].handle) || s.slug}`} target="_blank" rel="noopener noreferrer" className={`${btn} border border-gray-400`}>Open link</a>
                     <button type="button" disabled={busy === s.uid} onClick={() => approve(s)} className={`${btn} bg-green-600 text-white disabled:opacity-50`}>Approve</button>
                     <button type="button" disabled={busy === s.uid} onClick={() => reject(s)} className={`${btn} border border-red-500 text-red-500 disabled:opacity-50`}>Reject</button>
                   </div>
@@ -161,7 +161,7 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
                         {r.tier !== 'free' && <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase align-middle ${r.tier === 'premium' ? 'bg-black text-[#D4AF37] border border-[#D4AF37]' : 'bg-[#D4AF37] text-black'}`}>{r.tier === 'premium' ? 'Premium' : 'Pro'}</span>}
                         {r.feat.weeklyPayout && <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase align-middle bg-green-600 text-white">Weekly payout</span>}
                         <span className="font-normal text-gray-500"> · {r.name || ''} {r.email}</span></p>
-                      <p className="text-gray-500 break-all">{window.location.origin}/?shop={r.slug} · {r.shop ? Object.keys(r.shop.items || {}).length : 0} products · {r.orders} order(s) · {r.until > Date.now() ? `${r.tier === 'premium' ? 'Premium' : 'Pro'} until ${new Date(r.until).toLocaleDateString('en-GB')}` : 'Free plan'}</p>
+                      <p className="text-gray-500 break-all">{window.location.origin}/{(r.shop && r.shop.handle) || r.slug} · {r.shop ? Object.keys(r.shop.items || {}).length : 0} products · {r.orders} order(s) · {r.until > Date.now() ? `${r.tier === 'premium' ? 'Premium' : 'Pro'} until ${new Date(r.until).toLocaleDateString('en-GB')}` : 'Free plan'}</p>
                       <p className="text-gray-500">bKash: {r.bkash || 'not given yet'}</p>
                       {r.shop && r.shop.killed && <p className="text-red-500 font-semibold">Switched off by you{r.shop.killNote ? `: ${r.shop.killNote}` : ''}</p>}
                     </div>
@@ -170,7 +170,7 @@ export default function SellersPanel({ orders = [], isDarkMode, formatPrice, log
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span>Earned <strong className="text-[#D4AF37]">{formatPrice(r.earned)}</strong> · Paid <strong className="text-green-600">{formatPrice(r.paid)}</strong> · {r.due >= 0 ? 'Due' : 'Overpaid'} <strong className={r.due > 0 ? 'text-red-500' : 'text-green-600'}>{formatPrice(Math.abs(r.due))}</strong></span>
                     <div className="flex flex-wrap gap-2">
-                      <a href={`${window.location.origin}/?shop=${r.slug}`} target="_blank" rel="noopener noreferrer" className={`${btn} border border-gray-400`}>Open link</a>
+                      <a href={`${window.location.origin}/${(r.shop && r.shop.handle) || r.slug}`} target="_blank" rel="noopener noreferrer" className={`${btn} border border-gray-400`}>Open link</a>
                       <button type="button" disabled={busy === r.uid} onClick={() => pay(r)} className={`${btn} bg-green-600 text-white disabled:opacity-50`}>Mark as paid</button>
                       {r.shop && (r.shop.killed
                         ? <button type="button" disabled={busy === r.uid} onClick={() => act(r.uid, () => reviveSellerShop(r.slug), 'Shop is live again.')} className={`${btn} border border-green-600 text-green-600 disabled:opacity-50`}>Revive</button>

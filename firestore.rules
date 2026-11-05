@@ -456,6 +456,8 @@ service cloud.firestore {
         && request.resource.data.slug is string
         && (!exists(/databases/$(database)/documents/shops/$(h)) || h == request.resource.data.slug)
         && (isOwner() || !h.matches(blockedRe()))
+        // the site's own routes can never be a shop link (kyvro.store/<link>); same list as src/data/reservedLinks.js
+        && !h.matches('^(admin|api|s|shop|shops|men|mens|women|womens|winter|shoes|wallets|watches|cart|checkout|account|orders|order-tracking|wallet|sell|seller|sellers|plans|pricing|login|signup|about|contact|terms|privacy|help|support|kyvro|official|owner|www|static|assets)$')
         && existsAfter(/databases/$(database)/documents/shops/$(request.resource.data.slug))
         && getAfter(/databases/$(database)/documents/shops/$(request.resource.data.slug)).data.ownerUid == request.auth.uid
         && getAfter(/databases/$(database)/documents/shops/$(request.resource.data.slug)).data.get('handle', '') == h;
