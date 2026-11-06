@@ -399,6 +399,33 @@ export default function MyShop({ part = 'all', view = 'all', readOnly = false, a
       </div>
   ) : null;
 
+  // Owner's Team Shops page: only the Admins' shop requests here (the list of every shop is Plan Members below it)
+  if (part === 'requests') {
+    if (!isOwner || !allShops.some(teamPending)) return null;
+    return (
+      <div className={card}>
+        <h3 className="text-lg font-bold">Shop requests ({allShops.filter(teamPending).length})</h3>
+        <p className="text-xs text-gray-500">An Admin made their own shop. It stays switched off until you accept it. Reject removes it.</p>
+        {msg && <p className={`text-xs ${msg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{msg.text}</p>}
+        <div className="divide-y text-xs">
+          {allShops.filter(teamPending).map((s) => (
+            <div key={s.slug} className="py-2 flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-bold">{s.name || s.slug} <span className="font-normal text-gray-500">· {owners[s.slug] ? (owners[s.slug].name || owners[s.slug].email) : ''}</span></p>
+                <p className="text-gray-500 break-all">{owners[s.slug] ? owners[s.slug].email : ''} · {Object.keys(s.items || {}).length} products so far</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {linkButtons(shopLinkKey(s))}
+                <button type="button" onClick={async () => { try { await acceptShop(s.slug); setMsg({ type: 'ok', text: `"${s.name}" is live now.` }); } catch (e) { setMsg({ type: 'err', text: e.message }); } }} className="px-3 py-1.5 rounded bg-green-600 text-white font-semibold">Accept</button>
+                <button type="button" onClick={async () => { if (!(await askConfirm(`Reject the shop "${s.name}"? It is removed and the Admin can request again.`, { danger: true, confirmText: 'Reject' }))) return; try { await rejectShop(s.slug); setMsg({ type: 'ok', text: `"${s.name}" was rejected.` }); } catch (e) { setMsg({ type: 'err', text: e.message }); } }} className="px-3 py-1.5 rounded border border-red-500 text-red-500 font-semibold">Reject</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   // ---------- Admin: the shop links (and their own shop below, with "Shop create" ON) ----------
   const links = adminRole === 'admin' ? (
       <div className={card}>
