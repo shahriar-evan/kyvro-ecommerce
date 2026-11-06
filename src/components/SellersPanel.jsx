@@ -20,7 +20,7 @@ const markupOf = (o) => (o.items || []).reduce((n, it) => n + Math.max(0, (Numbe
 // the seller's payout details (sellerPayout/{uid}) as lines: bKash numbers and bank accounts
 const payoutLines = (p) => {
   if (!p) return [];
-  const out = [p.bkash, p.bkash2].filter(Boolean).map((n) => `bKash: ${n}`);
+  const out = [[p.bkash, p.bkashName], [p.bkash2, p.bkash2Name]].filter(([n]) => n).map(([n, name]) => `bKash: ${n}${name ? ` (${name})` : ''}`);
   (Array.isArray(p.banks) ? p.banks : []).forEach((b) => {
     out.push(`Bank: ${b.bank} · A/C ${b.account} · ${b.holder} · ${b.branch} branch${b.routing ? ` · Routing ${b.routing}` : ''}${b.swift ? ` · SWIFT ${b.swift}` : ''}`);
   });

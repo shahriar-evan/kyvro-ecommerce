@@ -189,8 +189,13 @@ export const bankProblem = (b) => {
   if (b.swift && !/^([A-Z0-9]{8}|[A-Z0-9]{11})$/.test(b.swift)) return "SWIFT Code: 8 or 11 letters / SWIFT কোড ৮ বা ১১ অক্ষরের";
   return "";
 };
-export const saveSellerPayout = (uid, { bkash = "", bkash2 = "", banks = [] }) =>
-  setDoc(doc(db, "sellerPayout", uid), { bkash, bkash2, banks: banks.slice(0, 2), updatedAt: new Date().toISOString() });
+export const cleanName = (v) => String(v || "").replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 80);
+// bkashName / bkash2Name: the name on that bKash account (required with a number, '' without one)
+export const saveSellerPayout = (uid, { bkash = "", bkashName = "", bkash2 = "", bkash2Name = "", banks = [] }) =>
+  setDoc(doc(db, "sellerPayout", uid), {
+    bkash, bkashName: bkash ? bkashName : "", bkash2, bkash2Name: bkash2 ? bkash2Name : "",
+    banks: banks.slice(0, 2), updatedAt: new Date().toISOString(),
+  });
 
 // my markup per order, from the server (no customer names, phones or addresses)
 // asUid: the Owner viewing that seller's dashboard (read-only; the server checks the Owner)

@@ -535,7 +535,10 @@ service cloud.firestore {
       allow read, delete: if isOwner();
       // up to 2 bKash numbers + up to 2 bank accounts (src/sellers.js saveSellerPayout); at least one way to pay
       allow create, update: if signedIn() && request.auth.uid == uid && exists(sellerPath(uid))
-        && request.resource.data.keys().hasOnly(['bkash', 'bkash2', 'banks', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['bkash', 'bkashName', 'bkash2', 'bkash2Name', 'banks', 'updatedAt'])
+        // the name on each bKash account: 2-80 letters with a number, empty without one (older saves have no name field)
+        && (!('bkashName' in request.resource.data) || (request.resource.data.bkash == '' ? request.resource.data.bkashName == '' : request.resource.data.bkashName.matches('^[^<>]{2,80}$')))
+        && (!('bkash2Name' in request.resource.data) || (request.resource.data.get('bkash2', '') == '' ? request.resource.data.bkash2Name == '' : request.resource.data.bkash2Name.matches('^[^<>]{2,80}$')))
         && request.resource.data.bkash is string && request.resource.data.bkash.matches('^(01[3-9][0-9]{8})?$')
         && request.resource.data.get('bkash2', '') is string && request.resource.data.get('bkash2', '').matches('^(01[3-9][0-9]{8})?$')
         && request.resource.data.get('banks', []) is list && request.resource.data.get('banks', []).size() <= 2
