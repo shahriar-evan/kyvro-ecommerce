@@ -18,6 +18,12 @@ export async function saveProfile(uid, patch) {
   await setDoc(doc(db, "users", uid), { ...patch, updatedAt: serverTimestamp() }, { merge: true });
 }
 
+// A short summary of the signed-in customer's cart (users/{uid}.cart), so the daily job can remind them on their phone
+// about a cart left behind (api/_plan/nudges.js). n = items, name = first product, at = last change, shop = shop link.
+export async function saveCartSummary(uid, cart) {
+  await setDoc(doc(db, "users", uid), { cart, updatedAt: serverTimestamp() }, { merge: true });
+}
+
 // The customer's own orders (orders placed while logged in), newest first.
 // No orderBy here on purpose: it would need an extra Firestore index, so we sort in the browser.
 export function watchMyOrders(uid, onData, onError) {

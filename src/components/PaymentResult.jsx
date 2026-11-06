@@ -12,7 +12,8 @@ export default function PaymentResult({ result, isDarkMode, setCurrentView }) {
   const [copied, setCopied] = useState(false);
   const ok = status === 'ok';
   const check = status === 'check';
-  const tone = ok ? { ring: '#22c55e', soft: 'rgba(34,197,94,.14)', Icon: Check } : check ? { ring: '#f59e0b', soft: 'rgba(245,158,11,.14)', Icon: Clock } : { ring: '#ef4444', soft: 'rgba(239,68,68,.14)', Icon: X };
+  const due = status === 'due'; // from a reminder (phone / email): the order waits for payment
+  const tone = ok ? { ring: '#22c55e', soft: 'rgba(34,197,94,.14)', Icon: Check } : (check || due) ? { ring: '#f59e0b', soft: 'rgba(245,158,11,.14)', Icon: Clock } : { ring: '#ef4444', soft: 'rgba(239,68,68,.14)', Icon: X };
   const retry = async () => {
     setBusy(true); setErr('');
     try { await startOnlinePayment(order); } catch (e) { setErr(e.message); setBusy(false); }
@@ -22,8 +23,8 @@ export default function PaymentResult({ result, isDarkMode, setCurrentView }) {
   };
   const wa = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hello Kyvro, I could not complete the online payment${order ? ` for my order ${order}` : ''}. I would like to order through WhatsApp.`)}`;
 
-  const title = ok ? (adv ? 'Delivery charge paid' : 'Payment received') : check ? 'We are checking your payment' : status === 'cancel' ? 'Payment cancelled' : 'Payment not completed';
-  const titleBn = ok ? (adv ? 'ডেলিভারি চার্জ পরিশোধ হয়েছে' : 'পেমেন্ট সফল হয়েছে') : check ? 'পেমেন্ট যাচাই করা হচ্ছে' : status === 'cancel' ? 'পেমেন্ট বাতিল হয়েছে' : 'পেমেন্ট সম্পন্ন হয়নি';
+  const title = ok ? (adv ? 'Delivery charge paid' : 'Payment received') : check ? 'We are checking your payment' : due ? 'Payment pending' : status === 'cancel' ? 'Payment cancelled' : 'Payment not completed';
+  const titleBn = ok ? (adv ? 'ডেলিভারি চার্জ পরিশোধ হয়েছে' : 'পেমেন্ট সফল হয়েছে') : check ? 'পেমেন্ট যাচাই করা হচ্ছে' : due ? 'পেমেন্ট বাকি আছে' : status === 'cancel' ? 'পেমেন্ট বাতিল হয়েছে' : 'পেমেন্ট সম্পন্ন হয়নি';
   const amt = amount ? `৳${amount}` : '';
   const amtBn = amount ? `৳${toBanglaDigits(String(amount))}` : '';
 
@@ -31,6 +32,7 @@ export default function PaymentResult({ result, isDarkMode, setCurrentView }) {
   if (ok && !adv) { bn = 'আপনার পেমেন্ট সফল হয়েছে। আমরা শীঘ্রই আপনার অর্ডারটি কনফার্ম করব।'; en = 'Your order is paid. Our team will confirm it shortly.'; }
   else if (ok) { bn = `আপনার ডেলিভারি চার্জ${amtBn ? ` ${amtBn}` : ''} পরিশোধ হয়েছে। বাকি টাকা পণ্য হাতে পেয়ে ডেলিভারি বয়ের কাছে দিবেন।`; en = `Your delivery charge${amt ? ` (${amt})` : ''} is paid. Pay the rest in cash to the delivery person when the parcel arrives. We will confirm your order shortly.`; }
   else if (check) { bn = 'পেমেন্টটি যাচাই করতে একটু সময় লাগছে। টাকা কেটে গেলে চিন্তা করবেন না, আমরা অর্ডারটি চেক করে নিব।'; en = 'If money was deducted, do not worry. We will verify it and update your order.'; }
+  else if (due) { bn = `আপনার অর্ডার সেভ করা আছে, কিন্তু ${adv ? 'ডেলিভারি চার্জ' : 'পেমেন্ট'}${amtBn ? ` (${amtBn})` : ''} এখনও বাকি। অর্ডারের ৭ দিনের মধ্যে পেমেন্ট না হলে অর্ডারটি নিজে থেকে বাতিল হয়ে যাবে। নিচের বাটনে পেমেন্ট করুন।`; en = `Your order is saved, but the ${adv ? 'delivery charge' : 'payment'}${amt ? ` (${amt})` : ''} is still due. Orders not paid within 7 days are cancelled automatically. Tap the button below to pay.`; }
   else if (status === 'cancel') { bn = 'আপনি পেমেন্ট বাতিল করেছেন। চিন্তা নেই, আপনার অর্ডার সেভ করা আছে। পেমেন্ট না করলে অর্ডার কনফার্ম হবে না, তাই নিচের বাটনে আবার পেমেন্ট করুন।'; en = 'You cancelled the payment. Your order is saved, but it will not be confirmed until you pay. Tap the button below to pay again.'; }
   else { bn = 'আপনার অর্ডারটি সেভ করা আছে, কিন্তু পেমেন্ট সম্পন্ন হয়নি। পেমেন্ট না হলে অর্ডার কনফার্ম করা হবে না, তাই আবার পেমেন্ট করুন।'; en = 'Your order is saved, but the payment was not completed. You can try again.'; }
 
@@ -78,7 +80,7 @@ export default function PaymentResult({ result, isDarkMode, setCurrentView }) {
           <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 justify-center items-stretch pt-2">
             {!ok && !check && order && (
               <button type="button" disabled={busy} onClick={retry} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-center text-black text-xs font-bold px-5 sm:px-7 py-3.5 tracking-widest uppercase rounded-lg shadow-lg shadow-[#D4AF37]/25 hover:-translate-y-0.5 hover:shadow-xl transition disabled:opacity-60" style={{ background: 'linear-gradient(135deg,#f3dc8b,#D4AF37 55%,#b8932a)' }}>
-                {busy ? 'Please wait...' : (adv ? 'Pay delivery charge again' : (PAY_PROVIDER === 'uddokta' ? (CARD_PAY_ON ? 'Pay again (bKash / Nagad / Card)' : 'Pay again (bKash / Nagad)') : 'Pay again (bKash / Card)'))}
+                {busy ? 'Please wait...' : due ? (adv ? 'Pay delivery charge now' : 'Pay now (bKash / Nagad)') : (adv ? 'Pay delivery charge again' : (PAY_PROVIDER === 'uddokta' ? (CARD_PAY_ON ? 'Pay again (bKash / Nagad / Card)' : 'Pay again (bKash / Nagad)') : 'Pay again (bKash / Card)'))}
               </button>
             )}
             {order && (

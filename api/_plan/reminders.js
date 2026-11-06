@@ -2,6 +2,8 @@
 // reminderDays (settings/plans), and once more when it has ended, with a "Renew" link. Each email is sent once per
 // plan end date (remindedBefore / remindedExpired on subscriptions/{uid}). The same for a paid Basic (basicUntil;
 // remindedBasicBefore / remindedBasicExpired), only while Basic is charged and no Pro / Premium runs.
+// Customers (api/_plan/nudges.js): unpaid orders get reminders on day 1 / 3 and are cancelled on day 7; carts left behind
+// get a phone notification on day 1 / 3 / 7.
 // It also looks after sellers who stopped signing in (sellers/{uid}.lastSeenAt, else createdAt):
 //   - warning emails to the seller after 7, 15 and 25 days without a visit (each once per absence);
 //   - removal only for a Free seller (no paid plan running) with NO open orders and NOTHING due: after 30 days, or
@@ -12,6 +14,7 @@
 import { PROJECT, SITE, FS, accessToken, val } from '../_sslc.js';
 import { emailOwners, ownerEmails, pushToOwners } from '../_owners.js';
 import { readPlans } from '../_plans.js';
+import { unpaidOrders, cartReminders } from './nudges.js';
 import { toMillis, planPrice, basicPrice, basicCharging } from '../../src/data/priceCheck.js';
 
 export const config = { maxDuration: 60 };
@@ -167,8 +170,12 @@ export default async function handler(req, res) {
     const now = Date.now();
     let cleanup = { warned: 0, removed: 0, hidden: 0 };
     try { cleanup = await cleanupInactiveSellers(token, now); } catch (e) { console.error('seller cleanup', e); }
+    // customers: unpaid orders (reminders, cancel after 7 days) and carts left behind (phone notifications)
+    let unpaid = { reminded: 0, cancelled: 0 }; let carts = { carts: 0 };
+    try { unpaid = await unpaidOrders(token, PROJECT, now); } catch (e) { console.error('unpaid orders', e); }
+    try { carts = await cartReminders(token, PROJECT, now, docPath); } catch (e) { console.error('cart reminders', e); }
     const plans = await readPlans(token);
-    if (!plans.enabled) return res.status(200).json({ sent: 0, reason: 'plans off', cleanup });
+    if (!plans.enabled) return res.status(200).json({ sent: 0, reason: 'plans off', cleanup, unpaid, carts });
     let sent = 0;
     let pageToken = '';
     do {
@@ -221,7 +228,7 @@ export default async function handler(req, res) {
       }
       pageToken = j.nextPageToken || '';
     } while (pageToken);
-    return res.status(200).json({ sent, cleanup });
+    return res.status(200).json({ sent, cleanup, unpaid, carts });
   } catch (e) {
     console.error('plan-reminders', e);
     return res.status(500).json({ error: e.message || 'failed' });

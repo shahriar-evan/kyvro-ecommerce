@@ -10,7 +10,7 @@ import { touchSellerSeen, watchMySeller, sellerStatus } from './sellers';
 import { isReservedLink, ROOT_LINK_RE } from './data/reservedLinks';
 import { shopPriceClamp, productInCollection } from './data/shopConfig';
 import { placeOrder, watchOrders, cancelMyOrder } from './orders';
-import { watchProfile, saveProfile, watchMyOrders } from './customerData';
+import { watchProfile, saveProfile, watchMyOrders, saveCartSummary } from './customerData';
 import { ensureSubscribed } from './subscribers';
 import PushPrompt from './components/PushPrompt';
 import { watchProducts, watchProductCosts, watchProductCommissions, setProductCommission, saveProductCost, removeProductCost, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
@@ -224,7 +224,7 @@ export default function App() {
     try {
       const q = new URLSearchParams(window.location.search);
       const st = q.get('pay');
-      if (['ok', 'fail', 'cancel', 'check'].includes(st)) return { status: st, order: (q.get('order') || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40), kind: q.get('kind') === 'advance' ? 'advance' : 'full', amount: parseInt(q.get('amt'), 10) || 0 };
+      if (['ok', 'fail', 'cancel', 'check', 'due'].includes(st)) return { status: st, order: (q.get('order') || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40), kind: q.get('kind') === 'advance' ? 'advance' : 'full', amount: parseInt(q.get('amt'), 10) || 0 };
     } catch (e) { /* ignore */ }
     return null;
   });
@@ -486,6 +486,37 @@ export default function App() {
     localStorage.setItem('kyvro_cart', JSON.stringify(cart));
     cartRef.current = cart;
   }, [cart]);
+  // signed-in customer: keep a short cart summary on users/{uid} (only when the cart really changed), so a cart left
+  // behind gets a phone reminder on day 1 / 3 / 7 (daily job). An empty cart (ordered or cleared) stops the reminders.
+  const cartUid = customerUser && customerUser.uid;
+  useEffect(() => {
+    if (!cartUid || shopLoading) return undefined;
+    const items = cart || [];
+    const sig = items.map((i) => `${i.id}:${i.selectedSize || ''}:${i.selectedColor || ''}:${i.quantity}`).join('|');
+    const key = `kyvro_cart_sig_${cartUid}`;
+    let last = null;
+    try { last = localStorage.getItem(key); } catch (e) { /* ignore */ }
+    if (last === sig) return undefined;
+    const t = setTimeout(() => {
+      const n = Math.min(100, items.reduce((a, i) => a + (parseInt(i.quantity, 10) || 0), 0));
+      const summary = n > 0
+        ? { n, name: String(items[0].name || '').replace(/[<>]/g, '').slice(0, 80), at: new Date().toISOString(), shop: shopCtx ? String(shopLinkKey(shopCtx) || '') : '' }
+        : { n: 0, name: '', at: '', shop: '' };
+      saveCartSummary(cartUid, summary).then(() => { try { localStorage.setItem(key, sig); } catch (e) { /* ignore */ } }).catch(() => {});
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [cart, cartUid, shopLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  // a cart reminder opens the site with ?cart=open: show the cart
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      if (q.get('cart') === 'open') {
+        setIsCartOpen(true);
+        q.delete('cart');
+        window.history.replaceState(window.history.state, '', `${window.location.pathname}${q.toString() ? `?${q}` : ''}`);
+      }
+    } catch (e) { /* ignore */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Team members see new customer orders live
   useEffect(() => {
