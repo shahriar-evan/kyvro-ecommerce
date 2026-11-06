@@ -1,4 +1,4 @@
-"""Make the Kyvro logo files (C2: solid hexagon, cut K, gold notch).
+"""Make the Kyvro logo files (round badge with the hexagon K: solid hexagon, cut K, gold notch).
 
 Run from the project root:  python3 scripts/brand-assets.py
 Writes public/brand/*.svg, public/favicon.svg and the PNG icons. Needs Pillow (macOS: fonts from /System/Library).
@@ -33,22 +33,29 @@ def write(name, body):
 
 svg = lambda vb, inner, extra='': f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{vb}"{extra}>{inner}</svg>'
 
-# icons
-write('brand/kyvro-icon-black.svg', svg('10 4 80 92', mark(BLACK, GOLD)))
-write('brand/kyvro-icon-white.svg', svg('10 4 80 92', mark(WHITE, GOLD)))
-write('brand/kyvro-icon-gold-on-black.svg', svg('0 0 100 100', f'<rect width="100" height="100" rx="18" fill="{BLACK}"/>'
-                                                + f'<g transform="translate(50 50) scale(.78) translate(-50 -50)">{mark(GOLD, WHITE)}</g>'))
+BADGE_SCALE = 0.9  # hexagon size inside the round badge (KyvroMark BADGE_SCALE)
 
-# favicon: black in a light browser tab, white in a dark one
-write('favicon.svg', svg('10 4 80 92', '<style>.h{fill:#000000}@media (prefers-color-scheme:dark){.h{fill:#fff}}</style>'
-                         + mark(BLACK, GOLD).replace(f'fill="{BLACK}"', 'class="h"')))
+
+def badge(bg, f, a, mid):
+    """Round badge with the mark inside."""
+    return (f'<circle cx="50" cy="50" r="50" fill="{bg}"/>'
+            f'<g transform="translate(50 50) scale({BADGE_SCALE}) translate(-50 -50)">{mark(f, a, mid)}</g>')
+
+
+# badges: black (light pages), white (dark pages), gold (Minimal / Bold / Boutique themes)
+write('brand/kyvro-badge-black.svg', svg('0 0 100 100', badge(BLACK, WHITE, GOLD, 'b')))
+write('brand/kyvro-badge-white.svg', svg('0 0 100 100', badge(WHITE, BLACK, GOLD, 'w')))
+write('brand/kyvro-badge-gold.svg', svg('0 0 100 100', badge(BLACK, GOLD, WHITE, 'g')))
+
+# favicon: the black badge (shows on light and dark browser tabs)
+write('favicon.svg', svg('0 0 100 100', badge(BLACK, WHITE, GOLD, 'k')))
 
 # horizontal lockup: icon + KYVRO + gold dot + কাইভ্রো (text uses the site's fonts; measured with Georgia Bold)
 SERIF = "Georgia, 'Times New Roman', serif"
 BN = "'Hind Siliguri', 'Kohinoor Bangla', 'Noto Sans Bengali', sans-serif"
 FS, LS, BASE = 52, 2, 68
 geo = ImageFont.truetype('/System/Library/Fonts/Supplemental/Georgia Bold.ttf', FS)
-tx = 94
+tx = 106
 kw = geo.getlength('KYVRO') + LS * 4
 dot = tx + kw + 16
 bx = dot + 16
@@ -56,47 +63,46 @@ bw = 150  # কাইভ্রো at 46px is about 150 wide
 W = round(bx + bw + 4)
 
 
-def lockup(f, mid):
-    return svg(f'0 0 {W} 100', mark(f, GOLD, mid, -10, 0)
+def lockup(f, bg, hexf, mid):
+    return svg(f'0 0 {W} 100', f'<g transform="translate(0 4) scale(.92)">{badge(bg, hexf, GOLD, mid)}</g>'
                + f'<text x="{tx}" y="{BASE}" font-family="{SERIF}" font-weight="700" font-size="{FS}" letter-spacing="{LS}" fill="{f}">KYVRO</text>'
                + f'<circle cx="{dot:.1f}" cy="{BASE - 18}" r="5" fill="{GOLD}"/>'
                + f'<text x="{bx:.1f}" y="{BASE}" font-family="{BN}" font-weight="700" font-size="46" fill="{f}" lang="bn">কাইভ্রো</text>')
 
 
-write('brand/kyvro-lockup.svg', lockup(BLACK, 'kl'))
-write('brand/kyvro-lockup-white.svg', lockup(WHITE, 'kd'))
+write('brand/kyvro-lockup.svg', lockup(BLACK, BLACK, WHITE, 'kl'))  # for light backgrounds
+write('brand/kyvro-lockup-white.svg', lockup(WHITE, WHITE, BLACK, 'kd'))  # for dark backgrounds
 
 
 # PNGs (drawn big, then shrunk for smooth edges)
-def png(size, f, a, bg=None, scale=1.0, rounded=0, crop=True):
-    S = 8
+def png(size, bg, f, a, circle=True):
+    """circle=True: round badge on a clear background; False: full square (iPhone icon, share image)."""
+    S = 4
     big = size * S
     im = Image.new('RGBA', (big, big), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
-    if bg:
-        d.rounded_rectangle([0, 0, big - 1, big - 1], radius=rounded * S, fill=bg)
-    # map the 100-unit drawing: crop to the hexagon (x 10..90, y 4..96) when there is no background
-    if crop:
-        ox, oy, span = 10 - 6, 4, 92
+    if circle:
+        d.ellipse([0, 0, big - 1, big - 1], fill=bg)
     else:
-        span = 100 / scale
-        ox = oy = 50 - span / 2
+        d.rectangle([0, 0, big, big], fill=bg)
+    span = 100 / BADGE_SCALE
+    o = 50 - span / 2
     k = big / span
-    tr = lambda p: [((x - ox) * k, (y - oy) * k) for x, y in p]
+    tr = lambda p: [((x - o) * k, (y - o) * k) for x, y in p]
     layer = Image.new('RGBA', (big, big), (0, 0, 0, 0))
     ld = ImageDraw.Draw(layer)
     ld.polygon(tr(HEX), fill=f)
     for c in CUTS + [NOTCH]:
         ld.polygon(tr(c), fill=(0, 0, 0, 0))
-    ld.polygon([(x, y) for x, y in tr(LINE)], fill=f)
+    ld.polygon(tr(LINE), fill=f)
     ld.polygon(tr(NOTCH), fill=a)
     im.alpha_composite(layer)
     return im.resize((size, size), Image.LANCZOS)
 
 
-png(16, BLACK, GOLD).save(os.path.join(PUB, 'favicon-16.png'))
-png(32, BLACK, GOLD).save(os.path.join(PUB, 'favicon-32.png'))
-# apple-touch and the share / push icon: black square, white hexagon, gold notch
-png(180, WHITE, GOLD, bg=BLACK, scale=.74, crop=False).convert('RGB').save(os.path.join(PUB, 'apple-touch-icon.png'))
-png(1024, WHITE, GOLD, bg=BLACK, scale=.70, crop=False).convert('RGB').save(os.path.join(PUB, 'kyvro-icon.png'))
+png(16, BLACK, WHITE, GOLD).save(os.path.join(PUB, 'favicon-16.png'))
+png(32, BLACK, WHITE, GOLD).save(os.path.join(PUB, 'favicon-32.png'))
+# iPhone icon and the share / push icon: black square, white hexagon, gold notch (same as the Facebook picture)
+png(180, BLACK, WHITE, GOLD, circle=False).convert('RGB').save(os.path.join(PUB, 'apple-touch-icon.png'))
+png(1024, BLACK, WHITE, GOLD, circle=False).convert('RGB').save(os.path.join(PUB, 'kyvro-icon.png'))
 print('done, lockup width', W)
