@@ -1392,17 +1392,22 @@ export default function App() {
         const showAbout = f.about && ex.about;
         const showAnn = f.announcement && ex.announcement;
         const showBanner = f.banner && shopCtx.banner;
-        if (!seller && !showTagline && !showAbout && !showContact && !socials.length && !picks.length && !showAnn && !showBanner) return null;
+        // seller shops: no "Sold by" line (the shop name is in the header); only a Verified (Premium) shop shows its name + badge
+        const verified = seller && f.verified && !shopCtx.planExempt;
+        const showName = !seller || verified;
+        const showInfo = showName || showTagline || showAbout || showContact || socials.length > 0 || picks.length > 0;
+        if (!showInfo && !showAnn && !showBanner) return null;
         return (
           <>
             {showBanner && <img src={shopCtx.banner} alt={`${shopDisplayName(shopCtx, f)} banner`} className="w-full max-h-56 sm:max-h-72 object-cover" />}
             {showAnn && <div className="px-4 py-2 text-center text-xs font-semibold text-white" style={{ background: accent }}>{ex.announcement}</div>}
-            <div className={`border-b px-4 py-3 text-center text-xs space-y-1.5 ${isDarkMode ? 'bg-[#121212] border-gray-800 text-gray-300' : 'bg-[#D4AF37]/10 border-[#D4AF37]/30 text-gray-700'}`}>
-              <p>
-                {seller ? 'Sold by ' : ''}<strong style={{ color: accent }}>{shopDisplayName(shopCtx, f)}</strong>
-                {seller && f.verified && !shopCtx.planExempt && <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-white text-[10px] font-bold align-middle" style={{ background: accent }}>✓ Verified</span>}
-                {seller && <span className="text-gray-500"> · Independent seller, not official Kyvro. Kyvro delivers the order and takes the payment.</span>}
-              </p>
+            {showInfo && <div className={`border-b px-4 py-3 text-center text-xs space-y-1.5 ${isDarkMode ? 'bg-[#121212] border-gray-800 text-gray-300' : 'bg-[#D4AF37]/10 border-[#D4AF37]/30 text-gray-700'}`}>
+              {showName && (
+                <p>
+                  <strong style={{ color: accent }}>{shopDisplayName(shopCtx, f)}</strong>
+                  {verified && <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-white text-[10px] font-bold align-middle" style={{ background: accent }}>✓ Verified</span>}
+                </p>
+              )}
               {showTagline && <p className="italic">{ex.tagline}</p>}
               {showAbout && <p className="max-w-2xl mx-auto text-gray-500">{ex.about}</p>}
               {(showContact || socials.length > 0) && (
@@ -1425,7 +1430,7 @@ export default function App() {
                   </div>
                 </div>
               )}
-            </div>
+            </div>}
           </>
         );
       })()}
