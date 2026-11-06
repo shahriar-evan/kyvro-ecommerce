@@ -374,8 +374,8 @@ export default function App() {
   // a seller who signs in counts as active (unused shops are removed after 30 days without a visit)
   useEffect(() => { if (customerUser && customerUser.uid) touchSellerSeen(customerUser.uid); }, [customerUser && customerUser.uid]); // eslint-disable-line react-hooks/exhaustive-deps
   // a signed-in seller with a shop (live or waiting) sees "My Shop" in the account menu / footer instead of "Start your own business"
-  const [hasMyShop, setHasMyShop] = useState(false);
-  useEffect(() => watchMySeller(customerUser && customerUser.uid, (s) => setHasMyShop(!!s && sellerStatus(s) !== 'rejected')), [customerUser && customerUser.uid]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [hasSellerShop, setHasSellerShop] = useState(false);
+  useEffect(() => watchMySeller(customerUser && customerUser.uid, (s) => setHasSellerShop(!!s && sellerStatus(s) !== 'rejected')), [customerUser && customerUser.uid]); // eslint-disable-line react-hooks/exhaustive-deps
   // Maintenance mode: visitors can browse everything, but ordering is locked (team members can still test-order)
   const visitorLocked = storeSettings.maintenanceMode === true && !isAdminLoggedIn;
   const lockText = ((storeSettings.maintenanceMessage || '').trim()) || "ওয়েবসাইটে কাজ চলছে, অর্ডার সাময়িক বন্ধ, কিন্তু added to cart করে রাখতে পারবেন। পরবর্তীতে ওয়েবসাইট পুনরায় চালু হলে পেমেন্ট করতে পারবেন অথবা ম্যানুয়ালি অর্ডার করতে WhatsApp এ যোগাযোগ করুন।\n\nMaintenance mode is ON. Ordering is paused for a little while, but you can keep items in your cart and pay when the website opens again, or contact us on WhatsApp to order manually.";
@@ -894,7 +894,18 @@ export default function App() {
   const [sellPlan, setSellPlan] = useState('');
   const [pricingBusy, setPricingBusy] = useState('');
   const startSelling = () => { setCurrentView('pricing'); window.scrollTo(0, 0); };
-  const openMyShop = () => { setSellPlan(''); goAccount('sell'); window.scrollTo(0, 0); };
+  // a team member (Owner / Manager / Admin) with their own team shop: "My Shop" opens Admin Panel -> My Shop / Team Shops
+  const [hasTeamShop, setHasTeamShop] = useState(false);
+  useEffect(() => {
+    const uid = isAdminLoggedIn && auth.currentUser ? auth.currentUser.uid : '';
+    if (!uid) { setHasTeamShop(false); return undefined; }
+    return watchMyShop(uid, (sh) => setHasTeamShop(!!sh && sh.kind !== 'seller'), () => setHasTeamShop(false));
+  }, [isAdminLoggedIn, loggedInUserEmail]); // eslint-disable-line react-hooks/exhaustive-deps
+  const hasMyShop = hasSellerShop || hasTeamShop;
+  const openMyShop = () => {
+    if (hasTeamShop && !hasSellerShop) { setAdminTab(adminRole === 'owner' ? 'own-shop' : 'my-shop'); setCurrentView('admin'); window.scrollTo(0, 0); return; }
+    setSellPlan(''); goAccount('sell'); window.scrollTo(0, 0);
+  };
   const sellAction = hasMyShop ? openMyShop : startSelling;
   const sellLabel = hasMyShop ? 'My Shop' : 'Start your own business';
   const choosePlan = async (tier) => {

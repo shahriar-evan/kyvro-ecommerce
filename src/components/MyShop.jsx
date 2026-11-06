@@ -47,7 +47,8 @@ function ShopSwitch({ on, busy, onToggle, isDarkMode, label }) {
 // Payments (online, delivery charge, cash on delivery) all stay with the store; the Owner pays the markup out later.
 // view (seller dashboard): 'all' (default), 'products', 'manage', 'theme', 'plan' or 'none' (stays mounted so unsaved ticks survive)
 // readOnly + asUid: the Owner viewing a seller's dashboard (every control disabled, the seller's shops read by uid)
-export default function MyShop({ view = 'all', readOnly = false, asUid = '', sellerMode = false, showPlan = true, canCreateShop = false, adminRole, products, isOwner, isDarkMode, formatPrice, adminName, loggedInUserEmail, onDirtyChange }) {
+// part (Owner only): 'own' = just my own shop (Admin -> My Shop); 'all' = my shop first, then the Team Shops list
+export default function MyShop({ part = 'all', view = 'all', readOnly = false, asUid = '', sellerMode = false, showPlan = true, canCreateShop = false, adminRole, products, isOwner, isDarkMode, formatPrice, adminName, loggedInUserEmail, onDirtyChange }) {
   const [shop, setShop] = useState(undefined); // undefined = loading, null = none yet
   const [draft, setDraft] = useState({}); // productId -> price text (only the products that are in the shop)
   const [name, setName] = useState('');
@@ -385,6 +386,10 @@ export default function MyShop({ view = 'all', readOnly = false, asUid = '', sel
                   <div className="flex flex-wrap items-center gap-2">
                     {linkButtons(shopLinkKey(s))}
                     <ShopSwitch on={s.active !== false} busy={switching === s.slug} onToggle={() => flipShop(s)} isDarkMode={isDarkMode} label={`Shop ${s.name || s.slug} on or off`} />
+                    <button type="button" disabled={switching === s.slug} onClick={async () => {
+                      if (!(await askConfirm(`Remove the shop "${s.name || s.slug}"${owners[s.slug] ? ` (${owners[s.slug].name || owners[s.slug].email})` : ''}? Its link stops working and this cannot be undone. Orders stay. Pay any markup still due first (Team Stats).`, { danger: true, confirmText: 'Remove shop' }))) return;
+                      try { await rejectShop(s.slug); setMsg({ type: 'ok', text: `"${s.name || s.slug}" was removed.` }); } catch (e) { setMsg({ type: 'err', text: e.message }); }
+                    }} className="px-3 py-1.5 rounded border border-red-500 text-red-500 font-semibold disabled:opacity-50">Remove</button>
                   </div>
                 </div>
               ))}
@@ -422,7 +427,8 @@ export default function MyShop({ view = 'all', readOnly = false, asUid = '', sel
   const show = (...ks) => view === 'all' || ks.includes(view);
 
   // ---------- Manager (and an Admin with "Shop create" ON) ----------
-  const wrap = (el) => <div className="space-y-5">{top}{el}{links}</div>;
+  // my own shop first, then (Owner) the Team Shops list; part 'own' leaves the list out
+  const wrap = (el) => <div className="space-y-5">{el}{part !== 'own' && top}{links}</div>;
   if (shop === undefined) return wrap(<p className="text-sm text-gray-500 py-8 text-center">Loading...</p>);
   if (shop === null) {
     if (sellerMode) return null; // a seller applies in SellerDashboard

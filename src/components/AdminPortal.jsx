@@ -18,7 +18,7 @@ import PlanSettings from './PlanSettings';
 import SellerDashBannerSettings from './SellerDashBannerSettings';
 import SellerDashLayout from './SellerDashLayout';
 import { AdminDashboard, AdminAnalytics } from './AdminDashboard';
-import { LayoutDashboard, BarChart3, ShoppingBag, Package, PlusCircle, Boxes, Users, Store, UserCheck, Gem, ShieldCheck, Settings, Palette } from 'lucide-react';
+import { LayoutDashboard, BarChart3, ShoppingBag, Package, PlusCircle, Boxes, Users, Store, UserCheck, Gem, ShieldCheck, Settings, Palette, ShoppingBasket } from 'lucide-react';
 import ThemePicker from './ThemePicker';
 import { watchSiteTheme, saveSiteTheme } from '../themeStore';
 import SellersPanel from './SellersPanel';
@@ -47,7 +47,7 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
   // My Shop with unsaved ticks / prices: ask before switching to another tab
   const shopDirty = React.useRef(false);
   const goTab = async (tab, before) => {
-    if (adminTab === 'my-shop' && tab !== 'my-shop' && shopDirty.current
+    if ((adminTab === 'my-shop' || adminTab === 'own-shop') && tab !== adminTab && shopDirty.current
       && !(await askConfirm('You have unsaved changes in your shop. Leave without saving?', { danger: true, confirmText: 'Leave' }))) return;
     if (before) before();
     setAdminTab(tab);
@@ -296,6 +296,8 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                 ] },
                 { title: 'Team & Shops', items: [
                   { key: 'stats', label: isOwner ? 'Team Stats' : 'My Stats', icon: Users },
+                  // the Owner's own shop on its own page (Team Shops shows it first too, then everyone's shops)
+                  ...(isOwner ? [{ key: 'own-shop', label: 'My Shop', icon: ShoppingBasket }] : []),
                   { key: 'my-shop', label: isOwner ? 'Team Shops' : adminRole === 'manager' || adminCanCreateShop ? 'My Shop' : 'Shops', icon: Store, count: isOwner ? pendingShops : 0 },
                   ...(isOwner ? [{ key: 'sellers', label: 'Sellers', icon: UserCheck, count: pendingSellers }] : []),
                   ...(canManageTeam ? [{ key: 'plan-members', label: 'Plan Members', icon: Gem }] : []),
@@ -710,6 +712,7 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                 </div>
               )}
 
+              {adminTab === 'own-shop' && isOwner && <MyShop part="own" onDirtyChange={(d) => { shopDirty.current = d; }} canCreateShop={adminCanCreateShop} adminRole={adminRole} products={products} isOwner={isOwner} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} />}
               {adminTab === 'my-shop' && <MyShop onDirtyChange={(d) => { shopDirty.current = d; }} canCreateShop={adminCanCreateShop} adminRole={adminRole} products={products} isOwner={isOwner} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} />}
 
               {adminTab === 'my-products' && <MyProducts products={products} loggedInUserEmail={loggedInUserEmail} isDarkMode={isDarkMode} formatPrice={formatPrice} startEditProduct={startEditProduct} canEditProduct={canEditProduct} />}
