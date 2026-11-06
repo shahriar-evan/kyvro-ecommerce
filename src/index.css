@@ -37,8 +37,3 @@
 [data-theme="bold"] .font-serif { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-weight: 800; }
 
 [data-theme="street"] .font-serif, [data-theme="fresh"] .font-serif { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-weight: 800; }
-
-/* Kyvro logo (KyvroMark): Classic shows the black / white emblem, every other store theme the gold one */
-.kyvro-mark .km-gold { display: none; }
-[data-theme]:not([data-theme="classic"]) .kyvro-mark .km-bw { display: none; }
-[data-theme]:not([data-theme="classic"]) .kyvro-mark .km-gold { display: block; }
