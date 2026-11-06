@@ -71,7 +71,7 @@ export default function SellerDashLayout({ nav, active, onSelect, isDarkMode, he
   const brand = (
     <div className={`flex items-center gap-2 px-3 pt-1 pb-3 mb-3 border-b ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
       <KyvroMark dark={isDarkMode} title="Kyvro logo" className="h-7 w-auto shrink-0" />
-      <span className="font-serif font-bold tracking-wide text-base leading-none">KYVRO</span>
+      <span className="relative top-[0.16em] font-serif font-bold tracking-wide text-base leading-none">KYVRO</span>
     </div>
   );
   const panel = `rounded-2xl border ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`;

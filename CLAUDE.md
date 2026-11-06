@@ -125,7 +125,9 @@ After plan-setting changes, the Owner presses **Save plans** once. Vercel env: `
 
 ## Logo
 
-`src/components/KyvroMark.jsx`: plain hexagon with a cut K and a solid middle line, no background; black in light mode, white in dark mode, gold notch; Minimal / Bold / Boutique themes: gold hexagon (`index.css`, `[data-theme] .kyvro-mark`). Header: `KYVRO · কাইভ্রো` from 340px, only `KYVRO` below, only the logo under 320px. `scripts/brand-assets.py` makes `public/favicon.svg` (+16/32 PNG), `apple-touch-icon.png`, `kyvro-icon.png` (share + push) and `public/brand/*` (icons, lockups, round badges for social profile pictures); change it together with KyvroMark.
+- Website logo = the **K emblem** (from Evan's logo picture): `src/components/KyvroMark.jsx` shows `public/brand/kyvro-emblem-black.png` (light mode) / `-white.png` (dark mode); every non-Classic store theme shows `-gold.png` (`index.css`, `[data-theme] .kyvro-mark`). Size it with a height class. Header: `KYVRO · কাইভ্রো` (HTML text) from 340px, only `KYVRO` below, only the logo under 320px.
+- `scripts/emblem-assets.py` makes the emblem PNGs (smoothed edges, from `scripts/emblem-source.png`) plus `apple-touch-icon.png` and `kyvro-icon.png` (share + push: gold emblem on black).
+- The **favicon stays the hexagon** (`scripts/brand-assets.py`: `favicon.svg`, 16/32 PNG, `public/brand` hexagon icons, lockups, round badges); the emblem is too detailed for 16 / 32 px.
 
 ## Key files
 
