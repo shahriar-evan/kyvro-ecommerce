@@ -8,10 +8,10 @@ export default function Footer({ onStartSelling, navHas = () => true, isDarkMode
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8 sm:gap-10 text-xs">
           <div className="space-y-4">
             {/* logo + name: centered on a phone (one column), left from 640px (grid columns) */}
-            <div className="flex items-center justify-center sm:justify-start gap-2">
+            <div className="flex items-center justify-center sm:justify-start gap-1.5">
               <KyvroMark dark={isDarkMode} title="Kyvro logo" className="h-11 sm:h-12 xl:h-10 w-auto shrink-0" />
-              <span className={`flex items-center gap-2 whitespace-nowrap leading-none ${isDarkMode ? 'text-white' : 'text-black'}`}>
-                <span className="text-2xl sm:text-3xl xl:text-xl font-serif font-bold tracking-widest xl:tracking-wider">KYVRO</span>
+              <span className={`flex items-center gap-1 whitespace-nowrap leading-none ${isDarkMode ? 'text-white' : 'text-black'}`}>
+                <span className="text-2xl sm:text-3xl xl:text-xl font-serif font-bold tracking-wide">KYVRO</span>
                 <span className={`${isDarkMode ? 'text-[#D4AF37]' : 'text-black'} text-2xl sm:text-3xl xl:text-xl leading-none`} aria-hidden="true">&bull;</span>
                 <span className="text-[22px] sm:text-[26px] xl:text-[18px] font-bold" lang="bn">কাইভ্রো</span>
               </span>

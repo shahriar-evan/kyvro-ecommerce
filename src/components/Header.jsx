@@ -33,7 +33,7 @@ export default function Header({ shopBrand = null, onStartSelling, onAdminPanel 
             </button>
             <div 
               onClick={() => { setCurrentView('home'); setSelectedCategory('All'); }}
-              className="cursor-pointer flex items-center gap-1 sm:gap-1.5 min-w-0"
+              className="cursor-pointer flex items-center gap-1 min-w-0"
             >
               {/* the Kyvro logo is always there; a Premium shop shows its own name as a wordmark next to it; otherwise one line "KYVRO • কাইভ্রো" centred on the logo; under 430px only "KYVRO", under 320px only the logo */}
               {shopBrand && shopBrand.logo && <img src={shopBrand.logo} alt="" className="h-9 w-9 sm:h-11 sm:w-11 rounded object-cover border border-gray-300/40" />}
@@ -44,8 +44,8 @@ export default function Header({ shopBrand = null, onStartSelling, onAdminPanel 
                   <span className="text-[9px] tracking-[0.2em] font-sans -mt-0.5 text-gray-500">POWERED BY KYVRO</span>
                 </div>
               ) : (
-                <span className={`flex items-center gap-1 sm:gap-1.5 lg:gap-2 whitespace-nowrap leading-none max-[319px]:hidden ${isDarkMode ? 'text-white' : 'text-black'}`}>
-                  <span className="text-[16px] min-[400px]:text-[18px] sm:text-[22px] xl:text-[24px] font-serif font-bold tracking-[0.03em] min-[400px]:tracking-wider xl:tracking-widest">KYVRO</span>
+                <span className={`flex items-center gap-0.5 sm:gap-1 whitespace-nowrap leading-none max-[319px]:hidden ${isDarkMode ? 'text-white' : 'text-black'}`}>
+                  <span className="text-[16px] min-[400px]:text-[18px] sm:text-[22px] xl:text-[24px] font-serif font-bold tracking-[0.03em] min-[400px]:tracking-wide">KYVRO</span>
                   <span className={`${isDarkMode ? 'text-[#D4AF37]' : 'text-black'} text-[15px] sm:text-[20px] xl:text-[22px] leading-none max-[429px]:hidden`} aria-hidden="true">&bull;</span>
                   <span className="text-[14px] min-[400px]:text-[16px] sm:text-[20px] xl:text-[22px] font-bold max-[429px]:hidden" lang="bn">কাইভ্রো</span>
                 </span>
