@@ -13,11 +13,11 @@ import { normalizePlans, effectiveTier, TIER_LABEL, shopLimitFor, toMillis, basi
 import SellerStats from './SellerStats';
 import SellPricing from './SellPricing';
 import { watchMySubscription } from '../storeSettings';
-import { watchShop, watchMyShops, cleanHandle, HANDLE_RE, handleTaken, prettyHandle } from '../shops';
+import { watchShop, watchMyShops, cleanHandle, HANDLE_RE, handleTaken, prettyHandle, shopLinkKey } from '../shops';
 import { GOLD_BTN, OUTLINE_BTN } from './ui';
 import { isReservedLink } from '../data/reservedLinks';
 import { effectiveFeatures, httpsLinkOk, FEATURES, shopDisplayName } from '../data/shopBrand';
-import { LayoutDashboard, ShoppingBag, Package, Store, BarChart3, Palette, LayoutTemplate, TicketPercent, Wallet, LifeBuoy, Gem, Lock, Receipt } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Package, Store, BarChart3, Palette, LayoutTemplate, TicketPercent, Wallet, LifeBuoy, Gem, Lock, Receipt, ExternalLink, Copy, Check } from 'lucide-react';
 import SellerDashLayout from './SellerDashLayout';
 import SellerBanner from './SellerBanner';
 import ThemePicker from './ThemePicker';
@@ -77,6 +77,7 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
   useEffect(() => watchMySeller(uid, setSeller), [uid]);
   useEffect(() => watchMySubscription(uid, setMySub), [uid]);
   const [myShop, setMyShop] = useState(null);
+  const [linkCopied, setLinkCopied] = useState(false);
   useEffect(() => (seller && seller.slug ? watchShop(seller.slug, setMyShop, () => setMyShop(null)) : undefined), [seller && seller.slug]); // eslint-disable-line react-hooks/exhaustive-deps
   // every shop of this account (more than one on Pro / Premium) and the "New shop" request form
   const [myShops, setMyShops] = useState([]);
@@ -481,9 +482,32 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
   if (s === 'dashboard') {
     before = (
       <>
-        <div className={`${card} !space-y-1`}>
-          <h2 className="text-xl sm:text-2xl font-bold">Hello, {(customerUser.displayName || 'Seller').split(' ')[0]}!</h2>
-          <p className="text-xs text-gray-500">{approved ? (basicDue(myShop, plans) ? 'Your shop is ready. Pay the Basic plan to open it to customers.' : 'Your shop is live. Choose products, share your link and earn on every delivered order.') : 'Kyvro is checking your application. You can already choose products; your link starts working after approval.'}</p>
+        <div className={`${card} !space-y-0 flex flex-col lg:flex-row lg:items-center justify-between gap-4`}>
+          <div className="space-y-1 min-w-0">
+            <h2 className="text-xl sm:text-2xl font-bold">Hello, {(customerUser.displayName || 'Seller').split(' ')[0]}!</h2>
+            <p className="text-xs text-gray-500">{approved ? (basicDue(myShop, plans) ? 'Your shop is ready. Pay the Basic plan to open it to customers.' : 'Your shop is live. Choose products, share your link and earn on every delivered order.') : 'Kyvro is checking your application. You can already choose products; your link starts working after approval.'}</p>
+          </div>
+          {/* the shop's public link, right next to the greeting: open it or copy it to share */}
+          {myShop && shopLinkKey(myShop) && (() => {
+            const url = `${window.location.origin}/${shopLinkKey(myShop)}`;
+            const live = approved && myShop.active && !myShop.killed && !basicDue(myShop, plans);
+            const copy = async () => { try { await navigator.clipboard.writeText(url); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 1800); } catch (e) { /* old browser */ } };
+            return (
+              <div className={`shrink-0 w-full lg:w-auto rounded-xl border p-3 sm:p-4 ${isDarkMode ? 'border-[#D4AF37]/40 bg-[#D4AF37]/5' : 'border-[#D4AF37]/50 bg-[#D4AF37]/5'}`}>
+                <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#B8921F]">
+                  Your shop link · আপনার শপের লিংক
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] tracking-wider ${live ? 'bg-green-600 text-white' : 'bg-gray-400 text-white'}`}>{live ? 'LIVE' : 'NOT LIVE'}</span>
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <a href={url} target="_blank" rel="noopener noreferrer" className="text-base sm:text-lg font-bold text-[#D4AF37] hover:underline break-all">{url.replace(/^https?:\/\/(www\.)?/, '')}</a>
+                  <div className="flex gap-2">
+                    <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 bg-[#D4AF37] text-black font-bold px-3 py-1.5 rounded text-[11px] uppercase tracking-wider hover:opacity-90"><ExternalLink size={13} />Open shop</a>
+                    <button type="button" onClick={copy} className={`inline-flex items-center gap-1.5 border font-bold px-3 py-1.5 rounded text-[11px] uppercase tracking-wider ${isDarkMode ? 'border-gray-600' : 'border-gray-300'}`}>{linkCopied ? <><Check size={13} className="text-green-600" />Copied</> : <><Copy size={13} />Copy</>}</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
         {/* paid Basic: the store stays closed to customers until Basic is paid (or renewed) */}
         {approved && basicDue(myShop, plans) && (
