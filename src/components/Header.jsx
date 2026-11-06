@@ -35,7 +35,7 @@ export default function Header({ shopBrand = null, onStartSelling, onAdminPanel 
               onClick={() => { setCurrentView('home'); setSelectedCategory('All'); }}
               className="cursor-pointer flex items-center gap-1 min-w-0"
             >
-              {/* the Kyvro logo is always there; a Premium shop shows its own name as a wordmark next to it; otherwise one line "KYVRO • কাইভ্রো" centred on the logo; under 430px only "KYVRO", under 320px only the logo */}
+              {/* the Kyvro logo is always there; a Premium shop shows its own name as a wordmark next to it; otherwise one line "KYVRO • কাইভ্রো" centred on the logo; under 340px only "KYVRO", under 320px only the logo */}
               {shopBrand && shopBrand.logo && <img src={shopBrand.logo} alt="" className="h-9 w-9 sm:h-11 sm:w-11 rounded object-cover border border-gray-300/40" />}
               <KyvroMark dark={isDarkMode} title="Kyvro logo" className={`${shopBrand && shopBrand.wordmark ? 'h-7 sm:h-9' : 'h-8 min-[400px]:h-9 sm:h-10 xl:h-11'} w-auto shrink-0`} />
               {shopBrand && shopBrand.wordmark ? (
@@ -46,8 +46,8 @@ export default function Header({ shopBrand = null, onStartSelling, onAdminPanel 
               ) : (
                 <span className={`flex items-center gap-0.5 sm:gap-1 whitespace-nowrap leading-none max-[319px]:hidden ${isDarkMode ? 'text-white' : 'text-black'}`}>
                   <span className="text-[16px] min-[400px]:text-[18px] sm:text-[22px] xl:text-[24px] font-serif font-bold tracking-[0.03em] min-[400px]:tracking-wide">KYVRO</span>
-                  <span className={`${isDarkMode ? 'text-[#D4AF37]' : 'text-black'} text-[15px] sm:text-[20px] xl:text-[22px] leading-none max-[429px]:hidden`} aria-hidden="true">&bull;</span>
-                  <span className="text-[14px] min-[400px]:text-[16px] sm:text-[20px] xl:text-[22px] font-bold max-[429px]:hidden" lang="bn">কাইভ্রো</span>
+                  <span className={`${isDarkMode ? 'text-[#D4AF37]' : 'text-black'} text-[15px] sm:text-[20px] xl:text-[22px] leading-none max-[339px]:hidden`} aria-hidden="true">&bull;</span>
+                  <span className="text-[14px] min-[400px]:text-[16px] sm:text-[20px] xl:text-[22px] font-bold max-[339px]:hidden" lang="bn">কাইভ্রো</span>
                 </span>
               )}
             </div>
