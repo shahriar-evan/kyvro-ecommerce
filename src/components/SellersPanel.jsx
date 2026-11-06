@@ -4,7 +4,7 @@ import { watchAllShops, acceptShop } from '../shops';
 import { auth } from '../firebase';
 import { doc, updateDoc, getFirestore } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
-import { watchSellers, watchSellerPayouts, watchSubscriptions, killSellerShop, reviveSellerShop, removeSeller, watchSellerRules, saveSellerRules, sellerStatus, approveSeller, rejectSeller, rejectSellerShop, sellerShopList } from '../sellers';
+import { watchSellers, watchSellerPayouts, watchSubscriptions, reviveSellerShop, removeSeller, watchSellerRules, saveSellerRules, sellerStatus, approveSeller, rejectSeller, rejectSellerShop, sellerShopList } from '../sellers';
 import { formatDateTime } from '../utils/dates';
 import { watchPayouts, addPayout } from '../payouts';
 import { toMillis, effectiveTier, normalizePlans } from '../data/priceCheck';
@@ -16,7 +16,7 @@ import SellerDashboard from './SellerDashboard';
 const markupOf = (o) => (o.items || []).reduce((n, it) => n + Math.max(0, (Number(it.price) || 0) - (it.basePrice !== undefined ? Number(it.basePrice) || 0 : Number(it.price) || 0)) * (parseInt(it.quantity, 10) || 0), 0);
 
 // Owner: every public seller ("Sell on Kyvro") with their shop, plan, earnings (markup on delivered orders), what was
-// paid, what is due, their bKash, Mark as paid, and the kill switch. Plus who may open a shop and the blocked names.
+// paid, what is due, their bKash, Mark as paid. Plus who may open a shop and the blocked names.
 // the seller's payout details (sellerPayout/{uid}) as lines: bKash numbers and bank accounts
 const payoutLines = (p) => {
   if (!p) return [];
@@ -98,11 +98,6 @@ export default function SellersPanel({ orders = [], products = [], isDarkMode, f
     if (a === null || a === undefined || !(Number(a) > 0)) return;
     const note = await askInput('Note (optional, e.g. bKash TrxID):', { placeholder: 'e.g. TrxID 8N7...' });
     act(r.uid, () => addPayout(r.email, r.name || r.shop?.name || '', Number(a), note || '', { email: loggedInUserEmail }), 'Payment saved.');
-  };
-  const kill = async (r) => {
-    const note = await askInput(`Page off: switch off "${r.shop ? r.shop.name : r.slug}"? Nothing is deleted. The seller cannot switch it on again; only you can, with Page on. Reason (the seller sees it):`, { placeholder: 'e.g. uses the Kyvro name' });
-    if (note === null || note === undefined) return;
-    act(r.uid, () => killSellerShop(r.slug, note), 'Page off: the shop is switched off.');
   };
   const remove = async (r) => {
     if (!(await askConfirm(`Remove the seller ${r.email} and all their shops now? Their orders stay. The account could open a new shop later.`, { danger: true, confirmText: 'Remove' }))) return;
@@ -243,9 +238,8 @@ export default function SellersPanel({ orders = [], products = [], isDarkMode, f
                       <a href={`${window.location.origin}/${(r.shop && r.shop.handle) || r.slug}`} target="_blank" rel="noopener noreferrer" className={`${btn} border border-gray-400`}>Open link</a>
                       <button type="button" onClick={() => { setViewing({ uid: r.uid, email: r.email || '', name: r.name || '' }); try { window.scrollTo({ top: 0 }); } catch (e) { /* old browser */ } }} className={`${btn} border border-[#D4AF37] text-[#B8921F]`}>View dashboard</button>
                       <button type="button" disabled={busy === r.uid} onClick={() => pay(r)} className={`${btn} bg-green-600 text-white disabled:opacity-50`}>Mark as paid</button>
-                      {r.shop && (r.shop.killed
-                        ? <button type="button" disabled={busy === r.uid} onClick={() => act(r.uid, () => reviveSellerShop(r.slug), 'Page on: the shop is live again.')} className={`${btn} border border-green-600 text-green-600 disabled:opacity-50`}>Page on</button>
-                        : <button type="button" disabled={busy === r.uid} onClick={() => kill(r)} className={`${btn} bg-red-600 text-white disabled:opacity-50`}>Page off</button>)}
+                      {/* no Page off any more (an inactive or rule-breaking shop is removed); an old killed shop can still be opened */}
+                      {r.shop && r.shop.killed && <button type="button" disabled={busy === r.uid} onClick={() => act(r.uid, () => reviveSellerShop(r.slug), 'Page on: the shop is live again.')} className={`${btn} border border-green-600 text-green-600 disabled:opacity-50`}>Page on</button>}
                       <button type="button" disabled={busy === r.uid} onClick={() => remove(r)} className={`${btn} border border-red-500 text-red-500 disabled:opacity-50`}>Remove</button>
                     </div>
                   </div>

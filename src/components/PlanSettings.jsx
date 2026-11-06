@@ -112,7 +112,7 @@ export default function PlanSettings({ isDarkMode, staff, formatPrice }) {
             </label>
           ))}
         </div>
-        <p className="text-[11px] text-gray-500">1 to 5. Every new shop waits for your approval (Sellers tab). On Basic, the {preview.freeLimit} products count across all shops.</p>
+        <p className="text-[11px] text-gray-500">1 to 5. A new shop goes live at once (you get a notification). On Basic, the {preview.freeLimit} products count across all shops.</p>
       </div>
 
       {/* what each plan gets: ON / OFF per plan (a shop can still be switched one by one in Plan Members) */}

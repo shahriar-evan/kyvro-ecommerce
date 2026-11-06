@@ -407,11 +407,13 @@ service cloud.firestore {
                 // the store's basicFree is the application's (which the sellers/{uid} rule checks against settings/plans)
                 && request.resource.data.get('basicFree', true) == getAfter(sellerPath(request.auth.uid)).data.get('basicFree', true)
                 && sellersOpen() && sellerNameOk(request.resource.data.name, slug))
-            // an approved seller asks for one more shop (extra): OFF and 'pending' until the Owner approves it; the shop
-            // is added to sellers/{uid}.shops in the same batch, within the plan's shop limit (checked there)
+            // an approved seller opens one more shop (extra): live at once (on + 'approved'; the older flow off + 'pending'
+            // still works). The shop is added to sellers/{uid}.shops in the same batch, within the plan's shop limit
+            // (checked there: Basic 1 / Pro 2 / Premium 3)
             || (signedIn() && !isStaff() && request.resource.data.get('kind', '') == 'seller'
                 && request.resource.data.get('extra', false) == true
-                && request.resource.data.active == false && request.resource.data.status == 'pending'
+                && ((request.resource.data.active == true && request.resource.data.status == 'approved')
+                    || (request.resource.data.active == false && request.resource.data.status == 'pending'))
                 && exists(sellerPath(request.auth.uid))
                 && get(sellerPath(request.auth.uid)).data.get('status', 'approved') == 'approved'
                 && !(slug in get(sellerPath(request.auth.uid)).data.get('shops', [get(sellerPath(request.auth.uid)).data.slug]))
@@ -447,7 +449,15 @@ service cloud.firestore {
             || (signedIn() && !isStaff() && resource.data.get('kind', '') == 'seller'
                 && resource.data.ownerUid == request.auth.uid
                 && resource.data.get('killed', false) != true
-                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'theme', 'themeMode', 'logoRequest', 'logoPending', 'logoPendingAt', 'logoReject', 'bannerPending', 'bannerPendingAt', 'bannerReject', 'handle', 'handleChangedAt', 'autoName', 'logo', 'banner'])
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'theme', 'themeMode', 'logoRequest', 'logoPending', 'logoPendingAt', 'logoReject', 'bannerPending', 'bannerPendingAt', 'bannerReject', 'handle', 'handleChangedAt', 'autoName', 'logo', 'banner', 'active', 'inactiveHold'])
+                // the seller switches their own approved shop ON / OFF (also after it was switched off or hidden for
+                // inactivity). Not a killed shop (Page off: only the Owner) and not one waiting for approval.
+                // inactiveHold can only be cleared, never set.
+                && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['active', 'inactiveHold'])
+                    || (resource.data.get('status', 'approved') == 'approved'
+                        && request.resource.data.get('killed', false) != true
+                        && request.resource.data.active is bool
+                        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['inactiveHold']) || request.resource.data.inactiveHold == false)))
                 && shopExtrasOk()
                 && sellerSizeOk(slug)));
       // the Owner deletes a shop (also what "Reject" does with a request)

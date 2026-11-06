@@ -148,8 +148,9 @@ export async function requestSellerShop({ uid, seller, handle, categories }) {
     // same as the seller's first store (an account that opened while Basic was free stays free)
     basicFree: !(seller && seller.basicFree === false),
     categories: (Array.isArray(categories) ? categories : []).map((c) => String(c).slice(0, 60)).slice(0, 20),
-    active: false,
-    status: "pending",
+    // live at once (within the plan's shop limit); the Owner just gets a notification
+    active: true,
+    status: "approved",
     items: {},
     createdAt: serverTimestamp(),
     updatedAt: new Date().toISOString(),

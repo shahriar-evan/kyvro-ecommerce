@@ -279,7 +279,7 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
           </div>
         )}
         {(plan === 'pro' || plan === 'premium') && !seller && <p className="text-xs p-3 rounded border border-[#D4AF37]/50 text-[#D4AF37] bg-[#D4AF37]/10 font-semibold">{TIER_LABEL[plan]} plan: your shop opens on the Basic plan; pay right after from the plan card in My Shop to switch on {TIER_LABEL[plan]}.</p>}
-        <p className="text-xs text-gray-500">Open your own shop link with Kyvro products, set your price (within the limit) and earn the markup on delivered orders. Kyvro takes the payment and delivers every order. Your first shop goes live right away (more shops on Pro / Premium are checked by Kyvro first). Shops not visited for 30 days are removed. We never ask for NID, passport or bank details.</p>
+        <p className="text-xs text-gray-500">Open your own shop link with Kyvro products, set your price (within the limit) and earn the markup on delivered orders. Kyvro takes the payment and delivers every order. Your shop goes live right away (Pro: 2 shops, Premium: 3, each live at once). Shops not visited for 30 days are removed. We never ask for NID, passport or bank details.</p>
         <div className="grid sm:grid-cols-2 gap-3">
           {/* shop link name (any plan) + the shop name shown on the website (Premium) */}
           <label className="block text-xs font-semibold text-gray-500">Shop link *
@@ -428,7 +428,7 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
       setNsBusy(true);
       try {
         if (await handleTaken(h)) setNsMsg({ type: 'err', text: `kyvro.store/${h} is already taken. Try another one.` });
-        else { await requestSellerShop({ uid, seller, handle: h, categories: nsCats }); setNsMsg({ type: 'ok', text: `Sent. kyvro.store/${h} goes live after Kyvro approves it.` }); setNsHandle(''); setNsCats([]); setNsOpen(false); }
+        else { await requestSellerShop({ uid, seller, handle: h, categories: nsCats }); setNsMsg({ type: 'ok', text: `Done! kyvro.store/${h} is live. Switch to it to choose its products.` }); setNsHandle(''); setNsCats([]); setNsOpen(false); }
       } catch (e) { setNsMsg({ type: 'err', text: e.code === 'permission-denied' ? 'Could not send: your plan allows no more shops, or the link is taken.' : e.message }); }
       setNsBusy(false);
     };
@@ -469,7 +469,7 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
               </div>
             </div>
             <button type="button" disabled={nsBusy} onClick={sendShop} className={`${GOLD_BTN} w-full sm:w-auto`}>{nsBusy ? 'Sending...' : 'Send shop request'}</button>
-            <p className="text-[11px] text-gray-500">Kyvro checks every new shop; it goes live after approval.</p>
+            <p className="text-[11px] text-gray-500">The new shop goes live at once. Blocked words and big brand names are not allowed in the link.</p>
           </div>
         )}
       </div>
@@ -746,7 +746,7 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
       )}
       {/* read-only: a disabled fieldset switches off every button and field inside it (the menu on the left still works) */}
       {ro ? <fieldset disabled className="min-w-0 m-0 p-0 border-0 space-y-5">{before}</fieldset> : before}
-      <MyShop view={shopView} readOnly={ro} asUid={ro ? viewAs.uid : ''} sellerMode showPlan={approved} adminRole="seller" isOwner={false} products={products} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={customerUser.displayName || email} loggedInUserEmail={email} />
+      <MyShop onUpgrade={goPlans} view={shopView} readOnly={ro} asUid={ro ? viewAs.uid : ''} sellerMode showPlan={approved} adminRole="seller" isOwner={false} products={products} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={customerUser.displayName || email} loggedInUserEmail={email} />
     </SellerDashLayout>
   );
 }

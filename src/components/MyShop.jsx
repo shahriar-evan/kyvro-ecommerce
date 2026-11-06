@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { auth } from '../firebase';
-import { watchMyShop, watchMyShops, watchAllShops, watchShopOwners, createShop, saveShopItems, saveShopName, shopNameTaken, setShopActive, isPendingShop, acceptShop, rejectShop, shopLinkKey, cleanHandle, HANDLE_RE, handleTaken, setShopHandle, nextHandleChange } from '../shops';
+import { watchMyShop, watchMyShops, watchAllShops, watchShopOwners, createShop, saveShopItems, saveShopName, shopNameTaken, setShopActive, isPendingShop, acceptShop, rejectShop, shopLinkKey, cleanHandle, HANDLE_RE, handleTaken, setShopHandle, nextHandleChange, setMyShopLive } from '../shops';
 import { askConfirm } from './AlertCenter';
 import { maxMarkupFor, shopPriceClamp, SHOP_COLLECTIONS, productInCollection } from '../data/shopConfig';
 import { flatSubCategories, subLabel } from '../data/catalog';
 import { watchPlans, watchMySubscription } from '../storeSettings';
-import { normalizePlans, toMillis, SHOP_MAX_ITEMS, effectiveTier, TIER_LABEL, basicCharging, basicDue, basicPrice } from '../data/priceCheck';
+import { normalizePlans, toMillis, SHOP_MAX_ITEMS, effectiveTier, TIER_LABEL, basicCharging, basicDue, basicPrice, visibleShopIds } from '../data/priceCheck';
 import PlanCards from './PlanCards';
 import ShopExtrasEditor from './ShopExtrasEditor';
 import { GOLD_BTN, OUTLINE_BTN, GHOST_BTN } from './ui';
@@ -48,7 +48,7 @@ function ShopSwitch({ on, busy, onToggle, isDarkMode, label }) {
 // view (seller dashboard): 'all' (default), 'products', 'manage', 'theme', 'plan' or 'none' (stays mounted so unsaved ticks survive)
 // readOnly + asUid: the Owner viewing a seller's dashboard (every control disabled, the seller's shops read by uid)
 // part (Owner only): 'own' = just my own shop (Admin -> My Shop); 'all' = my shop first, then the Team Shops list
-export default function MyShop({ part = 'all', view = 'all', readOnly = false, asUid = '', sellerMode = false, showPlan = true, canCreateShop = false, adminRole, products, isOwner, isDarkMode, formatPrice, adminName, loggedInUserEmail, onDirtyChange }) {
+export default function MyShop({ part = 'all', view = 'all', readOnly = false, asUid = '', sellerMode = false, showPlan = true, canCreateShop = false, adminRole, products, isOwner, isDarkMode, formatPrice, adminName, loggedInUserEmail, onDirtyChange, onUpgrade = null }) {
   const [shop, setShop] = useState(undefined); // undefined = loading, null = none yet
   const [draft, setDraft] = useState({}); // productId -> price text (only the products that are in the shop)
   const [name, setName] = useState('');
@@ -150,6 +150,14 @@ export default function MyShop({ part = 'all', view = 'all', readOnly = false, a
   const otherItems = sellerMode && shop && myShops ? myShops.filter((x) => x.slug !== shop.slug).reduce((n, x) => n + Object.keys(x.items || {}).length, 0) : 0;
   const cap = Math.max(planLimit === SHOP_MAX_ITEMS ? planLimit : Math.max(0, planLimit - otherItems), Object.keys(savedItems).length);
   const daysLeft = paidUntil ? Math.ceil((paidUntil - Date.now()) / 86400000) : null;
+  // Pro / Premium ended (Basic now): the shop keeps every product, but customers see only the best sellers up to the
+  // Basic limit. The seller still sees the others, marked locked, with Upgrade to unlock them.
+  const visibleNow = shop && !isOwner ? visibleShopIds(shop, Object.fromEntries((products || []).map((p) => [String(p.id), p])), plans) : null;
+  const isLocked = (id) => !!visibleNow && savedItems[id] !== undefined && !visibleNow.has(String(id));
+  const lockedCount = visibleNow ? Object.keys(savedItems).filter((id) => !visibleNow.has(String(id))).length : 0;
+  const upgradeBtn = (label = 'Upgrade to unlock') => (onUpgrade && !readOnly
+    ? <button type="button" onClick={onUpgrade} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#D4AF37] text-black text-[11px] font-bold uppercase tracking-wider hover:opacity-90">🔓 {label}</button>
+    : null);
   // paid Basic: only a seller store opened while Basic was charged (basicFree false), while Basic costs something and
   // no Pro / Premium runs. Not paid (or ended) = the store is closed to customers until paid.
   const basicUntil = Math.max(toMillis(sub && sub.basicUntil), toMillis(shop && shop.basicUntil));
@@ -524,9 +532,18 @@ export default function MyShop({ part = 'all', view = 'all', readOnly = false, a
           <p className="mt-1 text-[11px] opacity-80">Please fix this soon, otherwise the shop may be removed. Questions: kyvrofashion@gmail.com</p>
         </div>
       )}
-      {show('products', 'manage') && shop.inactiveHold && (
-        <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-4 text-xs text-amber-600 font-semibold">
-          This shop is hidden from customers because nobody signed in for a long time while it still has open orders or money due. Kyvro makes it live again after those are cleared.
+      {/* seller: switch the shop ON / OFF themselves (also after Kyvro switched it off or hid it for inactivity).
+          A killed shop (Page off) or one waiting for approval stays with Kyvro. */}
+      {show('manage') && sellerMode && shop.status !== 'pending' && !shop.killed && (
+        <div className={`rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${shop.active === false ? 'border-amber-500/50 bg-amber-500/10' : isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
+          <div className="text-xs">
+            <p className="font-bold text-sm">Shop {shop.active === false ? 'OFF' : 'ON'} · শপ {shop.active === false ? 'বন্ধ' : 'চালু'}</p>
+            <p className="text-gray-500 mt-0.5">{shop.active === false
+              ? (shop.inactiveHold ? 'Hidden because nobody signed in for a long time. Welcome back! Switch it on to open it to customers again. · অনেকদিন লগইন না করায় শপটি লুকানো ছিল, চালু করে দিন।' : 'Customers cannot open your shop now. Switch it on any time. · কাস্টমাররা এখন শপ দেখতে পারছে না, যেকোনো সময় চালু করুন।')
+              : 'Customers can open your shop. Switch it off to close it for a while (nothing is deleted). · দরকার হলে সাময়িক বন্ধ রাখুন, কিছু মুছবে না।'}</p>
+          </div>
+          <ShopSwitch on={shop.active !== false} busy={busy} isDarkMode={isDarkMode} label="Shop on or off"
+            onToggle={async () => { if (readOnly) return; setBusy(true); try { await setMyShopLive(shop.slug, shop.active === false); setMsg({ type: 'ok', text: shop.active === false ? 'Your shop is live again.' : 'Your shop is switched off.' }); } catch (e) { setMsg({ type: 'err', text: e.code === 'permission-denied' ? 'Could not change it. Please contact Kyvro.' : e.message }); } setBusy(false); }} />
         </div>
       )}
       {/* 1. the shop: link + name */}
@@ -573,6 +590,12 @@ export default function MyShop({ part = 'all', view = 'all', readOnly = false, a
         {goldLine}
         {sectionTitle('Products in my shop', 'Open a category to choose its products. Your ticks are kept until you press Save.')}
         <p className="text-[11px] text-gray-500">Customers who open your link see only the products you tick, at the price you type (up to the limit shown for each product). Everything above the store price is yours when the order is delivered. Payments and delivery stay with the store.</p>
+        {lockedCount > 0 && (
+          <div className="rounded-xl border border-[#D4AF37]/50 bg-[#D4AF37]/10 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            <span><strong>🔒 {lockedCount} product{lockedCount === 1 ? ' is' : 's are'} locked.</strong> Your plan is Basic now, so customers see only your {plans.freeLimit} best sellers. The locked ones are kept (marked 🔒 below). <span className="opacity-80">· প্ল্যান Basic হওয়ায় {lockedCount}টি পণ্য লক আছে; আপগ্রেড করলে আবার দেখাবে।</span></span>
+            {upgradeBtn()}
+          </div>
+        )}
         {cats.length === 0 ? <p className="text-sm text-gray-500">No live products yet.</p> : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
             {cats.map((c) => {
@@ -617,13 +640,15 @@ export default function MyShop({ part = 'all', view = 'all', readOnly = false, a
                     const on = draft[p.id] !== undefined;
                     const max = p.price + maxMarkupFor(p.price);
                     const val = Number(draft[p.id]);
+                    const locked = isLocked(p.id);
                     return (
-                      <div key={p.id} className="py-3 flex flex-wrap sm:flex-nowrap items-center gap-3">
+                      <div key={p.id} className={`py-3 flex flex-wrap sm:flex-nowrap items-center gap-3 ${locked ? 'opacity-70' : ''}`}>
                         <input type="checkbox" checked={on} onChange={() => toggle(p)} className="accent-[#D4AF37] w-5 h-5 shrink-0" aria-label={`Sell ${p.name}`} />
                         {p.image && <img src={p.image} alt="" className="w-12 h-12 object-cover rounded-lg border shrink-0" />}
                         <div className="min-w-0 flex-1">
-                          <p className="font-semibold line-clamp-2 sm:truncate">{p.name}</p>
+                          <p className="font-semibold line-clamp-2 sm:truncate">{locked && <span className="mr-1" title="Locked: customers do not see it on the Basic plan">🔒</span>}{p.name}</p>
                           <p className="text-gray-500">Store price {formatPrice(p.price)} · highest you can sell for {formatPrice(max)}</p>
+                          {locked && <p className="mt-1 flex flex-wrap items-center gap-2 text-[#B8921F] font-semibold">Locked · customers cannot see it on Basic {upgradeBtn('Unlock')}</p>}
                         </div>
                         {on && (
                           <div className="w-full sm:w-auto sm:text-right pl-8 sm:pl-0">
@@ -655,7 +680,7 @@ export default function MyShop({ part = 'all', view = 'all', readOnly = false, a
           {goldLine}
           {paidUntil > 0 && (daysLeft <= 0 || daysLeft <= plans.reminderDays) && (
             <div className={`rounded-xl border p-3 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${daysLeft <= 0 ? 'border-red-500/50 bg-red-500/10 text-red-500' : 'border-amber-500/50 bg-amber-500/10 text-amber-600'}`}>
-              <span className="font-semibold">{daysLeft <= 0 ? `Your paid plan ended on ${fmtDate(paidUntil)}. Your shop now shows only its ${plans.freeLimit} best sellers; the others are hidden, not deleted.` : `Your paid plan ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'} (${fmtDate(paidUntil)}).`}</span>
+              <span className="font-semibold">{daysLeft <= 0 ? `Your paid plan ended on ${fmtDate(paidUntil)}. Your shop now shows only its ${plans.freeLimit} best sellers; the others are locked (🔒, kept, not deleted) until you renew.` : `Your paid plan ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'} (${fmtDate(paidUntil)}).`}</span>
               <button type="button" disabled={!!paying} onClick={() => buyPlan(sub && sub.tier === 'premium' ? 'premium' : 'pro')} className={`${GOLD_BTN} !py-1.5`}>{paying ? 'Opening...' : 'Renew'}</button>
             </div>
           )}

@@ -189,6 +189,10 @@ export const removeLogo = (slug) => updateDoc(doc(db, "shops", slug), { logo: de
 export const removeBanner = (slug) => updateDoc(doc(db, "shops", slug), { banner: deleteField(), updatedAt: new Date().toISOString() });
 export const approveLogo = (shop) => updateDoc(doc(db, "shops", shop.slug), { logo: shop.logoPending, logoPending: deleteField(), logoPendingAt: deleteField(), updatedAt: new Date().toISOString() });
 export const rejectLogo = (slug, note) => updateDoc(doc(db, "shops", slug), { logoPending: deleteField(), logoPendingAt: deleteField(), logoReject: { note: String(note || "").slice(0, 200), at: new Date().toISOString(), kind: "logo" }, updatedAt: new Date().toISOString() });
+// Owner: make a switched-off / killed / inactive-hidden shop live again in one go (the Preview bar's "Switch on")
+export const turnShopOn = (slug) => updateDoc(doc(db, "shops", slug), { active: true, killed: false, killNote: "", inactiveHold: false, updatedAt: new Date().toISOString() });
+// a seller switches their own approved shop ON / OFF (ON also clears an inactivity hide). Not a killed or waiting shop.
+export const setMyShopLive = (slug, on) => updateDoc(doc(db, "shops", slug), { active: !!on, ...(on ? { inactiveHold: false } : {}), updatedAt: new Date().toISOString() });
 export const setShopOn = (slug, on) => updateDoc(doc(db, "shops", slug), { active: !!on, updatedAt: new Date().toISOString() });
 
 // ---- Shop banner (Premium): uploaded banners wait for the Owner / a Manager like the logo ----
