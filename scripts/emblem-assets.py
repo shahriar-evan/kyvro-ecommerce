@@ -46,7 +46,11 @@ def emblem(height, kind):
 
 os.makedirs(os.path.join(ROOT, 'public', 'brand'), exist_ok=True)
 for kind in ('black', 'white', 'gold'):
-    emblem(192, kind).save(os.path.join(ROOT, 'public', 'brand', f'kyvro-emblem-{kind}.png'), optimize=True)
+    im = emblem(192, kind)
+    if kind == 'gold':
+        # 128 colours keep the metal look and make the file ~7x smaller (loads at once on a slow phone)
+        im = im.quantize(colors=128, method=Image.FASTOCTREE, dither=Image.NONE)
+    im.save(os.path.join(ROOT, 'public', 'brand', f'kyvro-emblem-{kind}.png'), optimize=True)
 
 
 def square(size, scale=0.74):
