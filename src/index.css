@@ -36,8 +36,8 @@
 [data-theme="minimal"] .font-serif { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; letter-spacing: -0.01em; }
 [data-theme="bold"] .font-serif { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-weight: 800; }
 
-/* Kyvro logo badge on the Minimal / Bold / Boutique store themes: black badge, gold hexagon, white notch
+/* Kyvro logo on the Minimal / Bold / Boutique store themes: gold hexagon; notch black in light mode, white in dark mode
    (Classic keeps black/white from KyvroMark). CSS wins over the SVG fill attributes. */
-[data-theme="minimal"] .kyvro-mark .km-badge, [data-theme="bold"] .kyvro-mark .km-badge, [data-theme="boutique"] .kyvro-mark .km-badge { fill: #000000; }
 [data-theme="minimal"] .kyvro-mark .km-hex, [data-theme="bold"] .kyvro-mark .km-hex, [data-theme="boutique"] .kyvro-mark .km-hex { fill: #C9A24B; }
-[data-theme="minimal"] .kyvro-mark .km-notch, [data-theme="bold"] .kyvro-mark .km-notch, [data-theme="boutique"] .kyvro-mark .km-notch { fill: #ffffff; }
+[data-theme="minimal"] .kyvro-mark .km-notch, [data-theme="bold"] .kyvro-mark .km-notch, [data-theme="boutique"] .kyvro-mark .km-notch { fill: #000000; }
+[data-theme="minimal"] .kyvro-mark.km-dark .km-notch, [data-theme="bold"] .kyvro-mark.km-dark .km-notch, [data-theme="boutique"] .kyvro-mark.km-dark .km-notch { fill: #ffffff; }
