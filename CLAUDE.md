@@ -125,7 +125,7 @@ After plan-setting changes, the Owner presses **Save plans** once. Vercel env: `
 
 ## Logo
 
-- Website logo = the **K emblem** (from Evan's logo picture): `src/components/KyvroMark.jsx` shows `public/brand/kyvro-emblem-gold.png` in light mode and `-white.png` in dark mode, on every theme (`-black.png` exists, unused). Bump `V` in KyvroMark when the pictures change (cache). Size it with a height class. Header: `KYVRO · কাইভ্রো` (HTML text) from 340px, only `KYVRO` below, only the logo under 320px.
+- Website logo = the **K emblem** (from Evan's logo picture): `src/components/KyvroMark.jsx` shows `public/brand/kyvro-emblem-black.png` in light mode (black text) and `-gold.png` in dark mode (gold text: header, footer, mobile menu, dashboard menu), on every theme (`-white.png` exists, unused). Bump `V` in KyvroMark when the pictures change (cache). Size it with a height class. Header: `KYVRO · কাইভ্রো` (HTML text) from 340px, only `KYVRO` below, only the logo under 320px.
 - `scripts/emblem-assets.py` makes the emblem PNGs (smoothed edges, from `scripts/emblem-source.png`) plus `apple-touch-icon.png` and `kyvro-icon.png` (share + push: gold emblem on black).
 - The **favicon stays the hexagon** (`scripts/brand-assets.py`: `favicon.svg`, 16/32 PNG, `public/brand` hexagon icons, lockups, round badges); the emblem is too detailed for 16 / 32 px.
 
