@@ -11,11 +11,15 @@ import { FEATURES, featureDefault, featureLockedFree } from '../data/shopBrand';
 // Plan Members (Owner and Managers): every shop with its plan, and per feature Default / ON / OFF.
 // Owner only: a plan by hand (comp), the seller's private details and the kill switch. A Manager can switch features,
 // decide logos and switch shops on or off, but not on their own shop (the rules check all of this too).
-export default function PlanMembers({ isOwner, isDarkMode }) {
+// title / hideUid: the Owner's Team Shops page uses this list for every shop, without the Owner's own shop (that one is
+// on Admin -> My Shop). kind filter: all shops / team shops / seller shops.
+export default function PlanMembers({ isOwner, isDarkMode, title = 'Plan Members', hideUid = '' }) {
   const [shops, setShops] = useState([]);
   const [owners, setOwners] = useState({});
   const [sellers, setSellers] = useState([]);
   const [filter, setFilter] = useState('All');
+  const [kind, setKind] = useState('all');
+  const [copied, setCopied] = useState('');
   const [q, setQ] = useState('');
   const [open, setOpen] = useState('');
   const [draft, setDraft] = useState({});
@@ -40,7 +44,11 @@ export default function PlanMembers({ isOwner, isDarkMode }) {
     return { ...s, seller, member, tier, until, expired: !!until && until <= Date.now() };
   }), [shops, sellers, owners]);
 
-  const shown = rows.filter((r) => {
+  const listed = rows.filter((r) => !(hideUid && r.ownerUid === hideUid));
+  const counts = { all: listed.length, team: listed.filter((r) => r.kind !== 'seller').length, seller: listed.filter((r) => r.kind === 'seller').length };
+  const shown = listed.filter((r) => {
+    if (kind === 'team' && r.kind === 'seller') return false;
+    if (kind === 'seller' && r.kind !== 'seller') return false;
     if (filter === 'Free' && r.tier !== 'free') return false;
     if (filter === 'Pro' && r.tier !== 'pro') return false;
     if (filter === 'Premium' && r.tier !== 'premium') return false;
@@ -76,8 +84,14 @@ export default function PlanMembers({ isOwner, isDarkMode }) {
     <div className="space-y-5">
       <div className={card}>
         <div>
-          <h3 className="text-lg font-bold">Plan Members</h3>
-          <p className="text-xs text-gray-500 mt-1">Every shop (sellers and team) with its plan. Open one to switch features ON or OFF, decide its logo or switch the shop on or off.{isOwner ? ' Only you can give a plan by hand, see sellers’ details and use the kill switch.' : ''}</p>
+          <h3 className="text-lg font-bold">{title}</h3>
+          <p className="text-xs text-gray-500 mt-1">Every shop (team and sellers) with its plan{hideUid ? ' (your own shop is under My Shop)' : ''}. Open one to see its link, switch features ON or OFF, decide its logo / banner or switch the shop on or off.{isOwner ? ' Only you can give a plan by hand, see sellers’ details and remove a shop.' : ''}</p>
+        </div>
+        {/* team shops and seller shops apart */}
+        <div className={`inline-flex rounded-lg border p-0.5 text-[11px] font-bold uppercase tracking-wider ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>
+          {[['all', 'All shops'], ['team', 'Team'], ['seller', 'Sellers']].map(([k, l]) => (
+            <button key={k} type="button" onClick={() => setKind(k)} className={`px-3 py-1.5 rounded-md ${kind === k ? 'bg-black text-[#D4AF37]' : 'text-gray-500'}`}>{l} ({counts[k]})</button>
+          ))}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {['All', 'Free', 'Pro', 'Premium', 'Expired'].map((f) => (
@@ -114,6 +128,10 @@ export default function PlanMembers({ isOwner, isDarkMode }) {
             <div>
               <h3 className="text-lg font-bold">{cur.name} {tierBadge(cur.tier)}</h3>
               <p className="text-xs text-gray-500 break-all">{window.location.origin}/{cur.handle || cur.slug} · {Object.keys(cur.items || {}).length} products</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <a href={`${window.location.origin}/${cur.handle || cur.slug}`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded border border-gray-400 text-xs font-semibold">Open link</a>
+                <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(`${window.location.origin}/${cur.handle || cur.slug}`); setCopied(cur.slug); setTimeout(() => setCopied(''), 1500); } catch (e) { /* old browser */ } }} className="px-3 py-1.5 rounded border border-gray-400 text-xs font-semibold">{copied === cur.slug ? 'Copied' : 'Copy link'}</button>
+              </div>
             </div>
             <button type="button" onClick={() => setOpen('')} className="text-xs underline text-gray-500">Close</button>
           </div>

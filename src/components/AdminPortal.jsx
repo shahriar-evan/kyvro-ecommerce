@@ -1,3 +1,4 @@
+import { auth } from '../firebase';
 import React from 'react';
 import { askConfirm } from './AlertCenter';
 import AdminLogin from './AdminLogin';
@@ -300,7 +301,8 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                   ...(isOwner ? [{ key: 'own-shop', label: 'My Shop', icon: ShoppingBasket }] : []),
                   { key: 'my-shop', label: isOwner ? 'Team Shops' : adminRole === 'manager' || adminCanCreateShop ? 'My Shop' : 'Shops', icon: Store, count: isOwner ? pendingShops : 0 },
                   ...(isOwner ? [{ key: 'sellers', label: 'Sellers', icon: UserCheck, count: pendingSellers }] : []),
-                  ...(canManageTeam ? [{ key: 'plan-members', label: 'Plan Members', icon: Gem }] : []),
+                  // the Owner has every shop under Team Shops; a Manager keeps Plan Members
+                  ...(canManageTeam && !isOwner ? [{ key: 'plan-members', label: 'Plan Members', icon: Gem }] : []),
                   ...(canManageTeam ? [{ key: 'admins', label: isOwner ? 'Manage Admins' : 'Add Admin', icon: ShieldCheck }] : []),
                 ] },
                 ...(isOwner ? [{ title: 'Settings', items: [{ key: 'settings', label: 'Banner & Discount', icon: Settings }, { key: 'theme', label: 'Store Theme', icon: Palette }] }] : []),
@@ -713,7 +715,13 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
               )}
 
               {adminTab === 'own-shop' && isOwner && <MyShop part="own" onDirtyChange={(d) => { shopDirty.current = d; }} canCreateShop={adminCanCreateShop} adminRole={adminRole} products={products} isOwner={isOwner} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} />}
-              {adminTab === 'my-shop' && <MyShop onDirtyChange={(d) => { shopDirty.current = d; }} canCreateShop={adminCanCreateShop} adminRole={adminRole} products={products} isOwner={isOwner} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} />}
+              {adminTab === 'my-shop' && isOwner && (
+                <div className="space-y-5">
+                  <MyShop part="requests" adminRole={adminRole} products={products} isOwner={isOwner} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} />
+                  <PlanMembers isOwner isDarkMode={isDarkMode} title="Team Shops" hideUid={auth.currentUser ? auth.currentUser.uid : ''} />
+                </div>
+              )}
+              {adminTab === 'my-shop' && !isOwner && <MyShop onDirtyChange={(d) => { shopDirty.current = d; }} canCreateShop={adminCanCreateShop} adminRole={adminRole} products={products} isOwner={isOwner} isDarkMode={isDarkMode} formatPrice={formatPrice} adminName={adminName} loggedInUserEmail={loggedInUserEmail} />}
 
               {adminTab === 'my-products' && <MyProducts products={products} loggedInUserEmail={loggedInUserEmail} isDarkMode={isDarkMode} formatPrice={formatPrice} startEditProduct={startEditProduct} canEditProduct={canEditProduct} />}
 
