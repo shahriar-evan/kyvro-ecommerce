@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { ChevronRight } from 'lucide-react';
 import { auth } from '../firebase';
 import { askConfirm, askInput } from './AlertCenter';
 import { watchAllShops, watchShopOwners, setShopFeatures, grantLogo, denyLogoRequest, approveLogo, rejectLogo, setShopOn, approveBanner, rejectBanner } from '../shops';
@@ -80,14 +81,14 @@ export default function PlanMembers({ isOwner, isDarkMode }) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {['All', 'Free', 'Pro', 'Premium', 'Expired'].map((f) => (
-            <button key={f} type="button" onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded text-[11px] font-bold uppercase tracking-wider ${filter === f ? 'bg-[#D4AF37] text-black' : isDarkMode ? 'bg-[#222] text-gray-300' : 'bg-gray-200 text-gray-700'}`}>{f}</button>
+            <button key={f} type="button" onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded text-[11px] font-bold uppercase tracking-wider ${filter === f ? 'bg-[#D4AF37] text-black' : isDarkMode ? 'bg-[#222] text-gray-300' : 'bg-gray-200 text-gray-700'}`}>{f === 'Free' ? 'Basic' : f}</button>
           ))}
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search shop or name" className={`${inputCls} flex-1 min-w-[10rem]`} />
         </div>
         {shown.length === 0 ? <p className="text-sm text-gray-500">No shops.</p> : (
           <div className="divide-y text-xs">
             {shown.map((r) => (
-              <button key={r.slug} type="button" onClick={() => setOpen(open === r.slug ? '' : r.slug)} className={`w-full text-left py-3 flex flex-wrap items-center justify-between gap-2 ${open === r.slug ? 'bg-[#D4AF37]/5' : ''}`}>
+              <button key={r.slug} type="button" onClick={() => setOpen(open === r.slug ? '' : r.slug)} aria-expanded={open === r.slug} title="Open details" className={`group w-full text-left py-3 px-2 -mx-2 rounded flex flex-wrap items-center justify-between gap-2 transition ${open === r.slug ? 'bg-[#D4AF37]/5' : 'hover:bg-gray-500/5'}`}>
                 <span className="min-w-0">
                   <span className="font-bold">{r.name || r.slug}</span> <span className="text-gray-500">· {r.member || '-'}{r.kind === 'seller' ? ' (seller)' : ''}</span>
                   {r.logoPending && <span className="ml-2 px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold">Logo to approve</span>}
@@ -98,6 +99,8 @@ export default function PlanMembers({ isOwner, isDarkMode }) {
                   {tierBadge(r.tier)}
                   <span className="text-gray-500">{r.until ? (r.expired ? `expired ${new Date(r.until).toLocaleDateString('en-GB')}` : `until ${new Date(r.until).toLocaleDateString('en-GB')}`) : ''}</span>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${r.active === false ? 'bg-gray-400 text-white' : 'bg-green-600 text-white'}`}>{r.killed ? 'KILLED' : r.status === 'pending' ? 'PENDING' : r.active === false ? 'OFF' : 'ON'}</span>
+                  {/* arrow: the row opens the shop's details below */}
+                  <ChevronRight size={16} aria-hidden="true" className={`shrink-0 text-gray-400 group-hover:text-[#B8921F] transition-transform ${open === r.slug ? 'rotate-90 text-[#B8921F]' : ''}`} />
                 </span>
               </button>
             ))}

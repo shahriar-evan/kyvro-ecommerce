@@ -5,7 +5,7 @@ import { GOLD_BTN } from './ui';
 
 // A small drawing of each theme's home page for its card (no screenshots, so it never goes out of date)
 function Thumb({ theme, dark }) {
-  const bg = dark ? 'bg-[#141414]' : theme === 'boutique' ? 'bg-[#FBF7F0]' : 'bg-white';
+  const bg = dark || theme === 'luxe' ? 'bg-[#141414]' : theme === 'boutique' ? 'bg-[#FBF7F0]' : 'bg-white';
   const ink = dark ? 'bg-gray-500' : 'bg-gray-800';
   const soft = dark ? 'bg-gray-700' : 'bg-gray-200';
   const photo = 'bg-gradient-to-br from-[#c9a35a] via-[#8a6d3b] to-[#3b2f1d]';
@@ -32,6 +32,27 @@ function Thumb({ theme, dark }) {
         <div className={`h-8 rounded-xl ${photo}`} />
         <div className="flex justify-center gap-1">{[0, 1, 2, 3, 4].map((i) => <span key={i} className={`h-4 w-4 rounded-full ${photo} ring-1 ring-[#D4AF37]/60`} />)}</div>
         <div className="grid grid-cols-3 gap-1">{[0, 1, 2].map((i) => <span key={i} className={`h-5 rounded-lg ${photo} opacity-80`} />)}</div>
+      </>)}
+      {theme === 'editorial' && (<>
+        <div className="grid grid-cols-2 gap-1"><div className="flex flex-col gap-0.5 justify-center"><span className={`h-2 w-9 ${ink}`} /><span className={`h-2 w-7 ${ink}`} /><span className="h-2 w-8 bg-[#B8921F]" /></div><span className={`h-12 ${photo}`} /></div>
+        {[0, 1].map((i) => <div key={i} className={`flex items-center gap-1 border-b ${dark ? 'border-gray-700' : 'border-gray-300'} pb-0.5`}><span className={`h-1 w-1.5 ${soft}`} /><span className={`h-1.5 flex-1 ${ink} opacity-70`} /><span className={`h-3 w-3 ${photo}`} /></div>)}
+        <div className="grid grid-cols-3 gap-1">{[0, 1, 2].map((i) => <span key={i} className={`${i === 1 ? 'h-5' : 'h-4'} ${photo} opacity-80`} />)}</div>
+      </>)}
+      {theme === 'street' && (<>
+        <div className="h-10 bg-black relative"><span className="absolute left-1 top-1 h-1.5 w-5 -rotate-6 bg-[#D4AF37]" /><span className="absolute left-1 bottom-1 h-2.5 w-16 bg-white" /></div>
+        <span className="h-1.5 bg-[#D4AF37]" />
+        <div className="grid grid-cols-6 gap-0.5">{[0, 1, 2, 3, 4, 5].map((i) => <span key={i} className={`aspect-square border ${dark ? 'border-white' : 'border-black'} ${photo}`} />)}</div>
+        <div className="grid grid-cols-4 gap-0.5">{[0, 1, 2, 3].map((i) => <span key={i} className={`h-4 border ${dark ? 'border-white' : 'border-black'}`} />)}</div>
+      </>)}
+      {theme === 'fresh' && (<>
+        <div className={`h-12 rounded-xl ${dark ? 'bg-[#13201b]' : 'bg-[#E8F3EE]'} p-1 grid grid-cols-2 gap-1`}><div className="flex flex-col gap-0.5 justify-center"><span className={`h-1.5 w-10 rounded ${ink}`} /><span className="h-1.5 w-6 rounded bg-[#2E8B6A]" /><span className="mt-0.5 h-1.5 w-7 rounded-full bg-[#2E8B6A]" /></div><span className={`rounded-lg ${photo}`} /></div>
+        <div className="flex gap-0.5">{[0, 1, 2, 3].map((i) => <span key={i} className={`h-2 w-7 rounded-full ${soft}`} />)}</div>
+        <div className="grid grid-cols-4 gap-1">{[0, 1, 2, 3].map((i) => <span key={i} className={`h-6 rounded-lg ${photo} opacity-80`} />)}</div>
+      </>)}
+      {theme === 'luxe' && (<>
+        <div className={`h-12 relative ${photo} opacity-90`}><span className="absolute inset-1 border border-[#D4AF37]" /><span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-1.5 w-12 bg-white/90" /></div>
+        <div className="flex justify-center gap-1">{[0, 1, 2, 3, 4].map((i) => <span key={i} className={`h-6 w-4 rounded-t-full border border-[#D4AF37]/70 ${photo}`} />)}</div>
+        <div className="grid grid-cols-4 gap-1">{[0, 1, 2, 3].map((i) => <span key={i} className={`h-4 border border-[#D4AF37]/50 ${photo} opacity-70`} />)}</div>
       </>)}
     </div>
   );

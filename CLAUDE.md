@@ -104,10 +104,10 @@ Per-member toggles on `admins/{email}` (default OFF): `addProducts`, `editAll`, 
 
 ## Storefront themes
 
-- Presets in `src/data/themes.js`: **Classic** (the original `HomeView`), **Minimal**, **Bold**, **Boutique** (`ThemedHome.jsx`), each with mode `auto` (visitor chooses) / `light` / `dark`. Only the home layout changes; other pages get small type changes via `[data-theme]` in `index.css`. Original designs; do not copy another site's themes.
+- Presets in `src/data/themes.js`: **Classic** (the original `HomeView`), **Minimal**, **Bold**, **Boutique**, **Editorial**, **Street**, **Fresh**, **Luxe** (`ThemedHome.jsx`; picker drawings in `ThemePicker.jsx` `Thumb`), each with mode `auto` (visitor chooses) / `light` / `dark`. Only the home layout changes; other pages get small type changes via `[data-theme]` in `index.css`. Original designs; do not copy another site's themes.
 - Which theme shows (`App.jsx`): `?themePreview=<key>&themeMode=<mode>` (preview, never saved) > the shop's own `theme` (non-Classic only with feature `themes`, else Classic) > `settings/theme` for the main site. A preview frame never reads or writes `sessionStorage.kyvro_shop`.
 - Picker `ThemePicker.jsx` (drawn thumbnails, mode buttons, Apply, preview iframe with Computer / Mobile 375px): Owner → Admin → Settings → Store Theme (main site, all themes); seller → Themes (per shop; Free can preview all but apply only Classic, "Upgrade to Pro"). Save: `src/themeStore.js`.
-- Rules: `settings/theme` Owner only, values from the 4 keys / 3 modes; shops `theme`/`themeMode` allowed for the shop's owner / seller with Classic always and the rest only with `paidFeatOn('themes', true)` (plan running + not switched off); `'themes'` is in the Manager's `features` key list. **Add a new theme key to `themes.js` AND both rule lists.**
+- Rules: `settings/theme` Owner only, values from the 8 keys / 3 modes; shops `theme`/`themeMode` allowed for the shop's owner / seller with Classic always and the rest only with `paidFeatOn('themes', true)` (plan running + not switched off); `'themes'` is in the Manager's `features` key list. **Add a new theme key to `themes.js` AND both rule lists.**
 
 ## Deploy order (every time `firestore.rules` changes)
 
