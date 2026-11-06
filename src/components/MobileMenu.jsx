@@ -44,10 +44,10 @@ export default function MobileMenu({ navHas = () => true, isDarkMode, setIsDarkM
         <div className={`kyvro-slide w-[85%] max-w-sm h-full flex flex-col justify-between shadow-2xl ${isDarkMode ? 'bg-[#121212] text-white' : 'bg-white text-black'}`}>
           <div>
             <div className={`flex justify-between items-center px-6 pt-6 pb-5 border-b ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
-              <div className="flex items-center gap-1.5 whitespace-nowrap leading-none">
+              <div className={`flex items-center gap-1.5 whitespace-nowrap leading-none ${isDarkMode ? 'text-[#D4AF37]' : 'text-black'}`}>
                 <KyvroMark dark={isDarkMode} title="Kyvro logo" className="h-8 w-auto shrink-0" />
                 <span className="relative top-[0.14em] text-2xl font-serif font-bold tracking-wide">KYVRO</span>
-                <span className="relative top-[0.14em] text-[#D4AF37] text-2xl" aria-hidden="true">&bull;</span>
+                <span className="relative top-[0.14em] text-2xl" aria-hidden="true">&bull;</span>
                 <span className="relative top-[0.14em] text-xl font-bold" lang="bn">কাইভ্রো</span>
               </div>
               <button onClick={close} aria-label="Close menu" className={`w-10 h-10 rounded-full flex items-center justify-center transition ${isDarkMode ? 'bg-white/10 text-gray-300 hover:bg-white/20' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
