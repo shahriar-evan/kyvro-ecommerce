@@ -108,7 +108,6 @@ export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mo
                     </div>
                   );
                 })()}
-                {free && price === 0 && cfg.discount > 0 && <p className={`text-[11px] mt-1.5 leading-snug ${muted}`}>{T.earlyFree}</p>}
               </div>
 
               <ul className={`mt-6 pt-6 border-t space-y-3.5 text-sm sm:text-[15px] ${line}`}>
