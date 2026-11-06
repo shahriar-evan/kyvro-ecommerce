@@ -9,7 +9,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 HEX = [(50, 6), (88, 28), (88, 72), (50, 94), (12, 72), (12, 28)]
 NOTCH = [(88, 28), (60, 50), (88, 72)]
-CUTS = [[(38, 0), (43, 0), (43, 100), (38, 100)], [(43, 0), (66, 0), (43, 40)], [(43, 100), (66, 100), (43, 60)]]
+CUTS = [[(37.5, 0), (44.5, 0), (44.5, 100), (37.5, 100)], [(44.5, 0), (66, 0), (44.5, 40)], [(44.5, 100), (66, 100), (44.5, 60)]]
+LINE = [(40.1, 11.73), (41.9, 10.69), (41.9, 89.31), (40.1, 88.27)]  # solid line in the middle of the straight cut, ends on the hexagon edge
 BLACK, WHITE, GOLD = '#000000', '#ffffff', '#C9A24B'
 pts = lambda p: ' '.join(f'{x},{y}' for x, y in p)
 
@@ -21,7 +22,7 @@ def mark(f, a, mid='k', dx=0, dy=0):
     """SVG elements of the mark; cuts are a mask so the background shows through."""
     cuts = ''.join(f'<polygon points="{pts(c)}" fill="#000"/>' for c in CUTS)
     return (f'<g transform="translate({dx} {dy})"><mask id="{mid}" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">'
-            f'<polygon points="{pts(HEX)}" fill="#fff"/>{cuts}<polygon points="{pts(NOTCH)}" fill="#000"/></mask>'
+            f'<polygon points="{pts(HEX)}" fill="#fff"/>{cuts}<polygon points="{pts(LINE)}" fill="#fff"/><polygon points="{pts(NOTCH)}" fill="#000"/></mask>'
             f'<polygon points="{pts(HEX)}" fill="{f}" mask="url(#{mid})"/><polygon points="{pts(NOTCH)}" fill="{a}"/></g>')
 
 
@@ -87,6 +88,7 @@ def png(size, f, a, bg=None, scale=1.0, rounded=0, crop=True):
     ld.polygon(tr(HEX), fill=f)
     for c in CUTS + [NOTCH]:
         ld.polygon(tr(c), fill=(0, 0, 0, 0))
+    ld.polygon([(x, y) for x, y in tr(LINE)], fill=f)
     ld.polygon(tr(NOTCH), fill=a)
     im.alpha_composite(layer)
     return im.resize((size, size), Image.LANCZOS)
