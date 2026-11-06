@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Smartphone, Landmark, Plus, Trash2, ShieldCheck } from 'lucide-react';
-import { BKASH_RE, cleanBank, bankProblem, saveSellerPayout } from '../sellers';
+import { BKASH_RE, cleanBank, bankProblem, cleanName, saveSellerPayout } from '../sellers';
 
 // Seller dashboard -> Earnings & Payout: where Kyvro sends the seller's markup. Up to 2 bKash numbers and up to 2 bank
 // accounts. Write only: the seller cannot read it back (only the Owner sees it in Sellers), so the form starts empty and
@@ -17,6 +17,7 @@ const BANK_FIELDS = [
 
 export default function PayoutForm({ uid, isDarkMode, disabled = false }) {
   const [bkash, setBkash] = useState(['', '']);
+  const [bkashName, setBkashName] = useState(['', '']);
   const [banks, setBanks] = useState([]);
   const [msg, setMsg] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -32,21 +33,25 @@ export default function PayoutForm({ uid, isDarkMode, disabled = false }) {
   const save = async () => {
     setMsg(null);
     const nums = bkash.map((n) => n.replace(/\D/g, ''));
+    const names = bkashName.map(cleanName);
     for (const [i, n] of nums.entries()) {
       if (n && !BKASH_RE.test(n)) { setMsg({ type: 'err', text: `bKash ${i + 1}: write an 11-digit number, e.g. 01712345678 / ১১ সংখ্যার বিকাশ নম্বর লিখুন` }); return; }
+      if (n && names[i].length < 2) { setMsg({ type: 'err', text: `bKash ${i + 1}: write the account name / বিকাশ অ্যাকাউন্টের নাম লিখুন` }); return; }
+      if (!n && names[i]) { setMsg({ type: 'err', text: `bKash ${i + 1}: write the number too / বিকাশ নম্বরও লিখুন` }); return; }
     }
     const list = banks.map(cleanBank);
     for (const [i, b] of list.entries()) {
       const p = bankProblem(b);
       if (p) { setMsg({ type: 'err', text: `Bank ${i + 1}: ${p}` }); return; }
     }
-    const [b1, b2] = nums.filter(Boolean);
+    const given = nums.map((n, i) => [n, names[i]]).filter(([n]) => n); // number 2 alone becomes number 1
+    const [[b1, n1] = [], [b2, n2] = []] = given;
     if (!b1 && !list.length) { setMsg({ type: 'err', text: 'Add a bKash number or a bank account. / একটি বিকাশ নম্বর বা ব্যাংক অ্যাকাউন্ট দিন।' }); return; }
     setSaving(true);
     try {
-      await saveSellerPayout(uid, { bkash: b1 || '', bkash2: b2 || '', banks: list });
-      setSaved({ bkash: [b1, b2].filter(Boolean).map((n) => `••••${n.slice(-3)}`), banks: list.map((b) => `${b.bank} ••••${b.account.slice(-4)}`) });
-      setBkash(['', '']); setBanks([]);
+      await saveSellerPayout(uid, { bkash: b1 || '', bkashName: n1 || '', bkash2: b2 || '', bkash2Name: n2 || '', banks: list });
+      setSaved({ bkash: given.map(([n, name]) => `••••${n.slice(-3)} (${name})`), banks: list.map((b) => `${b.bank} ••••${b.account.slice(-4)}`) });
+      setBkash(['', '']); setBkashName(['', '']); setBanks([]);
       setMsg({ type: 'ok', text: 'Saved. Only Kyvro can see it. / সেভ হয়েছে। শুধু Kyvro দেখতে পারবে।' });
     } catch (e) {
       setMsg({ type: 'err', text: e.code === 'permission-denied' ? 'Could not save. Open your shop first. / সেভ হয়নি। আগে দোকান খুলুন।' : e.message });
@@ -69,13 +74,16 @@ export default function PayoutForm({ uid, isDarkMode, disabled = false }) {
           <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#E2136E] text-white"><Smartphone size={16} /></span>
           bKash <span className={bn}>(বিকাশ, পার্সোনাল নম্বর)</span>
         </p>
-        <div className="grid sm:grid-cols-2 gap-3">
-          {[0, 1].map((i) => (
-            <label key={i} className={lab}>bKash number {i + 1}{i === 0 ? '' : ' (optional)'} <span className={bn}>· বিকাশ নম্বর {i === 0 ? '১' : '২ (ঐচ্ছিক)'}</span>
+        {[0, 1].map((i) => (
+          <div key={i} className={`grid sm:grid-cols-2 gap-3 ${i ? 'pt-3 border-t border-gray-500/15' : ''}`}>
+            <label className={lab}>bKash number {i + 1}{i === 0 ? '' : ' (optional)'} <span className={bn}>· বিকাশ নম্বর {i === 0 ? '১' : '২ (ঐচ্ছিক)'}</span>
               <input className={input} inputMode="numeric" maxLength={14} placeholder="017XXXXXXXX" value={bkash[i]} onChange={(e) => setBkash((l) => l.map((x, j) => (j === i ? e.target.value : x)))} />
             </label>
-          ))}
-        </div>
+            <label className={lab}>bKash account name{bkash[i].trim() ? ' *' : ''} <span className={bn}>· বিকাশ অ্যাকাউন্টের নাম{bkash[i].trim() ? ' (অবশ্যই)' : ''}</span>
+              <input className={input} maxLength={80} placeholder="Name on this bKash account" value={bkashName[i]} onChange={(e) => setBkashName((l) => l.map((x, j) => (j === i ? e.target.value : x)))} />
+            </label>
+          </div>
+        ))}
       </div>
 
       {/* bank accounts */}
