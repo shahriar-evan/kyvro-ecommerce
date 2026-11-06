@@ -91,6 +91,7 @@ Per-member toggles on `admins/{email}` (default OFF): `addProducts`, `editAll`, 
 ### Daily job (`api/plan.js?action=reminders`, cron)
 
 - Plan reminder emails (as before).
+- Customers (`api/_plan/nudges.js`): unpaid Pending orders (Online not Paid, or COD whose delivery charge had to be paid online and was not) get a phone + email reminder on day 1 and 3 (`payRemind`; link `/?pay=due&order=…`) and are **cancelled on day 7** (history line, `autoCancelledAt`). Carts left behind: signed-in customers' cart summary `users/{uid}.cart {n, name, at, shop}` (app writes on change) → phone notification on day 1 / 3 / 7 after the last change (`cartReminders/{uid}` server only; link `?cart=open`).
 - Inactive sellers (`lastSeenAt`, saved on sign-in): warning emails after 7, 15, 25 days. On day 30 (60 if the account paid before; never while a paid plan runs): no open orders and nothing due → shops, links and seller entry are removed; otherwise shops are hidden (`inactiveHold`) and the Owner is notified, then **Make live** after clearing.
 
 ## Dashboards
