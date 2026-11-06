@@ -11,7 +11,7 @@ Fashion dropshipping store for Bangladesh, prices in BDT. Owner: Evan (shahriare
 1. **Supplier data (name, cost, link, profit) is never shown to Admins or sellers**, in the UI or through Firestore rules. `productCosts`, `orderSupply` are Owner/Manager only; `productCommission.profit` exists so Admins see earnings without the cost.
 2. **Customer PII (name, phone, address) is never given to sellers.** Sellers see their orders only through `api/plan.js?action=seller-earnings` (order number, date, status, products, markup).
 3. **Seller WhatsApp / address / email are Owner only** (`sellers/{uid}`); Managers never read `sellers/`.
-4. **`tier` and `paidUntil` (on `subscriptions/{uid}` and on shops) are written only by the server** (`api/plan.js`). Never add them to a client-writable branch in `firestore.rules`.
+4. **`tier`, `paidUntil` and `basicUntil` (on `subscriptions/{uid}` and on shops) are written only by the server** (`api/plan.js`). Never add them to a client-writable branch in `firestore.rules`. `basicFree` is written once when a store opens (checked against `settings/plans`) and never changed by the client.
 5. **Vercel Hobby allows at most 12 serverless functions. We use 11.** Do not add files under `api/` that are not prefixed with `_`. New server work goes inside an existing function as `?action=` (`api/plan.js` or `api/shop-request-notify.js`), with the code in `api/_plan/` (files and folders starting with `_` are not functions).
 6. Links stored on shops must be `https://` only (no `javascript:` / `data:`); images are data URLs `data:image/(png|jpeg|webp);base64,...`.
 7. Do not commit, push or merge unless Evan asks. Work on a feature branch. Run `npx vite build` before saying a change is done. Never paste or print secrets.
@@ -24,7 +24,7 @@ Fashion dropshipping store for Bangladesh, prices in BDT. Owner: Evan (shahriare
 | **Owner** | fixed email in `src/adminEmails.js` and `isFixedOwner()` in rules (+ `admins` role owner) | everything; plan prices; comp plans; sellers' details; Page off / Page on (kill switch); Mark as paid; delete orders; read-only **View dashboard** of any seller; main site theme | – |
 | **Manager** | `admins/{email}` role manager | supplier data, profit; confirm orders; mark Delivered; Mark as returned; own shop (markup); see Admins' stats; Plan Members: feature ON/OFF, logo/banner approve, shop ON/OFF on others' shops | change own shop's features; switch on killed/pending shops; comp plans; seller details; Owner-only settings |
 | **Admin** | `admins/{email}` role admin | place / confirm orders; commission on own `soldBy` main-store sales; "Request delivered"; own shop only with "Shop create" ON (pending until Owner accepts; earns markup) | supplier data; mark Delivered or Paid; create shops without permission |
-| **Seller** | any signed-in customer not in `admins/` ("Sell on Kyvro") | first shop live at once, more shops by plan (Free 1 / Pro 2 / Premium 3, Owner approves extras); markup on delivered orders; plan Pro/Premium | supplier data; customer data; touching orders; writing `active`, `status`, `tier`, `paidUntil` |
+| **Seller** | any signed-in customer not in `admins/` ("Sell on Kyvro") | first shop live at once (or after paying Basic, see Plans), more shops by plan (Basic 1 / Pro 2 / Premium 3, Owner approves extras); markup on delivered orders; plan Pro/Premium | supplier data; customer data; touching orders; writing `active`, `status`, `tier`, `paidUntil`, `basicUntil`, `basicFree` (after create) |
 
 Per-member toggles on `admins/{email}` (default OFF): `addProducts`, `editAll`, `canApprove`, `canCreateShop`.
 
@@ -33,12 +33,12 @@ Per-member toggles on `admins/{email}` (default OFF): `addProducts`, `editAll`, 
 - `admins/{email}` team list; `adminPrivate/{email}` Owner-only details; `statsReset/{email}`.
 - `products/{id}` public (approved) / staff (all); `productCosts/{id}` Owner/Manager; `productCommission/{id}` staff.
 - `orders/{orderNumber}`: customer writes on create (validated); staff updates; fields `soldBy`, `shop`, `items[].basePrice`, `returned`, `cancelRequest`, `deliveredRequest`, `deliveredReject`. `orderSupply/{id}` Owner/Manager.
-- `shops/{slug}` public read. `slug` = fixed internal id (orders, earnings, payouts point at it; never changes). Team shops (`kind` missing/'team') and seller shops (`kind: 'seller'`). Fields: `name` (Website Name), `autoName` (no Website Name yet), `handle` (public link), `handleChangedAt`, `ownerUid`, `items{productId: price}`, `active`, `status` (pending/approved), `killed`, `extra` (seller's 2nd/3rd shop), `categories`, `inactiveHold`, `warning{note, at}`, `planExempt` (Owner's shop), `tier`, `paidUntil` (server), extras (`tagline`, `contactUrl`, `about`, `socialLinks`, `brandColor`, `announcement`, `pinnedItems`), `theme` + `themeMode` (storefront theme), `features{}` overrides, `logo*`, `banner*`.
+- `shops/{slug}` public read. `slug` = fixed internal id (orders, earnings, payouts point at it; never changes). Team shops (`kind` missing/'team') and seller shops (`kind: 'seller'`). Fields: `name` (Website Name), `autoName` (no Website Name yet), `handle` (public link), `handleChangedAt`, `ownerUid`, `items{productId: price}`, `active`, `status` (pending/approved), `killed`, `extra` (seller's 2nd/3rd shop), `categories`, `inactiveHold`, `warning{note, at}`, `planExempt` (Owner's shop), `tier`, `paidUntil`, `basicUntil` (server), `basicFree` (seller shops, set on create), extras (`tagline`, `contactUrl`, `about`, `socialLinks`, `brandColor`, `announcement`, `pinnedItems`), `theme` + `themeMode` (storefront theme), `features{}` overrides, `logo*`, `banner*`.
 - `shopHandles/{handle}` = `{slug, uid}`: unique public links + old aliases (public read; owner creates; only the Owner deletes).
 - `shopOwners/{slug}` team shops' owner email (Owner/Manager/self). Sellers do not get one.
-- `sellers/{uid}` seller application + private details (self + Owner): `slug` (first shop), `shops[]` (all shops), `lastSeenAt`, `inactiveWarn*` / `inactiveHoldAt` (server). `sellerPayout/{uid}` bKash (seller writes, Owner reads).
-- `subscriptions/{uid}` plan (server writes; self + Owner read); `subscriptionPayments/{invoiceId}` server only.
-- `payouts/{id}` Owner writes, member reads own. `settings/store`, `settings/plans` (+ `freeCategoryLimit`, `tierFeatures`, `shopLimits`), `settings/sellerRules`, `settings/theme` (main site `theme` + `themeMode`), `settings/sellerDash` (seller dashboard banner `banners[]` ≤ 3 × `{image ≤ 300 KB data URL, link https}`) public read, Owner write.
+- `sellers/{uid}` seller application + private details (self + Owner): `slug` (first shop), `shops[]` (all shops), `basicFree`, `lastSeenAt`, `inactiveWarn*` / `inactiveHoldAt` (server). `sellerPayout/{uid}` bKash (seller writes, Owner reads).
+- `subscriptions/{uid}` plan (server writes; self + Owner read): `tier`, `paidUntil`, `basicUntil`, reminder flags; `subscriptionPayments/{invoiceId}` server only.
+- `payouts/{id}` Owner writes, member reads own. `settings/store`, `settings/plans` (+ `freeCategoryLimit`, `tierFeatures`, `shopLimits`, `basic{price, discount, label, endsAt}`), `settings/sellerRules`, `settings/theme` (main site `theme` + `themeMode`), `settings/sellerDash` (seller dashboard banner `banners[]` ≤ 3 × `{image ≤ 300 KB data URL, link https}`) public read, Owner write.
 - `users/{uid}`, `subscribers/{email}`, `pushTokens/{token}`, `blockedPhones`, `blockedEmails`.
 
 ## Money
@@ -50,15 +50,20 @@ Per-member toggles on `admins/{email}` (default OFF): `addProducts`, `editAll`, 
 
 ## Plans and sellers
 
-- Tiers: **Free** (`freeLimit` products, default 10), **Pro** and **Premium** (up to 300). Prices in `settings/plans` (`pro`/`premium` `{price, discount}`), computed on the server (`planPrice`). Expired = Free: only the top `freeLimit` best sellers show; the rest are hidden, not deleted.
+- Tiers: **Basic** (internal tier id `free` everywhere in code, rules and data; only the shown name is Basic, `TIER_LABEL`; `freeLimit` products, default 10), **Pro** and **Premium** (up to 300). Prices in `settings/plans` (`pro`/`premium` `{price, discount}` max 90%), computed on the server (`planPrice`). Expired Pro/Premium = Basic: only the top `freeLimit` best sellers show; the rest are hidden, not deleted.
+- **Basic price** (`settings/plans.basic` `{price, discount 0-100, label, endsAt}`, Owner: Shop plans → Basic; `basicPrice`): the card shows list price, % off, the price, the label ("Launch offer" is translated) and "Offer ends …" (display only; the offer runs until the Owner changes the discount).
+- **Paid Basic** (`basicCharging(plans)` = plans on and Basic ≥ ৳1; same test in rules `basicFreeNow()`):
+  - At 100% off nobody pays. A store opened while Basic is ৳0 gets `basicFree: true` (sellers + shop, set on apply, rules check it) and stays free for good; stores from before this have no field = free. Extra stores copy the account's value.
+  - While Basic is charged, a new store gets `basicFree: false` and is closed to customers (`basicDue(shop, plans)` → hidden like a not-live shop, Preview bar for the owner, orders refused in `verifyOrderPrices`) until the seller pays Basic (`?action=init` `tier: 'basic'`, server price). Payment sets `subscriptions.basicUntil = max(now, basicUntil) + periodDays` once per invoice and copies it to the shops (`syncBasic`, also `?action=sync`). Renew every period, else closed again (nothing deleted). Daily reminders for Basic too.
+  - Back to 100% off = nobody pays (new or old). A running Pro / Premium includes Basic.
 - Payment: `api/plan.js?action=init` (tier priced on the server; no Pro while Premium runs) → UddoktaPay → `?action=callback` verifies and sets `paidUntil = max(now, paidUntil) + period` once per invoice → `syncShops` copies `tier`/`paidUntil` to shops. Reminders: daily cron `?action=reminders` (`vercel.json`, needs `CRON_SECRET`). Owner comp plans: `?action=comp`.
 - Features per shop: defaults by tier (`FEATURES` in `src/data/shopBrand.js`, `featOn()` in rules), changed per plan by the Owner (Shop plans → Plan features, `settings/plans.tierFeatures`) and per shop in Plan Members (`shops.features`). Free never gets Website Name, logo or banner (`paidFeatOn`).
-- Seller flow: Start selling → public pricing page → plan pick → Google sign-in → application (link, categories, socials). The **first shop is live at once** (any plan); the Owner gets a phone + email notification (`api/shop-request-notify.js?action=seller`). Not-live shops show a **Preview** banner to the team and the shop's owner; customers get 404.
+- Seller flow: Start selling → public pricing page → plan pick → Google sign-in → application (link, categories, socials). The **first shop is live at once** (any plan; while Basic is charged, after paying Basic: dashboard "Pay Basic"); the Owner gets a phone + email notification (`api/shop-request-notify.js?action=seller`). Not-live shops show a **Preview** banner to the team and the shop's owner; customers get 404.
 - Abuse controls: blocked words (`settings/sellerRules`) + big brand names (`BRAND_WORDS` in `src/sellers.js`, `brandRe()` in rules) in links and names, reserved links, "New sellers allowed" switch, **Page off** / **Page on** (= kill switch, `killed`; nothing deleted, only the Owner switches it back), Owner **Warning** (note on the shop + email, `api/plan.js?action=warn`), **Make live**, **Remove** per shop (Sellers tab).
 
 ### Plan features (defaults)
 
-| | Free | Pro | Premium |
+| | Basic (`free`) | Pro | Premium |
 |---|---|---|---|
 | Shops per account (`shopLimits`) | 1 | 2 | 3 |
 | Products | 10 (all shops together), max 3 categories | all | all |
@@ -106,6 +111,8 @@ Per-member toggles on `admins/{email}` (default OFF): `addProducts`, `editAll`, 
 
 ## Deploy order (every time `firestore.rules` changes)
 
+If the new app writes a field the live rules reject (e.g. a new key in a `hasOnly` list) and the new rules still accept the old app, publish the rules (from the PR branch, with Evan's OK) **before** merging; otherwise:
+
 1. Merge the PR on GitHub.
 2. Wait until the Vercel **Production** deployment is **Ready**.
 3. Publish `origin/main:firestore.rules` (not deployed by CI): Claude runs `firebase deploy --only firestore:rules --project kyvro-admin-auth` (dry-run first) **only after Evan's OK each time**, then diffs the live ruleset against main. Or Evan pastes the full file in Firebase Console → Firestore → Rules → Publish (check the editor is not empty).
@@ -115,6 +122,10 @@ Per-member toggles on `admins/{email}` (default OFF): `addProducts`, `editAll`, 
 If Vercel stops deploying from GitHub (no Vercel check on the PR): deploy a clean copy of main (`git archive origin/main` into a scratch dir + `.vercel/project.json`, then `vercel deploy --prod`) only with Evan's OK, so `.env.local` is never uploaded. All Vercel env vars are Production-only, so a preview's `/api` cannot work.
 
 After plan-setting changes, the Owner presses **Save plans** once. Vercel env: `FIREBASE_SERVICE_ACCOUNT`, `UDDOKTAPAY_BASE_URL`, `UDDOKTAPAY_API_KEY`, `RESEND_API_KEY`, `MAIL_FROM`, `CRON_SECRET` (+ SSLCommerz vars if used).
+
+## Logo
+
+`src/components/KyvroMark.jsx`: plain hexagon with a cut K and a solid middle line, no background; black in light mode, white in dark mode, gold notch; Minimal / Bold / Boutique themes: gold hexagon (`index.css`, `[data-theme] .kyvro-mark`). Header: `KYVRO · কাইভ্রো` from 340px, only `KYVRO` below, only the logo under 320px. `scripts/brand-assets.py` makes `public/favicon.svg` (+16/32 PNG), `apple-touch-icon.png`, `kyvro-icon.png` (share + push) and `public/brand/*` (icons, lockups, round badges for social profile pictures); change it together with KyvroMark.
 
 ## Key files
 
