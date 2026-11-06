@@ -319,7 +319,7 @@ service cloud.firestore {
         && (!changed.hasAny(['brandColor']) || (featOn('brandColor', false) && d.get('brandColor', '') in ['', 'gold', 'blue', 'green', 'red', 'purple', 'teal']))
         // storefront theme (src/data/themes.js): Classic on every plan; the other themes on Pro / Premium (never Free)
         && (!changed.hasAny(['theme', 'themeMode'])
-          || (d.get('theme', 'classic') in ['classic', 'minimal', 'bold', 'boutique']
+          || (d.get('theme', 'classic') in ['classic', 'minimal', 'bold', 'boutique', 'editorial', 'street', 'fresh', 'luxe']
               && d.get('themeMode', 'auto') in ['auto', 'light', 'dark']
               && (d.get('theme', 'classic') == 'classic' || paidFeatOn('themes', true))))
         && (!changed.hasAny(['announcement']) || (featOn('announcement', false) && d.get('announcement', '') is string && d.get('announcement', '').size() <= 100))
@@ -617,7 +617,7 @@ service cloud.firestore {
       // the main site's storefront theme (src/data/themes.js). Only the Owner.
       allow create, update: if docId == 'theme' && isOwner()
         && request.resource.data.keys().hasOnly(['theme', 'themeMode', 'updatedAt', 'updatedByName'])
-        && request.resource.data.theme in ['classic', 'minimal', 'bold', 'boutique']
+        && request.resource.data.theme in ['classic', 'minimal', 'bold', 'boutique', 'editorial', 'street', 'fresh', 'luxe']
         && request.resource.data.themeMode in ['auto', 'light', 'dark'];
       // Seller dashboard banner slides (max 3): picture as a data URL + optional https link. Only the Owner.
       allow create, update: if docId == 'sellerDash' && isOwner()
