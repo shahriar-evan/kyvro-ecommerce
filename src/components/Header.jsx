@@ -3,7 +3,7 @@ import { ShoppingBag, Search, User, Menu, Sun, Moon, Truck } from 'lucide-react'
 import KyvroMark from './KyvroMark';
 import { CURRENCIES } from '../data/currencies';
 
-export default function Header({ shopBrand = null, onStartSelling, sellLabel = 'Start your own business', onAdminPanel = null, cart, curr, currencyKey, currentView, isDarkMode, setCurrencyKey, setCurrentView, setIsCartOpen, setIsDarkMode, setIsMobileMenuOpen, setSelectedCategory, navHas = () => true, customerUser, displayName, photoURL, goAccount, onSignIn, onSignOut }) {
+export default function Header({ shopBrand = null, onStartSelling, sellLabel = 'Start your own business', onAdminPanel = null, cart, curr, currencyKey, currentView, isDarkMode, setCurrencyKey, setCurrentView, setIsCartOpen, setIsDarkMode, setIsMobileMenuOpen, setSelectedCategory, navHas = () => true, winterNav = false, customerUser, displayName, photoURL, goAccount, onSignIn, onSignOut }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
@@ -22,9 +22,10 @@ export default function Header({ shopBrand = null, onStartSelling, sellLabel = '
   return (
     <>
       <header className={`sticky top-0 z-40 backdrop-blur border-b ${isDarkMode ? 'bg-[#121212]/95 border-gray-800' : 'bg-white/95 border-gray-200'}`}>
-        <div className="max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-2">
+        {/* from xl the menu sits in the middle of the page: logo | menu | buttons (side columns share the rest; never overlap) */}
+        <div className="max-w-7xl mx-auto px-3 min-[380px]:px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-2 xl:grid xl:grid-cols-[minmax(max-content,1fr)_auto_minmax(max-content,1fr)] xl:gap-6">
           
-          <div className="flex items-center gap-1.5 min-[380px]:gap-2 sm:gap-6 min-w-0">
+          <div className="flex items-center gap-1.5 min-[380px]:gap-2 sm:gap-6 min-w-0 xl:justify-self-start">
             <button 
               onClick={() => setIsMobileMenuOpen(true)}
               className={`xl:hidden p-1 ${isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'}`}
@@ -57,12 +58,14 @@ export default function Header({ shopBrand = null, onStartSelling, sellLabel = '
             <button onClick={() => { setCurrentView('home'); setSelectedCategory('All'); }} className={`hover:text-[#D4AF37] transition ${currentView === 'home' ? 'text-[#D4AF37] border-b-2 border-[#D4AF37] pb-1' : ''}`}>HOME</button>
             {navHas('Men') && <button onClick={() => { setCurrentView('shop'); setSelectedCategory("Men"); }} className="hover:text-[#D4AF37] transition">MEN'S</button>}
             {navHas('Women') && <button onClick={() => { setCurrentView('shop'); setSelectedCategory("Women"); }} className="hover:text-[#D4AF37] transition">WOMEN'S</button>}
+            {/* a shop with winter products gets its own WINTER entry (the main store keeps its menu) */}
+            {winterNav && <button onClick={() => { setCurrentView('shop'); setSelectedCategory("Winter"); }} className="hover:text-[#D4AF37] transition">WINTER</button>}
             {navHas('Shoes') && <button onClick={() => { setCurrentView('shop'); setSelectedCategory("Shoes"); }} className="hover:text-[#D4AF37] transition">SHOES</button>}
             {navHas('Wallets') && <button onClick={() => { setCurrentView('shop'); setSelectedCategory("Wallets"); }} className="hover:text-[#D4AF37] transition">WALLETS</button>}
             {navHas('Watches') && <button onClick={() => { setCurrentView('shop'); setSelectedCategory("Watches"); }} className="hover:text-[#D4AF37] transition">WATCHES</button>}
           </nav>
 
-          <div className="flex items-center gap-1 sm:gap-4 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-4 shrink-0 xl:justify-self-end">
             <div className={`hidden md:flex items-center gap-1 px-2.5 py-1.5 rounded border text-xs font-semibold ${isDarkMode ? 'bg-[#1a1a1a] border-gray-700 text-white' : 'bg-gray-100 border-gray-300 text-black'}`}>
               <span>{curr.flag}</span>
               <select 
