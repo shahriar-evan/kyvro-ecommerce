@@ -5,8 +5,8 @@
 // Environment variables: UDDOKTAPAY_BASE_URL, UDDOKTAPAY_API_KEY, FIREBASE_SERVICE_ACCOUNT (all already used for orders)
 import { SITE, accessToken } from '../_sslc.js';
 import { uddoktaConfigured, UDDOKTA_BASE, UDDOKTA_KEY } from '../_uddokta.js';
-import { readPlans, planCaller, currentPlan } from '../_plans.js';
-import { planPrice } from '../../src/data/priceCheck.js';
+import { readPlans, planCaller, currentPlan, readDoc } from '../_plans.js';
+import { planPrice, basicPrice, basicCharging } from '../../src/data/priceCheck.js';
 
 export const config = { maxDuration: 30 };
 
@@ -21,11 +21,20 @@ export default async function handler(req, res) {
     const plans = await readPlans(token);
     if (!plans.enabled) return res.status(409).json({ error: 'Shop plans are switched off right now.' });
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-    const tier = body.tier === 'premium' ? 'premium' : 'pro';
+    const tier = body.tier === 'premium' ? 'premium' : body.tier === 'basic' ? 'basic' : 'pro';
     // no downgrade: while Premium runs, only Premium can be renewed
     const cur = await currentPlan(token, me.uid);
     if (cur.tier === 'premium' && tier === 'pro') return res.status(409).json({ error: 'You are on Premium. Renew Premium instead.' });
-    const amount = planPrice(plans, tier);
+    if (tier === 'basic') {
+      // Basic is paid only by a public seller whose store opened while Basic was charged (basicFree false), only while
+      // Basic costs something, and not while Pro / Premium runs (they include Basic)
+      if (!me.seller) return res.status(403).json({ error: 'Basic is for sellers.' });
+      const sd = await readDoc(token, `sellers/${me.uid}`);
+      if (!sd || sd.data.basicFree !== false) return res.status(409).json({ error: 'Basic is free for your account.' });
+      if (!basicCharging(plans)) return res.status(409).json({ error: 'Basic is free right now.' });
+      if (cur.tier !== 'free') return res.status(409).json({ error: 'Your Pro / Premium plan already includes Basic.' });
+    }
+    const amount = tier === 'basic' ? basicPrice(plans) : planPrice(plans, tier);
     if (!(amount > 0)) return res.status(400).json({ error: 'Invalid plan price.' });
 
     const r = await fetch(`${UDDOKTA_BASE}/api/checkout-v2`, {

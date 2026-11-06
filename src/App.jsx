@@ -15,7 +15,7 @@ import { ensureSubscribed } from './subscribers';
 import PushPrompt from './components/PushPrompt';
 import { watchProducts, watchProductCosts, watchProductCommissions, setProductCommission, saveProductCost, removeProductCost, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
 import { watchStoreSettings, watchPlans } from './storeSettings';
-import { visibleShopIds, normalizePlans, effectiveTier, shopIsPaid } from './data/priceCheck';
+import { visibleShopIds, normalizePlans, effectiveTier, shopIsPaid, basicDue } from './data/priceCheck';
 import { themePreviewFromUrl, cleanTheme, cleanMode } from './data/themes';
 import { watchSiteTheme } from './themeStore';
 import { shopExtrasOf, brandHex, SOCIALS, httpsLinkOk, contactOk, contactHref, contactLabel, effectiveFeatures, FEATURES, shopDisplayName } from './data/shopBrand';
@@ -110,8 +110,11 @@ export default function App() {
     resolveShopKey(shopKey).then((id) => { if (live) setShopSlug(id); });
     return () => { live = false; };
   }, [shopKey]);
-  // a seller's extra shop (2nd / 3rd) is hidden while the account's paid plan has ended (not deleted; shows again after renewing)
-  const shopVisibleToAll = (d) => !!d && d.active !== false && d.status !== 'pending' && !(d.extra && !(shopIsPaid(d)));
+  const [plans, setPlans] = useState(() => normalizePlans(null));
+  useEffect(() => (shopSlug ? watchPlans(setPlans) : undefined), [shopSlug]);
+  // a seller's extra shop (2nd / 3rd) is hidden while the account's paid plan has ended (not deleted; shows again after
+  // renewing); a seller's store that must pay Basic and has not is hidden too (basicDue)
+  const shopVisibleToAll = (d) => !!d && d.active !== false && d.status !== 'pending' && !(d.extra && !(shopIsPaid(d))) && !basicDue(d, plans);
   const [shopRaw, setShopRaw] = useState(undefined); // undefined = loading, null = not found
   useEffect(() => {
     if (!shopSlug) return undefined;
@@ -140,8 +143,6 @@ export default function App() {
   const pathNotFound = !!pathShop && !!shopSlug && shopDoc === null;
   useEffect(() => { if (pathNotFound) { try { sessionStorage.removeItem('kyvro_shop'); } catch (e) { /* ignore */ } } }, [pathNotFound]);
   // shop plans: a shop whose paid plan ran out shows only its best sellers (the rest are hidden, not deleted)
-  const [plans, setPlans] = useState(() => normalizePlans(null));
-  useEffect(() => (shopSlug ? watchPlans(setPlans) : undefined), [shopSlug]);
   const shopVisible = shopCtx ? visibleShopIds(shopCtx, Object.fromEntries(products.map((p) => [String(p.id), p])), plans) : null;
   // the shop's plan right now (the Owner's own shop has every extra) and the header brand (Premium: wordmark)
   const shopTier = shopCtx ? (shopCtx.planExempt ? 'premium' : effectiveTier(shopCtx)) : 'free';
@@ -1325,7 +1326,7 @@ export default function App() {
           extras (tagline, contact, about, social links) and the Premium ones (announcement, brand color, top picks) */}
       {shopPreview && currentView !== 'admin' && (
         <div className="px-4 py-2.5 text-center text-xs font-semibold bg-amber-500 text-black" role="status">
-          Preview: this shop is not live yet{shopRaw.status === 'pending' ? ' (waiting for Kyvro\'s approval)' : shopRaw.killed ? ' (switched off by Kyvro)' : shopRaw.active === false ? ' (switched off)' : ' (hidden: the paid plan has ended)'}. Only you can see it; customers get "page not found".
+          Preview: this shop is not live yet{shopRaw.status === 'pending' ? ' (waiting for Kyvro\'s approval)' : shopRaw.killed ? ' (switched off by Kyvro)' : shopRaw.active === false ? ' (switched off)' : basicDue(shopRaw, plans) ? ' (the Basic plan is not paid yet: pay it in your seller dashboard to open the store)' : ' (hidden: the paid plan has ended)'}. Only you can see it; customers get "page not found".
         </div>
       )}
       {/* the team and the shop's own owner can leave the shop link and go back to the main store (customers stay in the shop,

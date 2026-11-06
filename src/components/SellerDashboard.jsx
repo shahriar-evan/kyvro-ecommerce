@@ -8,7 +8,7 @@ import { getAdminStatus } from '../adminAuth';
 import { isOwnerEmail } from '../adminEmails';
 import { SHOP_COLLECTIONS, productInCollection } from '../data/shopConfig';
 import { watchPlans } from '../storeSettings';
-import { normalizePlans, effectiveTier, TIER_LABEL, shopLimitFor, toMillis } from '../data/priceCheck';
+import { normalizePlans, effectiveTier, TIER_LABEL, shopLimitFor, toMillis, basicCharging, basicDue, basicPrice } from '../data/priceCheck';
 import SellerStats from './SellerStats';
 import SellPricing from './SellPricing';
 import { watchMySubscription } from '../storeSettings';
@@ -167,12 +167,12 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
     const badSocial = APPLY_SOCIALS.find((x) => !httpsLinkOk(String(f.socialLinks[x.key] || '').trim()));
     if (badSocial) return setFormMsg(`${badSocial.label}: the link must start with https://`);
     if (!cats.length) return setFormMsg('Tick at least one category you want to sell.');
-    if (cats.length > catLimit) return setFormMsg(`The Free plan sells from up to ${catLimit} categories. Untick some, or choose Pro / Premium for all categories.`);
+    if (cats.length > catLimit) return setFormMsg(`The Basic plan sells from up to ${catLimit} categories. Untick some, or choose Pro / Premium for all categories.`);
     if (!f.agreed) return setFormMsg('Please tick the box to confirm you are an independent seller.');
     setApplying(true);
     try { if (await handleTaken(handle)) { setApplying(false); return setFormMsg(`kyvro.store/${handle} is already taken. Try another link name.`); } }
     catch (e) { /* checked again by the rules */ }
-    try { await applyAsSeller({ uid, email, handle, details: { ...f, categories: cats, subCategories: subs.filter((x) => cats.includes(x.split(' › ')[0])), productNote: plan === 'pro' || plan === 'premium' ? `Chose the ${TIER_LABEL[plan]} plan` : '' } }); }
+    try { await applyAsSeller({ uid, email, handle, basicFree: !basicCharging(plans), details: { ...f, categories: cats, subCategories: subs.filter((x) => cats.includes(x.split(' › ')[0])), productNote: plan === 'pro' || plan === 'premium' ? `Chose the ${TIER_LABEL[plan]} plan` : '' } }); }
     catch (e) { setFormMsg(e.code === 'permission-denied' ? 'Could not send the application. The link name may be taken or not allowed, you may already have a shop, or new sellers are paused.' : e.message); }
     setApplying(false);
   };
@@ -191,7 +191,7 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
   const toggleCat = (l) => {
     setCatMsg(null); setFormMsg(''); setCatLimitMsg('');
     if (cats.includes(l)) { setCats((c) => c.filter((x) => x !== l)); setSubs((s) => s.filter((x) => x.split(' › ')[0] !== l)); return; }
-    if (cats.length >= catLimit) { setCatLimitMsg(`The Free plan sells from up to ${catLimit} categories. Untick one first, or choose Pro / Premium for all categories.`); return; }
+    if (cats.length >= catLimit) { setCatLimitMsg(`The Basic plan sells from up to ${catLimit} categories. Untick one first, or choose Pro / Premium for all categories.`); return; }
     setCats((c) => [...c, l]);
   };
   const toggleSub = (key) => setSubs((s) => (s.includes(key) ? s.filter((x) => x !== key) : [...s, key]));
@@ -205,7 +205,7 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
           return <button key={l} type="button" aria-pressed={on} onClick={() => toggleCat(l)} className={chip(on, 'px-3 py-2 text-xs')}>{tick(on)}{l} <span className={on ? 'text-black/60' : 'text-gray-500'}>({catCount(l)})</span></button>;
         })}
       </div>
-      {catLimit !== Infinity && <p className="text-[11px] text-gray-500">Free plan: up to {catLimit} categories and {plans.freeLimit} products in total (from one or many categories). Pro / Premium: all categories and all products. <span className="font-semibold">{cats.length} / {catLimit} categories chosen.</span></p>}
+      {catLimit !== Infinity && <p className="text-[11px] text-gray-500">Basic plan: up to {catLimit} categories and {plans.freeLimit} products in total (from one or many categories). Pro / Premium: all categories and all products. <span className="font-semibold">{cats.length} / {catLimit} categories chosen.</span></p>}
       {catLimitMsg && <p className="text-xs text-red-500" role="alert">{catLimitMsg}</p>}
       {/* sub-categories of each chosen category (optional: none ticked = the whole category) */}
       {cats.map((l) => {
@@ -275,11 +275,11 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
         )}
         {!seller && (
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-            <span>Plan: <strong className="text-[#D4AF37]">{TIER_LABEL[plan] || 'Free'}</strong></span>
+            <span>Plan: <strong className="text-[#D4AF37]">{TIER_LABEL[plan] || 'Basic'}</strong></span>
             <button type="button" onClick={() => setPlan('')} className="underline text-gray-500">Change plan</button>
           </div>
         )}
-        {(plan === 'pro' || plan === 'premium') && !seller && <p className="text-xs p-3 rounded border border-[#D4AF37]/50 text-[#D4AF37] bg-[#D4AF37]/10 font-semibold">{TIER_LABEL[plan]} plan: your shop opens on the Free plan; pay right after from the plan card in My Shop to switch on {TIER_LABEL[plan]}.</p>}
+        {(plan === 'pro' || plan === 'premium') && !seller && <p className="text-xs p-3 rounded border border-[#D4AF37]/50 text-[#D4AF37] bg-[#D4AF37]/10 font-semibold">{TIER_LABEL[plan]} plan: your shop opens on the Basic plan; pay right after from the plan card in My Shop to switch on {TIER_LABEL[plan]}.</p>}
         <p className="text-xs text-gray-500">Open your own shop link with Kyvro products, set your price (within the limit) and earn the markup on delivered orders. Kyvro takes the payment and delivers every order. Your first shop goes live right away (more shops on Pro / Premium are checked by Kyvro first). Shops not visited for 30 days are removed. We never ask for NID, passport or bank details.</p>
         <div className="grid sm:grid-cols-2 gap-3">
           {/* shop link name (any plan) + the shop name shown on the website (Premium) */}
@@ -442,7 +442,7 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
       } catch (e) { setNsMsg({ type: 'err', text: e.code === 'permission-denied' ? 'Could not send: your plan allows no more shops, or the link is taken.' : e.message }); }
       setNsBusy(false);
     };
-    const upgradeText = acctTier === 'premium' ? `Premium: up to ${shopLimit} shops.` : acctTier === 'pro' ? `Pro: ${shopLimit} shops. Upgrade to Premium for ${shopLimitFor(plans, 'premium')}.` : `Free plan: ${shopLimit} shop. Upgrade to Pro (${shopLimitFor(plans, 'pro')} shops) or Premium (${shopLimitFor(plans, 'premium')} shops) for more.`;
+    const upgradeText = acctTier === 'premium' ? `Premium: up to ${shopLimit} shops.` : acctTier === 'pro' ? `Pro: ${shopLimit} shops. Upgrade to Premium for ${shopLimitFor(plans, 'premium')}.` : `Basic plan: ${shopLimit} shop. Upgrade to Pro (${shopLimitFor(plans, 'pro')} shops) or Premium (${shopLimitFor(plans, 'premium')} shops) for more.`;
     return (
       <div className={card}>
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -459,7 +459,7 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
             </div>
           ))}
         </div>
-        <p className="text-[11px] text-gray-500">{acctTier === 'free' ? `The Free plan's ${plans.freeLimit} products count across all your shops.` : 'Your plan covers all your shops.'} Switch between your shops on top of Products and Manage Shop.</p>
+        <p className="text-[11px] text-gray-500">{acctTier === 'free' ? `The Basic plan's ${plans.freeLimit} products count across all your shops.` : 'Your plan covers all your shops.'} Switch between your shops on top of Products and Manage Shop.</p>
         {nsMsg && <p className={`text-xs ${nsMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{nsMsg.text}</p>}
         {nsOpen && canAdd && (
           <div className={`rounded-xl border p-4 space-y-3 ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
@@ -494,8 +494,15 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
       <>
         <div className={`${card} !space-y-1`}>
           <h2 className="text-xl sm:text-2xl font-bold">Hello, {(customerUser.displayName || 'Seller').split(' ')[0]}!</h2>
-          <p className="text-xs text-gray-500">{approved ? 'Your shop is live. Choose products, share your link and earn on every delivered order.' : 'Kyvro is checking your application. You can already choose products; your link starts working after approval.'}</p>
+          <p className="text-xs text-gray-500">{approved ? (basicDue(myShop, plans) ? 'Your shop is ready. Pay the Basic plan to open it to customers.' : 'Your shop is live. Choose products, share your link and earn on every delivered order.') : 'Kyvro is checking your application. You can already choose products; your link starts working after approval.'}</p>
         </div>
+        {/* paid Basic: the store stays closed to customers until Basic is paid (or renewed) */}
+        {approved && basicDue(myShop, plans) && (
+          <div className="rounded-2xl border border-red-500/50 bg-red-500/10 text-red-500 p-4 text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <span className="font-semibold">{toMillis(myShop.basicUntil) ? 'Your Basic plan has ended, so your store is closed to customers (nothing is deleted).' : 'Your store is closed to customers until you pay the Basic plan.'} {formatPrice(basicPrice(plans))} / {plans.periodDays} days.</span>
+            <button type="button" onClick={() => go('sub-plans')} className={GOLD_BTN}>{toMillis(myShop.basicUntil) ? 'Renew Basic' : 'Pay Basic'}</button>
+          </div>
+        )}
         <SellerBanner isDarkMode={isDarkMode} />
         {approved && (
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
@@ -570,7 +577,7 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
         )}
         <ThemePicker current={{ theme: tShop.theme, mode: tShop.themeMode }} allowAll={!!tFeat.themes} previewPath={`/${tShop.handle || tShop.slug}`}
           onSave={(t, m) => saveShopTheme(tShop.slug, t, m)} onUpgrade={goPlans} isDarkMode={isDarkMode}
-          note={tFeat.themes ? 'Pick a design for your shop, see it in the preview, then press Apply theme.' : 'Free plan: the Classic theme with light or dark. Pro and Premium get every theme. You can still preview them all.'} />
+          note={tFeat.themes ? 'Pick a design for your shop, see it in the preview, then press Apply theme.' : 'Basic plan: the Classic theme with light or dark. Pro and Premium get every theme. You can still preview them all.'} />
         {feat.brandColor
           ? title('Premium look', 'Brand color, announcement strip and pinned products (saved with "Save my shop").')
           : <div className={`${card} !space-y-2`}><p className="text-sm font-bold flex items-center gap-2"><Lock size={14} /> Premium look</p><p className="text-xs text-gray-500">Your own brand color, an announcement strip on top and your best products pinned first. <button type="button" onClick={goPlans} className="underline text-[#B8921F] font-semibold">Upgrade to Premium</button></p></div>}
@@ -625,7 +632,7 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#B8921F]">Current plan</p>
-              <p className="text-2xl font-bold mt-1">{acctTier === 'free' ? 'Free' : <span className="text-[#D4AF37]">{TIER_LABEL[acctTier]}</span>}</p>
+              <p className="text-2xl font-bold mt-1">{acctTier === 'free' ? 'Basic' : <span className="text-[#D4AF37]">{TIER_LABEL[acctTier]}</span>}</p>
               <p className="text-xs text-gray-500 mt-1">{acctTier === 'free' ? (paidUntilMs ? `Your paid plan ended on ${fmtDay(paidUntilMs)}.` : 'Free forever. Upgrade any time.') : `Active until ${fmtDay(paidUntilMs)} (${daysLeft} day${daysLeft === 1 ? '' : 's'} left).`}</p>
             </div>
             <button type="button" onClick={goPlans} className={GOLD_BTN}>{acctTier === 'free' ? 'Upgrade' : acctTier === 'pro' ? 'Renew or upgrade' : 'Renew'}</button>
@@ -715,7 +722,7 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
       <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#D4AF37] text-black font-bold">{(myShop ? shopDisplayName(myShop) : 'K').charAt(0).toUpperCase()}</span>
       <div className="min-w-0">
         <p className="text-sm font-bold truncate">{myShop ? shopDisplayName(myShop) : 'My shop'}</p>
-        <button type="button" onClick={() => go('sub-overview')} className={`text-[10px] font-bold uppercase tracking-wider ${acctTier === 'free' ? 'text-gray-500' : 'text-[#B8921F]'}`}>{TIER_LABEL[acctTier] || 'Free'} plan</button>
+        <button type="button" onClick={() => go('sub-overview')} className={`text-[10px] font-bold uppercase tracking-wider ${acctTier === 'free' ? 'text-gray-500' : 'text-[#B8921F]'}`}>{TIER_LABEL[acctTier] || 'Basic'} plan</button>
       </div>
     </div>
   );

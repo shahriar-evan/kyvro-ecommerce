@@ -72,7 +72,9 @@ const cleanSubs = (list) => (Array.isArray(list) ? list : []).map((c) => String(
 // for the Owner's approval. The rules allow it once per account, and again only after a rejection or removal.
 // handle = the shop link name (kyvro.store/<handle>). The shop shows its pretty link name until it creates a
 // Website Name (Premium). The shop id (slug) is the handle plus 4 random letters and never changes.
-export async function applyAsSeller({ uid, email, handle, details }) {
+// basicFree: true when Basic costs ৳0 right now (basicCharging is false). The rules check it against settings/plans;
+// a seller who opens the store while Basic is free keeps it free for good.
+export async function applyAsSeller({ uid, email, handle, details, basicFree = true }) {
   const name = (prettyHandle(handle) || String(handle || "")).slice(0, 60);
   const slug = `${slugify(name)}-${rand()}`;
   const b = writeBatch(db);
@@ -85,6 +87,7 @@ export async function applyAsSeller({ uid, email, handle, details }) {
     kind: "seller",
     active: true,
     status: "approved",
+    basicFree: basicFree === true,
     items: {},
     createdAt: serverTimestamp(),
     updatedAt: new Date().toISOString(),
@@ -106,6 +109,7 @@ export async function applyAsSeller({ uid, email, handle, details }) {
     // every shop of this seller (the first one is this application's shop; more by plan: Free 1, Pro 2, Premium 3)
     shops: [slug],
     status: "approved",
+    basicFree: basicFree === true,
     createdAt: serverTimestamp(),
     lastSeenAt: serverTimestamp(),
   });
@@ -141,6 +145,8 @@ export async function requestSellerShop({ uid, seller, handle, categories }) {
     ownerUid: uid,
     kind: "seller",
     extra: true,
+    // same as the seller's first store (an account that opened while Basic was free stays free)
+    basicFree: !(seller && seller.basicFree === false),
     categories: (Array.isArray(categories) ? categories : []).map((c) => String(c).slice(0, 60)).slice(0, 20),
     active: false,
     status: "pending",

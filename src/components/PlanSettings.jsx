@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { watchPlans, savePlans } from '../storeSettings';
-import { normalizePlans, planPrice } from '../data/priceCheck';
+import { normalizePlans, planPrice, basicPrice } from '../data/priceCheck';
 import { FEATURES, featureDefault, featureLockedFree } from '../data/shopBrand';
 
-// Owner: the shop plan numbers (settings/plans). Free = freeLimit products; Pro and Premium = all products for
+// Owner: the shop plan numbers (settings/plans). Basic (internal tier 'free') = freeLimit products, plus the card's
+// Basic price (basic: list price, discount up to 100%, label, end date shown only). Charged only to stores opened while it costs something; Pro and Premium = all products for
 // periodDays, each with its own price and discount %. The payment server always reads the price from here.
 export default function PlanSettings({ isDarkMode, staff, formatPrice }) {
   const [saved, setSaved] = useState(null);
@@ -17,7 +18,9 @@ export default function PlanSettings({ isDarkMode, staff, formatPrice }) {
   const setTier = (t, k, v) => setDraft((d) => ({ ...d, [t]: { ...d[t], [k]: v } }));
   // per-plan feature switch: an explicit ON / OFF for that plan (normalizePlans keeps only true / false)
   const setFeat = (t, k, v) => setDraft((d) => { const tf = d.tierFeatures || {}; return { ...d, tierFeatures: { ...tf, [t]: { ...(tf[t] || {}), [k]: v } } }; });
+  const setBasic = (k, v) => setDraft((d) => ({ ...d, basic: { ...(d.basic || {}), [k]: v } }));
   const preview = normalizePlans(draft);
+  const basicDraft = draft.basic || preview.basic;
   const dirty = JSON.stringify(preview) !== JSON.stringify(saved);
   const card = `rounded-lg border p-5 sm:p-6 space-y-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`;
   const input = `block mt-1 w-full border p-2 text-sm rounded ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`;
@@ -56,7 +59,7 @@ export default function PlanSettings({ isDarkMode, staff, formatPrice }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-lg font-bold">Shop plans</h3>
-          <p className="text-xs text-gray-500 mt-1">Free: a shop shows up to the free limit, from a few categories. Pro and Premium: all products and categories for the period. Managers, Admins and sellers follow the same plans; your own shop has no limit.</p>
+          <p className="text-xs text-gray-500 mt-1">Basic: a shop shows up to the Basic limit, from a few categories. Pro and Premium: all products and categories for the period. Managers, Admins and sellers follow the same plans; your own shop has no limit.</p>
         </div>
         <label className="inline-flex items-center gap-2 text-xs font-semibold cursor-pointer">
           <input type="checkbox" checked={draft.enabled !== false} onChange={(e) => set('enabled', e.target.checked)} className="accent-[#D4AF37] w-4 h-4" />
@@ -65,12 +68,27 @@ export default function PlanSettings({ isDarkMode, staff, formatPrice }) {
       </div>
       <div className="grid sm:grid-cols-3 gap-3">
         <div className={box}>
-          <p className="text-xs font-bold uppercase tracking-wider text-[#D4AF37]">Free</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-[#D4AF37]">Basic</p>
           <div className="grid grid-cols-2 gap-3">
             {num(draft.freeLimit, (v) => set('freeLimit', v), 'Products', '1 to 300')}
             {num(draft.freeCategoryLimit, (v) => set('freeCategoryLimit', v), 'Categories', '1 to 20')}
+            {num(basicDraft.price, (v) => setBasic('price', v), 'Card price (৳)')}
+            {num(basicDraft.discount, (v) => setBasic('discount', v), 'Discount %', '0 to 100')}
+            <label className="text-xs font-semibold text-gray-500">Label
+              <input className={input} maxLength={40} value={basicDraft.label ?? ''} onChange={(e) => setBasic('label', e.target.value)} placeholder="Launch offer" />
+            </label>
+            <label className="text-xs font-semibold text-gray-500">Offer end date
+              <input type="date" className={input} value={basicDraft.endsAt || ''} onChange={(e) => setBasic('endsAt', e.target.value)} />
+              <span className="block mt-1 font-normal text-[11px]">Shown on the card only</span>
+            </label>
           </div>
-          <p className="text-sm"><strong className="text-lg text-[#D4AF37]">{formatPrice(0)}</strong> <span className="text-xs text-gray-500">· up to {preview.freeLimit} products from {preview.freeCategoryLimit} categories</span></p>
+          <p className="flex flex-wrap items-center gap-2 text-sm">
+            {preview.basic.discount > 0 && <span className="text-gray-500 line-through">{formatPrice(preview.basic.price)}</span>}
+            <strong className="text-lg text-[#D4AF37]">{formatPrice(basicPrice(preview))}</strong>
+            {preview.basic.discount > 0 && <span className="px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold">{preview.basic.discount}% OFF</span>}
+            {preview.basic.discount > 0 && preview.basic.label && <span className="text-xs text-gray-500">{preview.basic.label}</span>}
+          </p>
+          <p className="text-[11px] text-gray-500">Up to {preview.freeLimit} products from {preview.freeCategoryLimit} categories. At 100% off (৳0) nobody pays. With less discount, only sellers who open their store from then on pay this price every {preview.periodDays} days (their store opens after payment); stores opened while Basic was ৳0 stay free for good. Back to 100% off = nobody pays.</p>
         </div>
         {tierBox('pro', 'Pro')}
         {tierBox('premium', 'Premium')}
@@ -80,13 +98,13 @@ export default function PlanSettings({ isDarkMode, staff, formatPrice }) {
       <div className={box}>
         <p className="text-xs font-bold uppercase tracking-wider text-[#D4AF37]">Shops per seller account</p>
         <div className="grid grid-cols-3 gap-3">
-          {[['free', 'Free'], ['pro', 'Pro'], ['premium', 'Premium']].map(([t, l]) => (
+          {[['free', 'Basic'], ['pro', 'Pro'], ['premium', 'Premium']].map(([t, l]) => (
             <label key={t} className="text-xs font-semibold text-gray-500">{l}
               <input type="number" min="1" max="5" className={input} value={(draft.shopLimits || {})[t] ?? ''} onChange={(e) => setDraft((d) => ({ ...d, shopLimits: { ...(d.shopLimits || {}), [t]: e.target.value } }))} />
             </label>
           ))}
         </div>
-        <p className="text-[11px] text-gray-500">1 to 5. Every new shop waits for your approval (Sellers tab). On Free, the {preview.freeLimit} products count across all shops.</p>
+        <p className="text-[11px] text-gray-500">1 to 5. Every new shop waits for your approval (Sellers tab). On Basic, the {preview.freeLimit} products count across all shops.</p>
       </div>
 
       {/* what each plan gets: ON / OFF per plan (a shop can still be switched one by one in Plan Members) */}
@@ -94,14 +112,14 @@ export default function PlanSettings({ isDarkMode, staff, formatPrice }) {
       <div className={`rounded border overflow-x-auto ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
         <div className="min-w-[22rem]">
         <div className={`grid grid-cols-[1fr_repeat(3,4.5rem)] sm:grid-cols-[1fr_repeat(3,6rem)] gap-2 px-3 py-2 text-[11px] font-bold uppercase tracking-wider border-b ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
-          <span>Plan features</span><span className="text-center">Free</span><span className="text-center">Pro</span><span className="text-center">Premium</span>
+          <span>Plan features</span><span className="text-center">Basic</span><span className="text-center">Pro</span><span className="text-center">Premium</span>
         </div>
         <div className="divide-y divide-gray-500/10 text-xs">
           {FEATURES.filter((f) => f.key !== 'allProducts').map((f) => (
             <div key={f.key} className="grid grid-cols-[1fr_repeat(3,4.5rem)] sm:grid-cols-[1fr_repeat(3,6rem)] gap-2 px-3 py-1.5 items-center">
               <span className="font-semibold">{f.label}</span>
               {['free', 'pro', 'premium'].map((t) => {
-                if (featureLockedFree(f.key, t)) return <span key={t} className="text-center text-gray-500" title="Never on the Free plan">🔒</span>;
+                if (featureLockedFree(f.key, t)) return <span key={t} className="text-center text-gray-500" title="Never on the Basic plan">🔒</span>;
                 const on = featureDefault(f.key, t, preview.tierFeatures);
                 return (
                   <button key={t} type="button" aria-pressed={on} onClick={() => setFeat(t, f.key, !on)}
@@ -112,7 +130,7 @@ export default function PlanSettings({ isDarkMode, staff, formatPrice }) {
           ))}
         </div>
         </div>
-        <p className="px-3 py-2 text-[11px] text-gray-500 border-t border-gray-500/10">Shop name change, logo and banner are never on the Free plan. Plan Members can still switch a feature ON / OFF for one shop.</p>
+        <p className="px-3 py-2 text-[11px] text-gray-500 border-t border-gray-500/10">Shop name change, logo and banner are never on the Basic plan. Plan Members can still switch a feature ON / OFF for one shop.</p>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

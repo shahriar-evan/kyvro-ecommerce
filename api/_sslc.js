@@ -10,7 +10,7 @@
 //   SITE_URL                   optional, default https://kyvro.store
 
 import crypto from 'node:crypto';
-import { checkOrderPrices, normalizePlans, orderVisibleIds, shopIsPaid } from '../src/data/priceCheck.js';
+import { checkOrderPrices, normalizePlans, orderVisibleIds, shopIsPaid, basicDue } from '../src/data/priceCheck.js';
 
 export const PROJECT = process.env.FIREBASE_PROJECT_ID || 'kyvro-admin-auth';
 export const SITE = (process.env.SITE_URL || 'https://kyvro.store').replace(/\/$/, '');
@@ -98,6 +98,11 @@ export async function verifyOrderPrices(order) {
   const list = await Promise.all(ids.map((id) => getDocument(`products/${id}`)));
   const productsById = Object.fromEntries(ids.map((id, i) => [id, list[i]]).filter(([, p]) => p));
   const shop = order.shop && /^[a-z0-9-]{3,40}$/.test(String(order.shop)) ? await getDocument(`shops/${order.shop}`) : null;
+  // a seller's store whose Basic is not paid is closed to customers: no order from it
+  if (shop && shop.kind === 'seller' && shop.basicFree === false) {
+    const plansNow = normalizePlans(await getDocument('settings/plans'));
+    if (basicDue(shop, plansNow)) return { ok: false, problems: ['This shop is closed right now.'], subtotal: 0 };
+  }
   // a shop whose paid plan ran out sells only its best sellers (the same products the storefront still shows)
   let visible = null;
   if (shop && !shopIsPaid(shop) && shop.planExempt !== true) {

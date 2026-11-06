@@ -1,17 +1,25 @@
 import React, { useState } from 'react';
 import { Zap, Rocket, Gem, Check, Clock } from 'lucide-react';
-import { normalizePlans, planPrice } from '../data/priceCheck';
+import { normalizePlans, planPrice, basicPrice } from '../data/priceCheck';
 import { PLAN_TEXT, fill } from '../data/planText';
 
-// The three seller plans side by side (Free / Pro / Premium), in the Kyvro gold / dark style.
+// The three seller plans side by side (Basic / Pro / Premium), in the Kyvro gold / dark style.
+// Basic is the internal tier 'free'. Its card price (list price, discount, label, end date) comes from settings/plans.basic
+// and is display only: Basic never opens a payment page.
 //   mode 'apply'   : before applying (every button says Get started)
 //   mode 'upgrade' : an approved shop owner's plan (Current plan / Upgrade / Renew)
 // Prices, discounts and the period come from settings/plans. "Coming soon" features are shown greyed out, never as available.
-export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mode = 'apply', currentTier = 'free', busy = '', onChoose, lang = 'en' }) {
+// basicPay: a label ('Pay Basic' / 'Renew Basic') when this seller must pay Basic; the Basic button then opens the payment
+export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mode = 'apply', currentTier = 'free', busy = '', onChoose, lang = 'en', basicPay = '' }) {
   const T = PLAN_TEXT[lang] || PLAN_TEXT.en;
   const plans = normalizePlans(rawPlans);
   // first line of each card: how many shops one account may have on that plan (settings/plans.shopLimits)
   const shopsLine = (t) => { const n = plans.shopLimits[t]; return fill(n === 1 ? T.shopOne : T.shopMany, n, lang); };
+  // Basic card: the Owner's label ('Launch offer' by default, shown in the page language) and end date (shown only;
+  // the offer keeps running until the Owner changes the discount)
+  const basic = plans.basic;
+  const basicLabel = basic.label === 'Launch offer' ? T.launchOffer : basic.label;
+  const endsText = basic.endsAt ? fill(T.offerEnds, new Date(`${basic.endsAt}T00:00:00+06:00`).toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Dhaka' }), 'en') : '';
   const tiers = [
     { key: 'free', name: T.free, icon: Zap, blurb: T.blurbFree, features: [shopsLine('free'), ...T.featFree.map((f) => fill(f, plans.freeLimit, lang))] },
     { key: 'pro', name: T.pro, icon: Rocket, blurb: T.blurbPro, badge: T.mostPopular, features: [shopsLine('pro'), ...T.featPro] },
@@ -21,6 +29,7 @@ export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mo
 
   const button = (t) => {
     if (mode === 'apply') return { label: t.key === 'pro' ? T.btnPro : t.key === 'premium' ? T.btnPremium : T.btnFree, disabled: false };
+    if (t.key === 'free' && basicPay && currentTier === 'free') return { label: basicPay, disabled: false };
     if (t.key === 'free') return { label: currentTier === 'free' ? 'Current plan' : 'Included', disabled: true };
     if (t.key === 'pro') {
       if (currentTier === 'premium') return { label: 'Included in Premium', disabled: true };
@@ -41,8 +50,9 @@ export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mo
         {tiers.map((t) => {
           const pro = t.key === 'pro';
           const premium = t.key === 'premium';
-          const cfg = t.key === 'free' ? null : plans[t.key];
-          const price = t.key === 'free' ? 0 : planPrice(plans, t.key);
+          const free = t.key === 'free';
+          const cfg = free ? basic : plans[t.key];
+          const price = free ? basicPrice(plans) : planPrice(plans, t.key);
           const b = button(t);
           const current = mode === 'upgrade' && currentTier === t.key;
           const Icon = t.icon;
@@ -62,7 +72,8 @@ export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mo
               <p className={`mt-1 flex items-center justify-center gap-2 text-xl sm:text-2xl font-bold uppercase tracking-[0.14em] ${pro || premium ? 'text-[#D4AF37]' : ''}`}><Icon size={22} />{t.name}{current && <span className="ml-1 normal-case tracking-normal text-[10px] px-2 py-0.5 rounded-full bg-green-600 text-white">{T.current}</span>}</p>
               <p className={`text-sm mt-1 text-center ${muted}`}>{t.blurb}</p>
 
-              <div className="mt-5 min-h-[5.5rem] text-center">
+              {/* price block: the same height on all three cards from md up, so the feature lists line up */}
+              <div className="mt-5 min-h-[5.5rem] md:min-h-[8.5rem] text-center">
                 {cfg && cfg.discount > 0 && (
                   <p className="flex items-center justify-center gap-2">
                     <span className={`text-base line-through ${muted}`}>{formatPrice(cfg.price)}</span>
@@ -70,7 +81,13 @@ export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mo
                   </p>
                 )}
                 <p className="mt-1 text-4xl sm:text-5xl font-extrabold tracking-tight">{formatPrice(price)}</p>
-                <p className={`text-xs mt-1 ${muted}`}>{t.key === 'free' ? T.forever : fill(T.perDays, plans.periodDays, lang)}</p>
+                {!free && <p className={`text-xs mt-1 ${muted}`}>{fill(T.perDays, plans.periodDays, lang)}</p>}
+                {free && cfg.discount > 0 && basicLabel && (
+                  <p className="mt-2"><span className="inline-block px-3 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-[#D4AF37]/15 text-[#B8921F] border border-[#D4AF37]/40">{basicLabel}</span></p>
+                )}
+                {free && !(cfg.discount > 0) && price === 0 && <p className={`text-xs mt-1 ${muted}`}>{T.forever}</p>}
+                {free && cfg.discount > 0 && endsText && <p className={`text-[11px] mt-1.5 ${muted}`}>{endsText}</p>}
+                {free && price === 0 && cfg.discount > 0 && <p className={`text-[11px] mt-1.5 leading-snug ${muted}`}>{T.earlyFree}</p>}
               </div>
 
               <ul className={`mt-6 pt-6 border-t space-y-3.5 text-sm sm:text-[15px] ${line}`}>
