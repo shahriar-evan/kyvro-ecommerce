@@ -2,13 +2,16 @@ import React from 'react';
 
 // The Kyvro logo: the K emblem (public/brand/kyvro-emblem-*.png, made by scripts/emblem-assets.py from Evan's logo).
 // Light mode: black (with black text). Dark mode: gold (with gold text). The same on every store theme.
+// Both pictures are always on the page (one hidden), so switching light / dark shows the right one at once instead
+// of keeping the old picture until the new one loads.
 // Size it with a height class (h-8, h-10 ...); the width follows. The favicon stays the hexagon (too small for this).
 // ?v= changes when the pictures are redrawn, so browsers never keep an old copy.
-const V = '2';
+const V = '3';
 export default function KyvroMark({ dark = false, className = '', title = 'Kyvro' }) {
   return (
     <span className={`kyvro-mark inline-flex items-center ${className}`} role="img" aria-label={title}>
-      <img src={`/brand/kyvro-emblem-${dark ? 'gold' : 'black'}.png?v=${V}`} alt="" draggable={false} className="h-full w-auto select-none" />
+      <img src={`/brand/kyvro-emblem-black.png?v=${V}`} alt="" draggable={false} className={`h-full w-auto select-none ${dark ? 'hidden' : ''}`} />
+      <img src={`/brand/kyvro-emblem-gold.png?v=${V}`} alt="" draggable={false} className={`h-full w-auto select-none ${dark ? '' : 'hidden'}`} />
     </span>
   );
 }
