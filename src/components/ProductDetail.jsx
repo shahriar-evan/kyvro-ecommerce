@@ -132,7 +132,7 @@ function ZoomViewer({ photos, index, onIndex, onClose }) {
   );
 }
 
-export default function ProductDetail({ product, products, addToCart, calculateDiscountPercent, formatPrice, isDarkMode, setCurrentView, setSelectedProduct = () => {}, storeSettings = {}, cartSubtotal = 0, cartUnits = 0, savedIds = [], toggleSaved = () => {} }) {
+export default function ProductDetail({ product, products, addToCart, calculateDiscountPercent, formatPrice, isDarkMode, setCurrentView, setSelectedProduct = () => {}, storeSettings = {}, cartSubtotal = 0, cartUnits = 0, savedIds = [], toggleSaved = () => {}, teamShop = '' }) {
   // Always use the latest version of the product (admin may have changed stock)
   const live = (products || []).find((p) => p.id === product.id) || product;
   const sized = hasSizeStock(live);
@@ -216,7 +216,7 @@ export default function ProductDetail({ product, products, addToCart, calculateD
   };
 
   // WhatsApp message carries the size / color / quantity the customer picked
-  const waLink = waOrderLink(waProductLines({ name: live.name, color: color || '', size: sized && size ? size : '', qty, price: live.price }));
+  const waLink = waOrderLink(waProductLines({ id: live.id, name: live.name, color: color || '', size: sized && size ? size : '', qty, price: live.price }));
   const waNeedsSize = needsSize;
 
   const cardBtn = (active, disabled) =>
@@ -332,6 +332,18 @@ export default function ProductDetail({ product, products, addToCart, calculateD
             />
           )}
           {soldOut && <p className="text-sm font-bold text-red-500">This product is currently sold out.</p>}
+
+          {/* team only, on a shop link: place a WhatsApp customer's order for this shop (the shop's owner earns the markup) */}
+          {teamShop && !soldOut && (
+            <div className={`rounded-lg border-2 border-dashed p-4 space-y-2 ${isDarkMode ? 'border-green-600/50 bg-green-600/5' : 'border-green-600/60 bg-green-50'}`}>
+              <p className="text-xs font-bold uppercase tracking-wider text-green-700">Team · WhatsApp order for {teamShop}</p>
+              <p className="text-xs text-gray-500">Pick size / color / quantity, then order for the customer: write their name, phone and address at checkout. The order is saved for {teamShop}, so the shop's owner earns the markup when it is Delivered. Then confirm it in Orders; if they already paid, press "Mark payment received" there.</p>
+              <button type="button" onClick={needsSize ? () => sizeRef.current && sizeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' }) : handleBuyNow} disabled={colorOut}
+                className="w-full bg-green-600 text-white font-bold py-3 rounded text-xs uppercase tracking-widest hover:bg-green-700 transition disabled:opacity-50">
+                {needsSize ? 'Select a size' : `Order for customer (${teamShop})`}
+              </button>
+            </div>
+          )}
 
           {/* Delivery information */}
           {(() => {

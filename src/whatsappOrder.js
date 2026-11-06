@@ -20,11 +20,21 @@ export const waOrderText = (lines) => [...lines, ...WA_ADDRESS_LINES].join('\n')
 export const waLinkFor = (text) => `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
 export const waOrderLink = (lines) => waLinkFor(waOrderText(lines));
 
-// One product (card or detail page). color / size are optional.
-export const waProductLines = ({ name, color, size, qty = 1, price }) => [
+// The shop link the customer is on (set by App.jsx; null = the main store). Every WhatsApp order message then says
+// which shop it came from and links the product inside that shop, so the team can open it and place the order for
+// that shop (the seller earns the markup).
+let waShop = null;
+export const setWaShop = (s) => { waShop = s && s.url ? { name: String(s.name || ''), url: String(s.url) } : null; };
+const shopLines = () => (waShop ? [`* Shop: ${waShop.name} (${waShop.url})`] : []);
+const productUrl = (id) => (id ? `${waShop ? waShop.url : (typeof window !== 'undefined' ? window.location.origin : 'https://www.kyvro.store')}?product=${encodeURIComponent(id)}` : '');
+
+// One product (card or detail page). color / size / id are optional.
+export const waProductLines = ({ id, name, color, size, qty = 1, price }) => [
   'Hello Kyvro, I want to order:',
   '',
+  ...shopLines(),
   `* Name: ${name}`,
+  ...(id ? [`* Link: ${productUrl(id)}`] : []),
   ...(color ? [`* Color: ${color}`] : []),
   ...(size ? [`* Size: ${size}`] : []),
   `* Quantity: ${qty}`,
@@ -38,9 +48,11 @@ export const waCartLines = (items) => {
   return [
     'Hello Kyvro, I want to order these items:',
     '',
+    ...shopLines(),
+    ...(waShop ? [''] : []),
     ...list.map((it, i) => {
       const opts = [it.selectedColor ? `Color: ${it.selectedColor}` : '', it.selectedSize ? `Size: ${it.selectedSize}` : '', `Qty: ${it.quantity}`].filter(Boolean).join(' | ');
-      return `${i + 1}. ${it.name}\n   ${opts}\n   Price: ${bdt(it.price)} x ${it.quantity} = ${bdt(it.price * it.quantity)}`;
+      return `${i + 1}. ${it.name}\n   ${opts}\n   Price: ${bdt(it.price)} x ${it.quantity} = ${bdt(it.price * it.quantity)}${it.id ? `\n   Link: ${productUrl(it.id)}` : ''}`;
     }),
     '',
     `Items total: ${bdt(total)}`,
