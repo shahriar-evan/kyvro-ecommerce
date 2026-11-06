@@ -14,7 +14,7 @@ import { normalizePlans, planPrice, toMillis, effectiveTier } from '../src/data/
 const DOCS = `projects/${PROJECT}/databases/(default)/documents`;
 const fields = (d) => Object.fromEntries(Object.entries((d && d.fields) || {}).map(([k, v]) => [k, val(v)]));
 
-async function readDoc(token, path) {
+export async function readDoc(token, path) {
   const r = await fetch(`${FS}/documents/${path}`, { headers: { Authorization: `Bearer ${token}` } });
   if (r.status === 404) return null;
   if (!r.ok) throw new Error(`Could not read ${path}.`);
@@ -108,6 +108,25 @@ export async function syncShops(token, uid, paidUntilIso, tier = 'pro') {
   return rows.length;
 }
 
+// Copies the paid Basic end date onto the seller's shops (basicDue() in src/data/priceCheck.js reads it there)
+export async function syncBasic(token, uid, basicUntilIso) {
+  const r = await fetch(`${FS}/documents:runQuery`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'shops' }], where: { fieldFilter: { field: { fieldPath: 'ownerUid' }, op: 'EQUAL', value: { stringValue: uid } } } } }),
+  });
+  if (!r.ok) return 0;
+  const rows = (await r.json()).filter((x) => x.document);
+  if (!rows.length) return 0;
+  const writes = rows.map((x) => ({
+    update: { name: x.document.name, fields: { basicUntil: { timestampValue: basicUntilIso } } },
+    updateMask: { fieldPaths: ['basicUntil'] },
+    currentDocument: { exists: true },
+  }));
+  await fetch(`${FS}/documents:commit`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ writes }) });
+  return rows.length;
+}
+
 // Asks UddoktaPay whether the invoice is really paid, checks it is a plan payment for the amount the server asked for,
 // then extends the plan: paidUntil = max(now, current paidUntil) + periodDays. The same invoice never extends twice.
 // Returns { ok, already?, paidUntil?, reason? }
@@ -143,6 +162,26 @@ export async function confirmPlanPayment(invoiceId) {
     }
     const sub = await readDoc(token, `subscriptions/${uid}`);
     const now = Date.now();
+    const str0 = (s) => ({ stringValue: String(s || '').slice(0, 200) });
+    if (meta.tier === 'basic') {
+      // Basic: basicUntil = max(now, current basicUntil) + days. Pro / Premium (tier, paidUntil) are not touched.
+      const bFrom = Math.max(now, toMillis(sub && sub.data.basicUntil));
+      const bUntil = new Date(bFrom + days * 86400000).toISOString();
+      const bAt = new Date(now).toISOString();
+      const bBody = { writes: [
+        { update: { name: paymentPath, fields: { uid: str0(uid), email: str0(meta.email), tier: str0('basic'), amount: { doubleValue: amount }, days: { integerValue: String(days) }, at: { timestampValue: bAt }, method: str0(v.payment_method), transactionId: str0(v.transaction_id) } }, currentDocument: { exists: false } },
+        { update: { name: subPath, fields: { basicUntil: { timestampValue: bUntil }, lastPaymentAt: { timestampValue: bAt }, lastPaymentId: str0(invoiceId), email: str0(meta.email), name: str0(meta.name) } },
+          updateMask: { fieldPaths: ['basicUntil', 'lastPaymentAt', 'lastPaymentId', 'email', 'name'] },
+          currentDocument: sub ? { updateTime: sub.updateTime } : { exists: false } },
+      ] };
+      const bc = await fetch(`${FS}/documents:commit`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(bBody) });
+      if (bc.ok) {
+        await syncBasic(token, uid, bUntil);
+        return { ok: true, uid, basicUntil: bUntil, tier: 'basic' };
+      }
+      if (bc.status !== 400 && bc.status !== 409) throw new Error('Could not save the plan.');
+      continue;
+    }
     // the tier bought; a running Premium stays Premium (no downgrade by a late Pro payment)
     const bought = meta.tier === 'premium' ? 'premium' : 'pro';
     const tier = sub && effectiveTier(sub.data, now) === 'premium' ? 'premium' : bought;

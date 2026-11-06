@@ -36,10 +36,15 @@ export const DEFAULT_PLANS = {
   shopLimits: { free: 1, pro: 2, premium: 3 },
   pro: { price: 999, discount: 40 },
   premium: { price: 2999, discount: 40 },
+  // Basic (internal tier id 'free'). While it costs ৳0 (100% off) nobody pays. When the Owner removes the discount, only
+  // sellers who open their store after that pay (every periodDays); sellers who opened their store while it was ৳0 keep
+  // Basic free (basicFree on shops/sellers, set when the store opens). Back to 100% off = nobody pays.
+  basic: { price: 499, discount: 100, label: 'Launch offer', endsAt: '' },
   supportWhatsapp: '',
 };
 export const PLAN_TIERS = ['pro', 'premium'];
-export const TIER_LABEL = { free: 'Free', pro: 'Pro', premium: 'Premium' };
+// shown names; the internal id of the first plan stays 'free' everywhere (rules, subscriptions, shops)
+export const TIER_LABEL = { free: 'Basic', pro: 'Pro', premium: 'Premium' };
 // the most products a shop document can hold at all (also checked in firestore.rules)
 export const SHOP_MAX_ITEMS = 300;
 const num = (v, def, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : def; };
@@ -47,6 +52,18 @@ const tierCfg = (t, def, legacy) => ({
   price: num(t && t.price !== undefined ? t.price : legacy.price, def.price, 1, 1000000),
   discount: num(t && t.discount !== undefined ? t.discount : legacy.discount, def.discount, 0, 90),
 });
+// Basic card: list price, discount 0 to 100, a short label and an optional end date (YYYY-MM-DD, shown only)
+const basicCfg = (b) => {
+  const x = b || {};
+  const label = String(x.label === undefined ? DEFAULT_PLANS.basic.label : x.label).replace(/[<>]/g, '').trim().slice(0, 40);
+  const endsAt = /^\d{4}-\d{2}-\d{2}$/.test(String(x.endsAt || '')) ? String(x.endsAt) : '';
+  return {
+    price: num(x.price, DEFAULT_PLANS.basic.price, 0, 1000000),
+    discount: num(x.discount, DEFAULT_PLANS.basic.discount, 0, 100),
+    label,
+    endsAt,
+  };
+};
 // settings/plans -> clean numbers. Before tiers there was one paid plan (originalPrice / discountPercent): that is Pro.
 // per-plan feature switches set by the Owner (settings/plans.tierFeatures): { free: {key: bool}, pro: {...}, premium: {...} }.
 // A key that is not set falls back to the built-in default (FEATURES in src/data/shopBrand.js). Same in firestore.rules (featOn).
@@ -70,6 +87,7 @@ export const normalizePlans = (p) => {
     reminderDays: num(x.reminderDays, DEFAULT_PLANS.reminderDays, 0, 30),
     pro,
     premium,
+    basic: basicCfg(x.basic),
     supportWhatsapp: /^\+?[0-9]{8,15}$/.test(wa) ? wa : '',
     // older code reads these: they are the Pro numbers
     originalPrice: pro.price,
@@ -82,6 +100,16 @@ export const shopLimitFor = (plans, tier) => normalizePlans(plans).shopLimits[ti
 export const planPrice = (plans, tier = 'pro') => {
   const c = normalizePlans(plans)[tier === 'premium' ? 'premium' : 'pro'];
   return Math.round((c.price * (100 - c.discount)) / 100);
+};
+// what Basic costs for one period (৳0 while the launch offer runs)
+export const basicPrice = (plans) => {
+  const b = normalizePlans(plans).basic;
+  return Math.round((b.price * (100 - b.discount)) / 100);
+};
+// Basic is charged right now: plans on and the price at least ৳1. Same test in firestore.rules (basicFreeNow).
+export const basicCharging = (plans) => {
+  const p = normalizePlans(plans);
+  return p.enabled && p.basic.price * (100 - p.basic.discount) >= 50;
 };
 // a Firestore Timestamp, an ISO text or milliseconds -> milliseconds (0 = none)
 export const toMillis = (v) => {
@@ -96,6 +124,11 @@ export const shopIsPaid = (shop, now = Date.now()) => toMillis(shop && shop.paid
 // the tier that counts right now for a subscription or a shop: 'free' once paidUntil has passed;
 // a paid plan from before tiers (no tier) is Pro
 export const effectiveTier = (x, now = Date.now()) => (toMillis(x && x.paidUntil) > now ? (x.tier === 'premium' ? 'premium' : 'pro') : 'free');
+// A seller's shop that must pay Basic and has not (or its paid Basic period ended): customers do not see it.
+// Never for team shops, the Owner's shop, shops opened while Basic was free (basicFree not false), a running
+// Pro / Premium, or while Basic costs ৳0.
+export const basicDue = (shop, plans, now = Date.now()) => !!shop && shop.kind === 'seller' && shop.basicFree === false
+  && shop.planExempt !== true && basicCharging(plans) && !shopIsPaid(shop, now) && toMillis(shop.basicUntil) <= now;
 // The products a shop may show right now: null = all of them. A shop whose paid plan ran out shows only its
 // freeLimit best sellers (most "sold"; ties and no sales: the product added to the store first). The rest are
 // hidden, not deleted, and come back when the plan is renewed. The Owner's own shop has no limit.

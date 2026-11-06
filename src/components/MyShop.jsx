@@ -5,7 +5,7 @@ import { askConfirm } from './AlertCenter';
 import { maxMarkupFor, shopPriceClamp, SHOP_COLLECTIONS, productInCollection } from '../data/shopConfig';
 import { flatSubCategories, subLabel } from '../data/catalog';
 import { watchPlans, watchMySubscription } from '../storeSettings';
-import { normalizePlans, toMillis, SHOP_MAX_ITEMS, effectiveTier, TIER_LABEL } from '../data/priceCheck';
+import { normalizePlans, toMillis, SHOP_MAX_ITEMS, effectiveTier, TIER_LABEL, basicCharging, basicDue, basicPrice } from '../data/priceCheck';
 import PlanCards from './PlanCards';
 import ShopExtrasEditor from './ShopExtrasEditor';
 import { GOLD_BTN, OUTLINE_BTN, GHOST_BTN } from './ui';
@@ -149,13 +149,19 @@ export default function MyShop({ view = 'all', readOnly = false, asUid = '', sel
   const otherItems = sellerMode && shop && myShops ? myShops.filter((x) => x.slug !== shop.slug).reduce((n, x) => n + Object.keys(x.items || {}).length, 0) : 0;
   const cap = Math.max(planLimit === SHOP_MAX_ITEMS ? planLimit : Math.max(0, planLimit - otherItems), Object.keys(savedItems).length);
   const daysLeft = paidUntil ? Math.ceil((paidUntil - Date.now()) / 86400000) : null;
+  // paid Basic: only a seller store opened while Basic was charged (basicFree false), while Basic costs something and
+  // no Pro / Premium runs. Not paid (or ended) = the store is closed to customers until paid.
+  const basicUntil = Math.max(toMillis(sub && sub.basicUntil), toMillis(shop && shop.basicUntil));
+  const basicNeed = !isOwner && !!shop && shop.kind === 'seller' && shop.basicFree === false && basicCharging(plans) && tier === 'free';
+  const basicLate = basicNeed && basicDue(shop, plans);
+  const basicDays = basicUntil ? Math.ceil((basicUntil - Date.now()) / 86400000) : null;
   const fmtDate = (ms) => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  const limitMsg = () => setMsg({ type: 'err', text: `The Free plan shows up to ${plans.freeLimit} products${otherItems ? ' across all your shops' : ''}. Upgrade to add all products.` });
+  const limitMsg = () => setMsg({ type: 'err', text: `The Basic plan shows up to ${plans.freeLimit} products${otherItems ? ' across all your shops' : ''}. Upgrade to add all products.` });
   // Free plan: products from at most plans.freeCategoryLimit categories (Pro / Premium / "All products": every category)
   const catLimit = planLimit === SHOP_MAX_ITEMS ? Infinity : plans.freeCategoryLimit;
   const catOf = (p) => (SHOP_COLLECTIONS.find((c) => productInCollection(p, c.name)) || {}).name || 'Other';
   const catsOf = (ids) => new Set(ids.map((id) => live.find((x) => String(x.id) === String(id))).filter(Boolean).map(catOf));
-  const catMsg = () => setMsg({ type: 'err', text: `The Free plan sells from up to ${plans.freeCategoryLimit} categories. Upgrade to Pro / Premium for all categories.` });
+  const catMsg = () => setMsg({ type: 'err', text: `The Basic plan sells from up to ${plans.freeCategoryLimit} categories. Upgrade to Pro / Premium for all categories.` });
   const catsOk = (ids) => catsOf(ids).size <= catLimit;
   // Free seller shop: only the categories in the approved application (labels like "Men's"); Pro / Premium: every category
   const appCats = sellerMode && catLimit !== Infinity && mySeller && Array.isArray(mySeller.categories) ? mySeller.categories : [];
@@ -165,12 +171,13 @@ export default function MyShop({ view = 'all', readOnly = false, asUid = '', sel
   // (once per shop: a seller's 2nd / 3rd shop made after paying gets it when it is opened; the server syncs all shops)
   const [synced, setSynced] = useState('');
   useEffect(() => {
-    if (readOnly || isOwner || !shop || synced === shop.slug || !paidUntil || (toMillis(shop.paidUntil) === paidUntil && (shop.tier || 'pro') === (sub.tier || 'pro')) || !auth.currentUser) return;
+    const basicSame = toMillis(sub && sub.basicUntil) === toMillis(shop && shop.basicUntil);
+    if (readOnly || isOwner || !shop || synced === shop.slug || ((!paidUntil || (toMillis(shop.paidUntil) === paidUntil && (shop.tier || 'pro') === (sub.tier || 'pro'))) && (!(sub && sub.basicUntil) || basicSame)) || !auth.currentUser) return;
     setSynced(shop.slug);
     auth.currentUser.getIdToken().then((t) => fetch('/api/plan?action=sync', { method: 'POST', headers: { Authorization: `Bearer ${t}` } })).catch(() => {});
   }, [readOnly, isOwner, synced, shop, paidUntil]);
   const buyPlan = async (want) => {
-    const buy = want === 'premium' ? 'premium' : 'pro';
+    const buy = want === 'premium' ? 'premium' : want === 'basic' ? 'basic' : 'pro';
     setMsg(null); setPaying(buy);
     try {
       const t = await auth.currentUser.getIdToken();
@@ -219,7 +226,7 @@ export default function MyShop({ view = 'all', readOnly = false, asUid = '', sel
 
   const toggle = (p) => {
     if (draft[p.id] === undefined && Object.keys(draft).length >= cap) { limitMsg(); return; }
-    if (draft[p.id] === undefined && allowed && !allowed.has(catOf(p))) { setMsg({ type: 'err', text: 'On the Free plan you can add products only from your approved categories.' }); return; }
+    if (draft[p.id] === undefined && allowed && !allowed.has(catOf(p))) { setMsg({ type: 'err', text: 'On the Basic plan you can add products only from your approved categories.' }); return; }
     if (draft[p.id] === undefined && !catsOk([...Object.keys(draft), p.id])) { catMsg(); return; }
     setDraft((d) => { const n = { ...d }; if (n[p.id] !== undefined) delete n[p.id]; else n[p.id] = String(p.price); return n; });
   };
@@ -474,7 +481,7 @@ export default function MyShop({ view = 'all', readOnly = false, asUid = '', sel
       <RO>
       {show('products', 'manage') && extraHidden && (
         <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-4 text-xs text-amber-600 font-semibold">
-          Your paid plan has ended, so this shop is hidden from customers (nothing is deleted). Your first shop stays on the Free plan. Renew Pro / Premium below and this shop shows again.
+          Your paid plan has ended, so this shop is hidden from customers (nothing is deleted). Your first shop stays on the Basic plan. Renew Pro / Premium below and this shop shows again.
         </div>
       )}
       {show('products', 'manage') && shop.warning && shop.warning.note && (
@@ -619,14 +626,22 @@ export default function MyShop({ view = 'all', readOnly = false, asUid = '', sel
               <button type="button" disabled={!!paying} onClick={() => buyPlan(sub && sub.tier === 'premium' ? 'premium' : 'pro')} className={`${GOLD_BTN} !py-1.5`}>{paying ? 'Opening...' : 'Renew'}</button>
             </div>
           )}
+          {basicNeed && (basicLate || (basicDays !== null && basicDays <= plans.reminderDays)) && (
+            <div className={`rounded-xl border p-3 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${basicLate ? 'border-red-500/50 bg-red-500/10 text-red-500' : 'border-amber-500/50 bg-amber-500/10 text-amber-600'}`}>
+              <span className="font-semibold">{basicLate
+                ? (basicUntil ? `Your Basic plan ended on ${fmtDate(basicUntil)}. Your store is closed to customers (nothing is deleted). Renew Basic (${formatPrice(basicPrice(plans))} / ${plans.periodDays} days) to open it again.` : `Pay Basic (${formatPrice(basicPrice(plans))} / ${plans.periodDays} days) to open your store to customers.`)
+                : `Your Basic plan ends in ${basicDays} day${basicDays === 1 ? '' : 's'} (${fmtDate(basicUntil)}).`}</span>
+              <button type="button" disabled={!!paying} onClick={() => buyPlan('basic')} className={`${GOLD_BTN} !py-1.5`}>{paying ? 'Opening...' : basicUntil ? 'Renew Basic' : 'Pay Basic'}</button>
+            </div>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#B8921F]">My plan</p>
-              <p className="text-xl font-bold">{tier === 'free' ? 'Free' : <span className="text-[#D4AF37]">{TIER_LABEL[tier]}</span>}</p>
+              <p className="text-xl font-bold">{tier === 'free' ? 'Basic' : <span className="text-[#D4AF37]">{TIER_LABEL[tier]}</span>}</p>
             </div>
-            <p className="text-xs text-gray-500">{paid ? `All products · paid until ${fmtDate(paidUntil)}` : `${count} / ${plans.freeLimit} products · ${catsOf(Object.keys(draft)).size} / ${plans.freeCategoryLimit} categories`}</p>
+            <p className="text-xs text-gray-500">{paid ? `All products · paid until ${fmtDate(paidUntil)}` : basicNeed && !basicLate && basicUntil ? `Basic paid until ${fmtDate(basicUntil)} · ${count} / ${plans.freeLimit} products` : `${count} / ${plans.freeLimit} products · ${catsOf(Object.keys(draft)).size} / ${plans.freeCategoryLimit} categories`}</p>
           </div>
-          <PlanCards plans={plans} formatPrice={formatPrice} isDarkMode={isDarkMode} mode="upgrade" currentTier={tier} busy={paying} onChoose={(t) => t !== 'free' && buyPlan(t)} />
+          <PlanCards plans={plans} formatPrice={formatPrice} isDarkMode={isDarkMode} mode="upgrade" currentTier={tier} busy={paying === 'basic' ? 'free' : paying} basicPay={basicNeed ? (basicUntil ? 'Renew Basic' : 'Pay Basic') : ''} onChoose={(t) => (t === 'free' ? basicNeed && buyPlan('basic') : buyPlan(t))} />
           {tier !== 'free' && <p className="text-[11px] text-gray-500 text-center">Renewing or upgrading adds {plans.periodDays} days to your current end date.</p>}
         </div>
       )}
@@ -636,7 +651,7 @@ export default function MyShop({ view = 'all', readOnly = false, asUid = '', sel
       {show('products', 'manage', 'theme') && !readOnly && <div className={`sticky bottom-2 sm:bottom-3 z-20 rounded-2xl border px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 backdrop-blur shadow-[0_8px_30px_-10px_rgba(0,0,0,0.5)] ${dirty ? 'border-[#D4AF37]' : isDarkMode ? 'border-gray-800' : 'border-gray-200'} ${isDarkMode ? 'bg-[#0d0d0d]/95' : 'bg-white/95'}`}>
         <div className="min-w-0 text-xs">
           <p className="font-bold text-sm">{cap < SHOP_MAX_ITEMS ? `Selected ${count} / ${cap}` : `${count} product${count === 1 ? '' : 's'} selected`}</p>
-          {allowed && <p className="text-[11px] text-gray-500">Free plan: from your approved categories ({appCats.join(', ')})</p>}
+          {allowed && <p className="text-[11px] text-gray-500">Basic plan: from your approved categories ({appCats.join(', ')})</p>}
           {msg ? <p className={msg.type === 'ok' ? 'text-green-600' : 'text-red-500'}>{msg.text}</p> : <p className="text-gray-500">{dirty ? 'Unsaved changes' : 'All changes saved'}</p>}
         </div>
         <div className="grid grid-cols-2 sm:flex gap-2">
