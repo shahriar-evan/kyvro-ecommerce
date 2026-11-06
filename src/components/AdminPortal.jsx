@@ -1,6 +1,7 @@
 import React from 'react';
 import { askConfirm } from './AlertCenter';
 import AdminLogin from './AdminLogin';
+import KyvroMark from './KyvroMark';
 import AdminManager from './AdminManager';
 import ImageField from './ImageField';
 import SizeStockEditor from './SizeStockEditor';
@@ -268,9 +269,12 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
           ) : (
             <div className="space-y-8">
               <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 rounded-lg border gap-4 ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
-                <div>
+                <div className="flex items-center gap-4 min-w-0">
+                <KyvroMark dark={isDarkMode} title="Kyvro logo" className="h-11 w-auto shrink-0" />
+                <div className="min-w-0">
                   <h1 className="text-2xl font-serif font-bold">Kyvro Management Dashboard</h1>
                   <p className="text-xs text-gray-500">Logged in as: <strong className="text-[#D4AF37]">{adminName || loggedInUserEmail}</strong>{adminName && <span> ({loggedInUserEmail})</span>} &middot; {roleLabel} | Domain: www.kyvro.store</p>
+                </div>
                 </div>
                 <button 
                   onClick={handleAdminLogout}

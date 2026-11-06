@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronDown, Lock, Menu, X } from 'lucide-react';
+import KyvroMark from './KyvroMark';
 
 // Seller dashboard frame: a menu on the left (desktop) or a drop-down menu (phone), the chosen page on the right.
 // nav = [{ title, items: [{ key, label, icon, badge, children: [{ key, label }] }] }]
@@ -66,6 +67,13 @@ export default function SellerDashLayout({ nav, active, onSelect, isDarkMode, he
       ))}
     </nav>
   );
+  // the Kyvro logo at the top of the menu (seller dashboard and Admin Portal)
+  const brand = (
+    <div className={`flex items-center gap-2 px-3 pt-1 pb-3 mb-3 border-b ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
+      <KyvroMark dark={isDarkMode} title="Kyvro logo" className="h-7 w-auto shrink-0" />
+      <span className="font-serif font-bold tracking-widest text-base leading-none">KYVRO</span>
+    </div>
+  );
   const panel = `rounded-2xl border ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`;
   const parent = parentOf(active);
 
@@ -73,6 +81,7 @@ export default function SellerDashLayout({ nav, active, onSelect, isDarkMode, he
     <div className="lg:grid lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-6 items-start">
       {/* desktop: the menu stays on the left */}
       <aside className={`hidden lg:block sticky top-24 p-3 max-h-[calc(100vh-7rem)] overflow-y-auto ${panel}`}>
+        {brand}
         {head && <div className="px-3 pt-1 pb-4">{head}</div>}
         {menu}
       </aside>
@@ -84,7 +93,7 @@ export default function SellerDashLayout({ nav, active, onSelect, isDarkMode, he
           <span className="truncate">{parent ? `${parent.label} · ` : ''}{current ? current.label : ''}</span>
           <ChevronDown size={16} className={`ml-auto transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
-        {open && <div className={`mt-2 p-3 ${panel}`}>{head && <div className="px-3 pt-1 pb-4">{head}</div>}{menu}</div>}
+        {open && <div className={`mt-2 p-3 ${panel}`}>{brand}{head && <div className="px-3 pt-1 pb-4">{head}</div>}{menu}</div>}
       </div>
       <main className="min-w-0 space-y-5">{children}</main>
     </div>
