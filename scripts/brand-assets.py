@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 HEX = [(50, 6), (88, 28), (88, 72), (50, 94), (12, 72), (12, 28)]
 NOTCH = [(88, 28), (60, 50), (88, 72)]
 CUTS = [[(38, 0), (43, 0), (43, 100), (38, 100)], [(43, 0), (66, 0), (43, 40)], [(43, 100), (66, 100), (43, 60)]]
-BLACK, WHITE, GOLD = '#0b0b0b', '#ffffff', '#C9A24B'
+BLACK, WHITE, GOLD = '#000000', '#ffffff', '#C9A24B'
 pts = lambda p: ' '.join(f'{x},{y}' for x, y in p)
 
 PUB = os.path.join(os.path.dirname(__file__), '..', 'public')
@@ -39,18 +39,18 @@ write('brand/kyvro-icon-gold-on-black.svg', svg('0 0 100 100', f'<rect width="10
                                                 + f'<g transform="translate(50 50) scale(.78) translate(-50 -50)">{mark(GOLD, WHITE)}</g>'))
 
 # favicon: black in a light browser tab, white in a dark one
-write('favicon.svg', svg('10 4 80 92', '<style>.h{fill:#0b0b0b}@media (prefers-color-scheme:dark){.h{fill:#fff}}</style>'
+write('favicon.svg', svg('10 4 80 92', '<style>.h{fill:#000000}@media (prefers-color-scheme:dark){.h{fill:#fff}}</style>'
                          + mark(BLACK, GOLD).replace(f'fill="{BLACK}"', 'class="h"')))
 
 # horizontal lockup: icon + KYVRO + gold dot + কাইভ্রো (text uses the site's fonts; measured with Georgia Bold)
 SERIF = "Georgia, 'Times New Roman', serif"
 BN = "'Hind Siliguri', 'Kohinoor Bangla', 'Noto Sans Bengali', sans-serif"
-FS, LS, BASE = 52, 5, 68
+FS, LS, BASE = 52, 2, 68
 geo = ImageFont.truetype('/System/Library/Fonts/Supplemental/Georgia Bold.ttf', FS)
-tx = 100
+tx = 94
 kw = geo.getlength('KYVRO') + LS * 4
-dot = tx + kw + 22
-bx = dot + 22
+dot = tx + kw + 16
+bx = dot + 16
 bw = 150  # কাইভ্রো at 46px is about 150 wide
 W = round(bx + bw + 4)
 

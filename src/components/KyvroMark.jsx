@@ -2,7 +2,7 @@ import React, { useId } from 'react';
 
 // The Kyvro mark (C2): a solid hexagon with a K cut out of it (a straight cut beside the stem,
 // a V cut at the top and bottom) and a gold notch on the right.
-// Light mode: black hexagon. Dark mode: white hexagon. The gold notch stays gold.
+// Light mode: deep black (#000) hexagon. Dark mode: white hexagon. The gold notch stays gold.
 // The cuts are a mask, so the page colour shows through them.
 // Same drawing in public/brand/*.svg, public/favicon.svg and the PNGs (scripts/brand-png.py); change all together.
 export const HEX = '50,6 88,28 88,72 50,94 12,72 12,28';
@@ -18,7 +18,7 @@ export default function KyvroMark({ dark = false, className = '', title = 'Kyvro
         {CUTS.map((p) => <polygon key={p} points={p} fill="#000" />)}
         <polygon points={NOTCH} fill="#000" />
       </mask>
-      <polygon points={HEX} fill={dark ? '#ffffff' : '#0b0b0b'} mask={`url(#${id})`} />
+      <polygon points={HEX} fill={dark ? '#ffffff' : '#000000'} mask={`url(#${id})`} />
       <polygon points={NOTCH} fill="#C9A24B" />
     </svg>
   );
