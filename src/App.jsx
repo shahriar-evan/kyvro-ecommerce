@@ -6,7 +6,7 @@ import { auth, googleProvider } from './firebase';
 import { isOwnerEmail } from './adminEmails';
 import { getAdminStatus, watchAdminAccess, MAX_COMMISSION } from './adminAuth';
 import { watchShop, watchMyShop, watchShopOwners, SLUG_RE, resolveShopKey, shopLinkKey } from './shops';
-import { touchSellerSeen } from './sellers';
+import { touchSellerSeen, watchMySeller, sellerStatus } from './sellers';
 import { isReservedLink, ROOT_LINK_RE } from './data/reservedLinks';
 import { shopPriceClamp, productInCollection } from './data/shopConfig';
 import { placeOrder, watchOrders, cancelMyOrder } from './orders';
@@ -370,6 +370,9 @@ export default function App() {
   }, [shopRaw, isAdminLoggedIn, customerUser]);
   // a seller who signs in counts as active (unused shops are removed after 30 days without a visit)
   useEffect(() => { if (customerUser && customerUser.uid) touchSellerSeen(customerUser.uid); }, [customerUser && customerUser.uid]); // eslint-disable-line react-hooks/exhaustive-deps
+  // a signed-in seller with a shop (live or waiting) sees "My Shop" in the account menu / footer instead of "Start your own business"
+  const [hasMyShop, setHasMyShop] = useState(false);
+  useEffect(() => watchMySeller(customerUser && customerUser.uid, (s) => setHasMyShop(!!s && sellerStatus(s) !== 'rejected')), [customerUser && customerUser.uid]); // eslint-disable-line react-hooks/exhaustive-deps
   // Maintenance mode: visitors can browse everything, but ordering is locked (team members can still test-order)
   const visitorLocked = storeSettings.maintenanceMode === true && !isAdminLoggedIn;
   const lockText = ((storeSettings.maintenanceMessage || '').trim()) || "ওয়েবসাইটে কাজ চলছে, অর্ডার সাময়িক বন্ধ, কিন্তু added to cart করে রাখতে পারবেন। পরবর্তীতে ওয়েবসাইট পুনরায় চালু হলে পেমেন্ট করতে পারবেন অথবা ম্যানুয়ালি অর্ডার করতে WhatsApp এ যোগাযোগ করুন।\n\nMaintenance mode is ON. Ordering is paused for a little while, but you can keep items in your cart and pay when the website opens again, or contact us on WhatsApp to order manually.";
@@ -857,6 +860,9 @@ export default function App() {
   const [sellPlan, setSellPlan] = useState('');
   const [pricingBusy, setPricingBusy] = useState('');
   const startSelling = () => { setCurrentView('pricing'); window.scrollTo(0, 0); };
+  const openMyShop = () => { setSellPlan(''); goAccount('sell'); window.scrollTo(0, 0); };
+  const sellAction = hasMyShop ? openMyShop : startSelling;
+  const sellLabel = hasMyShop ? 'My Shop' : 'Start your own business';
   const choosePlan = async (tier) => {
     if (!auth.currentUser) {
       setPricingBusy(tier);
@@ -1321,7 +1327,7 @@ export default function App() {
       {currentView !== 'home' && <BackButton onClick={goBack} />}
 
       {/* 2. HEADER */}
-      <Header shopBrand={shopBrand} onStartSelling={startSelling} onAdminPanel={isAdminLoggedIn ? () => setCurrentView('admin') : null} cart={cart} curr={curr} currencyKey={currencyKey} currentView={currentView} isDarkMode={isDarkMode} setCurrencyKey={setCurrencyKey} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} setIsDarkMode={setIsDarkMode} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} navHas={navHas} customerUser={customerUser} displayName={displayName} photoURL={photoURL} goAccount={goAccount} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} />
+      <Header shopBrand={shopBrand} onStartSelling={sellAction} sellLabel={sellLabel} onAdminPanel={isAdminLoggedIn ? () => setCurrentView('admin') : null} cart={cart} curr={curr} currencyKey={currencyKey} currentView={currentView} isDarkMode={isDarkMode} setCurrencyKey={setCurrencyKey} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} setIsDarkMode={setIsDarkMode} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedCategory={selectCategory} navHas={navHas} customerUser={customerUser} displayName={displayName} photoURL={photoURL} goAccount={goAccount} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} />
       {/* a shop link: who sells it (a public seller is not Kyvro itself), Verified for Premium, the Pro / Premium page
           extras (tagline, contact, about, social links) and the Premium ones (announcement, brand color, top picks) */}
       {shopPreview && currentView !== 'admin' && (
@@ -1455,11 +1461,11 @@ export default function App() {
               <p className="text-lg sm:text-xl font-bold text-white">Start your own business with <span className="text-[#D4AF37]">Kyvro · কাইভ্রো</span></p>
               <p className="text-sm text-gray-400 mt-1">Free 10 products, no investment. We deliver, you earn the markup.</p>
             </div>
-            <button type="button" onClick={startSelling} className="shrink-0 w-full sm:w-auto bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold px-8 py-3 rounded text-xs uppercase tracking-widest shadow hover:opacity-90 transition">Start selling</button>
+            <button type="button" onClick={sellAction} className="shrink-0 w-full sm:w-auto bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold px-8 py-3 rounded text-xs uppercase tracking-widest shadow hover:opacity-90 transition">{hasMyShop ? 'My Shop' : 'Start selling'}</button>
           </div>
         </section>
       )}
-      <Footer onStartSelling={startSelling} navHas={navHas} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} customerUser={customerUser} onSignIn={handleCustomerSignIn} goAccount={goAccount} />
+      <Footer onStartSelling={sellAction} sellLabel={sellLabel} navHas={navHas} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} customerUser={customerUser} onSignIn={handleCustomerSignIn} goAccount={goAccount} />
 
     </div>
   );
