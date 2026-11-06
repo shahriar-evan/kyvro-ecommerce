@@ -102,15 +102,16 @@ async function logoPending(req, res) {
   return res.status(200).json({ sent: pushed, emailed });
 }
 
-// ?action=seller-shop: an approved seller asked for another shop (shops/{slug} kind 'seller', extra, 'pending').
-// Same safety: text from the saved shop, only for a waiting one, once per shop (notified).
+// ?action=seller-shop: an approved seller opened another shop (shops/{slug} kind 'seller', extra; live at once, older
+// ones 'pending'). Same safety: text from the saved shop, once per shop (notified).
 async function sellerShopRequested(req, res) {
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   const slug = String(body.slug || '');
   if (!/^[a-z0-9-]{3,40}$/.test(slug)) return res.status(400).json({ error: 'Bad shop.' });
   const token = await accessToken();
   const shop = await readDoc(token, `shops/${slug}`);
-  if (!shop || shop.kind !== 'seller' || shop.extra !== true || shop.status !== 'pending') return res.status(200).json({ sent: 0, reason: 'no waiting shop request' });
+  if (!shop || shop.kind !== 'seller' || shop.extra !== true || !['pending', 'approved'].includes(String(shop.status || 'approved'))) return res.status(200).json({ sent: 0, reason: 'no new seller shop' });
+  const waiting = shop.status === 'pending';
   if (shop.notified) return res.status(200).json({ sent: 0, reason: 'already notified' });
   const mark = await fetch(`${FS}/documents:commit`, {
     method: 'POST',
@@ -128,13 +129,13 @@ async function sellerShopRequested(req, res) {
   const link = `${SITE}/${String(shop.handle || slug)}`;
   const cats = Array.isArray(shop.categories) ? shop.categories.join(', ') : '';
   const owners = await ownerEmails(token);
-  const title = `New shop request: ${shopName}`;
-  const text = `${person} asked for another shop (${link}). Admin Portal -> Sellers -> New shop requests.`;
+  const title = waiting ? `New shop request: ${shopName}` : `New seller shop: ${shopName}`;
+  const text = waiting ? `${person} asked for another shop (${link}). Admin Portal -> Sellers -> New shop requests.` : `${person} opened another shop (${link}). It is live. Admin Portal -> Team Shops.`;
   const pushed = await pushToOwners(token, owners, title, text);
   const html = `<!doctype html><html><body style="font-family:Arial,Helvetica,sans-serif;color:#111"><div style="max-width:560px;margin:0 auto;padding:24px;line-height:1.7">
-    <p><strong>${esc(person)}</strong> asked for another shop: <strong>${esc(shopName)}</strong> (${esc(link)}).</p>
+    <p><strong>${esc(person)}</strong> ${waiting ? 'asked for' : 'opened'} another shop: <strong>${esc(shopName)}</strong> (${esc(link)}).</p>
     ${cats ? `<p>Categories: ${esc(cats)}</p>` : ''}
-    <p>It stays off until you approve it. Admin Portal &rarr; <strong>Sellers</strong> &rarr; New shop requests &rarr; Approve or Reject.</p>
+    <p>${waiting ? 'It stays off until you approve it. Admin Portal &rarr; <strong>Sellers</strong> &rarr; New shop requests &rarr; Approve or Reject.' : 'It is live now (within their plan\'s shop limit). If something is wrong, remove it in Admin Portal &rarr; <strong>Team Shops</strong>.'}</p>
     <p><a href="${esc(SITE)}">${esc(SITE)}</a></p></div></body></html>`;
   const emailed = await emailOwners(owners, title, html, `${text}\n${cats ? `Categories: ${cats}\n` : ''}${SITE}`);
   return res.status(200).json({ sent: pushed, emailed });

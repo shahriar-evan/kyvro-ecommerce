@@ -5,10 +5,10 @@ import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, signOu
 import { auth, googleProvider } from './firebase';
 import { isOwnerEmail } from './adminEmails';
 import { getAdminStatus, watchAdminAccess, MAX_COMMISSION } from './adminAuth';
-import { watchShop, watchMyShop, watchShopOwners, SLUG_RE, resolveShopKey, shopLinkKey } from './shops';
+import { watchShop, watchMyShop, watchShopOwners, SLUG_RE, resolveShopKey, shopLinkKey, turnShopOn, setMyShopLive } from './shops';
 import { touchSellerSeen, watchMySeller, sellerStatus } from './sellers';
 import { isReservedLink, ROOT_LINK_RE } from './data/reservedLinks';
-import { shopPriceClamp, productInCollection } from './data/shopConfig';
+import { shopPriceClamp, productInCollection, WHATSAPP_NUMBER } from './data/shopConfig';
 import { placeOrder, watchOrders, cancelMyOrder } from './orders';
 import { watchProfile, saveProfile, watchMyOrders, saveCartSummary } from './customerData';
 import { ensureSubscribed } from './subscribers';
@@ -1377,7 +1377,31 @@ export default function App() {
           extras (tagline, contact, about, social links) and the Premium ones (announcement, brand color, top picks) */}
       {shopPreview && currentView !== 'admin' && (
         <div className="px-4 py-2.5 text-center text-xs font-semibold bg-amber-500 text-black" role="status">
-          Preview: this shop is not live yet{shopRaw.status === 'pending' ? ' (waiting for Kyvro\'s approval)' : shopRaw.killed ? ' (switched off by Kyvro)' : shopRaw.active === false ? ' (switched off)' : basicDue(shopRaw, plans) ? ' (the Basic plan is not paid yet: pay it in your seller dashboard to open the store)' : ' (hidden: the paid plan has ended)'}. Only you can see it; customers get "page not found".
+          Preview: this shop is not live yet{shopRaw.status === 'pending' ? ' (waiting for Kyvro\'s approval)' : shopRaw.killed ? ' (switched off by Kyvro)' : shopRaw.inactiveHold ? ' (hidden: the seller was inactive)' : shopRaw.active === false ? ' (switched off)' : basicDue(shopRaw, plans) ? ' (the Basic plan is not paid yet: pay it in your seller dashboard to open the store)' : ' (hidden: the paid plan has ended)'}. Only you can see it; customers get "page not found".
+          {/* what to do next: the team switches it on / reviews it; the shop's owner pays, renews or asks Kyvro */}
+          {(() => {
+            const btn = 'ml-2 mt-1.5 sm:mt-0 inline-flex items-center px-3 py-1 rounded-full bg-black text-[#D4AF37] font-bold hover:opacity-90';
+            const off = shopRaw.killed || shopRaw.inactiveHold || shopRaw.active === false;
+            const pending = shopRaw.status === 'pending';
+            const goAdmin = (tab) => { setAdminTab(tab); setCurrentView('admin'); window.scrollTo(0, 0); };
+            if (isAdminLoggedIn) {
+              if (pending) return <button type="button" onClick={() => goAdmin(shopRaw.kind === 'seller' ? 'sellers' : 'my-shop')} className={btn}>Review it</button>;
+              if (off && adminRole === 'owner') {
+                return <button type="button" onClick={async () => { if (!(await askConfirm(`Switch "${shopRaw.name || shopRaw.slug}" on? Customers can open it again.`, { confirmText: 'Switch on' }))) return; try { await turnShopOn(shopRaw.slug); } catch (e) { alert(e.message); } }} className={btn}>Switch shop on</button>;
+              }
+              if (off) return <button type="button" onClick={() => goAdmin(adminRole === 'manager' ? 'plan-members' : 'my-shop')} className={btn}>Open shop settings</button>;
+              return null;
+            }
+            // the shop's own owner (a seller): switched off or hidden for inactivity -> they switch it on themselves (then
+            // Basic must be paid if it is charged; an ended Pro / Premium runs as Basic). Killed (Page off): ask Kyvro.
+            if (off && !shopRaw.killed && !pending) {
+              return <button type="button" onClick={async () => { try { await setMyShopLive(shopRaw.slug, true); } catch (e) { alert(e.code === 'permission-denied' ? 'Could not switch it on. Please contact Kyvro.' : e.message); } }} className={btn}>Switch my shop on</button>;
+            }
+            if (basicDue(shopRaw, plans) || (!off && !pending)) return <button type="button" onClick={() => { setSellPlan(''); goAccount('sell'); window.scrollTo(0, 0); }} className={btn}>{basicDue(shopRaw, plans) ? 'Pay Basic' : 'Renew plan'}</button>;
+            if (pending) return <button type="button" onClick={() => { setSellPlan(''); goAccount('sell'); window.scrollTo(0, 0); }} className={btn}>Open my dashboard</button>;
+            const wa = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hello Kyvro, my shop ${shopRaw.name || ''} (${window.location.origin}/${shopLinkKey(shopRaw)}) is switched off. Please switch it on. / আমার শপটি বন্ধ আছে, দয়া করে চালু করে দিন।`)}`;
+            return <a href={wa} target="_blank" rel="noopener noreferrer" className={btn}>Ask Kyvro to switch it on</a>;
+          })()}
         </div>
       )}
       {/* the team and the shop's own owner can leave the shop link and go back to the main store (customers stay in the shop,

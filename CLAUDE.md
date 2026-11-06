@@ -21,10 +21,10 @@ Fashion dropshipping store for Bangladesh, prices in BDT. Owner: Evan (shahriare
 
 | Role | Who | Can | Cannot |
 |---|---|---|---|
-| **Owner** | fixed email in `src/adminEmails.js` and `isFixedOwner()` in rules (+ `admins` role owner) | everything; plan prices; comp plans; sellers' details; Page off / Page on (kill switch); Mark as paid; delete orders; read-only **View dashboard** of any seller; main site theme | – |
+| **Owner** | fixed email in `src/adminEmails.js` and `isFixedOwner()` in rules (+ `admins` role owner) | everything; plan prices; comp plans; sellers' details; Remove shops; Mark as paid; delete orders; read-only **View dashboard** of any seller; main site theme | – |
 | **Manager** | `admins/{email}` role manager | supplier data, profit; confirm orders; mark Delivered; Mark as returned; own shop (markup); see Admins' stats; Plan Members: feature ON/OFF, logo/banner approve, shop ON/OFF on others' shops | change own shop's features; switch on killed/pending shops; comp plans; seller details; Owner-only settings |
 | **Admin** | `admins/{email}` role admin | place / confirm orders; commission on own `soldBy` main-store sales; "Request delivered"; own shop only with "Shop create" ON (pending until Owner accepts; earns markup) | supplier data; mark Delivered or Paid; create shops without permission |
-| **Seller** | any signed-in customer not in `admins/` ("Sell on Kyvro") | first shop live at once (or after paying Basic, see Plans), more shops by plan (Basic 1 / Pro 2 / Premium 3, Owner approves extras); markup on delivered orders; plan Pro/Premium | supplier data; customer data; touching orders; writing `active`, `status`, `tier`, `paidUntil`, `basicUntil`, `basicFree` (after create) |
+| **Seller** | any signed-in customer not in `admins/` ("Sell on Kyvro") | every shop live at once (or after paying Basic, see Plans), more shops by plan (Basic 1 / Pro 2 / Premium 3; extras live at once, the Owner gets a notification); markup on delivered orders; plan Pro/Premium | supplier data; customer data; touching orders; writing `status`, `tier`, `paidUntil`, `basicUntil`, `basicFree` (after create), `killed`; `active` only ON / OFF on their own approved, not-killed shop (Manage Shop switch; ON also clears `inactiveHold`) |
 
 Per-member toggles on `admins/{email}` (default OFF): `addProducts`, `editAll`, `canApprove`, `canCreateShop`.
 
@@ -60,7 +60,7 @@ Per-member toggles on `admins/{email}` (default OFF): `addProducts`, `editAll`, 
 - Payment: `api/plan.js?action=init` (tier priced on the server; no Pro while Premium runs) → UddoktaPay → `?action=callback` verifies and sets `paidUntil = max(now, paidUntil) + period` once per invoice → `syncShops` copies `tier`/`paidUntil` to shops. Reminders: daily cron `?action=reminders` (`vercel.json`, needs `CRON_SECRET`). Owner comp plans: `?action=comp`.
 - Features per shop: defaults by tier (`FEATURES` in `src/data/shopBrand.js`, `featOn()` in rules), changed per plan by the Owner (Shop plans → Plan features, `settings/plans.tierFeatures`) and per shop in Plan Members (`shops.features`). Free never gets Website Name, logo or banner (`paidFeatOn`).
 - Seller flow: Start selling → public pricing page → plan pick → Google sign-in → application (link, categories, socials). The **first shop is live at once** (any plan; while Basic is charged, after paying Basic: dashboard "Pay Basic"); the Owner gets a phone + email notification (`api/shop-request-notify.js?action=seller`). Not-live shops show a **Preview** banner to the team and the shop's owner; customers get 404.
-- Abuse controls: blocked words (`settings/sellerRules`) + big brand names (`BRAND_WORDS` in `src/sellers.js`, `brandRe()` in rules) in links and names, reserved links, "New sellers allowed" switch, **Page off** / **Page on** (= kill switch, `killed`; nothing deleted, only the Owner switches it back), Owner **Warning** (note on the shop + email, `api/plan.js?action=warn`), **Make live**, **Remove** per shop (Sellers tab).
+- Abuse controls: blocked words (`settings/sellerRules`) + big brand names (`BRAND_WORDS` in `src/sellers.js`, `brandRe()` in rules) in links and names, reserved links, "New sellers allowed" switch, no Page off any more (a bad or inactive shop is **Removed**; an old `killed` shop can still get **Page on**), sellers switch their own shop ON / OFF, Owner **Warning** (note on the shop + email, `api/plan.js?action=warn`), **Make live**, **Remove** per shop (Sellers tab).
 
 ### Plan features (defaults)
 
@@ -84,7 +84,7 @@ Per-member toggles on `admins/{email}` (default OFF): `addProducts`, `editAll`, 
 ### Multi-shop (sellers only; team shops unchanged)
 
 - Limit by account plan: Free 1 / Pro 2 / Premium 3 (`settings/plans.shopLimits`, rules `shopLimitFor` reads `subscriptions/{uid}`). One plan covers all shops (`syncShops` writes every shop of the uid).
-- "+ New shop" (My shops card): link + categories → `extra: true`, off + pending until the Owner approves (Sellers → New shop requests; notification `?action=seller-shop`).
+- "+ New shop" (My shops card): link + categories → `extra: true`, **live at once** within the plan's shop limit (rules: `sellers/{uid}.shops` size ≤ `shopLimitFor`); the Owner gets a notification (`?action=seller-shop`). Old pending requests still show in Sellers → New shop requests.
 - Free products count across all shops (My Shop cap + rules `sellerSizeOk`). My Shop has a shop switcher.
 - Paid plan ended: first shop stays Free; extra shops are hidden from customers (not deleted) until renewed.
 
@@ -92,7 +92,7 @@ Per-member toggles on `admins/{email}` (default OFF): `addProducts`, `editAll`, 
 
 - Plan reminder emails (as before).
 - Customers (`api/_plan/nudges.js`): unpaid Pending orders (Online not Paid, or COD whose delivery charge had to be paid online and was not) get a phone + email reminder on day 1 and 3 (`payRemind`; link `/?pay=due&order=…`) and are **cancelled on day 7** (history line, `autoCancelledAt`). Carts left behind: signed-in customers' cart summary `users/{uid}.cart {n, name, at, shop}` (app writes on change) → phone notification on day 1 / 3 / 7 after the last change (`cartReminders/{uid}` server only; link `?cart=open`).
-- Inactive sellers (`lastSeenAt`, saved on sign-in): warning emails after 7, 15, 25 days. On day 30 (60 if the account paid before; never while a paid plan runs): no open orders and nothing due → shops, links and seller entry are removed; otherwise shops are hidden (`inactiveHold`) and the Owner is notified, then **Make live** after clearing.
+- Inactive sellers (`lastSeenAt`, saved on sign-in): warning emails after 7, 15, 25 days. On day 30 (60 if the account paid before; never while a paid plan runs): no open orders and nothing due → shops, links and seller entry are removed; otherwise shops are hidden (`inactiveHold`) and the Owner is notified; the seller (back again) switches it on themselves (Manage Shop ON / OFF, or the Preview bar), or the Owner does (**Make live** / Preview bar **Switch shop on**). Basic still needs paying while charged; an ended Pro / Premium runs as Basic.
 
 ## Dashboards
 
