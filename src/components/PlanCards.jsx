@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Zap, Rocket, Gem, Check, Clock } from 'lucide-react';
+import { Zap, Rocket, Gem, Check, Clock, Hourglass } from 'lucide-react';
 import { normalizePlans, planPrice, basicPrice } from '../data/priceCheck';
 import { PLAN_TEXT, fill } from '../data/planText';
 
@@ -20,11 +20,16 @@ export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mo
   // Pro / Premium have the same label + end date. A date that has already passed is not shown.
   const basic = plans.basic;
   const labelOf = (c) => (c.label === 'Launch offer' ? T.launchOffer : c.label);
+  // the offer's last day (Dhaka time): { left: '15 days left' | 'Last day!', date: 'Offer ends 22 Nov 2026', urgent }
   const endsOf = (c) => {
-    if (!c.endsAt) return '';
+    if (!c.endsAt) return null;
     const end = new Date(`${c.endsAt}T23:59:59+06:00`);
-    if (end.getTime() < Date.now()) return '';
-    return fill(T.offerEnds, end.toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Dhaka' }), 'en');
+    const ms = end.getTime() - Date.now();
+    if (ms < 0) return null;
+    const days = Math.floor(ms / 86400000); // whole days after today
+    const left = days === 0 ? T.lastDay : days === 1 ? T.oneDayLeft : fill(T.daysLeft, days, lang);
+    const date = fill(T.offerEnds, end.toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Dhaka' }), 'en');
+    return { left, date, urgent: days <= 3 };
   };
   const tiers = [
     { key: 'free', name: T.free, icon: Zap, blurb: T.blurbFree, features: [shopsLine('free'), ...T.featFree.map((f) => fill(f, plans.freeLimit, lang))] },
@@ -92,7 +97,17 @@ export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mo
                   <p className="mt-2"><span className="inline-block px-3 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-[#D4AF37]/15 text-[#B8921F] border border-[#D4AF37]/40">{labelOf(cfg)}</span></p>
                 )}
                 {free && !(cfg.discount > 0) && price === 0 && <p className={`text-xs mt-1 ${muted}`}>{T.forever}</p>}
-                {cfg.discount > 0 && endsOf(cfg) && <p className={`text-[11px] mt-1.5 ${muted}`}>{endsOf(cfg)}</p>}
+                {cfg.discount > 0 && endsOf(cfg) && (() => {
+                  const e = endsOf(cfg);
+                  return (
+                    <div className={`mt-3 mx-auto w-fit rounded-2xl border px-4 py-2 ${e.urgent ? 'border-red-500/50 bg-red-500/10' : isDarkMode ? 'border-[#D4AF37]/40 bg-[#D4AF37]/10' : 'border-[#D4AF37]/50 bg-[#D4AF37]/10'}`}>
+                      <p className={`flex items-center justify-center gap-1.5 text-lg sm:text-xl font-extrabold leading-tight ${e.urgent ? 'text-red-600' : isDarkMode ? 'text-[#E9CB6B]' : 'text-[#9A7A16]'}`}>
+                        <Hourglass size={18} className={e.urgent ? 'motion-safe:animate-pulse' : ''} />{e.left}
+                      </p>
+                      <p className={`text-[11px] mt-0.5 ${muted}`}>{e.date}</p>
+                    </div>
+                  );
+                })()}
                 {free && price === 0 && cfg.discount > 0 && <p className={`text-[11px] mt-1.5 leading-snug ${muted}`}>{T.earlyFree}</p>}
               </div>
 
