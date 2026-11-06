@@ -643,6 +643,8 @@ export default function MyShop({ view = 'all', readOnly = false, asUid = '', sel
           </div>
           <PlanCards plans={plans} formatPrice={formatPrice} isDarkMode={isDarkMode} mode="upgrade" currentTier={tier} busy={paying === 'basic' ? 'free' : paying} basicPay={basicNeed ? (basicUntil ? 'Renew Basic' : 'Pay Basic') : ''} onChoose={(t) => (t === 'free' ? basicNeed && buyPlan('basic') : buyPlan(t))} />
           {tier !== 'free' && <p className="text-[11px] text-gray-500 text-center">Renewing or upgrading adds {plans.periodDays} days to your current end date.</p>}
+          {/* under every Pay / Renew button of this page (plan cards and the renew notices above) */}
+          <p className="text-[11px] text-gray-500 text-center">Plan fees are non-refundable. · <span lang="bn">প্ল্যানের ফি ফেরতযোগ্য নয়।</span></p>
         </div>
       )}
 
