@@ -77,7 +77,7 @@ export const PLAN_TEXT = {
       ['Can I have more than one shop?', 'Yes: Basic 1 shop, Pro 2, Premium 3. One plan covers all your shops, and the earnings of all your shops are paid together. Every new shop goes live after Kyvro approves it. If your paid plan ends, your first shop stays on the Basic plan and the others are hidden (not deleted) until you renew; on Basic the 10 products count across all shops.'],
       ['Can I change my shop link or name?', 'Your shop link (kyvro.store/your-name) is free on every plan and can be changed in My Shop once in 30 days; old links keep working and open the new one. Your shop shows its link name (for example "Rupa Style") until you create your own Website Name, which is a Premium feature.'],
       ['Can I use my own logo or domain?', 'Logo and banner: on Premium you can upload them (they go live after Kyvro approves them). A custom domain is coming soon.'],
-      ['Can I get a refund?', 'For a refund, please contact Kyvro support.'],
+      ['Can I get a refund?', "Plan fees are non-refundable once paid, because your plan is activated immediately. Plans don't renew automatically, so you're never charged again unless you choose to renew. If you were charged twice or a payment error occurred, contact Kyvro support and we'll fix it."],
     ],
   },
   bn: {
@@ -118,7 +118,7 @@ export const PLAN_TEXT = {
       ['একাধিক শপ খুলতে পারব?', 'হ্যাঁ: Basic-এ ১টি, Pro-তে ২টি, Premium-এ ৩টি শপ। এক প্ল্যানে আপনার সব শপ চলে, আর সব শপের আয় একসাথে পেআউট হয়। প্রতিটি নতুন শপ Kyvro অনুমোদন করলে লাইভ হয়। পেইড প্ল্যান শেষ হলে প্রথম শপ Basic-এ থাকে, বাকিগুলো নবায়ন না করা পর্যন্ত লুকানো থাকে (মুছে যায় না); Basic-এ ১০টি পণ্য সব শপ মিলিয়ে গোনা হয়।'],
       ['শপের লিংক বা নাম বদলাতে পারব?', 'শপ লিংক (kyvro.store/your-name) সব প্ল্যানে ফ্রি, My Shop থেকে ৩০ দিনে একবার বদলানো যায়; পুরনো লিংকও কাজ করে এবং নতুন লিংকে নিয়ে যায়। নিজের ওয়েবসাইটের নাম (Premium) না দেওয়া পর্যন্ত শপে লিংকের নাম দেখায় (যেমন "Rupa Style")।'],
       ['নিজের লোগো বা ডোমেইন ব্যবহার করতে পারব?', 'লোগো ও ব্যানার: প্রিমিয়ামে আপলোড করা যায় (Kyvro অনুমোদন করলে লাইভ হয়)। কাস্টম ডোমেইন শিগগিরই আসছে।'],
-      ['রিফান্ড পাব?', 'রিফান্ডের জন্য Kyvro সাপোর্টের সাথে যোগাযোগ করুন।'],
+      ['রিফান্ড পাব?', 'প্ল্যানের ফি একবার পরিশোধ করলে ফেরতযোগ্য নয়, কারণ পেমেন্টের সাথে সাথেই আপনার প্ল্যান চালু হয়ে যায়। আমরা অটো-চার্জ করি না, তাই আপনি নিজে রিনিউ না করলে আর কোনো টাকা কাটা হবে না। পেমেন্ট দুইবার কাটলে বা টেকনিক্যাল ভুল হলে Kyvro support-এ যোগাযোগ করুন, আমরা ঠিক করে দেব।'],
     ],
   },
 };
