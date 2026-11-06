@@ -1,21 +1,25 @@
-import React from 'react';
+import React, { useId } from 'react';
 
-// The Kyvro mark: a black rounded square with a gold "cut K" (stem, a thin white gap, then the arms).
-// Drawn as shapes so it needs no image or font. The same mark is used in light and dark mode;
-// in dark mode a thin grey edge keeps the black square visible on a dark page.
-// public/favicon.svg and public/kyvro-icon.png (1024px, full black square) hold the same drawing; change all together.
+// The Kyvro mark (C2): a solid hexagon with a K cut out of it (a straight cut beside the stem,
+// a V cut at the top and bottom) and a gold notch on the right.
+// Light mode: black hexagon. Dark mode: white hexagon. The gold notch stays gold.
+// The cuts are a mask, so the page colour shows through them.
+// Same drawing in public/brand/*.svg, public/favicon.svg and the PNGs (scripts/brand-png.py); change all together.
+export const HEX = '50,6 88,28 88,72 50,94 12,72 12,28';
+export const NOTCH = '88,28 60,50 88,72';
+export const CUTS = ['38,0 43,0 43,100 38,100', '43,0 66,0 43,40', '43,100 66,100 43,60'];
+
 export default function KyvroMark({ dark = false, className = '', title = 'Kyvro' }) {
+  const id = `km${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   return (
-    <svg viewBox="0 0 100 100" className={className} role="img" aria-label={title} xmlns="http://www.w3.org/2000/svg">
-      <rect x="4" y="4" width="92" height="92" rx="20" fill="#111111" stroke={dark ? '#3a3a3a' : 'none'} strokeWidth="2" />
-      <g transform="translate(50 50) scale(.66) translate(-54 -50)">
-        <g fill="#D4AF37">
-          <rect x="24" y="20" width="14" height="60" />
-          <polygon points="48,52 68,20 84,20 58,58" />
-          <polygon points="58,46 84,80 68,80 48,52" />
-        </g>
-        <rect x="41" y="20" width="3" height="60" fill="#ffffff" />
-      </g>
+    <svg viewBox="10 4 80 92" className={className} role="img" aria-label={title} xmlns="http://www.w3.org/2000/svg">
+      <mask id={id} maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
+        <polygon points={HEX} fill="#fff" />
+        {CUTS.map((p) => <polygon key={p} points={p} fill="#000" />)}
+        <polygon points={NOTCH} fill="#000" />
+      </mask>
+      <polygon points={HEX} fill={dark ? '#ffffff' : '#0b0b0b'} mask={`url(#${id})`} />
+      <polygon points={NOTCH} fill="#C9A24B" />
     </svg>
   );
 }

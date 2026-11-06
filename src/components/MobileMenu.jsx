@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, ChevronRight, Home, Footprints, Wallet, Watch } from 'lucide-react';
+import KyvroMark from './KyvroMark';
 
 // Custom line icons: a man, a woman and a jacket (lucide has no icon for them)
 const mk = (paths) => function CustomIcon({ size = 20 }) {
@@ -44,6 +45,7 @@ export default function MobileMenu({ navHas = () => true, isDarkMode, setIsDarkM
           <div>
             <div className={`flex justify-between items-center px-6 pt-6 pb-5 border-b ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
               <div className="flex items-center gap-2 whitespace-nowrap leading-none">
+                <KyvroMark dark={isDarkMode} title="Kyvro logo" className="h-8 w-auto shrink-0" />
                 <span className="text-2xl font-serif font-bold tracking-widest">KYVRO</span>
                 <span className="text-[#D4AF37] text-2xl" aria-hidden="true">&bull;</span>
                 <span className="text-xl font-bold" lang="bn">কাইভ্রো</span>
