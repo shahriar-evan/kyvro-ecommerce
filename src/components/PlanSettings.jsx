@@ -37,12 +37,20 @@ export default function PlanSettings({ isDarkMode, staff, formatPrice }) {
       <div className="grid grid-cols-2 gap-3">
         {num(draft[t].price, (v) => setTier(t, 'price', v), 'Price (৳)')}
         {num(draft[t].discount, (v) => setTier(t, 'discount', v), 'Discount %', '0 to 90')}
+        <label className="text-xs font-semibold text-gray-500">Label
+          <input className={input} maxLength={40} value={draft[t].label ?? ''} onChange={(e) => setTier(t, 'label', e.target.value)} placeholder="Launch offer" />
+        </label>
+        <label className="text-xs font-semibold text-gray-500">Offer end date
+          <input type="date" className={input} value={draft[t].endsAt || ''} onChange={(e) => setTier(t, 'endsAt', e.target.value)} />
+          <span className="block mt-1 font-normal text-[11px]">Shown on the card only</span>
+        </label>
       </div>
       <p className="flex flex-wrap items-center gap-2 text-sm">
         {preview[t].discount > 0 && <span className="text-gray-500 line-through">{formatPrice(preview[t].price)}</span>}
         <strong className="text-lg text-[#D4AF37]">{formatPrice(planPrice(preview, t))}</strong>
         {preview[t].discount > 0 && <span className="px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold">{preview[t].discount}% OFF</span>}
         <span className="text-xs text-gray-500">/ {preview.periodDays} days</span>
+        {preview[t].discount > 0 && preview[t].label && <span className="text-xs text-gray-500">{preview[t].label}</span>}
       </p>
     </div>
   );

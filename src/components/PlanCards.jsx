@@ -17,9 +17,15 @@ export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mo
   const shopsLine = (t) => { const n = plans.shopLimits[t]; return fill(n === 1 ? T.shopOne : T.shopMany, n, lang); };
   // Basic card: the Owner's label ('Launch offer' by default, shown in the page language) and end date (shown only;
   // the offer keeps running until the Owner changes the discount)
+  // Pro / Premium have the same label + end date. A date that has already passed is not shown.
   const basic = plans.basic;
-  const basicLabel = basic.label === 'Launch offer' ? T.launchOffer : basic.label;
-  const endsText = basic.endsAt ? fill(T.offerEnds, new Date(`${basic.endsAt}T00:00:00+06:00`).toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Dhaka' }), 'en') : '';
+  const labelOf = (c) => (c.label === 'Launch offer' ? T.launchOffer : c.label);
+  const endsOf = (c) => {
+    if (!c.endsAt) return '';
+    const end = new Date(`${c.endsAt}T23:59:59+06:00`);
+    if (end.getTime() < Date.now()) return '';
+    return fill(T.offerEnds, end.toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Dhaka' }), 'en');
+  };
   const tiers = [
     { key: 'free', name: T.free, icon: Zap, blurb: T.blurbFree, features: [shopsLine('free'), ...T.featFree.map((f) => fill(f, plans.freeLimit, lang))] },
     { key: 'pro', name: T.pro, icon: Rocket, blurb: T.blurbPro, badge: T.mostPopular, features: [shopsLine('pro'), ...T.featPro] },
@@ -82,11 +88,11 @@ export default function PlanCards({ plans: rawPlans, formatPrice, isDarkMode, mo
                 )}
                 <p className="mt-1 text-4xl sm:text-5xl font-extrabold tracking-tight">{formatPrice(price)}</p>
                 {!free && <p className={`text-xs mt-1 ${muted}`}>{fill(T.perDays, plans.periodDays, lang)}</p>}
-                {free && cfg.discount > 0 && basicLabel && (
-                  <p className="mt-2"><span className="inline-block px-3 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-[#D4AF37]/15 text-[#B8921F] border border-[#D4AF37]/40">{basicLabel}</span></p>
+                {cfg.discount > 0 && labelOf(cfg) && (
+                  <p className="mt-2"><span className="inline-block px-3 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-[#D4AF37]/15 text-[#B8921F] border border-[#D4AF37]/40">{labelOf(cfg)}</span></p>
                 )}
                 {free && !(cfg.discount > 0) && price === 0 && <p className={`text-xs mt-1 ${muted}`}>{T.forever}</p>}
-                {free && cfg.discount > 0 && endsText && <p className={`text-[11px] mt-1.5 ${muted}`}>{endsText}</p>}
+                {cfg.discount > 0 && endsOf(cfg) && <p className={`text-[11px] mt-1.5 ${muted}`}>{endsOf(cfg)}</p>}
                 {free && price === 0 && cfg.discount > 0 && <p className={`text-[11px] mt-1.5 leading-snug ${muted}`}>{T.earlyFree}</p>}
               </div>
 

@@ -595,9 +595,12 @@ service cloud.firestore {
           && b.get('link', '') is string && b.get('link', '').size() <= 300 && (b.get('link', '') == '' || b.get('link', '').matches('^https://[^ <>"]+$'));
       }
       function tierOk(t) {
-        return t is map && t.keys().hasOnly(['price', 'discount'])
+        return t is map && t.keys().hasOnly(['price', 'discount', 'label', 'endsAt'])
           && t.price is number && t.price >= 1 && t.price <= 1000000
-          && t.discount is number && t.discount >= 0 && t.discount <= 90;
+          && t.discount is number && t.discount >= 0 && t.discount <= 90
+          // card label + offer end date: shown on the plan card only
+          && t.get('label', '') is string && t.get('label', '').size() <= 40
+          && t.get('endsAt', '') is string && (t.get('endsAt', '') == '' || t.get('endsAt', '').matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'));
       }
       // Basic plan card (internal tier 'free'): display price only, discount may be 100%. Never read by the payment server.
       function basicOk(b) {
