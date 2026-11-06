@@ -108,7 +108,8 @@ export default function HomeView({ theme = 'classic', brandName = 'Kyvro', hideE
               <div className="w-12 h-0.5 bg-[#D4AF37] mx-auto mt-3"></div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-6 gap-4 sm:gap-6">
+            {/* centred: a shop with 3 or 4 collections shows them in the middle (6 in one row on a computer, 2 per row on a phone) */}
+            <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
               {[
                 { name: "Men", label: "Men's Collection", image: shirtImg },
                 { name: "Women", label: "Women's & Girls' Fashion", image: shirtImg },
@@ -126,7 +127,7 @@ export default function HomeView({ theme = 'classic', brandName = 'Kyvro', hideE
                 <div 
                   key={idx}
                   onClick={() => { setSelectedCategory(cat.name); setCurrentView('shop'); }}
-                  className="group relative h-60 sm:h-80 rounded-lg overflow-hidden cursor-pointer shadow-xl border border-gray-800"
+                  className="group relative h-60 sm:h-80 w-[calc(50%-0.5rem)] sm:w-[calc(50%-0.75rem)] lg:w-[calc((100%-7.5rem)/6)] rounded-lg overflow-hidden cursor-pointer shadow-xl border border-gray-800"
                 >
                   <img src={cat.image} alt={cat.label} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent flex flex-col justify-end p-4 sm:p-6">
