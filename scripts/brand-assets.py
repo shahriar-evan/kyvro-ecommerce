@@ -1,4 +1,5 @@
-"""Make the Kyvro logo files (round badge with the hexagon K: solid hexagon, cut K, gold notch).
+"""Make the hexagon logo files: the favicon (16 / 32 px + SVG) and public/brand hexagon icons, lockups and round badges.
+The website logo itself is the K emblem now (scripts/emblem-assets.py, KyvroMark).
 
 Run from the project root:  python3 scripts/brand-assets.py
 Writes public/brand/*.svg, public/favicon.svg and the PNG icons. Needs Pillow (macOS: fonts from /System/Library).
@@ -111,7 +112,5 @@ def png(size, bg, f, a, circle=True, scale=BADGE_SCALE):
 # favicon PNGs: plain black hexagon on a clear background (fills the image)
 png(16, None, BLACK, GOLD, scale=100 / 92).save(os.path.join(PUB, 'favicon-16.png'))
 png(32, None, BLACK, GOLD, scale=100 / 92).save(os.path.join(PUB, 'favicon-32.png'))
-# iPhone icon and the share / push icon: black square, white hexagon, gold notch (same as the Facebook picture)
-png(180, BLACK, WHITE, GOLD, circle=False).convert('RGB').save(os.path.join(PUB, 'apple-touch-icon.png'))
-png(1024, BLACK, WHITE, GOLD, circle=False).convert('RGB').save(os.path.join(PUB, 'kyvro-icon.png'))
+# The iPhone icon and the share / push icon now show the K emblem: scripts/emblem-assets.py makes them.
 print('done, lockup width', W)
