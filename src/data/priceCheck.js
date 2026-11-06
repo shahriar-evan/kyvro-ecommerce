@@ -48,15 +48,20 @@ export const TIER_LABEL = { free: 'Basic', pro: 'Pro', premium: 'Premium' };
 // the most products a shop document can hold at all (also checked in firestore.rules)
 export const SHOP_MAX_ITEMS = 300;
 const num = (v, def, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : def; };
+// card label ('Launch offer') and offer end date (YYYY-MM-DD): shown on the plan card only, never used for the price
+const cardLabel = (v, def) => String(v === undefined ? def : v).replace(/[<>]/g, '').trim().slice(0, 40);
+const cardDate = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? String(v) : '');
 const tierCfg = (t, def, legacy) => ({
   price: num(t && t.price !== undefined ? t.price : legacy.price, def.price, 1, 1000000),
   discount: num(t && t.discount !== undefined ? t.discount : legacy.discount, def.discount, 0, 90),
+  label: cardLabel(t && t.label, ''),
+  endsAt: cardDate(t && t.endsAt),
 });
 // Basic card: list price, discount 0 to 100, a short label and an optional end date (YYYY-MM-DD, shown only)
 const basicCfg = (b) => {
   const x = b || {};
-  const label = String(x.label === undefined ? DEFAULT_PLANS.basic.label : x.label).replace(/[<>]/g, '').trim().slice(0, 40);
-  const endsAt = /^\d{4}-\d{2}-\d{2}$/.test(String(x.endsAt || '')) ? String(x.endsAt) : '';
+  const label = cardLabel(x.label, DEFAULT_PLANS.basic.label);
+  const endsAt = cardDate(x.endsAt);
   return {
     price: num(x.price, DEFAULT_PLANS.basic.price, 0, 1000000),
     discount: num(x.discount, DEFAULT_PLANS.basic.discount, 0, 100),

@@ -1,5 +1,6 @@
 import { getApp } from "firebase/app";
 import { getFirestore, doc, collection, query, where, onSnapshot, setDoc, updateDoc, deleteDoc, deleteField, serverTimestamp, getDocs, getDoc, writeBatch } from "firebase/firestore";
+import { isReservedLink } from "./data/reservedLinks";
 import "./firebase"; // makes sure the default Firebase app exists
 
 const db = getFirestore(getApp());
@@ -109,7 +110,7 @@ export function watchShopOwners(onData, onError) {
 export async function createShop({ uid, email, name, ownerName, pending = false }) {
   const shopName = String(name || "").trim().slice(0, 60);
   const slug = `${slugify(shopName)}-${rand()}`;
-  await setDoc(doc(db, "shops", slug), {
+  const data = {
     name: shopName,
     ownerUid: uid,
     active: !pending,
@@ -117,7 +118,23 @@ export async function createShop({ uid, email, name, ownerName, pending = false 
     items: {},
     createdAt: serverTimestamp(),
     updatedAt: new Date().toISOString(),
-  });
+  };
+  // the public link = the shop name ("Zayra" -> kyvro.store/zayra) when that link is free; else the shop id as before.
+  // No handleChangedAt, so the owner can still change the link right away in My Shop.
+  const handle = cleanHandle(shopName);
+  let linked = false;
+  if (HANDLE_RE.test(handle) && !isReservedLink(handle)) {
+    try {
+      if (!(await handleTaken(handle))) {
+        const b = writeBatch(db);
+        b.set(doc(db, "shops", slug), { ...data, handle });
+        b.set(doc(db, "shopHandles", handle), { slug, uid });
+        await b.commit();
+        linked = true;
+      }
+    } catch (e) { /* link not allowed (blocked word) or just taken: fall back to the plain shop id */ }
+  }
+  if (!linked) await setDoc(doc(db, "shops", slug), data);
   await setDoc(doc(db, "shopOwners", slug), { email: String(email || "").toLowerCase(), name: String(ownerName || "").slice(0, 80) });
   if (pending) {
     // phone notification + email to the Owner (best effort: the request also shows in the Owner's My Shop tab)
