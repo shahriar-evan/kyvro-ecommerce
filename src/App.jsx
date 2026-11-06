@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { askConfirm, showMaintenance } from './components/AlertCenter';
-import { waOrderText, waCartLines } from './whatsappOrder';
+import { waOrderText, waCartLines, setWaShop } from './whatsappOrder';
 import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth, googleProvider } from './firebase';
 import { isOwnerEmail } from './adminEmails';
@@ -148,6 +148,8 @@ export default function App() {
   const shopTier = shopCtx ? (shopCtx.planExempt ? 'premium' : effectiveTier(shopCtx)) : 'free';
   // what the shop may show right now: tier defaults, or the Owner's / a Manager's ON / OFF for this shop
   const shopFeat = shopCtx ? (shopCtx.planExempt ? Object.fromEntries(FEATURES.map((f) => [f.key, true])) : effectiveFeatures(shopCtx, shopTier, plans.tierFeatures)) : {};
+  // WhatsApp order messages name the shop and link its products (null on the main store)
+  setWaShop(shopCtx ? { name: shopDisplayName(shopCtx), url: `${window.location.origin}/${shopLinkKey(shopCtx)}` } : null);
   useEffect(() => { if (shopCtx) { try { document.title = `${shopDisplayName(shopCtx)} · Kyvro`; } catch (e) { /* ignore */ } } }, [shopCtx && shopDisplayName(shopCtx)]); // eslint-disable-line react-hooks/exhaustive-deps
   // storefront theme (src/data/themes.js): a preview (?themePreview=) > the shop's own theme (non-Classic needs the
   // "themes" feature, else Classic) > the main site's theme (settings/theme)
@@ -286,7 +288,8 @@ export default function App() {
     deepLinkDone.current = true;
     setSelectedProduct(found); setCurrentView('product-detail');
     try { window.history.replaceState(window.history.state, '', window.location.pathname); } catch (e) { /* ignore */ }
-  }, [products]); // eslint-disable-line react-hooks/exhaustive-deps
+    // on a shop link (kyvro.store/<shop>?product=ID, e.g. from a WhatsApp order) the list is empty until the shop loads
+  }, [products, shopLoading, storefrontProducts.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Page history: every page the customer opens (home, a collection + sub-category, a product ...) is also a browser
   // history entry, so the phone's Back button / swipe-back and the floating Back button go to the PREVIOUS page of the
@@ -1417,7 +1420,7 @@ export default function App() {
       {/* SHOP CATALOG VIEW */}
       {currentView === 'shop' && <ShopView selectedSubCategory={selectedSubCategory} setSelectedSubCategory={setSelectedSubCategory} requestAdd={requestAdd} addToCart={addToCart} filteredProducts={filteredProducts} formatPrice={formatPrice} isDarkMode={isDarkMode} products={storefrontProducts} searchQuery={searchQuery} selectedCategory={selectedCategory} setCurrentView={setCurrentView} setSearchQuery={setSearchQuery} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} setSortBy={setSortBy} sortBy={sortBy} savedIds={savedIds} toggleSaved={toggleSaved} />}
 
-      {currentView === 'product-detail' && selectedProduct && <ProductDetail key={selectedProduct.id} product={selectedProduct} products={storefrontProducts} setSelectedProduct={setSelectedProduct} storeSettings={storeSettings} cartSubtotal={subtotal} cartUnits={cart.reduce((n, i) => n + (parseInt(i.quantity, 10) || 0), 0)} addToCart={addToCart} calculateDiscountPercent={calculateDiscountPercent} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} savedIds={savedIds} toggleSaved={toggleSaved} />}
+      {currentView === 'product-detail' && selectedProduct && <ProductDetail key={selectedProduct.id} product={selectedProduct} products={storefrontProducts} setSelectedProduct={setSelectedProduct} storeSettings={storeSettings} cartSubtotal={subtotal} cartUnits={cart.reduce((n, i) => n + (parseInt(i.quantity, 10) || 0), 0)} addToCart={addToCart} calculateDiscountPercent={calculateDiscountPercent} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} savedIds={savedIds} toggleSaved={toggleSaved} teamShop={isAdminLoggedIn && shopCtx ? shopDisplayName(shopCtx) : ''} />}
 
       {currentView === 'tracking' && <OrderTracking customerUser={customerUser} onSignIn={handleCustomerSignIn} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
       {currentView === 'pricing' && (

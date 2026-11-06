@@ -780,7 +780,8 @@ export default function OrdersPanel({ orders, products = [], productCosts = {}, 
                 }} className={`${btn} border border-red-500 text-red-500 hover:bg-red-500/10`}>Mark as returned</button>
               )}
               {o.returned && <span className="text-[11px] text-red-500 self-center font-semibold">Returned{o.returned.loss > 0 ? ` · loss ${formatPrice(o.returned.loss)}` : ''}{o.returned.note ? ` · ${o.returned.note}` : ''}. No commission or markup is paid on it.</span>}
-              {(o.paymentStatus === 'Awaiting payment' || o.paymentStatus === 'Awaiting verification') && o.status !== 'Cancelled' && isOwner && (
+              {/* also on Cash on Delivery: a WhatsApp customer who paid before delivery (Owner only) */}
+              {(o.paymentStatus === 'Awaiting payment' || o.paymentStatus === 'Awaiting verification' || (o.paymentStatus === 'Cash on Delivery' && o.status !== 'Delivered')) && o.status !== 'Cancelled' && isOwner && (
                 <button disabled={busy} onClick={() => run(o.id, () => markOrderPaid(o.id, staff))} className={`${btn} bg-[#D4AF37] text-black hover:opacity-90`}>Mark payment received</button>
               )}
               {o.status !== 'Cancelled' && o.status !== 'Delivered' && (isOwner || !isPaidOrder(o)) && (

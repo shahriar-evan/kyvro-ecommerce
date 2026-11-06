@@ -162,7 +162,7 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
                         >
                           Buy Now
                         </button>
-                        <WhatsAppButton compact href={waOrderLink(waProductLines({ name: product.name, price: product.price }))} />
+                        <WhatsAppButton compact href={waOrderLink(waProductLines({ id: product.id, name: product.name, price: product.price }))} />
                       </div>
                     </div>
                   </div>
