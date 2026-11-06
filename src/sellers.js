@@ -242,9 +242,17 @@ export async function rejectSeller(seller, note, staff) {
 // kill switch: the shop goes off and the seller can never switch it on again (only the Owner can revive it)
 export const killSellerShop = (slug, note) => updateDoc(doc(db, "shops", slug), { active: false, killed: true, killNote: String(note || "").slice(0, 200), updatedAt: new Date().toISOString() });
 export const reviveSellerShop = (slug) => updateDoc(doc(db, "shops", slug), { active: true, killed: false, killNote: "", updatedAt: new Date().toISOString() });
+// Owner: remove one seller shop. An extra shop goes on its own (the seller keeps the rest); the first shop is the
+// seller's main entry, so removing it removes the seller with all their shops (the account could open a new one later).
+// Orders stay as they are.
+export async function removeSellerShop(seller, slug) {
+  if (!seller || slug === seller.slug) return removeSeller(seller || { uid: '', slug, shops: [slug] });
+  return rejectSellerShop(seller, slug);
+}
 // remove a seller completely (shop + entry), so the account could open a new shop later
 export async function removeSeller(seller) {
   for (const slug of sellerShopList(seller)) { await releaseShopHandle(slug); try { await deleteDoc(doc(db, "shops", slug)); } catch (e) { /* already gone */ } }
+  if (!seller.uid) return;
   await deleteDoc(doc(db, "sellers", seller.uid));
   try { await deleteDoc(doc(db, "sellerPayout", seller.uid)); } catch (e) { /* nothing saved */ }
 }

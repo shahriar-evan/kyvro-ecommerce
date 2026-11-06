@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { auth } from '../firebase';
 import { askConfirm, askInput } from './AlertCenter';
-import { watchAllShops, watchShopOwners, setShopFeatures, grantLogo, denyLogoRequest, approveLogo, rejectLogo, setShopOn, approveBanner, rejectBanner } from '../shops';
-import { watchSellers, killSellerShop, reviveSellerShop } from '../sellers';
+import { watchAllShops, watchShopOwners, setShopFeatures, grantLogo, denyLogoRequest, approveLogo, rejectLogo, setShopOn, approveBanner, rejectBanner, rejectShop } from '../shops';
+import { watchSellers, reviveSellerShop, removeSellerShop, sellerShopList } from '../sellers';
 import { effectiveTier, toMillis, TIER_LABEL, normalizePlans } from '../data/priceCheck';
 import { watchPlans } from '../storeSettings';
 import { FEATURES, featureDefault, featureLockedFree } from '../data/shopBrand';
@@ -206,9 +206,20 @@ export default function PlanMembers({ isOwner, isDarkMode }) {
                   <p><span className="text-gray-500">Address:</span> {cur.seller.address || '-'}</p>
                 </div>
               )}
-              {cur.kind === 'seller' && (cur.killed
-                ? <button type="button" disabled={busy} onClick={() => act(() => reviveSellerShop(cur.slug), 'Shop revived.')} className="px-3 py-1.5 rounded border border-green-600 text-green-600 font-bold disabled:opacity-50">Revive</button>
-                : <button type="button" disabled={busy} onClick={async () => { const n = await askInput('Kill switch: reason (the seller sees it):'); if (n === null || n === undefined) return; act(() => killSellerShop(cur.slug, n), 'Shop switched off for good.'); }} className="px-3 py-1.5 rounded bg-red-600 text-white font-bold disabled:opacity-50">Kill switch</button>)}
+              <div className="flex flex-wrap gap-2">
+                {cur.kind === 'seller' && cur.killed && <button type="button" disabled={busy} onClick={() => act(() => reviveSellerShop(cur.slug), 'Shop revived.')} className="px-3 py-1.5 rounded border border-green-600 text-green-600 font-bold disabled:opacity-50">Revive</button>}
+                {/* delete the shop for good (its link is freed; orders stay) */}
+                <button type="button" disabled={busy} onClick={async () => {
+                  const owner = cur.kind === 'seller' ? sellers.find((x) => sellerShopList(x).includes(cur.slug)) : null;
+                  const whole = cur.kind === 'seller' && (!owner || owner.slug === cur.slug);
+                  const others = whole && owner ? sellerShopList(owner).filter((x) => x !== cur.slug).length : 0;
+                  const text = cur.kind === 'seller'
+                    ? (whole ? `Remove the shop "${cur.name || cur.slug}"? This is the seller's first shop, so the seller entry${others ? ` and their other ${others} shop(s)` : ''} are removed too (they could open a new shop later).` : `Remove the shop "${cur.name || cur.slug}"? The seller keeps their other shops.`)
+                    : `Remove the team shop "${cur.name || cur.slug}"?`;
+                  if (!(await askConfirm(`${text} Its link stops working and cannot be undone. Orders stay. Pay any markup still due first (Sellers / Team Stats).`, { danger: true, confirmText: 'Remove shop' }))) return;
+                  act(async () => { await (cur.kind === 'seller' ? removeSellerShop(owner, cur.slug) : rejectShop(cur.slug)); setOpen(''); }, 'Shop removed.');
+                }} className="px-3 py-1.5 rounded bg-red-600 text-white font-bold disabled:opacity-50">Remove shop</button>
+              </div>
             </div>
           )}
         </div>

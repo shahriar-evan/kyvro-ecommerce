@@ -184,6 +184,9 @@ export async function uploadLogo(slug, dataUrl) {
 export const setShopFeatures = (slug, features) => updateDoc(doc(db, "shops", slug), { features, updatedAt: new Date().toISOString() });
 export const grantLogo = (slug, features) => updateDoc(doc(db, "shops", slug), { features: { ...(features || {}), logo: true }, logoRequest: deleteField(), updatedAt: new Date().toISOString() });
 export const denyLogoRequest = (slug, note) => updateDoc(doc(db, "shops", slug), { logoRequest: deleteField(), logoReject: { note: String(note || "").slice(0, 200), at: new Date().toISOString(), kind: "request" }, updatedAt: new Date().toISOString() });
+// the shop's owner takes the live logo / banner off (Premium; a new one can be uploaded and approved later)
+export const removeLogo = (slug) => updateDoc(doc(db, "shops", slug), { logo: deleteField(), updatedAt: new Date().toISOString() });
+export const removeBanner = (slug) => updateDoc(doc(db, "shops", slug), { banner: deleteField(), updatedAt: new Date().toISOString() });
 export const approveLogo = (shop) => updateDoc(doc(db, "shops", shop.slug), { logo: shop.logoPending, logoPending: deleteField(), logoPendingAt: deleteField(), updatedAt: new Date().toISOString() });
 export const rejectLogo = (slug, note) => updateDoc(doc(db, "shops", slug), { logoPending: deleteField(), logoPendingAt: deleteField(), logoReject: { note: String(note || "").slice(0, 200), at: new Date().toISOString(), kind: "logo" }, updatedAt: new Date().toISOString() });
 export const setShopOn = (slug, on) => updateDoc(doc(db, "shops", slug), { active: !!on, updatedAt: new Date().toISOString() });

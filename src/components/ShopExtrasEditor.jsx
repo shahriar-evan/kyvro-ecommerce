@@ -2,7 +2,8 @@ import React, { useMemo, useState } from 'react';
 import qrcode from 'qrcode-generator';
 import { BRAND_COLORS, SOCIALS } from '../data/shopBrand';
 import { imageFileToDataURL } from '../utils/imageUpload';
-import { uploadLogo, uploadBanner } from '../shops';
+import { uploadLogo, uploadBanner, removeLogo, removeBanner } from '../shops';
+import { askConfirm } from './AlertCenter';
 import { GOLD_BTN, OUTLINE_BTN, planBadge } from './ui';
 
 // My Shop: the shop page extras, in plan order. Pro + Premium: social links and the share kit (link, QR code, caption).
@@ -31,6 +32,18 @@ export default function ShopExtrasEditor({ only = '', extras, setExtras, feat, s
   };
   // banner: PNG / JPG / WebP up to 2 MB, made into a wide picture (max 1200 px) that waits for approval
   const [bannerMsg, setBannerMsg] = useState(null);
+  // take the live logo / banner off the shop (a new one can be uploaded any time and goes through approval again)
+  const takeOff = async (what) => {
+    const isLogo = what === 'logo';
+    if (!(await askConfirm(`Remove your ${what} from the shop? You can upload a new one any time (Kyvro approves it first).`, { confirmText: 'Remove', danger: true }))) return;
+    try {
+      await (isLogo ? removeLogo : removeBanner)(shop.slug);
+      (isLogo ? setLogoMsg : setBannerMsg)({ type: 'ok', text: `${isLogo ? 'Logo' : 'Banner'} removed.` });
+    } catch (e) {
+      (isLogo ? setLogoMsg : setBannerMsg)({ type: 'err', text: e.code === 'permission-denied' ? 'Could not remove it. Please try again later.' : e.message });
+    }
+  };
+  const removeBtn = (what) => <button type="button" onClick={() => takeOff(what)} className="text-xs font-semibold text-red-500 hover:underline">Remove</button>;
   const [bannerBusy, setBannerBusy] = useState(false);
   const pickBanner = async (file) => {
     setBannerMsg(null);
@@ -155,7 +168,7 @@ export default function ShopExtrasEditor({ only = '', extras, setExtras, feat, s
       {shop && (
         <div className={`${box} ${feat.logo ? '' : 'opacity-60'}`}>
           {head('Shop logo', 'Premium', feat.logo)}
-          {shop.logo && <div className="flex items-center gap-3 text-xs"><img src={shop.logo} alt="" className="w-14 h-14 rounded-xl object-cover border" /><span className="text-green-600 font-semibold">Approved logo (shown on your shop)</span></div>}
+          {shop.logo && <div className="flex items-center gap-3 text-xs"><img src={shop.logo} alt="" className="w-14 h-14 rounded-xl object-cover border" /><span className="text-green-600 font-semibold">Approved logo (shown on your shop)</span>{removeBtn('logo')}</div>}
           {shop.logoPending && <div className="flex items-center gap-3 text-xs"><img src={shop.logoPending} alt="" className="w-14 h-14 rounded-xl object-cover border" /><span className="text-amber-600 font-semibold">Waiting for Kyvro's approval</span></div>}
           {shop.logoReject && <p className="text-xs text-red-500">{shop.logoReject.kind === 'request' ? 'Logo request rejected' : 'Logo rejected'}{shop.logoReject.note ? `: ${shop.logoReject.note}` : ''}</p>}
           {feat.logo ? (
@@ -171,7 +184,7 @@ export default function ShopExtrasEditor({ only = '', extras, setExtras, feat, s
       {shop && (
         <div className={`${box} ${feat.banner ? '' : 'opacity-60'}`}>
           {head('Shop banner', 'Premium', feat.banner)}
-          {shop.banner && <div className="space-y-1 text-xs"><img src={shop.banner} alt="" className="w-full max-h-36 object-cover rounded-xl border" /><span className="text-green-600 font-semibold">Approved banner (shown on top of your shop)</span></div>}
+          {shop.banner && <div className="space-y-1 text-xs"><img src={shop.banner} alt="" className="w-full max-h-36 object-cover rounded-xl border" /><span className="text-green-600 font-semibold">Approved banner (shown on top of your shop)</span> {removeBtn('banner')}</div>}
           {shop.bannerPending && <div className="space-y-1 text-xs"><img src={shop.bannerPending} alt="" className="w-full max-h-36 object-cover rounded-xl border" /><span className="text-amber-600 font-semibold">Waiting for Kyvro's approval</span></div>}
           {shop.bannerReject && <p className="text-xs text-red-500">Banner rejected{shop.bannerReject.note ? `: ${shop.bannerReject.note}` : ''}</p>}
           {feat.banner ? (
