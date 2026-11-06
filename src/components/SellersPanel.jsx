@@ -17,6 +17,16 @@ const markupOf = (o) => (o.items || []).reduce((n, it) => n + Math.max(0, (Numbe
 
 // Owner: every public seller ("Sell on Kyvro") with their shop, plan, earnings (markup on delivered orders), what was
 // paid, what is due, their bKash, Mark as paid, and the kill switch. Plus who may open a shop and the blocked names.
+// the seller's payout details (sellerPayout/{uid}) as lines: bKash numbers and bank accounts
+const payoutLines = (p) => {
+  if (!p) return [];
+  const out = [p.bkash, p.bkash2].filter(Boolean).map((n) => `bKash: ${n}`);
+  (Array.isArray(p.banks) ? p.banks : []).forEach((b) => {
+    out.push(`Bank: ${b.bank} · A/C ${b.account} · ${b.holder} · ${b.branch} branch${b.routing ? ` · Routing ${b.routing}` : ''}${b.swift ? ` · SWIFT ${b.swift}` : ''}`);
+  });
+  return out;
+};
+
 export default function SellersPanel({ orders = [], products = [], isDarkMode, formatPrice, loggedInUserEmail, adminName }) {
   // View dashboard: the seller's own dashboard, read-only, read with the Owner's login
   const [viewing, setViewing] = useState(null);
@@ -60,7 +70,7 @@ export default function SellersPanel({ orders = [], products = [], isDarkMode, f
     const until = toMillis((subs[s.uid] || {}).paidUntil);
     const tier = effectiveTier(subs[s.uid] || null);
     const feat = effectiveFeatures(shop, shop ? effectiveTier(shop) : tier, plans.tierFeatures);
-    return { ...s, tier, feat, shop, shopCount: own.size, orders: mine.length, earned, paid, due: earned - paid, until, bkash: (bkash[s.uid] || {}).bkash || '' };
+    return { ...s, tier, feat, shop, shopCount: own.size, orders: mine.length, earned, paid, due: earned - paid, until, payTo: payoutLines(bkash[s.uid]) };
   }).sort((a, b) => b.due - a.due), [sellers, shops, orders, payouts, subs, bkash, plans]);
 
   // days since the seller last signed in (shops without orders are removed after 30 days without a visit)
@@ -84,7 +94,7 @@ export default function SellersPanel({ orders = [], products = [], isDarkMode, f
   const act = async (key, fn, ok) => { setBusy(key); setMsg(null); try { await fn(); if (ok) setMsg({ type: 'ok', text: ok }); } catch (e) { setMsg({ type: 'err', text: e.message }); } setBusy(''); };
 
   const pay = async (r) => {
-    const a = await askInput(`Paid ${r.name || r.email}? Amount in taka (due: ${formatPrice(Math.max(0, r.due))})${r.bkash ? `\nbKash: ${r.bkash}` : ''}`, { placeholder: 'e.g. 500', initial: r.due > 0 ? String(Math.round(r.due)) : '' });
+    const a = await askInput(`Paid ${r.name || r.email}? Amount in taka (due: ${formatPrice(Math.max(0, r.due))})${r.payTo.length ? `\n${r.payTo.join('\n')}` : ''}`, { placeholder: 'e.g. 500', initial: r.due > 0 ? String(Math.round(r.due)) : '' });
     if (a === null || a === undefined || !(Number(a) > 0)) return;
     const note = await askInput('Note (optional, e.g. bKash TrxID):', { placeholder: 'e.g. TrxID 8N7...' });
     act(r.uid, () => addPayout(r.email, r.name || r.shop?.name || '', Number(a), note || '', { email: loggedInUserEmail }), 'Payment saved.');
@@ -220,7 +230,9 @@ export default function SellersPanel({ orders = [], products = [], isDarkMode, f
                         {r.feat.weeklyPayout && <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase align-middle bg-green-600 text-white">Weekly payout</span>}
                         <span className="font-normal text-gray-500"> · {r.name || ''} {r.email}</span></p>
                       <p className="text-gray-500 break-all">{window.location.origin}/{(r.shop && r.shop.handle) || r.slug} · {r.shop ? Object.keys(r.shop.items || {}).length : 0} products · {seenText(r)}{r.shopCount > 1 ? `${r.shopCount} shops · ` : ''}{r.orders} order(s) · {r.until > Date.now() ? `${r.tier === 'premium' ? 'Premium' : 'Pro'} until ${new Date(r.until).toLocaleDateString('en-GB')}` : 'Free plan'}</p>
-                      <p className="text-gray-500">bKash: {r.bkash || 'not given yet'}</p>
+                      {r.payTo.length
+                        ? <div className="text-gray-500">{r.payTo.map((l) => <p key={l} className="break-all">{l}</p>)}</div>
+                        : <p className="text-gray-500">Payout: not given yet</p>}
                       {r.shop && r.shop.killed && <p className="text-red-500 font-semibold">Switched off by you{r.shop.killNote ? `: ${r.shop.killNote}` : ''}</p>}
                     </div>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${on ? 'bg-green-600 text-white' : 'bg-gray-400 text-white'}`}>{on ? 'LIVE' : 'OFF'}</span>

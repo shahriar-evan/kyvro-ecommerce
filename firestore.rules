@@ -522,10 +522,26 @@ service cloud.firestore {
     }
     // Where a seller wants their markup paid (bKash). The seller writes it; ONLY the Owner can read it.
     match /sellerPayout/{uid} {
+      // one bank account: name, number, holder, branch required; routing (9 digits) and SWIFT (8 / 11) optional
+      function bankOk(b) {
+        return b is map && b.keys().hasOnly(['bank', 'account', 'holder', 'branch', 'routing', 'swift'])
+          && b.bank is string && b.bank.matches('^[^<>]{2,80}$')
+          && b.account is string && b.account.matches('^[0-9]{6,20}$')
+          && b.holder is string && b.holder.matches('^[^<>]{2,80}$')
+          && b.branch is string && b.branch.matches('^[^<>]{2,80}$')
+          && b.get('routing', '') is string && b.get('routing', '').matches('^([0-9]{9})?$')
+          && b.get('swift', '') is string && b.get('swift', '').matches('^([A-Z0-9]{8}|[A-Z0-9]{11})?$');
+      }
       allow read, delete: if isOwner();
+      // up to 2 bKash numbers + up to 2 bank accounts (src/sellers.js saveSellerPayout); at least one way to pay
       allow create, update: if signedIn() && request.auth.uid == uid && exists(sellerPath(uid))
-        && request.resource.data.keys().hasOnly(['bkash', 'updatedAt'])
-        && request.resource.data.bkash is string && request.resource.data.bkash.matches('^01[3-9][0-9]{8}$')
+        && request.resource.data.keys().hasOnly(['bkash', 'bkash2', 'banks', 'updatedAt'])
+        && request.resource.data.bkash is string && request.resource.data.bkash.matches('^(01[3-9][0-9]{8})?$')
+        && request.resource.data.get('bkash2', '') is string && request.resource.data.get('bkash2', '').matches('^(01[3-9][0-9]{8})?$')
+        && request.resource.data.get('banks', []) is list && request.resource.data.get('banks', []).size() <= 2
+        && (request.resource.data.get('banks', []).size() < 1 || bankOk(request.resource.data.banks[0]))
+        && (request.resource.data.get('banks', []).size() < 2 || bankOk(request.resource.data.banks[1]))
+        && (request.resource.data.bkash != '' || request.resource.data.get('bkash2', '') != '' || request.resource.data.get('banks', []).size() > 0)
         && request.resource.data.updatedAt is string && request.resource.data.updatedAt.size() <= 40;
     }
 

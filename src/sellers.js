@@ -168,9 +168,29 @@ export async function rejectSellerShop(seller, slug) {
   await b.commit();
 }
 
-// where my markup is paid (the seller cannot read it back, only the Owner)
-export const saveSellerBkash = (uid, bkash) =>
-  setDoc(doc(db, "sellerPayout", uid), { bkash: String(bkash || "").replace(/\D/g, ""), updatedAt: new Date().toISOString() });
+// where my markup is paid (the seller cannot read it back, only the Owner): up to 2 bKash numbers and up to 2 bank
+// accounts. Saving replaces everything. Same checks in firestore.rules (sellerPayout).
+export const BKASH_RE = /^01[3-9][0-9]{8}$/;
+export const cleanBank = (b) => ({
+  bank: String(b.bank || "").replace(/[<>]/g, "").trim().slice(0, 80),
+  account: String(b.account || "").replace(/\D/g, ""),
+  holder: String(b.holder || "").replace(/[<>]/g, "").trim().slice(0, 80),
+  branch: String(b.branch || "").replace(/[<>]/g, "").trim().slice(0, 80),
+  routing: String(b.routing || "").replace(/\D/g, ""),
+  swift: String(b.swift || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase(),
+});
+// the first problem of one bank account, or '' (EN + Bangla)
+export const bankProblem = (b) => {
+  if (b.bank.length < 2) return "Bank Name / ব্যাংকের নাম লিখুন";
+  if (!/^[0-9]{6,20}$/.test(b.account)) return "Account Number: 6-20 digits / ৬-২০ সংখ্যার অ্যাকাউন্ট নম্বর লিখুন";
+  if (b.holder.length < 2) return "Account Holder Name / অ্যাকাউন্টধারীর নাম লিখুন";
+  if (b.branch.length < 2) return "Branch Name / শাখার নাম লিখুন";
+  if (b.routing && !/^[0-9]{9}$/.test(b.routing)) return "Routing Number: 9 digits / রাউটিং নম্বর ৯ সংখ্যার";
+  if (b.swift && !/^([A-Z0-9]{8}|[A-Z0-9]{11})$/.test(b.swift)) return "SWIFT Code: 8 or 11 letters / SWIFT কোড ৮ বা ১১ অক্ষরের";
+  return "";
+};
+export const saveSellerPayout = (uid, { bkash = "", bkash2 = "", banks = [] }) =>
+  setDoc(doc(db, "sellerPayout", uid), { bkash, bkash2, banks: banks.slice(0, 2), updatedAt: new Date().toISOString() });
 
 // my markup per order, from the server (no customer names, phones or addresses)
 // asUid: the Owner viewing that seller's dashboard (read-only; the server checks the Owner)

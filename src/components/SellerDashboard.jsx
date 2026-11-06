@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import MyShop from './MyShop';
+import PayoutForm from './PayoutForm';
 import { auth } from '../firebase';
-import { requestSellerShop, sellerShopList, updateSellerCategories, watchMySeller, saveSellerBkash, loadSellerEarnings, applyAsSeller, sellerStatus, normalizeWhatsapp, watchSellerRules, sellerNameBlocked } from '../sellers';
+import { requestSellerShop, sellerShopList, updateSellerCategories, watchMySeller, loadSellerEarnings, applyAsSeller, sellerStatus, normalizeWhatsapp, watchSellerRules, sellerNameBlocked } from '../sellers';
 import { watchPayouts } from '../payouts';
 import { formatDateTime, toDate } from '../utils/dates';
 import { getAdminStatus } from '../adminAuth';
@@ -42,9 +43,6 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
   const [earn, setEarn] = useState(null);
   const [earnErr, setEarnErr] = useState('');
   const [payouts, setPayouts] = useState([]);
-  const [bkash, setBkash] = useState('');
-  const [bkashMsg, setBkashMsg] = useState(null);
-  const [saving, setSaving] = useState(false);
   // application form (no NID, passport, bank or bKash: bKash is asked after approval)
   const [form, setForm] = useState({ handle: '', name: '', whatsapp: '', district: '', area: '', address: '', socialLinks: NO_SOCIALS, productNote: '', agreed: false });
   const [formMsg, setFormMsg] = useState('');
@@ -329,15 +327,6 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
 
   const paid = payouts.reduce((n, x) => n + (Number(x.amount) || 0), 0);
   const earned = earn ? earn.earned : 0;
-  const saveBkash = async () => {
-    setBkashMsg(null);
-    const n = bkash.replace(/\D/g, '');
-    if (!/^01[3-9][0-9]{8}$/.test(n)) { setBkashMsg({ type: 'err', text: 'Write an 11-digit bKash number, e.g. 01712345678.' }); return; }
-    setSaving(true);
-    try { await saveSellerBkash(uid, n); setBkash(''); setBkashMsg({ type: 'ok', text: `Saved: ••••${n.slice(-3)}. Only Kyvro can see it.` }); }
-    catch (e) { setBkashMsg({ type: 'err', text: e.code === 'permission-denied' ? 'Could not save. Open your shop first.' : e.message }); }
-    setSaving(false);
-  };
 
   // ---- the dashboard: menu on the left, the chosen page on the right ----
   const acctTier = effectiveTier(mySub);
@@ -605,12 +594,8 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
         </div>
         <div className={card}>
           <h3 className="text-lg font-bold">Payout</h3>
-          <p className="text-xs text-gray-500">Kyvro pays your markup to this bKash number. For your safety only Kyvro can see it, so it is not shown here after saving.</p>
-          <div className="flex flex-wrap gap-2 items-center">
-            <input className={`${inputCls} w-56`} inputMode="numeric" placeholder="bKash number, e.g. 017XXXXXXXX" value={bkash} onChange={(e) => setBkash(e.target.value)} />
-            <button type="button" disabled={saving} onClick={saveBkash} className="bg-[#D4AF37] text-black font-bold px-5 py-2 rounded text-xs uppercase tracking-wider disabled:opacity-50">{saving ? 'Saving...' : 'Save'}</button>
-          </div>
-          {bkashMsg && <p className={`text-xs ${bkashMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{bkashMsg.text}</p>}
+          {ro ? <p className="text-xs text-gray-500">Payout details are in the Sellers tab (Owner only).</p> : <PayoutForm uid={uid} isDarkMode={isDarkMode} />}
+          <h4 className="text-sm font-bold pt-2">Payout history <span className="font-normal text-gray-400">· পেমেন্টের ইতিহাস</span></h4>
           {payouts.length > 0 ? (
             <div className="divide-y divide-gray-500/15 text-xs">
               {[...payouts].sort((a, b) => (toDate(b.at) || 0) - (toDate(a.at) || 0)).map((x) => (
