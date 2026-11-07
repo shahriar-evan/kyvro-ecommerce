@@ -73,8 +73,13 @@ const EMPTY_PRODUCT_FORM = {
 export default function App() {
   // Products: Firestore ("cloud") once the Owner has moved them there, until then this browser's saved list
   const [localProducts, setLocalProducts] = useState(() => {
-    const saved = localStorage.getItem('kyvro_products');
-    return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
+    // an old copy can point at pictures from an older build (/assets/<name>-<hash>.png) that are gone now: use the
+    // starter list instead (the real products come from Firestore a moment later anyway)
+    try {
+      const saved = JSON.parse(localStorage.getItem('kyvro_products') || 'null');
+      const stale = Array.isArray(saved) && saved.some((p) => /^\/assets\/[^/]+\.png$/.test(String((p && p.image) || '')));
+      return Array.isArray(saved) && !stale ? saved : INITIAL_PRODUCTS;
+    } catch (e) { return INITIAL_PRODUCTS; }
   });
   const [cloudProducts, setCloudProducts] = useState(null); // null = not in Firestore yet
   const isCloud = cloudProducts !== null;
