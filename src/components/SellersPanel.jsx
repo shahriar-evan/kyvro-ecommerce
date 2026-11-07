@@ -258,11 +258,11 @@ export default function SellersPanel({ orders = [], products = [], isDarkMode, f
                           <div className="flex flex-wrap gap-2">
                             <button type="button" disabled={!!busy} onClick={() => warnShop(x)} className={`${btn} border border-amber-500 text-amber-600 disabled:opacity-50`}>Warning</button>
                             {x.inactiveHold && <button type="button" disabled={!!busy} onClick={() => unholdShop(x)} className={`${btn} border border-green-600 text-green-600 disabled:opacity-50`}>Make live</button>}
-                            <button type="button" disabled={!!busy} onClick={async () => {
-                              if (first) { remove(r); return; }
+                            {/* extra shops only: removing the first shop = removing the seller (the Remove button above) */}
+                            {!first && <button type="button" disabled={!!busy} onClick={async () => {
                               if (!(await askConfirm(`Remove the shop "${x.name}" now? Its link stops working; orders stay.`, { danger: true, confirmText: 'Remove' }))) return;
                               act(x.slug, () => rejectSellerShop(r, x.slug), `"${x.name}" was removed.`);
-                            }} className={`${btn} border border-red-500 text-red-500 disabled:opacity-50`}>{first ? 'Remove (all)' : 'Remove'}</button>
+                            }} className={`${btn} border border-red-500 text-red-500 disabled:opacity-50`}>Remove</button>}
                           </div>
                         </div>
                       );
