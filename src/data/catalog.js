@@ -15,8 +15,11 @@ export const COLLECTION_LABELS = {
 export const SUB_CATEGORIES = {
   Men: [
     { name: 'Shirt' },
+    { name: 'Formal Shirt' },
     { name: 'Punjabi' },
+    { name: 'Katua' },
     { name: 'T-Shirt' },
+    { name: 'Polo' },
     { name: 'Jacket' },
     { name: 'Pant' },
     { name: 'Joggers & Sweats' },
