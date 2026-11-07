@@ -15,6 +15,7 @@ import { PROJECT, SITE, FS, accessToken, val } from '../_sslc.js';
 import { emailOwners, ownerEmails, pushToOwners } from '../_owners.js';
 import { readPlans } from '../_plans.js';
 import { unpaidOrders, cartReminders } from './nudges.js';
+import { purgeOldRemovedShops } from './removeshop.js';
 import { toMillis, planPrice, basicPrice, basicCharging, orderMarkup } from '../../src/data/priceCheck.js';
 
 export const config = { maxDuration: 60 };
@@ -173,8 +174,11 @@ export default async function handler(req, res) {
     let unpaid = { reminded: 0, cancelled: 0 }; let carts = { carts: 0 };
     try { unpaid = await unpaidOrders(token, PROJECT, now); } catch (e) { console.error('unpaid orders', e); }
     try { carts = await cartReminders(token, PROJECT, now, docPath); } catch (e) { console.error('cart reminders', e); }
+    // shops the Owner removed more than 30 days ago are deleted for good
+    let purged = 0;
+    try { purged = await purgeOldRemovedShops(token, now); } catch (e) { console.error('purge removed shops', e); }
     const plans = await readPlans(token);
-    if (!plans.enabled) return res.status(200).json({ sent: 0, reason: 'plans off', cleanup, unpaid, carts });
+    if (!plans.enabled) return res.status(200).json({ sent: 0, reason: 'plans off', cleanup, unpaid, carts, purged });
     let sent = 0;
     let pageToken = '';
     do {
@@ -227,7 +231,7 @@ export default async function handler(req, res) {
       }
       pageToken = j.nextPageToken || '';
     } while (pageToken);
-    return res.status(200).json({ sent, cleanup, unpaid, carts });
+    return res.status(200).json({ sent, cleanup, unpaid, carts, purged });
   } catch (e) {
     console.error('plan-reminders', e);
     return res.status(500).json({ error: e.message || 'failed' });

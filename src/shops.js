@@ -1,6 +1,7 @@
 import { getApp } from "firebase/app";
 import { getFirestore, doc, collection, query, where, onSnapshot, setDoc, updateDoc, deleteDoc, deleteField, serverTimestamp, getDocs, getDoc, writeBatch } from "firebase/firestore";
 import { isReservedLink } from "./data/reservedLinks";
+import { getAuth } from "firebase/auth";
 import "./firebase"; // makes sure the default Firebase app exists
 
 const db = getFirestore(getApp());
@@ -193,6 +194,8 @@ export const rejectLogo = (slug, note) => updateDoc(doc(db, "shops", slug), { lo
 export const turnShopOn = (slug) => updateDoc(doc(db, "shops", slug), { active: true, killed: false, killNote: "", inactiveHold: false, updatedAt: new Date().toISOString() });
 // a seller switches their own approved shop ON / OFF (ON also clears an inactivity hide). Not a killed or waiting shop.
 export const setMyShopLive = (slug, on) => updateDoc(doc(db, "shops", slug), { active: !!on, ...(on ? { inactiveHold: false } : {}), updatedAt: new Date().toISOString() });
+// someone opened this shop (once a day per browser; rules allow only this field = now)
+export const noteShopVisit = (slug) => updateDoc(doc(db, "shops", slug), { lastVisitAt: serverTimestamp() });
 export const setShopOn = (slug, on) => updateDoc(doc(db, "shops", slug), { active: !!on, updatedAt: new Date().toISOString() });
 
 // ---- Shop banner (Premium): uploaded banners wait for the Owner / a Manager like the logo ----
@@ -202,3 +205,18 @@ export async function uploadBanner(slug, dataUrl) {
 }
 export const approveBanner = (shop) => updateDoc(doc(db, "shops", shop.slug), { banner: shop.bannerPending, bannerPending: deleteField(), bannerPendingAt: deleteField(), updatedAt: new Date().toISOString() });
 export const rejectBanner = (slug, note) => updateDoc(doc(db, "shops", slug), { bannerPending: deleteField(), bannerPendingAt: deleteField(), bannerReject: { note: String(note || "").slice(0, 200), at: new Date().toISOString() }, updatedAt: new Date().toISOString() });
+
+// Owner: remove a shop (kept 30 days in "Removed shops", reason emailed to its owner), restore it, or delete it now.
+// The server does it (api/_plan/removeshop.js) so the owner's private email can be used and the 30-day clean-up runs there.
+export async function ownerShopAction(slug, body) {
+  const u = getAuth(getApp()).currentUser;
+  if (!u) throw new Error("Please sign in again.");
+  const t = await u.getIdToken();
+  const r = await fetch("/api/plan?action=remove-shop", { method: "POST", headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" }, body: JSON.stringify({ slug, ...body }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.ok === false) throw new Error(j.error || "Could not do it.");
+  return j;
+}
+export const removeShopSoft = (slug, note, silent = false) => ownerShopAction(slug, { note, silent });
+export const restoreShop = (slug) => ownerShopAction(slug, { restore: true });
+export const purgeShopNow = (slug) => ownerShopAction(slug, { purge: true });

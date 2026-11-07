@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { auth } from '../firebase';
 import { watchMyShop, watchMyShops, watchAllShops, watchShopOwners, createShop, saveShopItems, saveShopName, shopNameTaken, setShopActive, isPendingShop, acceptShop, rejectShop, shopLinkKey, cleanHandle, HANDLE_RE, handleTaken, setShopHandle, nextHandleChange, setMyShopLive } from '../shops';
 import { askConfirm } from './AlertCenter';
+import { WHATSAPP_NUMBER } from '../data/shopConfig';
 import { maxMarkupFor, shopPriceClamp, SHOP_COLLECTIONS, productInCollection } from '../data/shopConfig';
 import { flatSubCategories, subLabel } from '../data/catalog';
 import { watchPlans, watchMySubscription } from '../storeSettings';
@@ -534,7 +535,20 @@ export default function MyShop({ part = 'all', view = 'all', readOnly = false, a
       )}
       {/* seller: switch the shop ON / OFF themselves (also after Kyvro switched it off or hid it for inactivity).
           A killed shop (Page off) or one waiting for approval stays with Kyvro. */}
-      {show('manage') && sellerMode && shop.status !== 'pending' && !shop.killed && (
+      {/* removed by the Owner: the reason, the last day to ask for it back, and a WhatsApp button */}
+      {show('products', 'manage') && shop.removed && shop.removed.at && (() => {
+        const last = new Date(Date.parse(shop.removed.at) + 30 * 86400000);
+        const wa = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hello Kyvro, my shop ${shop.name || ''} (kyvro.store/${shopLinkKey(shop)}) was removed. Please restore it. / আমার শপটি ফিরিয়ে দিন।`)}`;
+        return (
+          <div className="rounded-2xl border border-red-500/50 bg-red-500/10 p-4 text-xs text-red-600 space-y-1.5">
+            <p className="font-bold text-sm">This shop was removed by Kyvro · শপটি Kyvro সরিয়ে দিয়েছে</p>
+            {shop.removed.note && <p>Reason · কারণ: <strong>{shop.removed.note}</strong></p>}
+            <p className="font-normal">To get it back, message Kyvro on WhatsApp before {last.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}. After that it is deleted for good. · ফেরত পেতে এই তারিখের আগে WhatsApp-এ জানান।</p>
+            <a href={wa} target="_blank" rel="noopener noreferrer" className="inline-flex items-center mt-1 px-4 py-2 rounded-full bg-green-600 text-white font-bold">Ask Kyvro on WhatsApp</a>
+          </div>
+        );
+      })()}
+      {show('manage') && sellerMode && shop.status !== 'pending' && !shop.killed && !shop.removed && (
         <div className={`rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${shop.active === false ? 'border-amber-500/50 bg-amber-500/10' : isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
           <div className="text-xs">
             <p className="font-bold text-sm">Shop {shop.active === false ? 'OFF' : 'ON'} · শপ {shop.active === false ? 'বন্ধ' : 'চালু'}</p>
@@ -583,6 +597,18 @@ export default function MyShop({ part = 'all', view = 'all', readOnly = false, a
             ? <p className={`mt-1 text-[11px] ${nameMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{nameMsg.text}</p>
             : <p className="mt-1 text-[11px] text-gray-500">{feat.shopName ? 'Shown on top of your shop and in "Sold by". It shows at once.' : 'Your shop shows its link name. Upgrade to Premium to create your own website name.'}</p>}
         </div>
+        {/* the Owner removes their own shop (only the Owner may delete shops; its link is freed, orders stay) */}
+        {isOwner && !sellerMode && !readOnly && (
+          <div className="pt-4 mt-2 border-t border-red-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <p className="text-xs text-gray-500">Remove this shop and its link for good. Orders stay. You can create a new shop afterwards.</p>
+            <button type="button" disabled={busy} onClick={async () => {
+              if (!(await askConfirm(`Remove your shop "${shop.name || shop.slug}"? Its link kyvro.store/${shopLinkKey(shop)} stops working and this cannot be undone. Orders stay.`, { danger: true, confirmText: 'Remove shop' }))) return;
+              setBusy(true);
+              try { await rejectShop(shop.slug); setMsg({ type: 'ok', text: 'Your shop was removed.' }); } catch (e) { setMsg({ type: 'err', text: e.message }); }
+              setBusy(false);
+            }} className="shrink-0 px-4 py-2 rounded border border-red-500 text-red-500 text-xs font-bold uppercase tracking-wider hover:bg-red-500/10 disabled:opacity-50">Remove my shop</button>
+          </div>
+        )}
       </div>}
 
       {/* 2. products and prices */}
