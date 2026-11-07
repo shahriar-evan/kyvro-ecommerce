@@ -18,6 +18,7 @@ export const SUB_CATEGORIES = {
     { name: 'Punjabi' },
     { name: 'T-Shirt' },
     { name: 'Jacket' },
+    { name: 'Pant' },
     { name: 'Joggers & Sweats' },
   ],
   Women: [
