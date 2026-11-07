@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { askConfirm } from './AlertCenter';
+import { orderMarkup } from '../data/priceCheck';
 import { loadStatsResets, resetAdminStats, listAdmins } from '../adminAuth';
 import { isOwnerEmail } from '../adminEmails';
 import { toDate, formatDateTime } from '../utils/dates';
@@ -46,7 +47,7 @@ export default function TeamStats({ productCosts = {}, productCommissions = {}, 
   const [resets, setResets] = useState({});
   useEffect(() => { loadStatsResets(teamView, loggedInUserEmail).then(setResets); }, [teamView, loggedInUserEmail]);
   // a shop's markup on one order = (price the customer paid - store price) x pieces
-  const markupOf = (o) => (o.items || []).reduce((n, it) => n + Math.max(0, (Number(it.price) || 0) - (it.basePrice !== undefined ? Number(it.basePrice) || 0 : Number(it.price) || 0)) * (parseInt(it.quantity, 10) || 0), 0);
+  const markupOf = (o) => orderMarkup(o); // minus the shop's own promo code
   const myShopSlugs = Object.entries(shopOwners).filter(([, o]) => String(o.email || '').toLowerCase() === String(loggedInUserEmail || '').toLowerCase()).map(([k]) => k);
   // Managers earn the shop markup, Admins earn commission: the Owner's view needs everybody's role
   const [roles, setRoles] = useState({});

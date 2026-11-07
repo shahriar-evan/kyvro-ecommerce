@@ -10,6 +10,8 @@
 
 import { PROJECT, SITE, FS, accessToken, val } from './_sslc.js';
 import { ownerEmails, pushToOwners, emailOwners } from './_owners.js';
+import { normalizePlans, effectiveTier, toMillis, orderMarkup } from '../src/data/priceCheck.js';
+import { effectiveFeatures } from '../src/data/shopBrand.js';
 
 export const config = { maxDuration: 20 };
 
@@ -141,8 +143,64 @@ async function sellerShopRequested(req, res) {
   return res.status(200).json({ sent: pushed, emailed });
 }
 
+// ?action=order: a new order came from a shop link -> one email to the shop's owner, if their plan has "Order email
+// notification" (Premium, or switched on). Safe without a login: the text comes from the saved order and shop, only for
+// an order placed in the last hour, once per order (sellerNotified). NEVER the customer's name, phone or address.
+async function orderPlaced(req, res) {
+  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  const orderNumber = String(body.orderNumber || '');
+  if (!/^[A-Za-z0-9_-]{8,24}$/.test(orderNumber)) return res.status(400).json({ error: 'Bad order.' });
+  const token = await accessToken();
+  const order = await readDoc(token, `orders/${orderNumber}`);
+  if (!order || !order.shop || order.sellerNotified) return res.status(200).json({ sent: 0, reason: 'nothing to send' });
+  if (!(Date.now() - toMillis(order.createdAt) < 3600000)) return res.status(200).json({ sent: 0, reason: 'old order' });
+  const slug = String(order.shop);
+  const shop = await readDoc(token, `shops/${slug}`);
+  if (!shop) return res.status(200).json({ sent: 0, reason: 'no shop' });
+  const plans = normalizePlans(await readDoc(token, 'settings/plans'));
+  const tier = shop.planExempt ? 'premium' : effectiveTier(shop);
+  if (!effectiveFeatures(shop, tier, plans.tierFeatures).orderEmail) return res.status(200).json({ sent: 0, reason: 'feature off' });
+  const owner = shop.kind === 'seller' ? await readDoc(token, `sellers/${shop.ownerUid}`) : await readDoc(token, `shopOwners/${slug}`);
+  const to = String((owner && owner.email) || '').toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return res.status(200).json({ sent: 0, reason: 'no email' });
+  const mark = await fetch(`${FS}/documents:commit`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ writes: [{
+      update: { name: `projects/${PROJECT}/databases/(default)/documents/orders/${orderNumber}`, fields: { sellerNotified: { booleanValue: true } } },
+      updateMask: { fieldPaths: ['sellerNotified'] },
+      currentDocument: { exists: true },
+    }] }),
+  });
+  if (!mark.ok) return res.status(200).json({ sent: 0, reason: 'could not mark' });
+  const shopName = String(shop.name || slug).slice(0, 60);
+  const items = (Array.isArray(order.items) ? order.items : []).slice(0, 30);
+  const markup = Math.round(orderMarkup(order));
+  const pay = `${order.paymentMethod || ''}${order.paymentStatus ? ` (${order.paymentStatus})` : ''}`;
+  const rows = items.map((it) => `<tr><td style="padding:6px 8px;border-bottom:1px solid #eee">${esc(it.name || '')}${it.selectedSize ? ` · ${esc(it.selectedSize)}` : ''}${it.selectedColor ? ` · ${esc(it.selectedColor)}` : ''}</td><td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center">${Number(it.quantity) || 1}</td><td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">৳${Math.round(Number(it.price) || 0)}</td></tr>`).join('');
+  const subject = `New order ${orderNumber} on ${shopName}`;
+  const html = `<!doctype html><html><body style="margin:0;background:#f3f3f3;font-family:Arial,Helvetica,sans-serif;color:#111">
+<div style="max-width:560px;margin:0 auto;background:#fff">
+  <div style="background:#0b0b0b;padding:20px 24px;color:#D4AF37;font-size:20px;letter-spacing:3px;font-weight:bold">KYVRO</div>
+  <div style="padding:24px;font-size:15px;line-height:1.7">
+    <p>🎉 নতুন অর্ডার এসেছে! <strong>${esc(shopName)}</strong> থেকে অর্ডার <strong>${esc(orderNumber)}</strong>।</p>
+    <p>A new order came from your shop <strong>${esc(shopName)}</strong>.</p>
+    <table style="width:100%;border-collapse:collapse;font-size:14px"><tr style="background:#fafafa"><th style="padding:6px 8px;text-align:left">Product</th><th style="padding:6px 8px">Qty</th><th style="padding:6px 8px;text-align:right">Price</th></tr>${rows}</table>
+    <p>Payment: ${esc(pay)}<br>Your markup on this order: <strong>৳${markup}</strong> (paid after it is delivered and not returned).</p>
+    <p style="color:#666;font-size:13px">Kyvro confirms, packs and delivers the order. The customer's details stay with Kyvro.</p>
+    <p><a href="${esc(SITE)}" style="display:inline-block;background:#D4AF37;color:#000;padding:10px 18px;text-decoration:none;font-weight:bold;border-radius:4px">Open my dashboard</a></p>
+  </div>
+</div></body></html>`;
+  const text = `New order ${orderNumber} on ${shopName}.\n${items.map((it) => `- ${it.name} x${Number(it.quantity) || 1} ৳${Math.round(Number(it.price) || 0)}`).join('\n')}\nPayment: ${pay}\nYour markup: ৳${markup} (after delivery).\n${SITE}`;
+  const emailed = await emailOwners(new Set([to]), subject, html, text);
+  return res.status(200).json({ sent: emailed ? 1 : 0 });
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only.' });
+  if (String((req.query && req.query.action) || '') === 'order') {
+    try { return await orderPlaced(req, res); } catch (err) { return res.status(200).json({ sent: 0, error: err.message || 'failed' }); }
+  }
   if (String((req.query && req.query.action) || '') === 'logo') {
     try { return await logoPending(req, res); } catch (err) { return res.status(200).json({ sent: 0, error: err.message || 'failed' }); }
   }

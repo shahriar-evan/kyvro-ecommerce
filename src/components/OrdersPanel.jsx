@@ -6,7 +6,7 @@ import { updateOrderStatus, isPaidOrder, requestCancelOrder, declineCancelReques
 import { formatDateTime, toDate } from '../utils/dates';
 import { phoneKey, emailKey } from '../data/shopConfig';
 import { watchBlocked, blockPhone, blockEmail, unblockPhone, unblockEmail } from '../blocklist';
-import { checkOrderPrices, orderVisibleIds } from '../data/priceCheck';
+import { checkOrderPrices, orderVisibleIds, orderMarkup } from '../data/priceCheck';
 import { watchPlans } from '../storeSettings';
 import { watchAllShops } from '../shops';
 
@@ -109,7 +109,7 @@ export default function OrdersPanel({ orders, products = [], productCosts = {}, 
     });
     const revenue = (Number(o.subtotal) || 0) - (Number(o.discount) || 0);
     // an admin's shop sold this above the store price: that markup belongs to the shop owner
-    const markup = (o.items || []).reduce((n, it) => n + Math.max(0, (Number(it.price) || 0) - (it.basePrice !== undefined ? Number(it.basePrice) || 0 : Number(it.price) || 0)) * (parseInt(it.quantity, 10) || 0), 0);
+    const markup = orderMarkup(o); // minus the shop's own promo code (src/data/priceCheck.js)
     const list = Object.values(groups);
     list.forEach((g) => { g.delivery = supplierDelivery(o, g.units); });
     const delivery = list.reduce((a, g) => a + g.delivery, 0);

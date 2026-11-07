@@ -4,10 +4,11 @@
 // address or email, and nothing about suppliers. The caller must be signed in as that seller.
 import { FS, accessToken, val } from '../_sslc.js';
 import { planCaller, ownerViewer } from '../_plans.js';
+import { orderMarkup } from '../../src/data/priceCheck.js';
 
 export const config = { maxDuration: 30 };
 
-const markupOf = (items) => (items || []).reduce((n, it) => n + Math.max(0, (Number(it.price) || 0) - (it.basePrice !== undefined ? Number(it.basePrice) || 0 : Number(it.price) || 0)) * (parseInt(it.quantity, 10) || 0), 0);
+
 
 export default async function earnings(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -40,8 +41,10 @@ export default async function earnings(req, res) {
       const items = (Array.isArray(f.items) ? f.items : []).map((it) => ({ name: String((it && it.name) || ''), quantity: parseInt(it && it.quantity, 10) || 0, price: Number(it && it.price) || 0, basePrice: it && it.basePrice !== undefined ? Number(it.basePrice) || 0 : Number(it && it.price) || 0, size: String((it && it.size) || ''), color: String((it && it.color) || '') }));
       const status = String(f.status || '');
       const returned = !!f.returned;
-      const markup = markupOf(items);
-      return { orderNumber: String(f.orderNumber || ''), shop: String(f.shop || ''), createdAt: f.createdAt || '', status, returned, items, markup, earned: status === 'Delivered' && !returned ? markup : 0 };
+      // minus the shop's own promo code (never below 0)
+      const coupon = f.coupon && Number(f.coupon.amount) > 0 ? { code: String(f.coupon.code || ''), amount: Number(f.coupon.amount) || 0 } : null;
+      const markup = orderMarkup({ items, coupon });
+      return { orderNumber: String(f.orderNumber || ''), shop: String(f.shop || ''), createdAt: f.createdAt || '', status, returned, items, markup, coupon, earned: status === 'Delivered' && !returned ? markup : 0 };
     }).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
     const earned = orders.reduce((n, o) => n + o.earned, 0);
     const waiting = orders.filter((o) => !['Delivered', 'Cancelled'].includes(o.status)).reduce((n, o) => n + o.markup, 0);
