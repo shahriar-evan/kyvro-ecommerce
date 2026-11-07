@@ -132,6 +132,27 @@ export const effectiveTier = (x, now = Date.now()) => (toMillis(x && x.paidUntil
 // A seller's shop that must pay Basic and has not (or its paid Basic period ended): customers do not see it.
 // Never for team shops, the Owner's shop, shops opened while Basic was free (basicFree not false), a running
 // Pro / Premium, or while Basic costs ৳0.
+// A shop order's markup for its owner: (shop price - store price) x qty for every item, minus the shop's own promo code
+// (a promo code only ever comes out of the markup, never out of Kyvro's price). Never below 0.
+export const itemsMarkup = (items) => (items || []).reduce((n, it) => n + Math.max(0, (Number(it && it.price) || 0) - (it && it.basePrice !== undefined ? Number(it.basePrice) || 0 : Number(it && it.price) || 0)) * (parseInt(it && it.quantity, 10) || 0), 0);
+// ---- Promo codes (Premium feature "coupons"): shops/{slug}.coupons = { CODE: { percent 1-50, minOrder, endsAt, active } }
+// (at most 5). The customer gets percent % off the products, but never more than the shop's own markup on the order,
+// so Kyvro's store price is never reduced. Same checks in firestore.rules (orders create) and checkOrderPrices below.
+export const COUPON_MAX_PERCENT = 50;
+export const COUPON_MAX = 5;
+export const cleanCouponCode = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15);
+export const couponActive = (shop, code, now = Date.now()) => {
+  const c = shop && shop.coupons && typeof shop.coupons === 'object' ? shop.coupons[code] : null;
+  if (!c || c.active !== true) return null;
+  const percent = parseInt(c.percent, 10);
+  if (!(percent >= 1 && percent <= COUPON_MAX_PERCENT)) return null;
+  if (c.endsAt && /^\d{4}-\d{2}-\d{2}$/.test(c.endsAt) && Date.parse(`${c.endsAt}T23:59:59+06:00`) < now) return null;
+  return { code, percent, minOrder: Math.max(0, parseInt(c.minOrder, 10) || 0) };
+};
+// the amount off: percent of (products after the store discount), capped at the shop's markup; whole taka
+export const couponAmountFor = (items, coupon, net) => (!coupon || net < coupon.minOrder ? 0
+  : Math.max(0, Math.min(Math.floor((net * coupon.percent) / 100), Math.floor(itemsMarkup(items)))));
+export const orderMarkup = (o) => Math.max(0, itemsMarkup(o && o.items) - (o && o.coupon ? Number(o.coupon.amount) || 0 : 0));
 export const basicDue = (shop, plans, now = Date.now()) => !!shop && shop.kind === 'seller' && shop.basicFree === false
   && shop.planExempt !== true && basicCharging(plans) && !shopIsPaid(shop, now) && toMillis(shop.basicUntil) <= now;
 // The products a shop may show right now: null = all of them. A shop whose paid plan ran out shows only its
@@ -189,5 +210,17 @@ export function checkOrderPrices(order, productsById, shop, visible = null) {
     subtotal += expected * q;
   }
   if (!problems.length && Number(order.subtotal) !== subtotal) problems.push(`Subtotal ${order.subtotal}, should be ${subtotal}`);
+  // the shop's promo code: it must exist (and run) on the shop, and take no more than allowed (never past the markup)
+  if (order.coupon) {
+    const code = String(order.coupon.code || '');
+    const c = inShop && shop ? couponActive(shop, code, toMillis(order.createdAt) || Date.now()) : null;
+    const net = (Number(order.subtotal) || 0) - (Number(order.discount) || 0);
+    if (!c) problems.push(`Promo code ${code || '?'} is not valid for this shop`);
+    else {
+      const most = couponAmountFor(order.items, c, net);
+      if (Number(order.coupon.percent) !== c.percent) problems.push(`Promo code ${code}: ${order.coupon.percent}% should be ${c.percent}%`);
+      if (Number(order.coupon.amount) > most) problems.push(`Promo code ${code}: ${order.coupon.amount} off, at most ${most}`);
+    }
+  }
   return { ok: problems.length === 0, problems, subtotal };
 }

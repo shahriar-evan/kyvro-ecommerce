@@ -334,6 +334,8 @@ service cloud.firestore {
         // the shop's owner may only take the live logo / banner off (a new one goes through logoPending / bannerPending)
         && (!changed.hasAny(['logo']) || !('logo' in d))
         && (!changed.hasAny(['banner']) || !('banner' in d))
+        // promo codes (Premium "coupons"): at most 5 codes, A-Z 0-9; the order rule checks each used code's values
+        && (!changed.hasAny(['coupons']) || (paidFeatOn('coupons', false) && d.get('coupons', {}) is map && d.get('coupons', {}).size() <= 5))
         // logo: a Pro shop may ask for permission; with the logo feature on, upload one that waits for approval
         && (!changed.hasAny(['logoRequest'])
           || (!('logoRequest' in d) || (shopPaidNow() && !paidFeatOn('logo', false) && d.logoRequest is map && d.logoRequest.keys().hasOnly(['at']) && d.logoRequest.at is string && d.logoRequest.at.size() <= 40)))
@@ -426,18 +428,18 @@ service cloud.firestore {
         && handleOk()
         && request.resource.data.items is map && request.resource.data.items.size() <= 300
         // the Owner: everything, also the seller kill switch (killed: the seller can never switch the shop on again)
-        && ((isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'active', 'status', 'updatedAt', 'planExempt', 'killed', 'killNote', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'theme', 'themeMode', 'features', 'logo', 'logoPending', 'logoPendingAt', 'logoReject', 'logoRequest', 'banner', 'bannerPending', 'bannerPendingAt', 'bannerReject', 'handle', 'handleChangedAt', 'autoName', 'inactiveHold', 'warning'])
+        && ((isOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'active', 'status', 'updatedAt', 'planExempt', 'killed', 'killNote', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'theme', 'themeMode', 'features', 'logo', 'logoPending', 'logoPendingAt', 'logoReject', 'logoRequest', 'banner', 'bannerPending', 'bannerPendingAt', 'bannerReject', 'handle', 'handleChangedAt', 'autoName', 'inactiveHold', 'warning', 'coupons'])
                 && request.resource.data.get('status', 'approved') in ['pending', 'approved'])
             || ((isManager() || canShopNow())
                 && resource.data.ownerUid == request.auth.uid
-                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'theme', 'themeMode', 'logoRequest', 'logoPending', 'logoPendingAt', 'logoReject', 'bannerPending', 'bannerPendingAt', 'bannerReject', 'handle', 'handleChangedAt', 'autoName', 'logo', 'banner'])
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'theme', 'themeMode', 'logoRequest', 'logoPending', 'logoPendingAt', 'logoReject', 'bannerPending', 'bannerPendingAt', 'bannerReject', 'handle', 'handleChangedAt', 'autoName', 'logo', 'banner', 'coupons'])
                 && shopExtrasOk()
                 && shopSizeOk())
             // a Manager (Plan Members): feature ON / OFF, logo grant / approve / reject and shop ON / OFF on other people's
             // shops. Not their own shop (no self-upgrade), and never switching on a killed or a waiting (pending) shop.
             || (isManager() && resource.data.ownerUid != request.auth.uid
                 && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['features', 'logo', 'logoPending', 'logoPendingAt', 'logoReject', 'logoRequest', 'banner', 'bannerPending', 'bannerPendingAt', 'bannerReject', 'active', 'updatedAt'])
-                && request.resource.data.get('features', {}) is map && request.resource.data.get('features', {}).keys().hasOnly(['allProducts', 'priorityApproval', 'tagline', 'social', 'about', 'shareKit', 'brandColor', 'announcement', 'pinned', 'verified', 'weeklyPayout', 'prioritySupport', 'shopName', 'logo', 'banner', 'salesStats', 'earningsCsv', 'themes'])
+                && request.resource.data.get('features', {}) is map && request.resource.data.get('features', {}).keys().hasOnly(['allProducts', 'priorityApproval', 'tagline', 'social', 'about', 'shareKit', 'brandColor', 'announcement', 'pinned', 'verified', 'weeklyPayout', 'prioritySupport', 'shopName', 'logo', 'banner', 'salesStats', 'earningsCsv', 'themes', 'featured', 'coupons', 'orderEmail'])
                 && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['logo'])
                     || request.resource.data.get('logo', '') == '' || request.resource.data.get('logo', '') == resource.data.get('logoPending', ''))
                 && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['banner'])
@@ -449,7 +451,7 @@ service cloud.firestore {
             || (signedIn() && !isStaff() && resource.data.get('kind', '') == 'seller'
                 && resource.data.ownerUid == request.auth.uid
                 && resource.data.get('killed', false) != true
-                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'theme', 'themeMode', 'logoRequest', 'logoPending', 'logoPendingAt', 'logoReject', 'bannerPending', 'bannerPendingAt', 'bannerReject', 'handle', 'handleChangedAt', 'autoName', 'logo', 'banner', 'active', 'inactiveHold'])
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'theme', 'themeMode', 'logoRequest', 'logoPending', 'logoPendingAt', 'logoReject', 'bannerPending', 'bannerPendingAt', 'bannerReject', 'handle', 'handleChangedAt', 'autoName', 'logo', 'banner', 'active', 'inactiveHold', 'coupons'])
                 // the seller switches their own approved shop ON / OFF (also after it was switched off or hidden for
                 // inactivity). Not a killed shop (Page off: only the Owner) and not one waiting for approval.
                 // inactiveHold can only be cleared, never set.
@@ -829,7 +831,7 @@ service cloud.firestore {
       function validNewOrder() {
         let d = request.resource.data;
         let c = d.customer;
-        return d.keys().hasOnly(['orderNumber', 'createdAt', 'customer', 'items', 'subtotal', 'discount', 'discountLabel', 'deliveryArea', 'shipping', 'total', 'paymentMethod', 'paymentStatus', 'status', 'uid', 'email', 'manualPay', 'shop', 'soldBy'])
+        return d.keys().hasOnly(['orderNumber', 'createdAt', 'customer', 'items', 'subtotal', 'discount', 'discountLabel', 'deliveryArea', 'shipping', 'total', 'paymentMethod', 'paymentStatus', 'status', 'uid', 'email', 'manualPay', 'shop', 'soldBy', 'coupon'])
           && d.keys().hasAll(['orderNumber', 'createdAt', 'customer', 'items', 'subtotal', 'discount', 'discountLabel', 'deliveryArea', 'shipping', 'total', 'paymentMethod', 'paymentStatus', 'status'])
           && (siteOpen() || isStaff())
           // signed in: the order must carry the customer's own uid + email. Guest (not signed in): no uid / email at all.
@@ -874,7 +876,20 @@ service cloud.firestore {
                     && d.manualPay.sender is string && d.manualPay.sender.matches('^[+]?[0-9]{7,15}$')
                     && d.manualPay.trxId is string && d.manualPay.trxId.matches('^[A-Za-z0-9]{6,20}$'))
                 : !('manualPay' in d))
-          && d.total == d.subtotal - d.discount + d.shipping;
+          && couponOk(d)
+          && d.total == d.subtotal - d.discount - d.get('coupon', {'amount': 0}).amount + d.shipping;
+      }
+      // a shop's promo code (shops/{shop}.coupons[code]): switched on, same percent (at most 50), the order reaches its
+      // minimum and the amount is at most that percent of the products. Kept short (the rules engine allows 1000 steps per
+      // order); the end date and the "never past the shop's markup" cap are checked at checkout, by the payment server
+      // (verifyOrderPrices) and flagged in the Orders panel (checkOrderPrices).
+      function couponOk(d) {
+        return !('coupon' in d) || (('shop' in d) && d.coupon.keys().hasOnly(['code', 'percent', 'amount']) && couponValid(d.coupon, d.subtotal - d.discount,
+          get(/databases/$(database)/documents/shops/$(d.shop)).data.get('coupons', {}).get(d.coupon.code, {})));
+      }
+      function couponValid(k, net, c) {
+        return c.get('active', false) == true && k.percent == c.get('percent', 0) && k.percent <= 50
+          && net >= c.get('minOrder', 0) && k.amount is int && k.amount >= 1 && k.amount <= net * k.percent / 100;
       }
 
       allow create: if validNewOrder();

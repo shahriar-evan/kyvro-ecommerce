@@ -2,9 +2,27 @@ import React, { useState, useEffect } from 'react';
 import { Trash2 } from 'lucide-react';
 import { deliveryAreaFor, DELIVERY_AREAS, DELIVERY_AREA_BN, PAYMENT_METHODS, PAYMENT_METHOD_BN, ONLINE_PAY_ON, PAY_PROVIDER, CARD_PAY_ON, toBanglaDigits, deliveryNote, freeDeliveryApplies, freeDeliveryMissing, normalizeSettings } from '../data/shopConfig';
 
+// promo code box: type a code, Apply (or Remove the applied one)
+function PromoBox({ couponCode, couponMsg, onApply, isDarkMode }) {
+  const [text, setText] = React.useState(couponCode || '');
+  React.useEffect(() => { setText(couponCode || ''); }, [couponCode]);
+  return (
+    <div className="space-y-1">
+      <div className="flex gap-2">
+        <input value={text} onChange={(e) => setText(e.target.value.toUpperCase())} placeholder="Promo code · প্রোমো কোড" maxLength={15} aria-label="Promo code"
+          className={`flex-1 min-w-0 border px-3 py-2 rounded text-sm uppercase tracking-wider ${isDarkMode ? 'bg-[#121212] border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`} />
+        {couponCode
+          ? <button type="button" onClick={() => { setText(''); onApply(''); }} className="px-3 py-2 rounded border border-gray-400 text-xs font-bold uppercase">Remove</button>
+          : <button type="button" onClick={() => onApply(text)} className="px-4 py-2 rounded bg-[#D4AF37] text-black text-xs font-bold uppercase">Apply</button>}
+      </div>
+      {couponMsg && <p className={`text-xs ${couponMsg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{couponMsg.text}</p>}
+    </div>
+  );
+}
+
 export default function CheckoutView({
   storeSettings, cart, checkoutForm, setCheckoutForm, checkoutError, deliveryCharge, grandTotal, formatPrice,
-  handleCheckoutSubmit, isDarkMode, placingOrder, removeFromCart, updateCartQty, setCurrentView, subtotal, discount = 0, discountLabel = '', customerUser = null, authReady = true, onSignIn, reward = null,
+  handleCheckoutSubmit, isDarkMode, placingOrder, removeFromCart, updateCartQty, setCurrentView, subtotal, discount = 0, discountLabel = '', customerUser = null, authReady = true, onSignIn, reward = null, couponsOn = false, couponCode = '', couponAmount = 0, couponPercent = 0, couponMsg = null, onApplyCoupon = () => {},
 }) {
   const set = (field, value) => setCheckoutForm({ ...checkoutForm, [field]: value });
 
@@ -173,6 +191,13 @@ export default function CheckoutView({
             {discount > 0 && (
               <div className="flex justify-between font-semibold text-green-600">
                 <span>Discount ({discountLabel})</span><span>- {formatPrice(discount)}</span>
+              </div>
+            )}
+            {/* the shop's own promo code (only on a shop link whose plan has promo codes) */}
+            {couponsOn && <PromoBox couponCode={couponCode} couponMsg={couponMsg} onApply={onApplyCoupon} isDarkMode={isDarkMode} />}
+            {couponAmount > 0 && (
+              <div className="flex justify-between font-semibold text-green-600">
+                <span>Promo {couponCode} ({couponPercent}%)</span><span>- {formatPrice(couponAmount)}</span>
               </div>
             )}
 

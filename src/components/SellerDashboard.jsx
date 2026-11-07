@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import MyShop from './MyShop';
 import PayoutForm from './PayoutForm';
+import PromoCodesEditor from './PromoCodesEditor';
 import { auth } from '../firebase';
 import { requestSellerShop, sellerShopList, updateSellerCategories, watchMySeller, loadSellerEarnings, applyAsSeller, sellerStatus, normalizeWhatsapp, watchSellerRules, sellerNameBlocked } from '../sellers';
 import { watchPayouts } from '../payouts';
@@ -351,7 +352,7 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
       { key: 'analytics', label: 'Analytics', icon: BarChart3, badge: needs('salesStats') },
       { key: 'themes', label: 'Themes', icon: Palette },
       { key: 'landing', label: 'Landing Pages', icon: LayoutTemplate, badge: 'Soon' },
-      { key: 'promo', label: 'Promo Codes', icon: TicketPercent, badge: 'Soon' },
+      { key: 'promo', label: 'Promo Codes', icon: TicketPercent, badge: needs('coupons') },
     ] },
     { title: 'Money', items: [
       { key: 'earnings', label: 'Earnings & Payout', icon: Wallet },
@@ -599,7 +600,11 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
   } else if (s === 'landing') {
     before = locked('Landing Pages', 'Soon', 'A separate page for one offer or one product, to share in your ads.');
   } else if (s === 'promo') {
-    before = locked('Promo Codes', 'Soon', 'Your own coupon codes for your shop\'s customers.');
+    // Premium: codes per shop (the shops whose plan has promo codes)
+    const promoShops = myShops.filter((x) => effectiveFeatures(x, effectiveTier(x), plans.tierFeatures).coupons);
+    before = !approved ? notYet : promoShops.length
+      ? <PromoCodesEditor shops={promoShops} products={products} isDarkMode={isDarkMode} readOnly={ro} formatPrice={formatPrice} />
+      : locked('Promo Codes', needs('coupons') || 'Premium', 'Your own promo codes (like EID10) for your shop\'s customers. The discount comes out of your markup.');
   } else if (s === 'earnings') {
     before = !approved ? notYet : (
       <>

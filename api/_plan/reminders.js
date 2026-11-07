@@ -15,7 +15,7 @@ import { PROJECT, SITE, FS, accessToken, val } from '../_sslc.js';
 import { emailOwners, ownerEmails, pushToOwners } from '../_owners.js';
 import { readPlans } from '../_plans.js';
 import { unpaidOrders, cartReminders } from './nudges.js';
-import { toMillis, planPrice, basicPrice, basicCharging } from '../../src/data/priceCheck.js';
+import { toMillis, planPrice, basicPrice, basicCharging, orderMarkup } from '../../src/data/priceCheck.js';
 
 export const config = { maxDuration: 60 };
 
@@ -25,7 +25,6 @@ const day = 86400000;
 const WARN_DAYS = [7, 15, 25];
 const fieldsOf = (d) => Object.fromEntries(Object.entries((d && d.fields) || {}).map(([k, v]) => [k, val(v)]));
 const docPath = (p) => `projects/${PROJECT}/databases/(default)/documents/${p}`;
-const markupOf = (items) => (items || []).reduce((n, it) => n + Math.max(0, (Number(it && it.price) || 0) - (it && it.basePrice !== undefined ? Number(it.basePrice) || 0 : Number(it && it.price) || 0)) * (parseInt(it && it.quantity, 10) || 0), 0);
 async function runQuery(token, structuredQuery) {
   const r = await fetch(`${FS}/documents:runQuery`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ structuredQuery }) });
   return r.ok ? (await r.json()).filter((x) => x.document) : null;
@@ -89,7 +88,7 @@ async function cleanupInactiveSellers(token, now) {
         const of = fieldsOf(o.document);
         const st = String(of.status || '');
         if (!['Delivered', 'Cancelled'].includes(st)) open += 1;
-        if (st === 'Delivered' && !of.returned) earned += markupOf(of.items);
+        if (st === 'Delivered' && !of.returned) earned += orderMarkup(of);
       }
       let paid = 0;
       if (email) {

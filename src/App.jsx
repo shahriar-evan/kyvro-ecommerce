@@ -15,7 +15,7 @@ import { ensureSubscribed } from './subscribers';
 import PushPrompt from './components/PushPrompt';
 import { watchProducts, watchProductCosts, watchProductCommissions, setProductCommission, saveProductCost, removeProductCost, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
 import { watchStoreSettings, watchPlans } from './storeSettings';
-import { visibleShopIds, normalizePlans, effectiveTier, shopIsPaid, basicDue } from './data/priceCheck';
+import { visibleShopIds, normalizePlans, effectiveTier, shopIsPaid, basicDue, couponActive, couponAmountFor, cleanCouponCode } from './data/priceCheck';
 import { themePreviewFromUrl, cleanTheme, cleanMode } from './data/themes';
 import { watchSiteTheme } from './themeStore';
 import { shopExtrasOf, brandHex, SOCIALS, httpsLinkOk, contactOk, contactHref, contactLabel, effectiveFeatures, FEATURES, shopDisplayName } from './data/shopBrand';
@@ -24,6 +24,7 @@ import { INITIAL_PRODUCTS } from './data/products';
 import { CURRENCIES } from './data/currencies';
 import { hasSubCategories, defaultCategoryFor, matchesCollectionPage, hasSizeStock, stockForSize, orderedSizes, hasColorStock, stockFor, variantKey, needsChoice, imageFor } from './data/catalog';
 import QuickAdd from './components/QuickAdd';
+import FeaturedShops from './components/FeaturedShops';
 import heroBannerImg from './assets/hero-banner.webp';
 import coverPhoto1Img from './assets/cover_photo1.webp';
 import men_womenImg from './assets/men_women.webp';
@@ -721,7 +722,23 @@ export default function App() {
   const deliveryCharge = deliveryFee(checkoutForm.deliveryArea, checkoutForm.paymentMethod, subtotal - discount, storeSettings, cart.reduce((n, i) => n + (parseInt(i.quantity, 10) || 0), 0));
   const discountLabel = discountInfo.rule ? describeRule(discountInfo.rule) : '';
   const reward = nextReward(subtotal, storeSettings);
-  const grandTotal = subtotal - discount + deliveryCharge;
+  // a shop's promo code (Premium "coupons"): only on that shop's link; comes out of the shop's markup, never Kyvro's price
+  const [couponCode, setCouponCode] = useState('');
+  const [couponMsg, setCouponMsg] = useState(null);
+  const couponsOn = !!shopCtx && !!shopFeat.coupons && !!shopCtx.coupons && Object.keys(shopCtx.coupons).length > 0;
+  const appliedCoupon = couponsOn && couponCode ? couponActive(shopCtx, couponCode) : null;
+  const couponAmount = appliedCoupon ? couponAmountFor(cart, appliedCoupon, subtotal - discount) : 0;
+  const applyCoupon = (raw) => {
+    const code = cleanCouponCode(raw);
+    if (!code) { setCouponCode(''); setCouponMsg(null); return; }
+    const c = couponActive(shopCtx, code);
+    if (!c) { setCouponCode(''); setCouponMsg({ type: 'err', text: 'This promo code is not valid. · প্রোমো কোডটি সঠিক নয়।' }); return; }
+    if (subtotal - discount < c.minOrder) { setCouponCode(''); setCouponMsg({ type: 'err', text: `This code needs an order of at least ${formatPrice(c.minOrder)}.` }); return; }
+    setCouponCode(code);
+    setCouponMsg({ type: 'ok', text: `${code} applied: ${c.percent}% off.` });
+  };
+  useEffect(() => { setCouponCode(''); setCouponMsg(null); }, [shopCtx && shopCtx.slug]); // eslint-disable-line react-hooks/exhaustive-deps
+  const grandTotal = subtotal - discount - couponAmount + deliveryCharge;
   useEffect(() => { if (currentView === 'checkout' && cart.length) trackInitiateCheckout(cart, subtotal - discount); }, [currentView]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCheckoutSubmit = async (e) => {
@@ -791,6 +808,7 @@ export default function App() {
       subtotal,
       discount,
       discountLabel,
+      ...(couponAmount > 0 ? { coupon: { code: appliedCoupon.code, percent: appliedCoupon.percent, amount: couponAmount } } : {}),
       deliveryArea: checkoutForm.deliveryArea,
       shipping: deliveryCharge,
       total: grandTotal,
@@ -807,6 +825,9 @@ export default function App() {
     setPlacingOrder(true);
     try {
       const { orderNumber } = await placeOrder(order);
+      // an order from a shop link: email its owner (Premium "Order email notification"; the server checks the plan,
+      // sends once and never includes the customer's details). Best effort, never blocks the order.
+      if (order.shop) { try { fetch('/api/shop-request-notify?action=order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderNumber }) }).catch(() => {}); } catch (e) { /* ignore */ } }
       setOrderCompleteData({ ...order, orderNumber, date: new Date().toISOString() });
       trackPurchase({ ...order, orderNumber });
       const goesOnline = ONLINE_PAY_ON && (order.paymentMethod === 'Online Payment' || (Number(order.shipping) || 0) > 0);
@@ -1511,7 +1532,7 @@ export default function App() {
       {currentView === 'account' && <AccountView sellPlan={sellPlan} products={products} isStaff={isAdminLoggedIn} customerUser={customerUser} displayName={displayName} photoURL={photoURL} activeTab={accountTab} setActiveTab={setAccountTab} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} onSaveProfile={handleSaveProfile} onCancelOrder={handleCancelMyOrder} myOrders={myOrders} savedProducts={savedProducts} toggleSaved={toggleSaved} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedProduct={setSelectedProduct} />}
 
       {/* CHECKOUT (guest checkout, no login needed) */}
-      {currentView === 'checkout' && <CheckoutView storeSettings={storeSettings} cart={cart} checkoutForm={checkoutForm} setCheckoutForm={setCheckoutForm} checkoutError={checkoutError} deliveryCharge={deliveryCharge} grandTotal={grandTotal} formatPrice={formatPrice} handleCheckoutSubmit={handleCheckoutSubmit} isDarkMode={isDarkMode} placingOrder={placingOrder} removeFromCart={removeFromCart} updateCartQty={updateCartQty} setCurrentView={setCurrentView} subtotal={subtotal} discount={discount} discountLabel={discountLabel} reward={reward} customerUser={customerUser} authReady={authReady} onSignIn={handleCustomerSignIn} />}
+      {currentView === 'checkout' && <CheckoutView storeSettings={storeSettings} cart={cart} checkoutForm={checkoutForm} setCheckoutForm={setCheckoutForm} checkoutError={checkoutError} deliveryCharge={deliveryCharge} grandTotal={grandTotal} formatPrice={formatPrice} handleCheckoutSubmit={handleCheckoutSubmit} isDarkMode={isDarkMode} placingOrder={placingOrder} removeFromCart={removeFromCart} updateCartQty={updateCartQty} setCurrentView={setCurrentView} subtotal={subtotal} discount={discount} discountLabel={discountLabel} reward={reward} customerUser={customerUser} authReady={authReady} onSignIn={handleCustomerSignIn} couponsOn={couponsOn} couponCode={couponCode} couponAmount={couponAmount} couponPercent={appliedCoupon ? appliedCoupon.percent : 0} couponMsg={couponMsg} onApplyCoupon={applyCoupon} />}
 
       {/* ORDER CONFIRMATION */}
       {['privacy', 'terms', 'refund'].includes(currentView) && <PolicyPages page={currentView} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
@@ -1536,6 +1557,8 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* home page of the main store only: Premium sellers' shops ("Featured on Kyvro") */}
+      {currentView === 'home' && !shopKey && <FeaturedShops plans={plans} products={shopProducts} isDarkMode={isDarkMode} formatPrice={formatPrice} />}
       {/* home page of the main store only (not on a shop link): invite visitors to sell */}
       {currentView === 'home' && !shopKey && (
         <section className={`border-t ${isDarkMode ? 'bg-[#0d0d0d] border-gray-800' : 'bg-[#111] border-gray-800'}`}>

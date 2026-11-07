@@ -46,6 +46,9 @@ Per-member toggles on `admins/{email}` (default OFF): `addProducts`, `editAll`, 
 - Profit = (basePrice − supplier cost) × qty. Shop markup = (price − basePrice) × qty, capped by `shopPriceClamp` (`src/data/priceCheck.js`).
 - Admin commission: only orders with `soldBy` = that Admin and no `shop`, Delivered, not returned, by `productCommission.pct` (max 15).
 - Shop markup goes to the shop owner (team via `shopOwners`, seller via `sellers`), Delivered and not returned only. A seller's shops are counted together (one Earned / Due / payout): `api/_plan/seller.js` (only shops whose `ownerUid` matches) and `SellersPanel.jsx`.
+- **Promo codes** (Premium `coupons`): `shops/{slug}.coupons = {CODE: {percent 1-50, minOrder, endsAt, active}}` (≤ 5), set in the seller dashboard (`PromoCodesEditor.jsx`). Checkout on that shop link takes the code; order gets `coupon {code, percent, amount}` and `total = subtotal − discount − coupon.amount + shipping`. The amount = percent of (subtotal − discount), **capped at the shop's markup** (`couponAmountFor`), so it only ever comes out of the seller's markup: every markup sum uses `orderMarkup(o)` (`src/data/priceCheck.js`; OrdersPanel, SellersPanel, TeamStats, `api/_plan/seller.js`, reminders). Rules (`couponOk`, kept short for the 1000-step limit) check on / percent / minimum / amount bound; end date and markup cap are checked at checkout, in `checkOrderPrices` (server before payment + Orders panel flag).
+- **Order email** (Premium `orderEmail`): after a shop order the app calls `api/shop-request-notify?action=order`; the server checks the plan and emails the shop owner once (`sellerNotified`) with products + markup, **never the customer's details**.
+- **Featured on Kyvro** (Premium `featured`): `FeaturedShops.jsx` on the main home lists live shops with the feature (not the Owner's own).
 - Order prices are checked on the server before any payment page (`verifyOrderPrices` in `api/_sslc.js`, `checkOrderPrices` / `orderVisibleIds` in `src/data/priceCheck.js`) and flagged in the Orders panel.
 
 ## Plans and sellers
@@ -73,6 +76,8 @@ Per-member toggles on `admins/{email}` (default OFF): `addProducts`, `editAll`, 
 | Tagline + contact, About, Re-design (brand color), announcement, pinned products, verified badge, priority support, earnings CSV | – | – | ✓ |
 | Website Name, logo, banner (Kyvro approves logo/banner) | never | off (Owner can switch on) | ✓ |
 | Storefront themes (feature `themes`, `paid`) | Classic only (+ light/dark) | all | all |
+| Featured on Kyvro (`featured`), Promo codes (`coupons`), Order email (`orderEmail`) — all `paid` | – | – | ✓ |
+| Landing pages, Custom domain | – | – | Soon |
 
 ### Shop links and names
 

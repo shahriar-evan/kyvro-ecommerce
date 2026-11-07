@@ -79,6 +79,10 @@ export const FEATURES = [
   { key: 'earningsCsv', label: 'Monthly earnings CSV', pro: false },
   // storefront themes other than Classic (src/data/themes.js); never on Free
   { key: 'themes', label: 'All themes (Minimal, Bold, Boutique)', pro: true, paid: true },
+  // Premium extras: the shop on the main site's "Featured shops", promo codes at checkout, an email for every new order
+  { key: 'featured', label: 'Featured on Kyvro', pro: false, paid: true },
+  { key: 'coupons', label: 'Promo codes', pro: false, paid: true },
+  { key: 'orderEmail', label: 'Order email notification', pro: false, paid: true },
 ];
 // the built-in default of a tier (used when the Owner did not switch the feature for that plan)
 export const builtInDefault = (key, tier) => tier === 'premium' || (tier === 'pro' && !!(FEATURES.find((f) => f.key === key) || {}).pro);

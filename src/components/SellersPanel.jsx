@@ -7,13 +7,13 @@ import { getApp } from 'firebase/app';
 import { watchSellers, watchSellerPayouts, watchSubscriptions, reviveSellerShop, removeSeller, watchSellerRules, saveSellerRules, sellerStatus, approveSeller, rejectSeller, rejectSellerShop, sellerShopList } from '../sellers';
 import { formatDateTime } from '../utils/dates';
 import { watchPayouts, addPayout } from '../payouts';
-import { toMillis, effectiveTier, normalizePlans } from '../data/priceCheck';
+import { toMillis, effectiveTier, normalizePlans, orderMarkup } from '../data/priceCheck';
 import { watchPlans } from '../storeSettings';
 import { effectiveFeatures } from '../data/shopBrand';
 import SellerDashboard from './SellerDashboard';
 
 // a shop's markup on one order = (price the customer paid - store price) x pieces
-const markupOf = (o) => (o.items || []).reduce((n, it) => n + Math.max(0, (Number(it.price) || 0) - (it.basePrice !== undefined ? Number(it.basePrice) || 0 : Number(it.price) || 0)) * (parseInt(it.quantity, 10) || 0), 0);
+const markupOf = (o) => orderMarkup(o); // minus the shop's own promo code
 
 // Owner: every public seller ("Sell on Kyvro") with their shop, plan, earnings (markup on delivered orders), what was
 // paid, what is due, their bKash, Mark as paid. Plus who may open a shop and the blocked names.
