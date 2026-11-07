@@ -145,7 +145,7 @@ After plan-setting changes, the Owner presses **Save plans** once. Vercel env: `
 
 ## Logo
 
-- Website logo = the **K emblem** (from Evan's logo picture): `src/components/KyvroMark.jsx` shows `public/brand/kyvro-emblem-black.png` in light mode (black text) and `-gold.png` in dark mode (gold text: header, footer, mobile menu, dashboard menu), on every theme (`-white.png` exists, unused). Bump `V` in KyvroMark when the pictures change (cache). Size it with a height class. Header: `KYVRO · কাইভ্রো` (HTML text) from 340px, only `KYVRO` below, only the logo under 320px.
+- Website logo = the **K emblem** (from Evan's logo picture): `src/components/KyvroMark.jsx` shows `public/brand/kyvro-emblem-black.png` in light mode (black text) and `-gold.png` in dark mode (gold text: header, footer, mobile menu, dashboard menu), on every theme (`-white.png` exists, unused). Bump `V` in KyvroMark when the pictures change (cache). Size it with a height class. Header: `KYVRO` only (HTML text, no Bangla), only the logo under 320px. Footer: `KYVRO · কাইভ্রো`.
 - `scripts/emblem-assets.py` makes the emblem PNGs (smoothed edges, from `scripts/emblem-source.png`) plus `apple-touch-icon.png` and `kyvro-icon.png` (share + push: gold emblem on black).
 - KyvroMark renders both pictures and hides one, so a light / dark switch is instant (swapping `src` kept the old logo until the new one loaded). The gold PNG is saved with 128 colours (~13 KB).
 - Social pictures (Facebook / Instagram profile = gold emblem on black, 2048px; T-shirt / label / hang-tag mockups) are made ad hoc and kept in the untracked `.claude/logo-export/`, not in git.
