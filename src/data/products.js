@@ -1,6 +1,6 @@
-import shirtImg from '../assets/shirts.png';
-import punjabiImg from '../assets/punjabi.png';
-import sneakersImg from '../assets/Snekers.png';
+import shirtImg from '../assets/shirts.webp';
+import punjabiImg from '../assets/punjabi.webp';
+import sneakersImg from '../assets/Snekers.webp';
 
 export const INITIAL_PRODUCTS = [
   {

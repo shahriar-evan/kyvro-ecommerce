@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { watchSellerDash } from '../sellerDash';
-import coverPhoto1Img from '../assets/cover_photo1.png';
-import menWomenImg from '../assets/men_women.png';
+import coverPhoto1Img from '../assets/cover_photo1.webp';
+import menWomenImg from '../assets/men_women.webp';
 
 // The slide banner on top of the seller dashboard. The Owner sets the slides (Admin > Settings > Seller dashboard banner);
 // until then it shows the main site's first two banners.

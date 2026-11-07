@@ -8,6 +8,7 @@
 //   POST /api/plan?action=comp        the Owner gives or ends a plan by hand (Plan Members)
 //   POST /api/plan?action=warn        the Owner warns a seller about a shop (note saved on the shop + emailed)
 //   POST /api/plan?action=billing     my own plan payments (Subscription > Billing history)
+//   GET  /api/plan?action=sitemap     /sitemap.xml for Google (home, products, live shop links)
 import init from './_plan/init.js';
 import callback from './_plan/callback.js';
 import sync from './_plan/sync.js';
@@ -16,10 +17,11 @@ import sellerEarnings from './_plan/seller.js';
 import comp from './_plan/comp.js';
 import warn from './_plan/warn.js';
 import billing from './_plan/billing.js';
+import sitemap from './_plan/sitemap.js';
 
 export const config = { maxDuration: 60 };
 
-const ACTIONS = { init, callback, sync, reminders, 'seller-earnings': sellerEarnings, comp, warn, billing };
+const ACTIONS = { init, callback, sync, reminders, 'seller-earnings': sellerEarnings, comp, warn, billing, sitemap };
 
 export default async function handler(req, res) {
   const action = String((req.query && req.query.action) || '');

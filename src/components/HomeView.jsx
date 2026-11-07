@@ -7,11 +7,11 @@ import WhatsAppButton from './WhatsAppButton';
 import { waOrderLink, waProductLines } from '../whatsappOrder';
 import { User, Shield, Truck, RefreshCw, ChevronRight, ArrowRight, Heart } from 'lucide-react';
 import ThemedHome from './ThemedHome';
-import heroBannerImg from '../assets/hero-banner.png';
-import heroBanner1Img from '../assets/hero-banner1.png';
-import heroBanner2Img from '../assets/hero-banner2.png';
-import shirtImg from '../assets/shirts.png';
-import sneakersImg from '../assets/Snekers.png';
+import heroBannerImg from '../assets/hero-banner.webp';
+import heroBanner1Img from '../assets/hero-banner1.webp';
+import heroBanner2Img from '../assets/hero-banner2.webp';
+import shirtImg from '../assets/shirts.webp';
+import sneakersImg from '../assets/Snekers.webp';
 
 // Photos of the big top (hero) section. Each one stays 10 seconds, then the next fades in.
 // To add a photo: put it in src/assets, import it above and add it to this list.

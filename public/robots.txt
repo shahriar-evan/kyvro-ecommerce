@@ -1,0 +1,8 @@
+# Kyvro: shop pages for everyone; the team panel, accounts and checkout are not for search results
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /Admin
+Disallow: /api/
+
+Sitemap: https://www.kyvro.store/sitemap.xml
