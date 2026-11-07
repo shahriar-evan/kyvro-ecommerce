@@ -473,7 +473,7 @@ export default function MyShop({ part = 'all', view = 'all', readOnly = false, a
         <h3 className="text-lg font-bold">Create my shop</h3>
         <p className="text-xs text-gray-500">You get your own link, and you earn the markup. Customers who open it see the same Kyvro store, but only the products you choose, at the price you set (within the allowed limit). Everything above the store price is your earning.{!isOwner && adminRole === 'admin' ? ' Orders from your own shop earn the markup, not commission. Your shop starts switched off: the Owner gets a notification and turns it on when they accept it.' : ' Admins can share your link and confirm its orders; they earn commission, not the markup.'}</p>
         <div className="flex flex-wrap gap-2 items-center">
-          <input className={`${inputCls} w-64`} placeholder="Shop name, e.g. Rupa Style" maxLength={60} value={newName} onChange={(e) => setNewName(e.target.value)} />
+          <input className={`${inputCls} w-64`} placeholder="Shop name, e.g. Zayra Fashion" maxLength={60} value={newName} onChange={(e) => setNewName(e.target.value)} />
           <button type="button" disabled={busy} onClick={doCreate} className="bg-[#D4AF37] text-black font-bold px-5 py-2 rounded text-xs uppercase tracking-wider disabled:opacity-50">{busy ? 'Creating...' : 'Create shop'}</button>
         </div>
         {msg && <p className={`text-xs ${msg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{msg.text}</p>}
