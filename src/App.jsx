@@ -1535,7 +1535,13 @@ export default function App() {
       {/* SHOP CATALOG VIEW */}
       {currentView === 'shop' && <ShopView selectedSubCategory={selectedSubCategory} setSelectedSubCategory={setSelectedSubCategory} requestAdd={requestAdd} addToCart={addToCart} filteredProducts={filteredProducts} formatPrice={formatPrice} isDarkMode={isDarkMode} products={storefrontProducts} searchQuery={searchQuery} selectedCategory={selectedCategory} setCurrentView={setCurrentView} setSearchQuery={setSearchQuery} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} setSortBy={setSortBy} sortBy={sortBy} savedIds={savedIds} toggleSaved={toggleSaved} />}
 
-      {currentView === 'product-detail' && selectedProduct && <ProductDetail key={selectedProduct.id} product={selectedProduct} products={storefrontProducts} setSelectedProduct={setSelectedProduct} storeSettings={storeSettings} cartSubtotal={subtotal} cartUnits={cart.reduce((n, i) => n + (parseInt(i.quantity, 10) || 0), 0)} addToCart={addToCart} calculateDiscountPercent={calculateDiscountPercent} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} savedIds={savedIds} toggleSaved={toggleSaved} teamShop={isAdminLoggedIn && shopCtx ? shopDisplayName(shopCtx) : ''} />}
+      {currentView === 'product-detail' && selectedProduct && <ProductDetail key={selectedProduct.id} product={selectedProduct} products={storefrontProducts} setSelectedProduct={setSelectedProduct} storeSettings={storeSettings} cartSubtotal={subtotal} cartUnits={cart.reduce((n, i) => n + (parseInt(i.quantity, 10) || 0), 0)} addToCart={addToCart} calculateDiscountPercent={calculateDiscountPercent} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} savedIds={savedIds} toggleSaved={toggleSaved} teamShop={isAdminLoggedIn && shopCtx ? shopDisplayName(shopCtx) : ''}
+        onEdit={(() => {
+          // the store's own product (not a shop link's priced copy), and only for team members allowed to edit it
+          const own = products.find((x) => String(x.id) === String(selectedProduct.id));
+          if (!isAdminLoggedIn || !own || !canEditProduct(own)) return null;
+          return () => { startEditProduct(own); setCurrentView('admin'); window.scrollTo(0, 0); };
+        })()} />}
 
       {currentView === 'tracking' && <OrderTracking customerUser={customerUser} onSignIn={handleCustomerSignIn} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}
       {currentView === 'pricing' && (

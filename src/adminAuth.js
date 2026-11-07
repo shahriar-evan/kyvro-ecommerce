@@ -193,7 +193,7 @@ export async function setAdminCanCreateShop(email, on) {
 
 // Owner: commission percent (0-100) this person earns on the profit of the orders they confirm
 // The highest commission % the Owner can set (protects your profit margin). Change this one number to raise or lower the limit.
-export const MAX_COMMISSION = 15;
+export const MAX_COMMISSION = 25;
 
 export async function setAdminCommission(email, pct) {
   const n = Math.max(0, Math.min(MAX_COMMISSION, Number(pct) || 0));

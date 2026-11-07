@@ -132,7 +132,7 @@ function ZoomViewer({ photos, index, onIndex, onClose }) {
   );
 }
 
-export default function ProductDetail({ product, products, addToCart, calculateDiscountPercent, formatPrice, isDarkMode, setCurrentView, setSelectedProduct = () => {}, storeSettings = {}, cartSubtotal = 0, cartUnits = 0, savedIds = [], toggleSaved = () => {}, teamShop = '' }) {
+export default function ProductDetail({ product, products, addToCart, calculateDiscountPercent, formatPrice, isDarkMode, setCurrentView, setSelectedProduct = () => {}, storeSettings = {}, cartSubtotal = 0, cartUnits = 0, savedIds = [], toggleSaved = () => {}, teamShop = '', onEdit = null }) {
   // Always use the latest version of the product (admin may have changed stock)
   const live = (products || []).find((p) => p.id === product.id) || product;
   const sized = hasSizeStock(live);
@@ -257,7 +257,16 @@ export default function ProductDetail({ product, products, addToCart, calculateD
 
         <div className="space-y-5">
           <div>
-            <span className="text-[11px] text-[#D4AF37] uppercase tracking-wider">{live.gender === live.category ? live.category : `${live.gender} / ${live.category}`}</span>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[11px] text-[#D4AF37] uppercase tracking-wider">{live.gender === live.category ? live.category : `${live.gender} / ${live.category}`}</span>
+              {/* Team only (Owner, or a member allowed to edit this product): opens it in the Admin edit form */}
+              {onEdit && (
+                <button type="button" onClick={onEdit}
+                  className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] font-bold uppercase tracking-wider transition ${isDarkMode ? 'border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10' : 'border-[#D4AF37] text-[#9A7A1A] hover:bg-[#D4AF37]/10'}`}>
+                  <span aria-hidden="true">✎</span> Edit product
+                </button>
+              )}
+            </div>
             <h1 className="text-2xl sm:text-3xl font-serif font-bold mt-1">{live.name}</h1>
           </div>
 
