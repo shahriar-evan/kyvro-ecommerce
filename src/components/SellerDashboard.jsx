@@ -157,7 +157,7 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
     if (rules && !rules.open) return setFormMsg('Kyvro is not taking new sellers right now. Please try again later.');
     // shop link name: kyvro.store/<handle> (3 to 30 letters a-z, 0-9, "-"; free; can be changed later)
     const handle = cleanHandle(f.handle);
-    if (!HANDLE_RE.test(handle)) return setFormMsg('Write a shop link name: 3 to 30 letters (a-z, 0-9 and -), e.g. zarin-fashion.');
+    if (!HANDLE_RE.test(handle)) return setFormMsg('Write a shop link name: 3 to 30 letters (a-z, 0-9 and -), e.g. zayra-fashion.');
     if (isReservedLink(handle)) return setFormMsg(`kyvro.store/${handle} is used by the website itself. Please choose another shop link.`);
     const bad = sellerNameBlocked(handle, '', rules);
     if (bad) return setFormMsg(`The shop link cannot contain "${bad}". Please choose another one.`);
@@ -286,12 +286,12 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
           <label className="block text-xs font-semibold text-gray-500">Shop link *
             <div className={`mt-1 flex items-stretch rounded border overflow-hidden ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>
               <span className={`px-2 flex items-center text-[11px] whitespace-nowrap ${isDarkMode ? 'bg-[#1a1a1a] text-gray-400' : 'bg-gray-100 text-gray-500'}`}>kyvro.store/</span>
-              <input className={`${inputCls} !border-0 !rounded-none flex-1 min-w-0`} value={form.handle} maxLength={30} placeholder="zarin-fashion" onChange={(e) => set('handle', cleanHandle(e.target.value))} />
+              <input className={`${inputCls} !border-0 !rounded-none flex-1 min-w-0`} value={form.handle} maxLength={30} placeholder="zayra-fashion" onChange={(e) => set('handle', cleanHandle(e.target.value))} />
             </div>
             <span className="block mt-1 font-normal text-[11px]">Your shop's web address. Free on every plan. You can change it later in My Shop (once in 30 days; old links keep working).</span>
           </label>
           <label className="block text-xs font-semibold text-gray-500">Create Website Name <span className="font-normal">🔒 Premium</span>
-            <input className={`${inputCls} block mt-1 w-full opacity-60`} value={prettyHandle(form.handle)} placeholder="Zarin Fashion" readOnly disabled />
+            <input className={`${inputCls} block mt-1 w-full opacity-60`} value={prettyHandle(form.handle)} placeholder="Zayra Fashion" readOnly disabled />
             <span className="block mt-1 font-normal text-[11px]">Until you create one (Premium), your shop shows its link name like this. Upgrade to Premium to create your own Website Name.</span>
           </label>
           {field('name', 'Full name *', { maxLength: 80 })}
