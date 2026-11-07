@@ -392,7 +392,7 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                             )}
                           </td>
                           <td className="p-4 text-gray-500">
-                            <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
                             {totalStock(p)} units
                             {hasSizeStock(p) && (
@@ -407,8 +407,9 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                             )}
                             </div>
                             <button type="button" onClick={() => setOpenId(openId === p.id ? null : p.id)}
-                              className={`shrink-0 px-3 py-1.5 rounded text-[11px] font-bold uppercase tracking-wider border transition ${openId === p.id ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'border-[#D4AF37] text-[#B8921F] hover:bg-[#D4AF37]/10'}`}>
-                              {openId === p.id ? 'Hide ▴' : 'Details ▾'}
+                              aria-label={openId === p.id ? 'Hide details' : 'Show details'} title={openId === p.id ? 'Hide details' : 'Show details'}
+                              className={`shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-sm leading-none border transition ${openId === p.id ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'border-[#D4AF37] text-[#B8921F] hover:bg-[#D4AF37]/10'}`}>
+                              {openId === p.id ? '▴' : '▾'}
                             </button>
                             </div>
                           </td>
