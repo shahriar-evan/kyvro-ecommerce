@@ -29,8 +29,14 @@ export const SUB_CATEGORIES = {
     { group: 'Muslim Wear', items: ['Borka', 'Hijab'] },
   ],
   Winter: [
+    { name: 'Hoodie' },
+    { name: 'Sweatshirt' },
+    { name: 'Sweater' },
     { name: 'Varsity Jacket' },
     { name: 'Denim Jacket' },
+    { name: 'Padding Jacket' },
+    { name: 'Ladies Jacket' },
+    { name: 'Overcoat' },
   ],
 };
 
