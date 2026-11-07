@@ -178,6 +178,9 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
             value={newProductForm.commission ?? ''}
             onChange={e => setNewProductForm(prev => ({ ...prev, commission: e.target.value }))}
             className={inputCls} />
+          {parseFloat(newProductForm.commission) > MAX_COMMISSION && (
+            <p className="text-xs font-bold text-red-500">The highest commission is {MAX_COMMISSION}%. Lower it to {MAX_COMMISSION} or less, then press Update.</p>
+          )}
           <p className="text-[11px] text-gray-500">The Admin or Manager who confirms an order with this product earns this % of the profit when the order is delivered. Team members see it on the product list. Customers never see it.{formProfit !== null && parseFloat(newProductForm.commission) > 0 ? ` Now: ${formatPrice(Math.round(formProfit * parseFloat(newProductForm.commission)) / 100)} per piece.` : ''}</p>
           {formProfit !== null && formProfit > 0 && parseFloat(newProductForm.commission) > 0 && (() => {
             const comm = Math.round(formProfit * Math.min(MAX_COMMISSION, parseFloat(newProductForm.commission))) / 100;
