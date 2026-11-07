@@ -5,7 +5,7 @@ import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, signOu
 import { auth, googleProvider } from './firebase';
 import { isOwnerEmail } from './adminEmails';
 import { getAdminStatus, watchAdminAccess, MAX_COMMISSION } from './adminAuth';
-import { watchShop, watchMyShop, watchShopOwners, SLUG_RE, resolveShopKey, shopLinkKey, turnShopOn, setMyShopLive } from './shops';
+import { watchShop, watchMyShop, watchShopOwners, SLUG_RE, resolveShopKey, shopLinkKey, turnShopOn, setMyShopLive, noteShopVisit } from './shops';
 import { touchSellerSeen, watchMySeller, sellerStatus } from './sellers';
 import { isReservedLink, ROOT_LINK_RE } from './data/reservedLinks';
 import { shopPriceClamp, productInCollection, WHATSAPP_NUMBER } from './data/shopConfig';
@@ -395,6 +395,15 @@ export default function App() {
   }, [visitorLocked, currentView]); // eslint-disable-line react-hooks/exhaustive-deps
   const [loggedInUserEmail, setLoggedInUserEmail] = useState('');
   const [adminRole, setAdminRole] = useState(null); // 'owner' | 'manager' | 'admin' | null
+  // a visitor (not the team, not the shop's own owner) opened a live shop: note it once a day on shops/{slug}.lastVisitAt
+  // (the Owner sees "last visit" before removing a shop)
+  useEffect(() => {
+    if (!shopCtx || !shopVisibleToAll(shopCtx) || isAdminLoggedIn || (customerUser && customerUser.uid === shopCtx.ownerUid)) return;
+    const k = `kyvro_visit_${shopCtx.slug}`;
+    const today = new Date().toISOString().slice(0, 10);
+    try { if (localStorage.getItem(k) === today) return; localStorage.setItem(k, today); } catch (e) { return; }
+    noteShopVisit(shopCtx.slug).catch(() => {});
+  }, [shopCtx && shopCtx.slug, isAdminLoggedIn, customerUser && customerUser.uid]); // eslint-disable-line react-hooks/exhaustive-deps
   const [adminAddProducts, setAdminAddProducts] = useState(false); // the Owner allowed this person to add new products
   const [adminCanApprove, setAdminCanApprove] = useState(false); // the Owner allowed this person to approve pending products
   const [adminCanCreateShop, setAdminCanCreateShop] = useState(false); // the Owner allowed this Admin to create their own shop
@@ -1405,14 +1414,16 @@ export default function App() {
           extras (tagline, contact, about, social links) and the Premium ones (announcement, brand color, top picks) */}
       {shopPreview && currentView !== 'admin' && (
         <div className="px-4 py-2.5 text-center text-xs font-semibold bg-amber-500 text-black" role="status">
-          Preview: this shop is not live yet{shopRaw.status === 'pending' ? ' (waiting for Kyvro\'s approval)' : shopRaw.killed ? ' (switched off by Kyvro)' : shopRaw.inactiveHold ? ' (hidden: the seller was inactive)' : shopRaw.active === false ? ' (switched off)' : basicDue(shopRaw, plans) ? ' (the Basic plan is not paid yet: pay it in your seller dashboard to open the store)' : ' (hidden: the paid plan has ended)'}. Only you can see it; customers get "page not found".
+          Preview: this shop is not live yet{shopRaw.removed && shopRaw.removed.at ? ` (removed by Kyvro${shopRaw.removed.note ? `: ${shopRaw.removed.note}` : ''})` : shopRaw.status === 'pending' ? ' (waiting for Kyvro\'s approval)' : shopRaw.killed ? ' (switched off by Kyvro)' : shopRaw.inactiveHold ? ' (hidden: the seller was inactive)' : shopRaw.active === false ? ' (switched off)' : basicDue(shopRaw, plans) ? ' (the Basic plan is not paid yet: pay it in your seller dashboard to open the store)' : ' (hidden: the paid plan has ended)'}. Only you can see it; customers get "page not found".
           {/* what to do next: the team switches it on / reviews it; the shop's owner pays, renews or asks Kyvro */}
           {(() => {
             const btn = 'ml-2 mt-1.5 sm:mt-0 inline-flex items-center px-3 py-1 rounded-full bg-black text-[#D4AF37] font-bold hover:opacity-90';
             const off = shopRaw.killed || shopRaw.inactiveHold || shopRaw.active === false;
+            const removed = !!(shopRaw.removed && shopRaw.removed.at);
             const pending = shopRaw.status === 'pending';
             const goAdmin = (tab) => { setAdminTab(tab); setCurrentView('admin'); window.scrollTo(0, 0); };
             if (isAdminLoggedIn) {
+              if (removed && adminRole === 'owner') return <button type="button" onClick={() => goAdmin('my-shop')} className={btn}>Removed · restore in Team Shops</button>;
               if (pending) return <button type="button" onClick={() => goAdmin(shopRaw.kind === 'seller' ? 'sellers' : 'my-shop')} className={btn}>Review it</button>;
               if (off && adminRole === 'owner') {
                 return <button type="button" onClick={async () => { if (!(await askConfirm(`Switch "${shopRaw.name || shopRaw.slug}" on? Customers can open it again.`, { confirmText: 'Switch on' }))) return; try { await turnShopOn(shopRaw.slug); } catch (e) { alert(e.message); } }} className={btn}>Switch shop on</button>;
@@ -1422,6 +1433,10 @@ export default function App() {
             }
             // the shop's own owner (a seller): switched off or hidden for inactivity -> they switch it on themselves (then
             // Basic must be paid if it is charged; an ended Pro / Premium runs as Basic). Killed (Page off): ask Kyvro.
+            if (removed) {
+              const waR = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hello Kyvro, my shop ${shopRaw.name || ''} (${window.location.origin}/${shopLinkKey(shopRaw)}) was removed. Please restore it. / আমার শপটি ফিরিয়ে দিন।`)}`;
+              return <a href={waR} target="_blank" rel="noopener noreferrer" className={btn}>Removed · ask Kyvro to restore</a>;
+            }
             if (off && !shopRaw.killed && !pending) {
               return <button type="button" onClick={async () => { try { await setMyShopLive(shopRaw.slug, true); } catch (e) { alert(e.code === 'permission-denied' ? 'Could not switch it on. Please contact Kyvro.' : e.message); } }} className={btn}>Switch my shop on</button>;
             }

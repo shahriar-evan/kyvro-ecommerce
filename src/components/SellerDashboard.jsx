@@ -446,7 +446,7 @@ export default function SellerDashboard({ customerUser: signedIn, viewAs = null,
           {list.map((x) => (
             <div key={x.slug} className="py-2 flex flex-wrap items-center justify-between gap-2">
               <span className="font-semibold">{x.missing ? x.slug : (x.handle ? prettyHandle(x.handle) : x.name)} <a href={`/${x.handle || x.slug}`} target="_blank" rel="noopener noreferrer" className="font-normal text-gray-500 hover:underline">· kyvro.store/{x.handle || x.slug}</a></span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${x.status === 'pending' ? 'bg-amber-500/15 text-amber-600' : x.active === false ? 'bg-gray-500/15 text-gray-500' : 'bg-green-600/15 text-green-600'}`}>{x.status === 'pending' ? 'Waiting for Kyvro' : x.active === false ? 'Off' : 'Live'}</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${x.removed && x.removed.at ? 'bg-red-500/15 text-red-600' : x.status === 'pending' ? 'bg-amber-500/15 text-amber-600' : x.active === false ? 'bg-gray-500/15 text-gray-500' : 'bg-green-600/15 text-green-600'}`}>{x.removed && x.removed.at ? 'Removed' : x.status === 'pending' ? 'Waiting for Kyvro' : x.active === false ? 'Off' : 'Live'}</span>
             </div>
           ))}
         </div>

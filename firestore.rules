@@ -424,6 +424,10 @@ service cloud.firestore {
                 && request.resource.data.get('basicFree', true) == get(sellerPath(request.auth.uid)).data.get('basicFree', true)
                 && request.resource.data.get('categories', []) is list && request.resource.data.get('categories', []).size() <= 20
                 && sellerNameOk(request.resource.data.name, slug)));
+      // any visitor: "someone opened this shop" (lastVisitAt = now, nothing else; at most once a day per browser in the app).
+      // The Owner sees it before removing a shop.
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastVisitAt'])
+        && request.resource.data.lastVisitAt == request.time;
       allow update: if request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 60
         && handleOk()
         && request.resource.data.items is map && request.resource.data.items.size() <= 300
@@ -432,6 +436,7 @@ service cloud.firestore {
                 && request.resource.data.get('status', 'approved') in ['pending', 'approved'])
             || ((isManager() || canShopNow())
                 && resource.data.ownerUid == request.auth.uid
+                && !('removed' in resource.data)
                 && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'theme', 'themeMode', 'logoRequest', 'logoPending', 'logoPendingAt', 'logoReject', 'bannerPending', 'bannerPendingAt', 'bannerReject', 'handle', 'handleChangedAt', 'autoName', 'logo', 'banner', 'coupons'])
                 && shopExtrasOk()
                 && shopSizeOk())
@@ -451,6 +456,8 @@ service cloud.firestore {
             || (signedIn() && !isStaff() && resource.data.get('kind', '') == 'seller'
                 && resource.data.ownerUid == request.auth.uid
                 && resource.data.get('killed', false) != true
+                // a shop the Owner removed (kept 30 days, restored only by the Owner) cannot be changed by its seller
+                && !('removed' in resource.data)
                 && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'items', 'updatedAt', 'tagline', 'contactUrl', 'about', 'socialLinks', 'brandColor', 'announcement', 'pinnedItems', 'theme', 'themeMode', 'logoRequest', 'logoPending', 'logoPendingAt', 'logoReject', 'bannerPending', 'bannerPendingAt', 'bannerReject', 'handle', 'handleChangedAt', 'autoName', 'logo', 'banner', 'active', 'inactiveHold', 'coupons'])
                 // the seller switches their own approved shop ON / OFF (also after it was switched off or hidden for
                 // inactivity). Not a killed shop (Page off: only the Owner) and not one waiting for approval.

@@ -2,9 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { auth } from '../firebase';
 import { askConfirm, askInput } from './AlertCenter';
-import { watchAllShops, watchShopOwners, setShopFeatures, grantLogo, denyLogoRequest, approveLogo, rejectLogo, setShopOn, approveBanner, rejectBanner, rejectShop } from '../shops';
-import { watchSellers, reviveSellerShop, removeSellerShop, sellerShopList } from '../sellers';
-import { effectiveTier, toMillis, TIER_LABEL, normalizePlans } from '../data/priceCheck';
+import { watchAllShops, watchShopOwners, setShopFeatures, grantLogo, denyLogoRequest, approveLogo, rejectLogo, setShopOn, approveBanner, rejectBanner, removeShopSoft, restoreShop, purgeShopNow } from '../shops';
+import { watchSellers, reviveSellerShop } from '../sellers';
+import { watchOrders } from '../orders';
+import { watchPayouts } from '../payouts';
+import { effectiveTier, toMillis, TIER_LABEL, normalizePlans, orderMarkup } from '../data/priceCheck';
 import { watchPlans } from '../storeSettings';
 import { FEATURES, featureDefault, featureLockedFree } from '../data/shopBrand';
 
@@ -34,6 +36,33 @@ export default function PlanMembers({ isOwner, isDarkMode, title = 'Plan Members
   useEffect(() => watchPlans(setPlans), []);
   useEffect(() => watchShopOwners(setOwners, () => {}), []);
   useEffect(() => (isOwner ? watchSellers(setSellers, () => {}) : undefined), [isOwner]);
+  // Owner: orders + payouts, for the checks before removing a shop (money still due, open orders)
+  const [orders, setOrders] = useState([]);
+  const [payouts, setPayouts] = useState([]);
+  useEffect(() => (isOwner ? watchOrders(setOrders, () => {}) : undefined), [isOwner]);
+  useEffect(() => (isOwner ? watchPayouts(true, '', setPayouts, () => {}) : undefined), [isOwner]);
+  // before removing: is the owner still active (signed in within 7 days), did customers open the shop within 15 days,
+  // is any markup still unpaid, any open orders? Warnings only; the Owner still decides.
+  const removalCheck = (r) => {
+    const day = 86400000;
+    const ago = (ms) => (ms ? Math.floor((Date.now() - ms) / day) : null);
+    const seller = r.kind === 'seller' ? sellers.find((x) => x.uid === r.ownerUid) : null;
+    const email = String(seller ? seller.email : (owners[r.slug] || {}).email || '').toLowerCase();
+    const slugs = new Set(r.kind === 'seller' ? shops.filter((x) => x.ownerUid === r.ownerUid).map((x) => x.slug) : [r.slug]);
+    const mine = orders.filter((o) => slugs.has(o.shop));
+    const earned = mine.filter((o) => o.status === 'Delivered' && !o.returned).reduce((n, o) => n + orderMarkup(o), 0);
+    const paid = email ? payouts.filter((p) => String(p.email || '').toLowerCase() === email).reduce((n, p) => n + (Number(p.amount) || 0), 0) : 0;
+    const due = Math.round(earned - paid);
+    const open = mine.filter((o) => o.shop === r.slug && !['Delivered', 'Cancelled'].includes(o.status)).length;
+    const seen = ago(toMillis(seller && seller.lastSeenAt));
+    const visit = ago(toMillis(r.lastVisitAt));
+    const warn = [];
+    if (seen !== null && seen <= 7) warn.push(`Active: the owner signed in ${seen === 0 ? 'today' : `${seen} day${seen === 1 ? '' : 's'} ago`}.`);
+    if (visit !== null && visit <= 15) warn.push(`Customers opened this shop ${visit === 0 ? 'today' : `${visit} day${visit === 1 ? '' : 's'} ago`}.`);
+    if (due > 0) warn.push(`Markup not paid yet: ৳${due}. Pay it first (Sellers / Team Stats); after removal it is no longer listed there.`);
+    if (open > 0) warn.push(`${open} open order${open === 1 ? '' : 's'} (not delivered or cancelled yet).`);
+    return { warn, seen, visit, due, open };
+  };
 
   const rows = useMemo(() => shops.map((s) => {
     const seller = s.kind === 'seller' ? sellers.find((x) => x.slug === s.slug) : null;
@@ -44,7 +73,10 @@ export default function PlanMembers({ isOwner, isDarkMode, title = 'Plan Members
     return { ...s, seller, member, tier, until, expired: !!until && until <= Date.now() };
   }), [shops, sellers, owners]);
 
-  const listed = rows.filter((r) => !(hideUid && r.ownerUid === hideUid));
+  const visibleRows = rows.filter((r) => !(hideUid && r.ownerUid === hideUid));
+  // removed shops wait 30 days in their own list (restore or delete now); the main list leaves them out
+  const removedRows = visibleRows.filter((r) => r.removed && r.removed.at).sort((a, b) => String(b.removed.at).localeCompare(String(a.removed.at)));
+  const listed = visibleRows.filter((r) => !(r.removed && r.removed.at));
   const counts = { all: listed.length, team: listed.filter((r) => r.kind !== 'seller').length, seller: listed.filter((r) => r.kind === 'seller').length };
   const shown = listed.filter((r) => {
     if (kind === 'team' && r.kind === 'seller') return false;
@@ -121,6 +153,35 @@ export default function PlanMembers({ isOwner, isDarkMode, title = 'Plan Members
           </div>
         )}
       </div>
+
+      {/* Owner: removed shops, kept 30 days (then the daily job deletes them); the shop owner can ask on WhatsApp */}
+      {isOwner && removedRows.length > 0 && (
+        <div className={card}>
+          <div>
+            <h3 className="text-lg font-bold">Removed shops <span className="text-sm font-normal text-gray-500">({removedRows.length})</span></h3>
+            <p className="text-xs text-gray-500 mt-1">Hidden from customers. Each is deleted for good 30 days after removal. Restore one if its owner asks (WhatsApp). Orders are not affected.</p>
+          </div>
+          {msg && !cur && <p className={`text-xs ${msg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{msg.text}</p>}
+          <div className="divide-y text-xs">
+            {removedRows.map((r) => {
+              const left = Math.max(0, 30 - Math.floor((Date.now() - Date.parse(r.removed.at)) / 86400000));
+              return (
+                <div key={r.slug} className="py-3 flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-bold">{r.name || r.slug} <span className="font-normal text-gray-500">· {r.member || '-'}{r.kind === 'seller' ? ' (seller)' : ''} · kyvro.store/{r.handle || r.slug}</span></p>
+                    <p className="text-gray-500">Removed {new Date(r.removed.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} · <strong className={left <= 5 ? 'text-red-500' : ''}>{left} day{left === 1 ? '' : 's'} left</strong></p>
+                    {r.removed.note && <p className="mt-1 px-2 py-1 rounded bg-gray-500/10">Reason: {r.removed.note}</p>}
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" disabled={busy} onClick={async () => { if (!(await askConfirm(`Restore "${r.name || r.slug}"? It goes live again with its link.`, { confirmText: 'Restore' }))) return; act(() => restoreShop(r.slug), `"${r.name || r.slug}" is live again.`); }} className="px-3 py-1.5 rounded border border-green-600 text-green-600 font-bold disabled:opacity-50">Restore</button>
+                    <button type="button" disabled={busy} onClick={async () => { if (!(await askConfirm(`Delete "${r.name || r.slug}" for good now? Its link is freed and it cannot be restored. Orders stay.`, { danger: true, confirmText: 'Delete now' }))) return; act(() => purgeShopNow(r.slug), 'Deleted for good.'); }} className="px-3 py-1.5 rounded border border-red-500 text-red-500 font-bold disabled:opacity-50">Delete now</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {cur && (
         <div className={card}>
@@ -224,18 +285,30 @@ export default function PlanMembers({ isOwner, isDarkMode, title = 'Plan Members
                   <p><span className="text-gray-500">Address:</span> {cur.seller.address || '-'}</p>
                 </div>
               )}
+              {/* removal check: the same facts the Remove dialog warns about */}
+              {(() => {
+                const chk = removalCheck(cur);
+                const fmt = (d) => (d === null ? 'never' : d === 0 ? 'today' : `${d} day${d === 1 ? '' : 's'} ago`);
+                return (
+                  <div className={`rounded border p-2.5 space-y-1 ${chk.warn.length ? 'border-amber-500/50 bg-amber-500/10' : 'border-green-600/40 bg-green-600/5'}`}>
+                    <p className="font-bold">{chk.warn.length ? '⚠ Before removing' : '✓ OK to remove'}</p>
+                    <p className="text-gray-500">Owner signed in: {cur.kind === 'seller' ? fmt(chk.seen) : 'team member'} · Last customer visit: {fmt(chk.visit)} · Markup due: ৳{Math.max(0, chk.due)} · Open orders: {chk.open}</p>
+                    {chk.warn.map((w) => <p key={w} className="text-amber-700">• {w}</p>)}
+                  </div>
+                );
+              })()}
               <div className="flex flex-wrap gap-2">
                 {cur.kind === 'seller' && cur.killed && <button type="button" disabled={busy} onClick={() => act(() => reviveSellerShop(cur.slug), 'Shop revived.')} className="px-3 py-1.5 rounded border border-green-600 text-green-600 font-bold disabled:opacity-50">Revive</button>}
-                {/* delete the shop for good (its link is freed; orders stay) */}
+                {/* remove: hidden at once and kept 30 days in "Removed shops" (restore from there); the reason is emailed */}
                 <button type="button" disabled={busy} onClick={async () => {
-                  const owner = cur.kind === 'seller' ? sellers.find((x) => sellerShopList(x).includes(cur.slug)) : null;
-                  const whole = cur.kind === 'seller' && (!owner || owner.slug === cur.slug);
-                  const others = whole && owner ? sellerShopList(owner).filter((x) => x !== cur.slug).length : 0;
-                  const text = cur.kind === 'seller'
-                    ? (whole ? `Remove the shop "${cur.name || cur.slug}"? This is the seller's first shop, so the seller entry${others ? ` and their other ${others} shop(s)` : ''} are removed too (they could open a new shop later).` : `Remove the shop "${cur.name || cur.slug}"? The seller keeps their other shops.`)
-                    : `Remove the team shop "${cur.name || cur.slug}"?`;
-                  if (!(await askConfirm(`${text} Its link stops working and cannot be undone. Orders stay. Pay any markup still due first (Sellers / Team Stats).`, { danger: true, confirmText: 'Remove shop' }))) return;
-                  act(async () => { await (cur.kind === 'seller' ? removeSellerShop(owner, cur.slug) : rejectShop(cur.slug)); setOpen(''); }, 'Shop removed.');
+                  const chk = removalCheck(cur);
+                  const head = chk.warn.length
+                    ? `⚠ Check before removing "${cur.name || cur.slug}":\n• ${chk.warn.join('\n• ')}\n\n`
+                    : `✓ OK to remove "${cur.name || cur.slug}": the owner has not signed in for 7+ days, no customer opened it in 15 days, nothing is due and no order is open.\n\n`;
+                  const note = await askInput(`${head}It is hidden at once and kept for 30 days under Removed shops (you can restore it there), then deleted. Reason (the shop owner gets it by email):`, { placeholder: 'e.g. used a big brand name' });
+                  if (note === null || note === undefined) return;
+                  if (String(note).trim().length < 3) { setMsg({ type: 'err', text: 'Write the reason (at least 3 letters).' }); return; }
+                  act(async () => { await removeShopSoft(cur.slug, String(note).trim()); setOpen(''); }, 'Shop removed. It stays 30 days under Removed shops.');
                 }} className="px-3 py-1.5 rounded bg-red-600 text-white font-bold disabled:opacity-50">Remove shop</button>
               </div>
             </div>
