@@ -9,11 +9,11 @@ export default function Footer({ onStartSelling, sellLabel = 'Start your own bus
           <div className="space-y-4">
             {/* logo + name: centered on a phone (one column), left from 640px (grid columns) */}
             <div className="flex items-center justify-center sm:justify-start gap-1.5">
-              <KyvroMark dark={isDarkMode} title="Kyvro logo" className="h-12 sm:h-14 xl:h-12 w-auto shrink-0" />
+              <KyvroMark dark={isDarkMode} title="Kyvro logo" className="h-11 sm:h-12 xl:h-11 w-auto shrink-0" />
               <span className={`relative top-[0.16em] flex items-center gap-1 whitespace-nowrap leading-none ${isDarkMode ? 'text-[#D4AF37]' : 'text-black'}`}>
-                <span className="text-[30px] sm:text-[38px] xl:text-[31px] font-serif font-bold tracking-wide">KYVRO</span>
-                <span className={`${isDarkMode ? 'text-[#D4AF37]' : 'text-black'} text-[30px] sm:text-[38px] xl:text-[31px] leading-none`} aria-hidden="true">&bull;</span>
-                <span className="text-[28px] sm:text-[34px] xl:text-[29px] font-bold" lang="bn">কাইভ্রো</span>
+                <span className="text-[28px] sm:text-[30px] xl:text-[28px] font-serif font-bold tracking-wide">KYVRO</span>
+                <span className={`${isDarkMode ? 'text-[#D4AF37]' : 'text-black'} text-[28px] sm:text-[30px] xl:text-[28px] leading-none`} aria-hidden="true">&bull;</span>
+                <span className="text-[26px] sm:text-[28px] xl:text-[26px] font-bold" lang="bn">কাইভ্রো</span>
               </span>
             </div>
             <p className="leading-relaxed">
