@@ -350,12 +350,12 @@ export default function App() {
   // the theme's mode: Light / Dark open the page in that mode (the visitor can still switch); "Visitor chooses" leaves it
   useEffect(() => { if (activeTheme.mode === 'light' || activeTheme.mode === 'dark') setIsDarkMode(activeTheme.mode === 'dark'); }, [activeTheme.theme, activeTheme.mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const banners = [coverPhoto1Img, threePieceWomenImg, men_womenImg, women_bannerImg, styleImg, punjabi_shirtImg, shirtImg, punjabiImg, sneakersImg];
+  const banners = [coverPhoto1Img, men_womenImg, women_bannerImg, styleImg, punjabi_shirtImg, shirtImg, punjabiImg, sneakersImg, threePieceWomenImg];
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
 
-  // Every slide stays exactly 10 seconds. The timer restarts after each change (also after a click on a dot)
+  // Every slide stays exactly 15 seconds. The timer restarts after each change (also after a click on a dot)
   // and only runs while the home page is open, so the first photo is never cut short.
-  const BANNER_SECONDS = 10;
+  const BANNER_SECONDS = 15;
   useEffect(() => {
     if (currentView !== 'home') return undefined;
     const timer = setTimeout(() => {
