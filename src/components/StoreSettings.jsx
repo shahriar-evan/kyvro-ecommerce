@@ -257,7 +257,7 @@ export default function StoreSettings({ products = [], settings, isDarkMode, sta
             <div className="space-y-3">
               {rules.length === 0 && <p className={`text-xs ${muted}`}>No rules yet. Add one below.</p>}
               {rules.map((r, i) => (
-                <div key={i} className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end">
+                <div key={i} className="grid grid-cols-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)_5.5rem_auto] gap-3 items-end">
                   <div>
                     <label className={label}>Cart total at least (BDT)</label>
                     <input type="number" min="1" value={r.min} onChange={(e) => setRule(i, { min: e.target.value })} className={input} placeholder="3500" />
