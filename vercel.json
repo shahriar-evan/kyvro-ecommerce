@@ -7,6 +7,10 @@
   ],
   "rewrites": [
     {
+      "source": "/sitemap.xml",
+      "destination": "/api/plan?action=sitemap"
+    },
+    {
       "source": "/Admin",
       "destination": "/"
     },

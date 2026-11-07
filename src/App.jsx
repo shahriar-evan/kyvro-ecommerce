@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { askConfirm, showMaintenance } from './components/AlertCenter';
 import { waOrderText, waCartLines, setWaShop } from './whatsappOrder';
 import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, signOut } from "firebase/auth";
@@ -24,15 +24,15 @@ import { INITIAL_PRODUCTS } from './data/products';
 import { CURRENCIES } from './data/currencies';
 import { hasSubCategories, defaultCategoryFor, matchesCollectionPage, hasSizeStock, stockForSize, orderedSizes, hasColorStock, stockFor, variantKey, needsChoice, imageFor } from './data/catalog';
 import QuickAdd from './components/QuickAdd';
-import heroBannerImg from './assets/hero-banner.png';
-import coverPhoto1Img from './assets/cover_photo1.png';
-import men_womenImg from './assets/men_women.png';
-import women_bannerImg from './assets/women_banner.png';
-import styleImg from './assets/style.png';
-import punjabi_shirtImg from './assets/punjabi_shirt.png';
-import shirtImg from './assets/shirts.png';
-import punjabiImg from './assets/punjabi.png';
-import sneakersImg from './assets/Snekers.png';
+import heroBannerImg from './assets/hero-banner.webp';
+import coverPhoto1Img from './assets/cover_photo1.webp';
+import men_womenImg from './assets/men_women.webp';
+import women_bannerImg from './assets/women_banner.webp';
+import styleImg from './assets/style.webp';
+import punjabi_shirtImg from './assets/punjabi_shirt.webp';
+import shirtImg from './assets/shirts.webp';
+import punjabiImg from './assets/punjabi.webp';
+import sneakersImg from './assets/Snekers.webp';
 import AnnouncementBar from './components/AnnouncementBar';
 import BackButton from './components/BackButton';
 import Header from './components/Header';
@@ -40,19 +40,21 @@ import MobileMenu from './components/MobileMenu';
 import CartDrawer from './components/CartDrawer';
 import HomeView from './components/HomeView';
 import ShopView from './components/ShopView';
-import AdminPortal from './components/AdminPortal';
 import Footer from './components/Footer';
 import AlertCenter from './components/AlertCenter';
-import CheckoutView from './components/CheckoutView';
-import PolicyPages from './components/PolicyPages';
-import OrderSuccess from './components/OrderSuccess';
 import ProductDetail from './components/ProductDetail';
-import AccountView from './components/AccountView';
-import SellPricing from './components/SellPricing';
-import OrderTracking from './components/OrderTracking';
-import PaymentResult from './components/PaymentResult';
 import { getPaymentUrl } from './payment';
 import { initAnalytics, trackPageView, trackViewContent, trackAddToCart, trackInitiateCheckout, trackPurchase } from './analytics';
+// Pages most visitors never open are loaded only when needed (smaller first download on phones)
+const AdminPortal = lazy(() => import('./components/AdminPortal'));
+const CheckoutView = lazy(() => import('./components/CheckoutView'));
+const PolicyPages = lazy(() => import('./components/PolicyPages'));
+const OrderSuccess = lazy(() => import('./components/OrderSuccess'));
+const AccountView = lazy(() => import('./components/AccountView'));
+const SellPricing = lazy(() => import('./components/SellPricing'));
+const OrderTracking = lazy(() => import('./components/OrderTracking'));
+const PaymentResult = lazy(() => import('./components/PaymentResult'));
+const PageLoading = () => <div className="flex-1 min-h-[50vh] flex items-center justify-center text-sm text-gray-500">Loading...</div>;
 
 const EMPTY_CHECKOUT = {
   fullName: '', phone: '', address: '', notes: '',
@@ -1477,6 +1479,7 @@ export default function App() {
       {quickAdd && <QuickAdd product={quickAdd.product} goCheckout={quickAdd.goCheckout} onConfirm={confirmQuickAdd} onClose={() => setQuickAdd(null)} formatPrice={formatPrice} isDarkMode={isDarkMode} />}
       {isCartOpen && <CartDrawer storeSettings={storeSettings} cart={cart} formatPrice={formatPrice} isDarkMode={isDarkMode} removeFromCart={removeFromCart} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} subtotal={subtotal} discount={discount} discountLabel={discountLabel} reward={reward} updateCartQty={updateCartQty} />}
 
+      <Suspense fallback={<PageLoading />}>
       {/* HOME VIEW */}
       {currentView === 'home' && pathNotFound && (
         <div className="w-full max-w-xl mx-auto px-4 py-24 text-center">
@@ -1512,6 +1515,7 @@ export default function App() {
 
       {/* ADMIN PORTAL VIEW (GOOGLE SIGN-IN, WHITELISTED EMAILS ONLY) */}
       {currentView === 'admin' && <AdminPortal adminCanCreateShop={adminCanCreateShop} adminTab={adminTab} deleteProduct={deleteProduct} editingProductId={editingProductId} formatPrice={formatPrice} handleAdminLogout={handleAdminLogout} handleEmailSignIn={handleEmailSignIn} handleGenderChange={handleGenderChange} handleGoogleSignIn={handleGoogleSignIn} handleSaveProduct={handleSaveProduct} isAdminLoggedIn={isAdminLoggedIn} isDarkMode={isDarkMode} adminRole={adminRole} adminName={adminName} canDeleteProduct={canDeleteProduct} canEditProduct={canEditProduct} canAddProduct={canAddProduct} shopOwners={shopOwners} productCommissions={productCommissions} canApproveProduct={canApproveProduct} handleApproveProduct={handleApproveProduct} pendingCount={pendingCount} loggedInUserEmail={loggedInUserEmail} newProductForm={newProductForm} orders={orders} productCosts={productCosts} products={products} storeSettings={storeSettings} isCloud={isCloud} migrating={migrating} handleMigrateProducts={handleMigrateProducts} setAdminTab={setAdminTab} setEditingProductId={setEditingProductId} setNewProductForm={setNewProductForm} startEditProduct={startEditProduct} handleDeleteRequest={handleDeleteRequest} clearProductForm={() => { setEditingProductId(null); setNewProductForm(freshProductForm()); }} />}
+      </Suspense>
 
       {/* FOOTER */}
       <PushPrompt customerUser={customerUser} isDarkMode={isDarkMode} />
