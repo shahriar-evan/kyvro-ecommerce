@@ -358,7 +358,7 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                         <th className="p-4">Category</th>
                         <th className="p-4">Price</th>
                         <th className="p-4">Stock</th>
-                        <th className="p-4 text-right">Actions</th>
+                        <th className="p-4 text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
@@ -369,7 +369,7 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                             <img src={p.image} alt={p.name} className="w-10 h-10 object-cover rounded" />
                             <div>
                               <span className="font-semibold">{p.name}</span>
-                              {p.status === 'pending' && <span className="ml-2 bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 text-[10px] font-bold px-2 py-0.5 rounded">PENDING APPROVAL</span>}
+                              {p.status === 'pending' && <span className="ml-2 bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 text-[10px] font-bold px-2 py-0.5 rounded inline-block whitespace-nowrap">PENDING</span>}
                               {p.deleteRequested && <span className="ml-2 bg-red-500/20 text-red-600 dark:text-red-400 text-[10px] font-bold px-2 py-0.5 rounded">DELETE REQUESTED{(p.deleteRequestedByName || p.deleteRequestedBy) ? ` BY ${String(p.deleteRequestedByName || p.deleteRequestedBy).toUpperCase()}` : ''}</span>}
                               {(p.addedByName || p.addedBy) && <p className="text-[10px] text-gray-500 font-normal mt-0.5">Added by {p.addedByName || p.addedBy}</p>}
                             </div>
@@ -412,7 +412,8 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                             </button>
                             </div>
                           </td>
-                          <td className="p-4 text-right space-x-2">
+                          <td className="p-4 align-middle">
+                            <div className="flex flex-nowrap items-center justify-center gap-2 whitespace-nowrap">
                             {canApproveProduct(p) && <button onClick={() => handleApproveProduct(p)} className="px-3 py-1.5 rounded text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition">Approve</button>}
                             {canEditProduct(p)
                               ? <button onClick={() => startEditProduct(p)} className="px-3 py-1.5 rounded text-xs font-semibold border bg-white text-gray-900 border-gray-400 hover:bg-gray-100 dark:bg-gray-700 dark:text-white dark:border-gray-500 dark:hover:bg-gray-600 transition">Edit</button>
@@ -425,6 +426,7 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                             )}
                             {p.deleteRequested && adminRole !== 'owner' && <span className="text-[10px] font-bold text-red-500">Waiting for Owner</span>}
                             {!p.deleteRequested && canDeleteProduct(p) && <button onClick={() => deleteProduct(p.id)} className="px-3 py-1.5 rounded text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition">{p.status === 'pending' ? 'Reject' : (adminRole === 'owner' ? 'Delete' : 'Request delete')}</button>}
+                            </div>
                           </td>
                         </tr>
                         {openId === p.id && (() => {
