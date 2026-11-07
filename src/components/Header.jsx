@@ -47,7 +47,7 @@ export default function Header({ shopBrand = null, onStartSelling, sellLabel = '
               ) : (
                 <span className={`flex items-center whitespace-nowrap leading-none max-[319px]:hidden ${isDarkMode ? 'text-[#D4AF37]' : 'text-black'}`}>
                   {/* Montserrat 600 with wide letter spacing (font loaded in index.html, only these 5 letters); the negative right margin cancels the last letter's spacing */}
-                  <span className="text-[16px] min-[400px]:text-[18px] sm:text-[21px] font-semibold tracking-[0.3em] -mr-[0.3em] ml-1 sm:ml-1.5" style={{ fontFamily: 'Montserrat, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' }}>KYVRO</span>
+                  <span className="text-[17px] min-[400px]:text-[20px] sm:text-[24px] font-semibold tracking-[0.3em] -mr-[0.3em] ml-1 sm:ml-1.5" style={{ fontFamily: 'Montserrat, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' }}>KYVRO</span>
                 </span>
               )}
             </div>
