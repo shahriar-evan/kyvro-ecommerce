@@ -10,13 +10,14 @@ import ThemedHome from './ThemedHome';
 import heroBannerImg from '../assets/hero-banner.webp';
 import heroBanner1Img from '../assets/hero-banner1.webp';
 import heroBanner2Img from '../assets/hero-banner2.webp';
+import heroBannerGreenImg from '../assets/hero-banner-green.webp';
 import shirtImg from '../assets/shirts.webp';
 import sneakersImg from '../assets/Snekers.webp';
 
-// Photos of the big top (hero) section. Each one stays 10 seconds, then the next fades in.
+// Photos of the big top (hero) section. Each one stays 15 seconds, then the next fades in.
 // To add a photo: put it in src/assets, import it above and add it to this list.
-const HERO_IMAGES = [heroBannerImg, heroBanner1Img, heroBanner2Img];
-const HERO_SECONDS = 10;
+const HERO_IMAGES = [heroBannerImg, heroBannerGreenImg, heroBanner1Img, heroBanner2Img];
+const HERO_SECONDS = 15;
 
 export default function HomeView({ theme = 'classic', brandName = 'Kyvro', hideEmptyCategories = false, requestAdd, addToCart, banners, calculateDiscountPercent, currentBannerIndex, formatPrice, isDarkMode, products, setCurrentBannerIndex, setCurrentView, setSelectedCategory, setSelectedProduct, savedIds = [], toggleSaved = () => {} }) {
   const [heroIdx, setHeroIdx] = useState(0);
