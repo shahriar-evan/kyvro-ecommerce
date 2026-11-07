@@ -164,6 +164,11 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
       {formProfit !== null && !(linkPerColor && photoColors.some((c) => String(colorCostsForm[c] ?? '').trim() !== '')) && (
         <p className={`text-xs font-semibold ${formProfit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
           Selling price {formatPrice(formPriceNum)} − supplier cost {formatPrice(formCostNum)} = {formProfit >= 0 ? 'profit' : 'LOSS'} {formatPrice(Math.abs(formProfit))} per piece
+          {formCostNum > 0 && formPriceNum > 0 && (
+            <span className="block font-normal">
+              {formProfit >= 0 ? '+' : '−'}{(Math.abs(formProfit) / formCostNum * 100).toFixed(1)}% on the supplier cost · {(formProfit / formPriceNum * 100).toFixed(1)}% of the selling price
+            </span>
+          )}
         </p>
       )}
       {adminRole === 'owner' && (
@@ -174,6 +179,17 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
             onChange={e => setNewProductForm(prev => ({ ...prev, commission: e.target.value }))}
             className={inputCls} />
           <p className="text-[11px] text-gray-500">The Admin or Manager who confirms an order with this product earns this % of the profit when the order is delivered. Team members see it on the product list. Customers never see it.{formProfit !== null && parseFloat(newProductForm.commission) > 0 ? ` Now: ${formatPrice(Math.round(formProfit * parseFloat(newProductForm.commission)) / 100)} per piece.` : ''}</p>
+          {formProfit !== null && formProfit > 0 && parseFloat(newProductForm.commission) > 0 && (() => {
+            const comm = Math.round(formProfit * Math.min(MAX_COMMISSION, parseFloat(newProductForm.commission))) / 100;
+            const keep = formProfit - comm;
+            return (
+              <p className="text-xs font-semibold text-green-600">
+                After {Math.min(MAX_COMMISSION, parseFloat(newProductForm.commission))}% commission ({formatPrice(comm)}) you keep {formatPrice(keep)} per piece
+                {formCostNum > 0 ? ` · +${(keep / formCostNum * 100).toFixed(1)}% on the supplier cost` : ''}
+                {formPriceNum > 0 ? ` · ${(keep / formPriceNum * 100).toFixed(1)}% of the selling price` : ''}
+              </p>
+            );
+          })()}
         </div>
       )}
       {!linkPerColor && (
