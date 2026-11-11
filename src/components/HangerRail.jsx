@@ -190,12 +190,12 @@ export default function HangerRail({
         )}
       </div>
 
-      <div className="relative flex-1 flex flex-col justify-center py-6 sm:py-10">
+      <div className="relative flex-1 flex flex-col justify-center pt-6 sm:pt-10">
         <div className="relative">
           <Rod variant={variant} />
           <div ref={scRef} onScroll={update} onPointerDown={onPointerDown} onClickCapture={onClickCapture}
             className="kyvro-noscroll relative flex items-start gap-3 sm:gap-6 overflow-x-auto px-6 sm:px-12 cursor-grab active:cursor-grabbing select-none"
-            style={{ paddingTop: ROD_Y - 8, paddingBottom: 28 }}>
+            style={{ paddingTop: ROD_Y - 8, paddingBottom: 84 }}>
             {products.map((p, i) => (
               <div key={p.id} data-hang onTransitionEnd={update}
                 className={`relative shrink-0 transition-[width] duration-500 ease-in-out ${!p.cutout ? (card === 'square' ? 'w-[160px] sm:w-[210px] lg:w-[250px]' : 'w-[158px] sm:w-[200px] lg:w-[230px]')
@@ -213,7 +213,9 @@ export default function HangerRail({
                     {p.cutout ? (() => {
                       // with a side photo the piece hangs side-on and turns to the front on hover / tap
                       const front = !p.cutoutSide || hover === i || tapped === i;
-                      const shadow = hover === i || tapped === i ? 'drop-shadow-[0_22px_22px_rgba(0,0,0,.28)]' : 'drop-shadow-[0_12px_12px_rgba(0,0,0,.16)]';
+                      // no CSS drop-shadow filter here: on the swinging pieces it drew a light box that flickered;
+                      // a soft gradient under the piece gives the depth instead
+                      const lifted = hover === i || tapped === i;
                       return (
                         <>
                           {/* background-free photo: it hangs on its own hanger, or on ours */}
@@ -225,15 +227,17 @@ export default function HangerRail({
                               At rest both pictures have a plain 2D transform, so the browser keeps no 3D layer (that flickered). */}
                           <div className={`relative h-[185px] sm:h-[235px] lg:h-[270px] w-full ${p.cutoutHanger ? '-mt-[3px]' : '-mt-[12px]'}`}
                             style={p.cutoutSide ? { perspective: '900px' } : undefined}>
+                            <span aria-hidden="true" className="pointer-events-none absolute left-1/2 -bottom-[16px] h-[30px] w-[78%] -translate-x-1/2 transition-opacity duration-300"
+                              style={{ background: 'radial-gradient(closest-side, rgba(0,0,0,.22), rgba(0,0,0,0))', opacity: lifted ? 1 : 0.6 }} />
                             {p.cutoutSide && (
                               // sized by height, so every piece hangs exactly as tall as the shirts (jackets too)
                               <img src={p.cutoutSide} alt="" aria-hidden="true" loading="lazy" draggable={false}
-                                className={`absolute left-1/2 top-0 h-full w-auto max-w-none transition-transform duration-[260ms] ${shadow}`}
+                                className={`absolute left-1/2 top-0 h-full w-auto max-w-none transition-transform duration-[260ms]`}
                                 style={{ transform: front ? 'translateX(-50%) rotateY(-90deg)' : 'translateX(-50%)',
                                   transitionTimingFunction: front ? 'cubic-bezier(.5,0,.9,.5)' : 'cubic-bezier(.1,.5,.5,1)', transitionDelay: front ? '0ms' : '260ms' }} />
                             )}
                             <img src={p.cutout} alt={p.name} loading="lazy" draggable={false}
-                              className={`absolute inset-0 h-full w-full object-contain object-top transition-transform duration-[260ms] ${shadow}`}
+                              className={`absolute inset-0 h-full w-full object-contain object-top transition-transform duration-[260ms]`}
                               style={p.cutoutSide ? { transform: front ? 'none' : 'rotateY(90deg)',
                                 transitionTimingFunction: front ? 'cubic-bezier(.1,.5,.5,1)' : 'cubic-bezier(.5,0,.9,.5)', transitionDelay: front ? '260ms' : '0ms' } : undefined} />
                           </div>
