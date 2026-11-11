@@ -27,12 +27,19 @@ export function Hanger({ className = '' }) {
   );
 }
 
-export function PriceTagHang({ children, rotate = -6 }) {
+// The tag on the hook: discount % on the left; on the right the old price crossed out above today's price
+export function PriceTagHang({ price, originalPrice, formatPrice, rotate = -6 }) {
+  const old = Number(originalPrice) || 0;
+  const pct = old > price && price > 0 ? Math.round(((old - price) / old) * 100) : 0;
   return (
-    <span className="absolute left-1/2 top-[30px] z-10 ml-1 whitespace-nowrap rounded-[3px] bg-white px-1.5 py-[3px] text-[9px] sm:text-[10px] font-extrabold text-black shadow-[0_2px_6px_rgba(0,0,0,.18)]"
+    <span className="absolute left-1/2 top-[30px] z-10 ml-1 inline-flex items-center gap-1 whitespace-nowrap rounded-[3px] bg-white px-1.5 py-[3px] text-black shadow-[0_2px_6px_rgba(0,0,0,.18)]"
       style={{ transform: `rotate(${rotate}deg)` }}>
       <span className="absolute left-1/2 top-[2px] -ml-[1.5px] h-[3px] w-[3px] rounded-full bg-gray-300" />
-      <span className="block pt-[3px]">{children}</span>
+      {pct > 0 && <span className="mt-[3px] rounded-[2px] bg-red-600 px-1 text-[8px] sm:text-[9px] font-extrabold leading-[14px] text-white">-{pct}%</span>}
+      <span className="flex flex-col items-end pt-[3px] leading-none">
+        {pct > 0 && <span className="text-[7px] sm:text-[8px] font-semibold text-gray-400 line-through">{shortPrice(formatPrice, old)}</span>}
+        <span className="text-[9px] sm:text-[10px] font-extrabold">{shortPrice(formatPrice, price)}</span>
+      </span>
     </span>
   );
 }
@@ -71,6 +78,8 @@ export default function HangerRail({
   const barRef = useRef(null);
   const drag = useRef({ down: false, x: 0, left: 0, moved: false });
   const [hover, setHover] = useState(-1);
+  const [tapped, setTapped] = useState(-1); // touch: the first tap turns a side-view piece to the front, the next opens it
+  const pointer = useRef('mouse');
   const sag = variant === 'curve' ? SAG : 0;
 
   // each hook gets longer or shorter so it meets the sagging rod at its place on the screen
@@ -125,7 +134,12 @@ export default function HangerRail({
     if (drag.current.moved) { e.preventDefault(); e.stopPropagation(); drag.current.moved = false; }
   };
 
-  const hovered = hover >= 0 ? products[hover] : null;
+  const hovered = hover >= 0 ? products[hover] : (tapped >= 0 ? products[tapped] : null);
+  const tap = (i) => {
+    const p = products[i];
+    if (p.cutoutSide && pointer.current !== 'mouse' && tapped !== i) { setTapped(i); return; }
+    onOpen(i);
+  };
 
   return (
     <section className="relative isolate w-full overflow-hidden text-black lg:min-h-[calc(100vh-72px)] flex flex-col" style={{ background: TONES[tone] || TONES.grey }}>
@@ -154,24 +168,42 @@ export default function HangerRail({
             className="kyvro-noscroll relative flex items-start gap-3 sm:gap-6 overflow-x-auto px-6 sm:px-12 cursor-grab active:cursor-grabbing select-none"
             style={{ paddingTop: ROD_Y - 8, paddingBottom: 28 }}>
             {products.map((p, i) => (
-              <div key={p.id} data-hang className={`relative shrink-0 ${p.cutout ? 'w-[112px] sm:w-[140px] lg:w-[158px]' : 'w-[118px] sm:w-[150px] lg:w-[172px]'}`} style={{ marginTop: 'var(--sag, 0px)' }}>
+              <div key={p.id} data-hang onTransitionEnd={update}
+                className={`relative shrink-0 transition-[width] duration-300 ease-out ${!p.cutout ? 'w-[118px] sm:w-[150px] lg:w-[172px]'
+                  : (p.cutoutSide && hover !== i && tapped !== i) ? 'w-[64px] sm:w-[80px] lg:w-[92px]' : 'w-[112px] sm:w-[140px] lg:w-[158px]'}`}
+                style={{ marginTop: 'var(--sag, 0px)' }}>
                 <div className="kyvro-swing" style={{ animationDelay: `${-((i * 1.37) % 5.5)}s`, animationDuration: `${5 + (i % 3) * 0.6}s` }}>
-                  <button type="button" onClick={() => onOpen(i)} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(-1)} onFocus={() => setHover(i)} onBlur={() => setHover(-1)}
+                  <button type="button" onPointerDown={(e) => { pointer.current = e.pointerType; }} onClick={() => tap(i)} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(-1)} onFocus={() => setHover(i)} onBlur={() => setHover(-1)}
                     aria-label={`${p.name}, ${shortPrice(formatPrice, p.price)}`}
                     className={`group relative block w-full origin-top transition-transform duration-300 ease-out ${hover === i ? 'z-10 scale-[1.1] translate-y-1' : ''}`}>
                     {/* hook over the rod + wire */}
                     <svg viewBox="0 0 20 40" className="mx-auto block h-[34px] w-[17px]" aria-hidden="true">
                       <path d="M10 40 V14 C10 6 3 5 3 10" fill="none" stroke="#8e9197" strokeWidth="1.6" strokeLinecap="round" />
                     </svg>
-                    <PriceTagHang rotate={i % 2 ? 5 : -6}>{shortPrice(formatPrice, p.price)}</PriceTagHang>
-                    {p.cutout ? (
-                      <>
-                        {/* background-free photo: it hangs on its own hanger, or on ours */}
-                        {!p.cutoutHanger && <Hanger className="relative z-[2] -mt-[2px] mx-auto block w-[62%]" />}
-                        <img src={p.cutout} alt={p.name} loading="lazy" draggable={false}
-                          className={`relative mx-auto block h-[150px] sm:h-[190px] lg:h-[215px] w-full object-contain object-top transition-[filter] duration-300 ${p.cutoutHanger ? '-mt-[3px]' : '-mt-[12px]'} ${hover === i ? 'drop-shadow-[0_22px_22px_rgba(0,0,0,.28)]' : 'drop-shadow-[0_12px_12px_rgba(0,0,0,.16)]'}`} />
-                      </>
-                    ) : (
+                    <PriceTagHang rotate={i % 2 ? 5 : -6} price={p.price} originalPrice={p.originalPrice} formatPrice={formatPrice} />
+                    {p.cutout ? (() => {
+                      // with a side photo the piece hangs side-on and turns to the front on hover / tap
+                      const front = !p.cutoutSide || hover === i || tapped === i;
+                      const shadow = hover === i || tapped === i ? 'drop-shadow-[0_22px_22px_rgba(0,0,0,.28)]' : 'drop-shadow-[0_12px_12px_rgba(0,0,0,.16)]';
+                      return (
+                        <>
+                          {/* background-free photo: it hangs on its own hanger, or on ours */}
+                          {!p.cutoutHanger && (
+                            <Hanger className={`relative z-[2] -mt-[2px] mx-auto block transition-all duration-300 ${front ? 'w-[62%]' : 'w-[22%]'}`} />
+                          )}
+                          <div className={`relative h-[150px] sm:h-[190px] lg:h-[215px] w-full ${p.cutoutHanger ? '-mt-[3px]' : '-mt-[12px]'}`}>
+                            {p.cutoutSide && (
+                              <img src={p.cutoutSide} alt="" aria-hidden="true" loading="lazy" draggable={false}
+                                className={`absolute inset-0 h-full w-full object-contain object-top transition-transform duration-200 ease-in ${shadow}`}
+                                style={{ transform: `scaleX(${front ? 0 : 1})` }} />
+                            )}
+                            <img src={p.cutout} alt={p.name} loading="lazy" draggable={false}
+                              className={`absolute inset-0 h-full w-full object-contain object-top transition-transform duration-300 ease-out ${shadow}`}
+                              style={{ transform: `scaleX(${front ? 1 : 0})`, transitionDelay: front && p.cutoutSide ? '150ms' : '0ms' }} />
+                          </div>
+                        </>
+                      );
+                    })() : (
                       <>
                         <Hanger className="relative z-[1] -mt-[2px] mx-auto block w-[78%]" />
                         {/* the photo card, held by two clips under the hanger */}

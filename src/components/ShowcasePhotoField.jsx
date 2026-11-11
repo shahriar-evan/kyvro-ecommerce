@@ -6,7 +6,7 @@ import { CUTOUTS, cutoutSrc } from '../data/cutouts';
 // Admin product form: the background-free "home page photo" of a product (hanging rail / shoe wheel)
 // plus up to 3 more angles (back, side) for the quick view.
 // value = the pending change kept in the form until Save / Update:
-//   null (no change), { image, hanger, extra: [] }, { off: true } (hide built-in), { remove: true } (delete uploaded).
+//   null (no change), { image (front), side, hanger, extra: [] }, { off: true } (hide built-in), { remove: true } (delete uploaded).
 // A transparent PNG / WebP uploaded as the main or a colour photo is added here by itself (see addAutoShowcase).
 export const MAX_EXTRA = 3;
 const builtIn = (id) => [...CUTOUTS.men, ...CUTOUTS.shoes].find((c) => c.id === String(id)) || null;
@@ -49,16 +49,16 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
   const base = builtIn(productId);
   // what the home page shows after saving
   let shown = null;
-  if (value && value.image) shown = { src: value.image, hanger: !!value.hanger, extra: value.extra || [], from: value.auto ? 'auto' : 'new' };
+  if (value && value.image) shown = { src: value.image, side: value.side || null, hanger: !!value.hanger, extra: value.extra || [], from: value.auto ? 'auto' : 'new' };
   else if (value && (value.remove || value.off)) shown = null;
-  else if (saved && saved.image) shown = { src: saved.image, hanger: !!saved.hanger, extra: saved.extra || [], from: 'uploaded' };
-  else if (base && !(saved && saved.off)) shown = { src: cutoutSrc(base.id), hanger: !!base.hanger, extra: [], from: 'built-in' };
+  else if (saved && saved.image) shown = { src: saved.image, side: saved.side || null, hanger: !!saved.hanger, extra: saved.extra || [], from: 'uploaded' };
+  else if (base && !(saved && saved.off)) shown = { src: cutoutSrc(base.id), side: null, hanger: !!base.hanger, extra: [], from: 'built-in' };
 
   // the current state as an editable value (a built-in picture is turned into a data URL first)
   const editable = async () => {
     if (!shown) return null;
     const image = shown.from === 'built-in' ? await urlToShowcaseImage(shown.src) : shown.src;
-    return { image, hanger: shown.hanger, extra: [...shown.extra] };
+    return { image, side: shown.side, hanger: shown.hanger, extra: [...shown.extra] };
   };
 
   const run = async (fn) => { setErr(''); setBusy(true); try { await fn(); } catch (ex) { setErr(ex.message || 'Could not use this picture.'); } setBusy(false); };
@@ -68,7 +68,7 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
     if (!file) return;
     run(async () => {
       const image = await prepareShowcaseImage(file);
-      onChange({ image, hanger: shown ? shown.hanger : false, extra: shown ? [...shown.extra] : [] });
+      onChange({ image, side: shown ? shown.side : null, hanger: shown ? shown.hanger : false, extra: shown ? [...shown.extra] : [] });
     });
   };
   const pickMore = (e) => {
@@ -84,6 +84,17 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
       onChange(cur);
     });
   };
+  const sideRef = useRef(null);
+  const pickSide = (e) => {
+    const file = e.target.files && e.target.files[0]; e.target.value = '';
+    if (!file) return;
+    run(async () => {
+      const cur = await editable();
+      if (!cur) throw new Error('Upload the front photo first.');
+      onChange({ ...cur, side: await prepareShowcaseImage(file) });
+    });
+  };
+  const removeSide = () => run(async () => { const cur = await editable(); onChange({ ...cur, side: null }); });
   const removeExtra = (i) => run(async () => {
     const cur = await editable();
     cur.extra.splice(i, 1);
@@ -101,11 +112,26 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
       <p className="text-xs font-semibold text-gray-500">Home page photo (no background)</p>
       <p className="mt-1 text-[11px] text-gray-500 leading-relaxed">
         Shown on the home page hanging rail (Men, Women) or the shoe wheel; <b>More</b> photos (back, side) show in the quick view.
+        With a <b>Side photo</b> (the product hanging, seen from the side) the rail shows it from the side and turns it to the front on hover / tap.
         Upload a PNG / WebP <b>without background</b>: on a Mac right-click the photo in Finder → Quick Actions → <b>Remove Background</b>.
         A transparent PNG used as the main or a colour photo above is added here by itself. Best: only the product, front view, no model, no folded shirts.
       </p>
       <div className="mt-3 flex flex-wrap items-start gap-4">
-        <Thumb src={shown && shown.src} big />
+        <div className="text-center">
+          <Thumb src={shown && shown.src} big />
+          <p className="mt-1 text-[10px] font-semibold text-gray-500">FRONT</p>
+        </div>
+        {shown && (
+          <div className="text-center">
+            {shown.side ? <Thumb src={shown.side} big onRemove={removeSide} /> : (
+              <button type="button" disabled={busy} onClick={() => sideRef.current && sideRef.current.click()}
+                className="h-36 w-32 rounded border border-dashed border-gray-300 text-[11px] font-semibold text-gray-500 px-2 hover:border-[#D4AF37] hover:text-[#D4AF37] disabled:opacity-50">
+                + Side photo<br /><span className="font-normal">(optional)</span>
+              </button>
+            )}
+            <p className="mt-1 text-[10px] font-semibold text-gray-500">SIDE</p>
+          </div>
+        )}
         <div className="flex flex-col gap-2 text-xs">
           {label && <span className="text-gray-500 max-w-sm">{label}</span>}
           {value && (value.off || value.remove) && <span className="text-red-500">Will be removed when you press Save / Update</span>}
@@ -143,6 +169,7 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
       )}
       <input ref={mainRef} type="file" accept="image/png,image/webp" className="hidden" onChange={pickMain} />
       <input ref={moreRef} type="file" accept="image/png,image/webp" multiple className="hidden" onChange={pickMore} />
+      <input ref={sideRef} type="file" accept="image/png,image/webp" className="hidden" onChange={pickSide} />
     </div>
   );
 }
