@@ -37,3 +37,10 @@
 [data-theme="bold"] .font-serif { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-weight: 800; }
 
 [data-theme="street"] .font-serif, [data-theme="fresh"] .font-serif { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-weight: 800; }
+
+/* Home showcase (HangerRail / ShoeOrbit): clothes swing gently on their hooks */
+@keyframes kyvroSwing { 0%, 100% { transform: rotate(-1.1deg); } 50% { transform: rotate(1.1deg); } }
+.kyvro-swing { transform-origin: 50% 0; animation: kyvroSwing 5.5s ease-in-out infinite; }
+.kyvro-noscroll { scrollbar-width: none; }
+.kyvro-noscroll::-webkit-scrollbar { display: none; }
+@media (prefers-reduced-motion: reduce) { .kyvro-swing { animation: none; } }
