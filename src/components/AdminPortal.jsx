@@ -724,6 +724,10 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                       <div className="sm:col-span-2">
                         <ShowcasePhotoField productId={editingProductId} value={newProductForm.showcaseEdit || null} isDarkMode={isDarkMode}
                           kind={newProductForm.gender === 'Shoes' || newProductForm.category === 'Shoes' ? 'shoe' : 'garment'}
+                          sourceNames={Object.fromEntries([
+                            ...Object.entries(newProductForm.colorImages || {}).map(([c, u]) => [u, c]),
+                            ...Object.entries(newProductForm.colorGallery || {}).flatMap(([c, list]) => (list || []).map((u) => [u, c])),
+                          ].filter(([u]) => typeof u === 'string' && u))}
                           sources={[...new Set([newProductForm.image, ...Object.values(newProductForm.colorImages || {}), ...(newProductForm.extraImages || []),
                             ...Object.values(newProductForm.colorGallery || {}).flat()].filter((u) => typeof u === 'string' && u))]}
                           onChange={(v) => setNewProductForm((f) => ({ ...f, showcaseEdit: v }))} />

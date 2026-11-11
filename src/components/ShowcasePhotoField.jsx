@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { getShowcase } from '../showcaseStore';
-import { prepareShowcaseImage, urlToShowcaseImage, whiteBgToShowcase } from '../utils/showcaseImage';
+import { prepareShowcaseImage, urlToShowcaseImage, keyBgToShowcase, pickKeyColour } from '../utils/showcaseImage';
 import { makeAiPhoto } from '../aiPhoto';
 import { CUTOUTS, cutoutSrc } from '../data/cutouts';
 
@@ -44,7 +44,8 @@ const LINKS = {
 const A = ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#B8921F] underline">{children}</a>;
 
 // sources = the product's photos in the form (main, colour, more); kind = 'garment' | 'shoe'
-export default function ShowcasePhotoField({ productId, value, onChange, isDarkMode, sources = [], kind = 'garment' }) {
+// sourceNames = { photo url: colour name } (helps pick the AI background colour when a photo cannot be read)
+export default function ShowcasePhotoField({ productId, value, onChange, isDarkMode, sources = [], sourceNames = {}, kind = 'garment' }) {
   const [saved, setSaved] = useState(null); // the Firestore entry of this product
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -116,34 +117,46 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
   // Remove: an uploaded photo is deleted; a built-in one is switched off
   const removeAll = () => onChange(base ? { off: true } : { remove: true });
 
-  // ---- Make with AI (Gemini, api/plan.js?action=ai-photo) ----
+  // ---- Make with AI (api/plan.js?action=ai-photo) ----
+  const WAIT = 30; // usual seconds; the counter goes down from here
   const [srcPick, setSrcPick] = useState(0);
-  const [ai, setAi] = useState(null); // { view, cut } | { busy: view, at } | { error, code }
-  const [secs, setSecs] = useState(0); // seconds since "Make" was pressed (counter while waiting)
+  const [aiBusy, setAiBusy] = useState(null); // { view, at } while the AI works
+  const [aiRes, setAiRes] = useState({}); // { front, side, clean }: each finished picture stays until used / discarded
+  const [aiErr, setAiErr] = useState(null); // { error, code, provider }
+  const [secs, setSecs] = useState(0);
   useEffect(() => {
-    if (!ai || !ai.busy) return undefined;
+    if (!aiBusy) return undefined;
     setSecs(0);
-    const t = setInterval(() => setSecs(Math.floor((Date.now() - ai.at) / 1000)), 250);
+    const t = setInterval(() => setSecs(Math.floor((Date.now() - aiBusy.at) / 1000)), 250);
     return () => clearInterval(t);
-  }, [ai && ai.busy, ai && ai.at]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [aiBusy]);
   const source = sources[Math.min(srcPick, Math.max(0, sources.length - 1))];
   // shoes: only "Remove background" (same angle); clothes: make a front or a side view
   const views = kind === 'shoe' ? ['clean'] : ['front', 'side'];
   const VIEW_LABEL = { clean: 'Remove background', front: 'Make front photo', side: 'Make side photo' };
   const makeAi = async (view) => {
-    if (!source) return;
-    setAi({ busy: view, at: Date.now() });
+    if (!source || aiBusy) return;
+    setAiErr(null);
+    setAiBusy({ view, at: Date.now() });
     try {
-      const raw = await makeAiPhoto({ source, view, kind });
-      setAi({ view, cut: await whiteBgToShowcase(raw) });
-    } catch (ex) { setAi({ error: ex.message || 'Could not make the picture.', code: ex.code || 'failed', provider: ex.provider || 'gemini' }); }
+      // ask for a flat background colour the product does not use, then cut that colour out here
+      const bg = await pickKeyColour(source, sourceNames[source] || '');
+      const raw = await makeAiPhoto({ source, view, kind, bg });
+      const cut = await keyBgToShowcase(raw);
+      setAiRes((r) => ({ ...r, [view]: cut }));
+    } catch (ex) { setAiErr({ error: ex.message || 'Could not make the picture.', code: ex.code || 'failed', provider: ex.provider || 'gemini' }); }
+    setAiBusy(null);
   };
-  const useAi = (as) => run(async () => {
+  const dropAi = (view) => setAiRes((r) => { const n = { ...r }; delete n[view]; return n; });
+  // put a finished AI picture in the Front or Side slot (the other slot keeps what it has)
+  const useAi = (view, as) => run(async () => {
+    const cut = aiRes[view];
+    if (!cut) return;
     const cur = (await editable()) || { image: null, side: null, hanger: false, extra: [] };
-    if (as === 'side' && !cur.image) throw new Error('Make or upload the front photo first.');
-    // the AI front of a garment already shows a wooden hanger
-    onChange(as === 'side' ? { ...cur, side: ai.cut } : { ...cur, image: ai.cut, hanger: kind === 'garment' && ai.view !== 'clean' ? true : cur.hanger });
-    setAi(null);
+    if (as === 'side' && !cur.image) throw new Error('Put a front photo in first (Use as front photo), then the side.');
+    // the AI front / side of a garment already shows a wooden hanger
+    onChange(as === 'side' ? { ...cur, side: cut } : { ...cur, image: cut, hanger: kind === 'garment' && view !== 'clean' ? true : cur.hanger });
+    dropAi(view);
   });
 
   const label = shown && { auto: 'Taken from the transparent photo you uploaded above · saved when you press Save / Update',
@@ -215,13 +228,13 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
           <p className="mt-1 text-[11px] text-gray-500 leading-relaxed">
             {kind === 'shoe'
               ? 'Pick one of this shoe\'s photos (the red one is picked): the AI keeps the shoe as it is and only removes the background. '
-              : 'Pick one of this product\'s photos (the red one is picked), then make the front or the side view. '}
-            It takes about 10-30 seconds and uses your AI credit.
+              : 'Pick one of this product\'s photos (the red one is picked), then make the front and / or the side view (both stay here until you use them). '}
+            It takes about {WAIT} seconds and uses your AI credit.
             <b> Check that colours, logos and text match the real product</b> before you use it (AI sometimes invents letters).
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {sources.slice(0, 10).map((u, i) => (
-              <button key={u.slice(0, 80) + i} type="button" onClick={() => setSrcPick(i)} aria-label={`Use photo ${i + 1}`}
+              <button key={u.slice(0, 80) + i} type="button" disabled={!!aiBusy} onClick={() => setSrcPick(i)} aria-label={`Use photo ${i + 1}`}
                 className={`relative h-16 w-16 overflow-hidden rounded bg-white transition ${i === srcPick ? 'border-[3px] border-red-600 ring-2 ring-red-600/30 scale-105' : 'border-2 border-transparent opacity-80 hover:opacity-100'}`}>
                 <img src={u} alt="" className="h-full w-full object-cover" />
                 {i === srcPick && <span className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white">✓</span>}
@@ -230,51 +243,56 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
           </div>
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
             {views.map((v) => (
-              <button key={v} type="button" disabled={!!(ai && ai.busy) || busy} onClick={() => makeAi(v)}
+              <button key={v} type="button" disabled={!!aiBusy || busy} onClick={() => makeAi(v)}
                 className="rounded bg-black px-3 py-2 font-semibold text-white hover:bg-gray-800 disabled:opacity-50">
-                {ai && ai.busy === v ? `Making… ${secs}s` : VIEW_LABEL[v]}
+                {aiBusy && aiBusy.view === v ? `Making… ${Math.max(0, WAIT - secs)}s` : VIEW_LABEL[v]}
               </button>
             ))}
           </div>
-          {ai && ai.busy && (
+          {aiBusy && (
             <div className="mt-3 max-w-sm">
               <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
-                <div className="h-full rounded-full bg-red-600 transition-[width] duration-300" style={{ width: `${Math.min(95, (secs / 30) * 100)}%` }} />
+                <div className="h-full rounded-full bg-red-600 transition-[width] duration-300" style={{ width: `${Math.min(97, (secs / WAIT) * 100)}%` }} />
               </div>
-              <p className="mt-1 text-[11px] text-gray-500">{secs}s · usually 10-30 seconds, the photo shows here when it is ready{secs > 40 ? ' (taking longer than usual, please wait)' : ''}.</p>
+              <p className="mt-1 text-[11px] text-gray-500">
+                {secs < WAIT ? `About ${WAIT - secs}s left · the photo shows here when it is ready.` : 'Almost done… (taking a little longer than usual, please wait)'}
+              </p>
             </div>
           )}
-          {ai && ai.cut && (
-            <div className="mt-3 flex flex-wrap items-start gap-3">
-              <Thumb src={ai.cut} big />
+          {views.filter((v) => aiRes[v]).map((v) => (
+            <div key={v} className="mt-3 flex flex-wrap items-start gap-3">
+              <div className="text-center">
+                <Thumb src={aiRes[v]} big />
+                <p className="mt-1 text-[10px] font-semibold uppercase text-gray-500">{v === 'clean' ? 'AI photo' : `AI ${v}`}</p>
+              </div>
               <div className="flex flex-col gap-2 text-xs">
-                <span className="text-gray-500">{ai.view === 'clean' ? 'Background removed by AI.' : `AI ${ai.view} photo, background removed.`} Does it match the real product?</span>
+                <span className="text-gray-500">{v === 'clean' ? 'Background removed by AI.' : `AI ${v} photo, background removed.`} Does it match the real product?</span>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" disabled={busy} onClick={() => useAi(ai.view === 'side' ? 'side' : 'front')}
-                    className="rounded bg-[#D4AF37] px-3 py-2 font-bold text-black hover:opacity-90 disabled:opacity-50">{ai.view === 'clean' ? 'Use this photo' : `Use as ${ai.view} photo`}</button>
-                  {ai.view !== 'clean' && (
-                    <button type="button" disabled={busy} onClick={() => useAi(ai.view === 'side' ? 'front' : 'side')}
+                  <button type="button" disabled={busy} onClick={() => useAi(v, v === 'side' ? 'side' : 'front')}
+                    className="rounded bg-[#D4AF37] px-3 py-2 font-bold text-black hover:opacity-90 disabled:opacity-50">{v === 'clean' ? 'Use this photo' : `Use as ${v} photo`}</button>
+                  {v !== 'clean' && (
+                    <button type="button" disabled={busy} onClick={() => useAi(v, v === 'side' ? 'front' : 'side')}
                       title="Puts THIS picture in the other slot. To make a real new view, press the Make button above."
-                      className="rounded border border-[#D4AF37] px-3 py-2 font-semibold text-[#B8921F]">Put this one in the {ai.view === 'side' ? 'Front' : 'Side'} slot</button>
+                      className="rounded border border-[#D4AF37] px-3 py-2 font-semibold text-[#B8921F]">Put this one in the {v === 'side' ? 'Front' : 'Side'} slot</button>
                   )}
-                  <button type="button" onClick={() => makeAi(ai.view)} className="rounded border border-gray-300 px-3 py-2">Try again</button>
-                  <button type="button" onClick={() => setAi(null)} className="px-3 py-2 text-gray-500 hover:underline">Discard</button>
+                  <button type="button" disabled={!!aiBusy} onClick={() => makeAi(v)} className="rounded border border-gray-300 px-3 py-2 disabled:opacity-50">Try again</button>
+                  <button type="button" onClick={() => dropAi(v)} className="px-3 py-2 text-gray-500 hover:underline">Discard</button>
                 </div>
               </div>
             </div>
-          )}
-          {ai && ai.error && (
+          ))}
+          {aiErr && (
             <div className="mt-3 rounded border border-red-300 bg-red-50 p-3 text-xs text-red-700 leading-relaxed">
-              <p className="font-semibold">{ai.error}</p>
-              {ai.code === 'no-credit' && (ai.provider === 'openrouter' ? (
+              <p className="font-semibold">{aiErr.error}</p>
+              {aiErr.code === 'no-credit' && (aiErr.provider === 'openrouter' ? (
                 <p className="mt-1">Buy more credit, then try again: <A href={LINKS.orCredits}>OpenRouter → Credits (buy) →</A> · if the key has a limit, raise it in <A href={LINKS.orKeys}>OpenRouter → Keys</A>.</p>
               ) : (
                 <p className="mt-1">Add credit or turn billing on, then try again: <A href={LINKS.billing}>Google Cloud billing →</A> · <A href={LINKS.usage}>AI Studio usage →</A></p>
               ))}
-              {ai.code === 'no-key' && (
+              {aiErr.code === 'no-key' && (
                 <p className="mt-1">Make a key at <A href={LINKS.orKeys}>OpenRouter → Keys</A> (buy credit at <A href={LINKS.orCredits}>Credits</A>), then add it as <b>OPENROUTER_API_KEY</b> in <A href={LINKS.vercel}>Vercel → Environment Variables</A> (Production) and redeploy.</p>
               )}
-              {ai.code === 'bad-key' && (ai.provider === 'openrouter' ? (
+              {aiErr.code === 'bad-key' && (aiErr.provider === 'openrouter' ? (
                 <p className="mt-1">Make a new key at <A href={LINKS.orKeys}>OpenRouter → Keys</A> and replace <b>OPENROUTER_API_KEY</b> in <A href={LINKS.vercel}>Vercel</A>.</p>
               ) : (
                 <p className="mt-1">Make a new key at <A href={LINKS.key}>Google AI Studio → API keys</A> and replace <b>GEMINI_API_KEY</b> in <A href={LINKS.vercel}>Vercel</A>.</p>

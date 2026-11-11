@@ -1,9 +1,10 @@
 // POST /api/plan?action=ai-photo  (team only)
 // Makes a FRONT or SIDE product photo with Google Gemini image editing ("Nano Banana") from a product photo, on a plain
-// white background. The Admin product form (ShowcasePhotoField) then removes the white background in the browser and
+// flat-colour background. The Admin product form (ShowcasePhotoField) then removes that background colour in the browser and
 // the team member decides to use it or not (nothing is saved here).
 //
-// Body: { source: 'https://…' or 'data:image/…;base64,…', view: 'front' | 'side' | 'clean' (only remove the background), kind: 'garment' | 'shoe' }
+// Body: { source: 'https://…' or 'data:image/…;base64,…', view: 'front' | 'side' | 'clean' (only remove the background), kind: 'garment' | 'shoe',
+//         bg: 'green' | 'magenta' | 'blue' | 'white' (the flat background colour to ask for; the browser removes it) }
 // Answer: { image: 'data:image/png;base64,…', model } or { error, code } with code
 //   'no-key' (GEMINI_API_KEY missing), 'bad-key', 'no-credit' (quota / billing finished), 'daily-limit', 'no-image', 'bad-source'.
 //
@@ -20,27 +21,36 @@ const orModels = () => [...new Set([process.env.OPENROUTER_IMAGE_MODEL, 'google/
 const models = () => [...new Set([process.env.GEMINI_IMAGE_MODEL, 'gemini-nano-banana-2.1', 'gemini-3.1-flash-image', 'gemini-2.5-flash-image'].filter(Boolean))];
 const dailyLimit = () => Math.max(1, parseInt(process.env.AI_PHOTO_DAILY_LIMIT || '60', 10) || 60);
 
-const KEEP = 'Keep the exact same product: same colours, fabric, pattern, print, buttons, zips, stitching and every detail. '
+// The background is one flat colour that is far from the product's colours (the browser picks it), so the browser can
+// cut it out cleanly afterwards: a white hoodie on white would lose its white parts.
+const BACKGROUNDS = {
+  green: 'solid flat pure chroma-key green (#00FF00)',
+  magenta: 'solid flat pure magenta (#FF00FF)',
+  blue: 'solid flat pure blue (#0000FF)',
+  white: 'pure plain white (#FFFFFF)',
+};
+const keep = (bg) => 'Keep the exact same product: same colours, fabric, pattern, print, buttons, zips, stitching and every detail. '
   + 'Do not add, change, translate or invent any text, letters, numbers, logos or brand names; if a logo is not visible from this angle, leave that area plain. '
-  + 'No person, no mannequin, no hands, no props, no extra items. Pure plain white background (#FFFFFF) with no shadow, no floor and no gradient. '
-  + 'Show the whole product centred with empty white space around it, sharp focus, soft even studio light, photorealistic e-commerce product photo.';
-const PROMPTS = {
+  + `No person, no mannequin, no hands, no props, no extra items. The whole background must be one ${bg} colour, with no shadow, no floor, no gradient, `
+  + 'and that colour must not appear on the product or as a colour cast on it. '
+  + 'Show the whole product centred with empty space around it, sharp focus, soft even studio light, photorealistic e-commerce product photo.';
+const prompts = (bg) => ({
   garment: {
     clean: 'Keep this exact same garment exactly as it is in the photo: same angle, same shape, same colours, print, logos and details. '
-      + 'Only remove everything around it (background, floor, wall, other items) and put it on a pure plain white background (#FFFFFF) with no shadow. '
+      + `Only remove everything around it (background, floor, wall, other items) and put it on a ${bg} background with no shadow. `
       + 'If a person wears it, remove the person and show only the garment. Do not add or change any text or logo. Photorealistic e-commerce product photo.',
-    front: 'Show this exact same garment hanging on a simple wooden clothes hanger, seen straight from the front, hanging neatly and not folded. ' + KEEP,
+    front: 'Show this exact same garment hanging on a simple wooden clothes hanger, seen straight from the front, hanging neatly and not folded. ' + keep(bg),
     side: 'Show this exact same garment hanging on a simple wooden clothes hanger, seen from the side as a full 90-degree side profile, '
-      + 'so only one sleeve and the side seam face the camera, as if it hangs on a clothing rail. ' + KEEP,
+      + 'so only one sleeve and the side seam face the camera, as if it hangs on a clothing rail. ' + keep(bg),
   },
   shoe: {
     clean: 'Keep this exact same shoe exactly as it is in the photo: same angle, same position, same size, same colours, laces, logos and sole. '
-      + 'Only remove everything around it (floor, rug, fur, shelf, box, hands, other shoes) and put it on a pure plain white background (#FFFFFF) '
+      + `Only remove everything around it (floor, rug, fur, shelf, box, hands, other shoes) and put it on a ${bg} background `
       + 'with no shadow. Do not redraw, restyle or change the shoe, do not add or change any text or logo. Photorealistic e-commerce product photo.',
-    front: 'Show this exact same single shoe seen from the outer side (classic side profile, toe pointing left). ' + KEEP,
-    side: 'Show this exact same single shoe seen at a three-quarter angle from the front. ' + KEEP,
+    front: 'Show this exact same single shoe seen from the outer side (classic side profile, toe pointing left). ' + keep(bg),
+    side: 'Show this exact same single shoe seen at a three-quarter angle from the front. ' + keep(bg),
   },
-};
+});
 
 // The caller must be on the team: an active entry in admins/{email} (read with their own login, so the token is real),
 // or the Owner (no entry needed: the read then answers 404, which Firestore only does for a valid login).
@@ -169,6 +179,8 @@ export default async function aiPhoto(req, res) {
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   const view = ['front', 'side', 'clean'].includes(body.view) ? body.view : 'front';
   const kind = body.kind === 'shoe' ? 'shoe' : 'garment';
+  const bg = BACKGROUNDS[body.bg] || BACKGROUNDS.green;
+  const prompt = prompts(bg)[kind][view];
   const src = await readSource(body.source);
   if (!src) return res.status(400).json({ error: 'This photo could not be opened. Use a JPG / PNG / WebP photo or link.', code: 'bad-source' });
 
@@ -182,8 +194,8 @@ export default async function aiPhoto(req, res) {
   const list = provider === 'openrouter' ? orModels() : models();
   for (const model of list) {
     const out = provider === 'openrouter'
-      ? await callOpenRouter(orKey, model, src, PROMPTS[kind][view])
-      : await callGemini(key, model, src, PROMPTS[kind][view]);
+      ? await callOpenRouter(orKey, model, src, prompt)
+      : await callGemini(key, model, src, prompt);
     if (out.next) continue;
     if (out.error) return res.status(out.code === 'no-credit' ? 402 : 502).json({ error: out.error, code: out.code, provider });
     await usage(token, day, 1);
