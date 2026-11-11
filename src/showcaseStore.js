@@ -3,7 +3,7 @@ import { getFirestore, doc, collection, getDocs, getDoc, setDoc, deleteDoc } fro
 import "./firebase";
 
 // Home page showcase photos (background-free) uploaded from the Admin product form.
-// Collection "showcase", document id = product id: { image (png/webp data URL), hanger, off, updatedAt, updatedBy }.
+// Collection "showcase", document id = product id: { image (png/webp data URL), hanger, off, extra[], updatedAt, updatedBy }.
 // "off" hides a built-in picture (src/data/cutouts.js) without uploading a new one. Rules: firestore.rules (showcase).
 const db = getFirestore(getApp());
 
@@ -19,14 +19,14 @@ export async function getShowcase(id) {
   return s.exists() ? s.data() : null;
 }
 
-// change = { image, hanger } to set a photo, { off: true } to hide the built-in one, { remove: true } to clear it all
+// change = { image, hanger, extra } to set a photo (+ up to 3 more angles), { off: true } to hide the built-in one, { remove: true } to clear it all
 export async function applyShowcaseChange(id, change, by = "") {
   if (!change) return;
   const ref = doc(db, "showcase", String(id));
   if (change.remove) { await deleteDoc(ref); return; }
   const data = { updatedAt: new Date().toISOString(), updatedBy: String(by).slice(0, 200) };
   if (change.off) data.off = true;
-  else { data.image = change.image; data.hanger = !!change.hanger; }
+  else { data.image = change.image; data.hanger = !!change.hanger; data.extra = (change.extra || []).slice(0, 3); }
   await setDoc(ref, data);
 }
 

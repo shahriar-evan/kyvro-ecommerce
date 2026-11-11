@@ -49,12 +49,12 @@ const cutoutsFor = (products, rail, uploaded) => {
     if (!p || (up && up.off && !up.image)) continue;
     seen.add(c.id);
     out.push(up && up.image
-      ? { ...p, cutout: up.image, cutoutHanger: !!up.hanger, cutoutColor: null }
+      ? { ...p, cutout: up.image, cutoutHanger: !!up.hanger, cutoutColor: null, cutoutExtra: up.extra || [] }
       : { ...p, cutout: cutoutSrc(c.id), cutoutHanger: !!c.hanger, cutoutColor: c.color || null });
   }
   const extra = rankBySales(products.filter((p) => !seen.has(String(p.id)) && totalStock(p) > 0 && railOf(p) === rail
     && uploaded[String(p.id)] && uploaded[String(p.id)].image));
-  for (const p of extra) { const up = uploaded[String(p.id)]; out.push({ ...p, cutout: up.image, cutoutHanger: !!up.hanger, cutoutColor: null }); }
+  for (const p of extra) { const up = uploaded[String(p.id)]; out.push({ ...p, cutout: up.image, cutoutHanger: !!up.hanger, cutoutColor: null, cutoutExtra: up.extra || [] }); }
   return out.slice(0, CUT_LIMIT);
 };
 

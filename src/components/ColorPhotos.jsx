@@ -1,10 +1,11 @@
 import React, { useRef, useState } from 'react';
 import { imageFileToDataURL } from '../utils/imageUpload';
+import { transparentShowcase } from '../utils/showcaseImage';
 import MorePhotos from './MorePhotos';
 
 // One photo per color: the customer sees the photo of the color he picks.
 // colors = ['Red','Blue'], value = { Red: url }, onChange(newValue)
-export default function ColorPhotos({ colors, value = {}, onChange, gallery = {}, onGalleryChange, isDarkMode }) {
+export default function ColorPhotos({ colors, value = {}, onChange, gallery = {}, onGalleryChange, isDarkMode, onTransparent }) {
   if (!colors.length) return null;
   const set = (color, url) => {
     const next = { ...value };
@@ -19,10 +20,10 @@ export default function ColorPhotos({ colors, value = {}, onChange, gallery = {}
       </div>
       {colors.map((c) => (
         <div key={c} className="space-y-2">
-          <Row color={c} url={value[c] || ''} set={set} isDarkMode={isDarkMode} />
+          <Row color={c} url={value[c] || ''} set={set} isDarkMode={isDarkMode} onTransparent={onTransparent} />
           {onGalleryChange && (
             <div className="pl-[68px]">
-              <MorePhotos compact max={5} title={`More ${c} photos`} value={gallery[c] || []} isDarkMode={isDarkMode}
+              <MorePhotos compact max={5} title={`More ${c} photos`} value={gallery[c] || []} isDarkMode={isDarkMode} onTransparent={onTransparent}
                 onChange={(list) => { const next = { ...gallery }; if (list.length) next[c] = list; else delete next[c]; onGalleryChange(next); }} />
             </div>
           )}
@@ -32,7 +33,7 @@ export default function ColorPhotos({ colors, value = {}, onChange, gallery = {}
   );
 }
 
-function Row({ color, url, set, isDarkMode }) {
+function Row({ color, url, set, isDarkMode, onTransparent }) {
   const file = useRef(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -42,6 +43,7 @@ function Row({ color, url, set, isDarkMode }) {
     e.target.value = '';
     if (!f) return;
     setErr(''); setBusy(true);
+    if (f && onTransparent) transparentShowcase(f).then((u) => { if (u) onTransparent(u); });
     try { set(color, await imageFileToDataURL(f, { maxSize: 700, quality: 0.75 })); } catch (x) { setErr(x.message || 'Upload failed.'); }
     setBusy(false);
   };

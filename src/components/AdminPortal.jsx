@@ -24,7 +24,7 @@ import ThemePicker from './ThemePicker';
 import { watchSiteTheme, saveSiteTheme } from '../themeStore';
 import SellersPanel from './SellersPanel';
 import PlanMembers from './PlanMembers';
-import ShowcasePhotoField from './ShowcasePhotoField';
+import ShowcasePhotoField, { addAutoShowcase } from './ShowcasePhotoField';
 import { subLabel, allPlaces, COLLECTION_LABELS, SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
 
 // Owner: the main site's theme (settings/theme), every theme allowed
@@ -37,6 +37,8 @@ function SiteThemePage({ isDarkMode, staff }) {
 }
 
 export default function AdminPortal({ adminCanCreateShop = false, adminTab, deleteProduct, editingProductId, formatPrice, handleAdminLogout, handleEmailSignIn, handleGenderChange, handleGoogleSignIn, handleSaveProduct, isAdminLoggedIn, adminName, adminRole, canDeleteProduct, canEditProduct, canAddProduct = true, shopOwners = {}, productCommissions = {}, canApproveProduct, handleApproveProduct, pendingCount, isDarkMode, loggedInUserEmail, newProductForm, orders, productCosts = {}, products, storeSettings, isCloud, migrating, handleMigrateProducts, setAdminTab, setEditingProductId, setNewProductForm, startEditProduct, clearProductForm, handleDeleteRequest }) {
+  // a transparent PNG / WebP uploaded as the main or a colour photo also becomes the home page photo (or a 'more' angle)
+  const autoShowcase = (url) => setNewProductForm((f) => ({ ...f, showcaseEdit: addAutoShowcase(f.showcaseEdit, url) }));
   const [productSearch, setProductSearch] = React.useState('');
   const psq = productSearch.trim().toLowerCase();
   const [catFilter, setCatFilter] = React.useState('All');
@@ -698,7 +700,7 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                         isDarkMode={isDarkMode}
                       />
                       <div className="mt-3">
-                        <ColorPhotos colors={photoColors} value={newProductForm.colorImages || {}} onChange={(colorImages) => setNewProductForm({...newProductForm, colorImages})} gallery={newProductForm.colorGallery || {}} onGalleryChange={(colorGallery) => setNewProductForm(prev => ({...prev, colorGallery}))} isDarkMode={isDarkMode} />
+                        <ColorPhotos colors={photoColors} onTransparent={isCloud ? autoShowcase : undefined} value={newProductForm.colorImages || {}} onChange={(colorImages) => setNewProductForm({...newProductForm, colorImages})} gallery={newProductForm.colorGallery || {}} onGalleryChange={(colorGallery) => setNewProductForm(prev => ({...prev, colorGallery}))} isDarkMode={isDarkMode} />
                       </div>
                     </div>
                     {hasColorPhotos ? (
@@ -708,6 +710,7 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                     ) : (
                       <div className="sm:col-span-2">
                         <ImageField
+                          onTransparent={isCloud ? autoShowcase : undefined}
                           value={newProductForm.image}
                           onChange={(image) => setNewProductForm(prev => ({...prev, image}))}
                           isDarkMode={isDarkMode}

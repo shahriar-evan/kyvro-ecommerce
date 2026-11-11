@@ -1,8 +1,9 @@
 // Gets an uploaded background-free product photo ready for the home showcase:
 // checks it really is transparent, cuts off the empty edges, makes it at most 800 x 800 and saves it as
-// WebP (PNG where the browser cannot make WebP), small enough for Firestore (rules: under 450 KB).
+// WebP (PNG where the browser cannot make WebP). Each photo stays under 230 KB so the main photo + 3 more
+// fit in one Firestore document (1 MB; rules: main under 450 KB, more under 250 KB each).
 const MAX_SIDE = 800;
-const MAX_CHARS = 440000;
+const MAX_CHARS = 230000;
 
 const loadImage = (file) => new Promise((resolve, reject) => {
   const url = URL.createObjectURL(file);
@@ -50,4 +51,18 @@ export async function prepareShowcaseImage(file) {
     scale *= 0.8;
   }
   throw new Error('This picture is too big even after making it smaller. Try a smaller file.');
+}
+
+// A built-in picture (/cutouts/<id>.webp) as a data URL, so it can be saved together with new photos
+export async function urlToShowcaseImage(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Could not load the built-in picture.');
+  const blob = await res.blob();
+  return prepareShowcaseImage(new File([blob], 'photo.webp', { type: blob.type || 'image/webp' }));
+}
+
+// For the main / colour / more photo uploads: the home page version when the file is a transparent PNG / WebP, else null
+export async function transparentShowcase(file) {
+  if (!file || !/^image\/(png|webp)$/.test(file.type)) return null;
+  try { return await prepareShowcaseImage(file); } catch (e) { return null; }
 }

@@ -31,11 +31,14 @@ export default function RailQuickView({ items, index, setIndex, onClose, formatP
     if (!p) return [];
     // the background-free picture first while the colour in it is the chosen one
     const main = p.cutout && (!color || color === p.cutoutColor || !p.cutoutColor) ? p.cutout : imageFor(p, color);
+    // more background-free angles (Admin "More photos") come right after it
+    const more = main === p.cutout ? (p.cutoutExtra || []) : [];
     const rest = (Array.isArray(p.images) ? p.images : []).filter((u) => u && u !== main);
-    return [main, ...rest].slice(0, 5);
+    return [main, ...more, ...rest].slice(0, 6);
   }, [p, color]);
 
   if (!p) return null;
+  const isCut = (u) => !!u && (u === p.cutout || (p.cutoutExtra || []).includes(u));
   const sizes = Array.isArray(p.sizes) ? orderedSizes(p.sizes.filter(Boolean), p.gender) : [];
   const inStock = (s) => (hasSizeStock(p) ? stockFor(p, s, color) > 0 : true);
   const needSize = sizes.length > 0 && !size;
@@ -71,14 +74,14 @@ export default function RailQuickView({ items, index, setIndex, onClose, formatP
           ))}
           <div className="-mt-1 w-full max-w-[420px] aspect-[4/5]">
             <img src={photos[photo] || p.image} alt={p.name} draggable={false}
-              className={`h-full w-full object-contain ${photos[photo] === p.cutout ? (hanging ? 'object-top' : 'object-center') : 'mix-blend-multiply'} drop-shadow-[0_28px_30px_rgba(0,0,0,.18)]`} />
+              className={`h-full w-full object-contain ${isCut(photos[photo]) ? (hanging ? 'object-top' : 'object-center') : 'mix-blend-multiply'} drop-shadow-[0_28px_30px_rgba(0,0,0,.18)]`} />
           </div>
           {photos.length > 1 && (
             <div className="mt-4 flex gap-2">
               {photos.map((u, i) => (
                 <button key={u + i} type="button" onClick={() => setPhoto(i)} aria-label={`Photo ${i + 1}`}
                   className={`h-14 w-14 overflow-hidden rounded-lg border bg-white ${photo === i ? 'border-black' : 'border-gray-200'}`}>
-                  <img src={u} alt="" className={`h-full w-full ${u === p.cutout ? 'object-contain p-1' : 'object-cover'}`} loading="lazy" />
+                  <img src={u} alt="" className={`h-full w-full ${isCut(u) ? 'object-contain p-1' : 'object-cover'}`} loading="lazy" />
                 </button>
               ))}
             </div>
