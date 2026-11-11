@@ -77,6 +77,14 @@ function Rod({ variant }) {
   );
 }
 
+// a side photo wider than a shirt's (width / height above 0.3) hangs a little shorter: at most 18 % shorter
+const sideFit = (e) => {
+  const im = e.currentTarget;
+  const r = im.naturalWidth / Math.max(1, im.naturalHeight);
+  const f = Math.max(0.82, Math.min(1, (0.3 / Math.max(r, 0.01)) ** 0.3));
+  im.style.height = `${(f * 100).toFixed(1)}%`;
+};
+
 export default function HangerRail({
   label = 'NEW COLLECTION', title, products, formatPrice, onOpen, onShopAll,
   tagline = [], variant = 'curve', tone = 'grey', card = 'portrait',
@@ -221,19 +229,21 @@ export default function HangerRail({
                             <Hanger className={`relative z-[2] -mt-[2px] mx-auto block transition-all duration-300 ${front ? 'w-[62%]' : 'w-[22%]'}`} />
                           )}
                           {/* the turn is a 3D spin: the side view swings away to the left while the front swings in from the
-                              right (every side photo shows the front of the piece pointing right), one after the other */}
+                              right (every side photo shows the front of the piece pointing right), one after the other.
+                              At rest both pictures have a plain 2D transform, so the browser keeps no 3D layer (that flickered). */}
                           <div className={`relative h-[185px] sm:h-[235px] lg:h-[270px] w-full ${p.cutoutHanger ? '-mt-[3px]' : '-mt-[12px]'}`}
                             style={p.cutoutSide ? { perspective: '900px' } : undefined}>
                             {p.cutoutSide && (
-                              // sized by height (not width), so a wide side photo (a puffer jacket) hangs as tall as the shirts
-                              <img src={p.cutoutSide} alt="" aria-hidden="true" loading="lazy" draggable={false}
+                              // sized by height, so every piece hangs about as tall as the shirts; a wide side photo
+                              // (a puffer jacket with its hood) is made a little shorter so it does not look bigger (sideFit)
+                              <img src={p.cutoutSide} alt="" aria-hidden="true" loading="lazy" draggable={false} onLoad={sideFit}
                                 className={`absolute left-1/2 top-0 h-full w-auto max-w-none transition-transform duration-[260ms] ${shadow}`}
-                                style={{ transform: `translateX(-50%) rotateY(${front ? -90 : 0}deg)`, backfaceVisibility: 'hidden',
+                                style={{ transform: front ? 'translateX(-50%) rotateY(-90deg)' : 'translateX(-50%)',
                                   transitionTimingFunction: front ? 'cubic-bezier(.5,0,.9,.5)' : 'cubic-bezier(.1,.5,.5,1)', transitionDelay: front ? '0ms' : '260ms' }} />
                             )}
                             <img src={p.cutout} alt={p.name} loading="lazy" draggable={false}
                               className={`absolute inset-0 h-full w-full object-contain object-top transition-transform duration-[260ms] ${shadow}`}
-                              style={p.cutoutSide ? { transform: `rotateY(${front ? 0 : 90}deg)`, backfaceVisibility: 'hidden',
+                              style={p.cutoutSide ? { transform: front ? 'none' : 'rotateY(90deg)',
                                 transitionTimingFunction: front ? 'cubic-bezier(.1,.5,.5,1)' : 'cubic-bezier(.5,0,.9,.5)', transitionDelay: front ? '260ms' : '0ms' } : undefined} />
                           </div>
                         </>
