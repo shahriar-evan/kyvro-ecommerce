@@ -1,3 +1,4 @@
+import { applyShowcaseChange } from './showcaseStore';
 import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { askConfirm, showMaintenance } from './components/AlertCenter';
 import { waOrderText, waCartLines, setWaShop } from './whatsappOrder';
@@ -1220,6 +1221,11 @@ export default function App() {
       console.error(err);
       alert('Could not save the product: ' + (err.code === 'permission-denied' ? 'you do not have permission (check the Firestore rules).' : err.message));
       return;
+    }
+    // The home page photo (background-free, collection "showcase"), when it was changed in the form
+    if (isCloud && newProductForm.showcaseEdit) {
+      try { await applyShowcaseChange(productData.id, newProductForm.showcaseEdit, loggedInUserEmail); }
+      catch (err) { console.error(err); alert('The product was saved, but the home page photo could NOT be saved: ' + (err.code === 'permission-denied' ? 'publish the latest Firestore rules (showcase), then edit the product and save again.' : err.message)); }
     }
     // Save (or clear) the private supplier details in their own admin-only collection
     try {

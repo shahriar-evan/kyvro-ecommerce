@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { matchesCollectionPage, rankBySales, totalStock } from '../data/catalog';
 import HangerRail from './HangerRail';
 import ShoeOrbit from './ShoeOrbit';
 import RailQuickView from './RailQuickView';
 import { CUTOUTS, cutoutSrc } from '../data/cutouts';
+import { loadShowcase } from '../showcaseStore';
 
 // Home page showcase (Classic theme), above "Shop by category":
 // Men rail, Women rail, Bags / Watches / Wallets rail, then the Shoes wheel.
@@ -28,11 +29,34 @@ const mix = (products, groups, limit = LIMIT) => {
   return out;
 };
 
-// the hand-picked products whose photo has no background (src/data/cutouts.js), in that order
-const fromCutouts = (products, list) => list.map((c) => {
-  const p = products.find((x) => String(x.id) === c.id);
-  return p && totalStock(p) > 0 ? { ...p, cutout: cutoutSrc(c.id), cutoutHanger: !!c.hanger, cutoutColor: c.color || null } : null;
-}).filter(Boolean);
+// Background-free pictures: the built-in ones (src/data/cutouts.js, in that order) and the ones uploaded in the
+// Admin product form (Firestore "showcase"; an upload replaces the built-in picture, "off" hides it).
+const MIN_CUT = 4; // a rail switches to background-free pictures from this many
+const CUT_LIMIT = 18;
+const railOf = (p) => {
+  if (p.gender === 'Shoes' || p.category === 'Shoes') return 'shoes';
+  if (p.gender === 'Women' && p.category !== 'Bags') return 'women';
+  if (p.category === 'Ladies Jacket') return 'women';
+  if (p.gender === 'Men' || p.gender === 'Winter' || p.gender === 'Jackets') return 'men';
+  return null;
+};
+const cutoutsFor = (products, rail, uploaded) => {
+  const inStock = (id) => products.find((x) => String(x.id) === String(id) && totalStock(x) > 0);
+  const out = [];
+  const seen = new Set();
+  for (const c of CUTOUTS[rail] || []) {
+    const p = inStock(c.id); const up = uploaded[c.id];
+    if (!p || (up && up.off && !up.image)) continue;
+    seen.add(c.id);
+    out.push(up && up.image
+      ? { ...p, cutout: up.image, cutoutHanger: !!up.hanger, cutoutColor: null }
+      : { ...p, cutout: cutoutSrc(c.id), cutoutHanger: !!c.hanger, cutoutColor: c.color || null });
+  }
+  const extra = rankBySales(products.filter((p) => !seen.has(String(p.id)) && totalStock(p) > 0 && railOf(p) === rail
+    && uploaded[String(p.id)] && uploaded[String(p.id)].image));
+  for (const p of extra) { const up = uploaded[String(p.id)]; out.push({ ...p, cutout: up.image, cutoutHanger: !!up.hanger, cutoutColor: null }); }
+  return out.slice(0, CUT_LIMIT);
+};
 
 const ACCESSORIES = [
   { key: 'Bags', label: 'Bags', pick: inPage('Women', 'Bags'), open: ['Women', 'Bags'] },
@@ -41,14 +65,18 @@ const ACCESSORIES = [
 ];
 
 export default function HomeShowcase({ products, formatPrice, addToCart, openProduct, openCollection }) {
-  const menCut = useMemo(() => fromCutouts(products, CUTOUTS.men), [products]);
-  const shoesCut = useMemo(() => fromCutouts(products, CUTOUTS.shoes), [products]);
+  const [uploaded, setUploaded] = useState({});
+  useEffect(() => { loadShowcase().then(setUploaded).catch(() => {}); }, []);
+  const menCut = useMemo(() => cutoutsFor(products, 'men', uploaded), [products, uploaded]);
+  const womenCut = useMemo(() => cutoutsFor(products, 'women', uploaded), [products, uploaded]);
+  const shoesCut = useMemo(() => cutoutsFor(products, 'shoes', uploaded), [products, uploaded]);
   const menMix = useMemo(() => mix(products, [inPage('Men', 'Shirt'), inPage('Men', 'T-Shirt'), inPage('Men', 'Jacket'), inPage('Men', 'Polo'), inPage('Men', 'Formal Shirt')]), [products]);
-  const men = menCut.length >= 6 ? menCut : menMix;
-  const women = useMemo(() => mix(products, [inPage('Women', 'Saree'), inPage('Women', 'Three Piece'), inPage('Women', 'Ladies Jacket'), inPage('Women', 'Tops')]), [products]);
+  const men = menCut.length >= MIN_CUT ? menCut : menMix;
+  const womenMix = useMemo(() => mix(products, [inPage('Women', 'Saree'), inPage('Women', 'Three Piece'), inPage('Women', 'Ladies Jacket'), inPage('Women', 'Tops')]), [products]);
+  const women = womenCut.length >= MIN_CUT ? womenCut : womenMix;
   const accTabs = useMemo(() => ACCESSORIES.map((t) => ({ ...t, items: mix(products, [t.pick]) })).filter((t) => t.items.length >= MIN), [products]);
   const shoesMix = useMemo(() => mix(products, [isKind('Shoes')], 12), [products]);
-  const shoes = shoesCut.length >= 6 ? shoesCut : shoesMix;
+  const shoes = shoesCut.length >= MIN_CUT ? shoesCut : shoesMix;
 
   const [accKey, setAccKey] = useState(null);
   const acc = accTabs.find((t) => t.key === accKey) || accTabs[0];

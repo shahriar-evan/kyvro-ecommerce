@@ -38,6 +38,7 @@ Per-member toggles on `admins/{email}` (default OFF): `addProducts`, `editAll`, 
 - `shopOwners/{slug}` team shops' owner email (Owner/Manager/self). Sellers do not get one.
 - `sellers/{uid}` seller application + private details (self + Owner): `slug` (first shop), `shops[]` (all shops), `basicFree`, `lastSeenAt`, `inactiveWarn*` / `inactiveHoldAt` (server). `sellerPayout/{uid}` `{bkash, bkashName, bkash2, bkash2Name, banks[≤2]{bank, account, holder, branch, routing?, swift?}}` (seller writes, write-only; Owner reads; `PayoutForm.jsx`).
 - `subscriptions/{uid}` plan (server writes; self + Owner read): `tier`, `paidUntil`, `basicUntil`, reminder flags; `subscriptionPayments/{invoiceId}` server only.
+- `showcase/{productId}` home page background-free photo `{image (png/webp data URL ≤ 450 KB), hanger, off}` (public read; written by whoever may edit the product; Admin product form `ShowcasePhotoField.jsx`, `src/showcaseStore.js`). Built-in ones: `public/cutouts` + `src/data/cutouts.js` (`scripts/cutouts`).
 - `payouts/{id}` Owner writes, member reads own. `settings/store`, `settings/plans` (+ `freeCategoryLimit`, `tierFeatures`, `shopLimits`, `basic{price, discount, label, endsAt}`), `settings/sellerRules`, `settings/theme` (main site `theme` + `themeMode`), `settings/sellerDash` (seller dashboard banner `banners[]` ≤ 3 × `{image ≤ 300 KB data URL, link https}`) public read, Owner write.
 - `users/{uid}` (+ `cart{n, name, at, shop}` summary), `cartReminders/{uid}` server only, `subscribers/{email}`, `pushTokens/{token}`, `blockedPhones`, `blockedEmails`.
 

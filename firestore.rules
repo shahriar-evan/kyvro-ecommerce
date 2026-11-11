@@ -163,6 +163,32 @@ service cloud.firestore {
         || ((isManager() || canApproveNow()) && resource.data.get('status', 'approved') == 'pending');
     }
 
+    // Home page showcase photo of a product (background-free picture on the hanging rails / shoe wheel).
+    // Everyone can read it. Written by whoever may edit that product (Owner, the person who added it, or "Edit all" ON).
+    // image = png / webp data URL (transparent), hanger = the photo shows its own hanger, off = hide the built-in picture.
+    // Document id = product id.
+    match /showcase/{pid} {
+      function canEditShowcase() {
+        return isOwner()
+          || (hasActiveEntry()
+              && (get(/databases/$(database)/documents/products/$(pid)).data.get('addedBy', '').lower() == myEmail()
+                  || get(myDocPath()).data.get('editAll', false) == true));
+      }
+      function showcaseOk() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['image', 'hanger', 'off', 'updatedAt', 'updatedBy'])
+          && (!('image' in d) || (d.image is string && d.image.size() <= 450000
+              && d.image.matches('^data:image/(png|webp);base64,[A-Za-z0-9+/=]+$')))
+          && d.get('hanger', false) is bool
+          && d.get('off', false) is bool
+          && d.get('updatedAt', '') is string && d.get('updatedAt', '').size() <= 40
+          && d.get('updatedBy', '') is string && d.get('updatedBy', '').size() <= 200;
+      }
+      allow read: if true;
+      allow create, update: if canEditShowcase() && showcaseOk();
+      allow delete: if canEditShowcase();
+    }
+
     // Supplier details for dropshipping (supplier shop name, what the supplier charges you, product link).
     // PRIVATE: only the Owner and Managers can read it. An Admin can only CREATE the entry when adding a new product
     // (so the Owner knows where it comes from) and can never read it back. Customers can never read it.

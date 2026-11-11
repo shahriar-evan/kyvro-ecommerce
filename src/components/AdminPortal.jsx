@@ -24,6 +24,7 @@ import ThemePicker from './ThemePicker';
 import { watchSiteTheme, saveSiteTheme } from '../themeStore';
 import SellersPanel from './SellersPanel';
 import PlanMembers from './PlanMembers';
+import ShowcasePhotoField from './ShowcasePhotoField';
 import { subLabel, allPlaces, COLLECTION_LABELS, SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
 
 // Owner: the main site's theme (settings/theme), every theme allowed
@@ -716,6 +717,12 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                     )}
                     {/* on phones / small screens the supplier box sits here; on large screens it is in the empty space on the right */}
                     <div className="sm:col-span-2 lg:hidden">{(canSeeSupplier || !editingProductId) && supplierPanel}</div>
+                    {isCloud && (
+                      <div className="sm:col-span-2">
+                        <ShowcasePhotoField productId={editingProductId} value={newProductForm.showcaseEdit || null} isDarkMode={isDarkMode}
+                          onChange={(v) => setNewProductForm((f) => ({ ...f, showcaseEdit: v }))} />
+                      </div>
+                    )}
                     <div className="sm:col-span-2">
                       <label className="block text-xs font-semibold text-gray-500 mb-1">Description *</label>
                       <textarea 

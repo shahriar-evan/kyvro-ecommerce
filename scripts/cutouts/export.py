@@ -5,7 +5,7 @@ S, R = sys.argv[1], sys.argv[2]
 MEN = [('1794400040000_3', 1), ('1794100046000_4', 1), ('1794100039000_2', 1), ('1794400073000_3', 0), ('1794600023000_1', 1),
        ('1794400041000_1', 1), ('1793307041659_1', 1), ('1794400072000_4', 1), ('1794100041000_0', 0), ('1794600025000_1', 1),
        ('1794400044000_1', 1), ('1794600005000_1', 1), ('1794400043000_1', 1), ('1794400071000_1', 1), ('1794400063000_3', 0)]
-SHOES = ['1793322608288_0', '1793322816247_0', '1793323455142_0', '1793366362530_0', '1794100019000_0', '1794100020000_0',
+SHOES = ['1793322816247_0', '1793366362530_0', '1794100019000_0', '1794100020000_0',
          '1794100021000_0', '1794100022000_0', '1794100028000_0', '1794100030000_0', '1794100032000_0', '1794100037000_0']
 items = {i['id']: i for i in json.load(open(f'{S}/cut/items.json'))}
 def color_of(key):
@@ -23,6 +23,19 @@ def colour(pid, url):
     return None
 import numpy as np
 from scipy import ndimage
+def shoe_clean(im):
+    # shoes: hard edge, cut thin rug / fur strands off the sole, keep the one big shape
+    from PIL import ImageFilter
+    a = np.array(im.convert('RGBA')); m = a[..., 3] > 140
+    r = max(3, int(im.width * 0.012)); yy, xx = np.ogrid[-r:r + 1, -r:r + 1]
+    o = ndimage.binary_opening(m, structure=(xx * xx + yy * yy <= r * r))
+    lab, n = ndimage.label(o)
+    if n > 1: o = lab == (int(np.argmax(ndimage.sum(o, lab, range(1, n + 1)))) + 1)
+    o = ndimage.binary_fill_holes(o)
+    alpha = Image.fromarray((o * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.8))
+    out = Image.fromarray(a[..., :3]); out.putalpha(alpha)
+    bb = alpha.point(lambda v: 255 if v > 40 else 0).getbbox()
+    return out.crop(bb) if bb else out
 def clean(im):
     # drop small loose bits (pins, dust, stray labels): keep only pieces >= 1.5% of the biggest one
     a = np.array(im); m = a[..., 3] > 30
@@ -39,7 +52,7 @@ for group, keys, box in (('men', MEN, (560, 700)), ('shoes', [(k, 0) for k in SH
     for key, hanger in keys:
         pid = key.rsplit('_', 1)[0]
         im = Image.open(f'{S}/cut/png2/{key}.png').convert('RGBA')
-        im = clean(im); im.thumbnail(box, Image.LANCZOS)
+        im = shoe_clean(im) if group == 'shoes' else clean(im); im.thumbnail(box, Image.LANCZOS)
         fn = f'{R}/public/cutouts/{pid}.webp'
         im.save(fn, 'WEBP', quality=82, method=6)
         total += os.path.getsize(fn)

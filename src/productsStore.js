@@ -48,6 +48,8 @@ export const removeProduct = async (id) => {
   await deleteDoc(doc(db, "products", String(id)));
   // the private supplier details of this product go too (best effort)
   try { await deleteDoc(doc(db, "productCosts", String(id))); } catch (err) { /* nothing to remove, or not allowed */ }
+  // and its home page photo (best effort)
+  try { await deleteDoc(doc(db, "showcase", String(id))); } catch (err) { /* nothing to remove, or not allowed */ }
   try { await deleteDoc(doc(db, "productCommission", String(id))); } catch (err) { /* nothing to remove, or not allowed */ }
 };
 
