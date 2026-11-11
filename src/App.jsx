@@ -1,4 +1,5 @@
 import { applyShowcaseChange } from './showcaseStore';
+import { isFoldedPhoto } from './data/photoShape';
 import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { askConfirm, showMaintenance } from './components/AlertCenter';
 import { waOrderText, waCartLines, setWaShop } from './whatsappOrder';
@@ -1394,8 +1395,9 @@ export default function App() {
     if (sortBy === 'price-low') return a.price - b.price;
     if (sortBy === 'price-high') return b.price - a.price;
     if (sortBy === 'newest') return b.id - a.id;
-    // default: best selling first, then the newest product
-    return ((parseInt(b.sold, 10) || 0) - (parseInt(a.sold, 10) || 0)) || ((Number(b.id) || 0) - (Number(a.id) || 0));
+    // default: shirts with a long photo (hanging / worn) before folded flat lays, then best selling, then the newest
+    return (Number(isFoldedPhoto(a)) - Number(isFoldedPhoto(b)))
+      || ((parseInt(b.sold, 10) || 0) - (parseInt(a.sold, 10) || 0)) || ((Number(b.id) || 0) - (Number(a.id) || 0));
   });
 
 

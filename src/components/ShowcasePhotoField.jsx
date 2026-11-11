@@ -68,6 +68,18 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
   else if (base && !(saved && saved.off)) shown = { src: cutoutSrc(base.id), side: null, hanger: !!base.hanger, extra: [], from: 'built-in' };
 
   // the current state as an editable value (a built-in picture is turned into a data URL first)
+  // 📌 pin: shown first on the home rail (1 = first). From the pending change, else from the saved entry.
+  const pinNow = value && (value.image || value.pinOnly) ? (Number(value.pin) || 0)
+    : value && (value.off || value.remove) ? 0 : (Number(saved && saved.pin) || 0);
+  const pinRef = useRef(pinNow);
+  pinRef.current = pinNow;
+  const setPin = (n) => {
+    const pin = Math.max(0, Math.min(99, Math.round(Number(n) || 0)));
+    pinRef.current = pin;
+    if (value && value.image) onChange({ ...value, pin });
+    else onChange({ pinOnly: true, pin });
+  };
+
   // the latest state, also right after a change that the form has not shown yet (two quick clicks must not undo each other)
   const shownRef = useRef(shown);
   shownRef.current = shown;
@@ -75,7 +87,7 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
     const cur = shownRef.current;
     if (!cur) return null;
     const image = cur.from === 'built-in' ? await urlToShowcaseImage(cur.src) : cur.src;
-    return { image, side: cur.side, hanger: cur.hanger, extra: [...cur.extra] };
+    return { image, side: cur.side, hanger: cur.hanger, extra: [...cur.extra], pin: pinRef.current };
   };
   const change = (next) => {
     shownRef.current = next && next.image ? { src: next.image, side: next.side || null, hanger: !!next.hanger, extra: next.extra || [], from: 'new' } : null;
@@ -228,6 +240,24 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
               <input type="checkbox" checked={!!shown.hanger} disabled={busy} onChange={(e) => setHanger(e.target.checked)} />
               The photo already shows a hanger (do not draw ours)
             </label>
+          )}
+          {shown ? (
+            <div className="flex flex-wrap items-center gap-2 text-gray-600">
+              <label className="flex items-center gap-2 font-semibold">
+                <input type="checkbox" checked={pinNow > 0} onChange={(e) => setPin(e.target.checked ? 1 : 0)} />
+                📌 Pin first on the home page
+              </label>
+              {pinNow > 0 && (
+                <label className="flex items-center gap-1">
+                  Position
+                  <input type="number" min="1" max="99" value={pinNow} onChange={(e) => setPin(Math.max(1, Number(e.target.value) || 1))}
+                    className={`w-14 rounded border px-2 py-1 text-xs ${isDarkMode ? 'border-gray-700 bg-[#121212] text-white' : 'border-gray-300 bg-white text-black'}`} />
+                  <span className="text-gray-400">(1 = first)</span>
+                </label>
+              )}
+            </div>
+          ) : (
+            <span className="text-gray-400">📌 Add a home page photo first, then you can pin it to the front.</span>
           )}
           {err && <p className="max-w-sm text-red-500">{err}</p>}
         </div>

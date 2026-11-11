@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { matchesCollectionPage, rankBySales, totalStock } from '../data/catalog';
+import { matchesCollectionPage, rankBySales, totalStock, flatSubCategories, subLabel } from '../data/catalog';
+import { isFoldedPhoto } from '../data/photoShape';
 import HangerRail from './HangerRail';
 import ShoeOrbit from './ShoeOrbit';
 import RailQuickView from './RailQuickView';
@@ -40,6 +41,13 @@ const railOf = (p) => {
   if (p.gender === 'Men' || p.gender === 'Winter' || p.gender === 'Jackets') return 'men';
   return null;
 };
+// 📌 pinned products (Admin "Pin first", showcase/{id}.pin) come first by their position; the rest keep their order
+const pinOf = (p, uploaded) => Number((uploaded[String(p.id)] || {}).pin) || 0;
+const byPin = (list, uploaded) => list.map((p, i) => [p, i]).sort(([a, i], [b, j]) => {
+  const pa = pinOf(a, uploaded) || 1000;
+  const pb = pinOf(b, uploaded) || 1000;
+  return (pa - pb) || (i - j);
+}).map(([p]) => p);
 const cutoutsFor = (products, rail, uploaded) => {
   const inStock = (id) => products.find((x) => String(x.id) === String(id) && totalStock(x) > 0);
   const out = [];
@@ -55,7 +63,7 @@ const cutoutsFor = (products, rail, uploaded) => {
   const extra = rankBySales(products.filter((p) => !seen.has(String(p.id)) && totalStock(p) > 0 && railOf(p) === rail
     && uploaded[String(p.id)] && uploaded[String(p.id)].image));
   for (const p of extra) { const up = uploaded[String(p.id)]; out.push({ ...p, cutout: up.image, cutoutHanger: !!up.hanger, cutoutColor: null, cutoutExtra: up.extra || [], cutoutSide: up.side || null }); }
-  return out.slice(0, CUT_LIMIT);
+  return byPin(out, uploaded).slice(0, CUT_LIMIT);
 };
 
 const ACCESSORIES = [
@@ -63,6 +71,26 @@ const ACCESSORIES = [
   { key: 'Watches', label: 'Watches', pick: isKind('Watches'), open: ['Watches'] },
   { key: 'Wallets', label: 'Wallets', pick: isKind('Wallets'), open: ['Wallets'] },
 ];
+
+// one section of a collection (e.g. Men > T-Shirt): every in-stock product of it, best sellers first;
+// the ones with a background-free picture hang first, folded shirt photos last
+const withCutout = (p, uploaded) => {
+  const id = String(p.id);
+  const up = uploaded[id];
+  if (up && up.image) return { ...p, cutout: up.image, cutoutHanger: !!up.hanger, cutoutColor: null, cutoutExtra: up.extra || [], cutoutSide: up.side || null };
+  const c = [...CUTOUTS.men, ...CUTOUTS.shoes].find((x) => x.id === id);
+  if (c && !(up && up.off)) return { ...p, cutout: cutoutSrc(id), cutoutHanger: !!c.hanger, cutoutColor: c.color || null };
+  return p;
+};
+const sectionItems = (products, col, sub, uploaded) => rankBySales(products.filter((p) => totalStock(p) > 0 && matchesCollectionPage(p, col, sub)))
+  .map((p) => withCutout(p, uploaded))
+  .sort((a, b) => ((pinOf(a, uploaded) || 1000) - (pinOf(b, uploaded) || 1000))
+    || (Number(!a.cutout) - Number(!b.cutout)) || (Number(isFoldedPhoto(a)) - Number(isFoldedPhoto(b))))
+  .slice(0, CUT_LIMIT);
+// the sections of a collection that have products, for the picker next to the title
+const sectionsOf = (products, col, skip = []) => flatSubCategories(col).filter((n) => !skip.includes(n)).map((n) => ({
+  key: n, label: subLabel(n), count: products.filter((p) => totalStock(p) > 0 && matchesCollectionPage(p, col, n)).length,
+})).filter((x) => x.count > 0);
 
 export default function HomeShowcase({ products, formatPrice, addToCart, openProduct, openCollection }) {
   const [uploaded, setUploaded] = useState({});
@@ -74,6 +102,13 @@ export default function HomeShowcase({ products, formatPrice, addToCart, openPro
   const men = menCut.length >= MIN_CUT ? menCut : menMix;
   const womenMix = useMemo(() => mix(products, [inPage('Women', 'Saree'), inPage('Women', 'Three Piece'), inPage('Women', 'Ladies Jacket'), inPage('Women', 'Tops')]), [products]);
   const women = womenCut.length >= MIN_CUT ? womenCut : womenMix;
+  // section picker (Men > T-Shirt, Women > Saree ...)
+  const [menSub, setMenSub] = useState(null);
+  const [womenSub, setWomenSub] = useState(null);
+  const menSections = useMemo(() => sectionsOf(products, 'Men'), [products]);
+  const womenSections = useMemo(() => sectionsOf(products, 'Women', ['Bags']), [products]);
+  const menShown = useMemo(() => (menSub ? sectionItems(products, 'Men', menSub, uploaded) : men), [menSub, products, uploaded, men]);
+  const womenShown = useMemo(() => (womenSub ? sectionItems(products, 'Women', womenSub, uploaded) : women), [womenSub, products, uploaded, women]);
   const accTabs = useMemo(() => ACCESSORIES.map((t) => ({ ...t, items: mix(products, [t.pick]) })).filter((t) => t.items.length >= MIN), [products]);
   const shoesMix = useMemo(() => mix(products, [isKind('Shoes')], 12), [products]);
   const shoes = shoesCut.length >= MIN_CUT ? shoesCut : shoesMix;
@@ -87,12 +122,14 @@ export default function HomeShowcase({ products, formatPrice, addToCart, openPro
   return (
     <>
       {men.length >= MIN && (
-        <HangerRail title="Men's Collection" products={men} formatPrice={formatPrice} onOpen={open(men)} onShopAll={() => openCollection('Men')}
-          tagline={['Shirts, tees and jackets.', 'Picked for everyday style.']} variant="curve" tone="grey" />
+        <HangerRail title="Men's Collection" products={menShown} formatPrice={formatPrice} onOpen={open(menShown)} onShopAll={() => openCollection('Men', menSub)}
+          tagline={['Shirts, tees and jackets.', 'Picked for everyday style.']} variant="curve" tone="grey"
+          filters={menSections} filter={menSub} onFilter={setMenSub} />
       )}
       {women.length >= MIN && (
-        <HangerRail title="Women's Collection" products={women} formatPrice={formatPrice} onOpen={open(women)} onShopAll={() => openCollection('Women')}
-          tagline={['Saree, three piece and more.', 'Made to stand out.']} variant="straight" tone="white" />
+        <HangerRail title="Women's Collection" products={womenShown} formatPrice={formatPrice} onOpen={open(womenShown)} onShopAll={() => openCollection('Women', womenSub)}
+          tagline={['Saree, three piece and more.', 'Made to stand out.']} variant="straight" tone="white"
+          filters={womenSections} filter={womenSub} onFilter={setWomenSub} />
       )}
       {acc && (
         <HangerRail label="FINISH THE LOOK" title="Accessories" products={acc.items} formatPrice={formatPrice} onOpen={open(acc.items)}
