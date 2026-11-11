@@ -1,8 +1,9 @@
 // Products shown on the home showcase with their background removed (public/cutouts/<id>.webp).
 // Made with rembg on Evan's Mac (scripts/cutouts/README.md). Order here = order on the rail.
 // hanger: the photo already shows its own hanger (only a wire is drawn); color: the colour in the photo.
-// A product that is gone or sold out is skipped; a rail with too few cutouts falls back to photo cards.
-export const CUTOUT_VERSION = 4; // bump when the pictures change (browser cache)
+// A product that is gone or sold out is skipped; a rail with fewer than 4 falls back to photo cards.
+// Photos uploaded in the Admin product form (Firestore "showcase") replace these or add more (HomeShowcase.jsx).
+export const CUTOUT_VERSION = 5; // bump when the pictures change (browser cache)
 export const cutoutSrc = (id) => `/cutouts/${id}.webp?v=${CUTOUT_VERSION}`;
 
 export const CUTOUTS = {
@@ -24,9 +25,7 @@ export const CUTOUTS = {
     { id: '1794400063000', color: "Design 4" },
   ],
   shoes: [
-    { id: '1793322608288', color: "Olive Green & Sail White" },
     { id: '1793322816247', color: "Khaki Tan & Dark Brown" },
-    { id: '1793323455142', color: "Deep Green & Teal White" },
     { id: '1793366362530', color: "Cream & Desert" },
     { id: '1794100019000', color: "Cream Oatmeal & Maroon" },
     { id: '1794100020000', color: "White & Black" },
