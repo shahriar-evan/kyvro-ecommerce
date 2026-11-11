@@ -167,7 +167,7 @@ service cloud.firestore {
     // Everyone can read it. Written by whoever may edit that product (Owner, the person who added it, or "Edit all" ON).
     // image = png / webp data URL (transparent), hanger = the photo shows its own hanger, off = hide the built-in picture,
     // side = the product seen from the side (the rail shows it and turns it to the front on hover / tap),
-    // extra = more angles for the quick view.
+    // extra = more angles for the quick view, pin = shown first on the home rail (1 = first; Admin "Pin first").
     // Document id = product id.
     match /showcase/{pid} {
       function canEditShowcase() {
@@ -183,7 +183,8 @@ service cloud.firestore {
       function showcaseOk() {
         let d = request.resource.data;
         let ex = d.get('extra', []);
-        return d.keys().hasOnly(['image', 'side', 'hanger', 'off', 'extra', 'updatedAt', 'updatedBy'])
+        return d.keys().hasOnly(['image', 'side', 'hanger', 'off', 'extra', 'pin', 'updatedAt', 'updatedBy'])
+          && d.get('pin', 0) is int && d.get('pin', 0) >= 0 && d.get('pin', 0) <= 999
           && (!('image' in d) || showcaseImg(d.image, 450000))
           && (!('side' in d) || showcaseImg(d.side, 250000))
           && ex is list && ex.size() <= 3

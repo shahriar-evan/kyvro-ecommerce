@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ChevronDown } from 'lucide-react';
 
 // A clothes rail on the home page: products hang from a metal rod on wire hooks and wooden hangers.
 // The row moves only when the visitor drags (mouse) or swipes (touch); a drag never opens a product.
@@ -72,12 +72,14 @@ function Rod({ variant }) {
 
 export default function HangerRail({
   label = 'NEW COLLECTION', title, products, formatPrice, onOpen, onShopAll,
-  tagline = [], variant = 'curve', tone = 'grey', card = 'portrait', tabs = null, activeTab, onTab,
+  tagline = [], variant = 'curve', tone = 'grey', card = 'portrait',
+  filters = null, filter = null, onFilter = null, tabs = null, activeTab, onTab, // filters: section picker next to the title [{ key, label }], key null = All
 }) {
   const scRef = useRef(null);
   const barRef = useRef(null);
   const drag = useRef({ down: false, x: 0, left: 0, moved: false });
   const [hover, setHover] = useState(-1);
+  const [pick, setPick] = useState(false); // section picker open
   const [tapped, setTapped] = useState(-1); // touch: the first tap turns a side-view piece to the front, the next opens it
   const pointer = useRef('mouse');
   const sag = variant === 'curve' ? SAG : 0;
@@ -107,7 +109,7 @@ export default function HangerRail({
     const sc = scRef.current;
     if (sc) sc.scrollLeft = 0;
     update();
-  }, [activeTab, update]);
+  }, [activeTab, filter, update]);
   useEffect(() => {
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
@@ -149,6 +151,26 @@ export default function HangerRail({
           <span className="mx-3 text-gray-300">|</span>
           <span className="font-semibold text-gray-500">{title}</span>
         </p>
+        {filters && filters.length > 0 && (
+          <div className="relative mt-3 inline-block">
+            <button type="button" onClick={() => setPick((o) => !o)} aria-expanded={pick}
+              className="inline-flex items-center gap-2 rounded-full border border-black/15 bg-white px-4 py-1.5 text-[11px] font-semibold tracking-wider text-black shadow-sm transition hover:border-black">
+              {(filters.find((f) => f.key === filter) || { label: 'All' }).label}
+              <ChevronDown size={14} className={`transition-transform ${pick ? 'rotate-180' : ''}`} />
+            </button>
+            {pick && (
+              <div className="absolute left-1/2 z-30 mt-2 w-56 -translate-x-1/2 overflow-hidden rounded-xl border border-black/10 bg-white py-1 text-left shadow-xl">
+                {[{ key: null, label: 'All' }, ...filters].map((f) => (
+                  <button key={f.key || 'all'} type="button" onClick={() => { setPick(false); onFilter(f.key); }}
+                    className={`flex w-full items-center justify-between px-4 py-2 text-xs transition hover:bg-gray-100 ${f.key === filter ? 'font-bold text-black' : 'text-gray-700'}`}>
+                    <span>{f.label}</span>
+                    {f.count != null && <span className="text-[10px] text-gray-400">{f.count}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {tabs && (
           <div className="mt-4 inline-flex gap-1 rounded-full bg-black/[.05] p-1">
             {tabs.map((t) => (
@@ -170,7 +192,7 @@ export default function HangerRail({
             {products.map((p, i) => (
               <div key={p.id} data-hang onTransitionEnd={update}
                 className={`relative shrink-0 transition-[width] duration-300 ease-out ${!p.cutout ? 'w-[118px] sm:w-[150px] lg:w-[172px]'
-                  : (p.cutoutSide && hover !== i && tapped !== i) ? 'w-[64px] sm:w-[80px] lg:w-[92px]' : 'w-[112px] sm:w-[140px] lg:w-[158px]'}`}
+                  : (p.cutoutSide && hover !== i && tapped !== i) ? 'w-[78px] sm:w-[98px] lg:w-[112px]' : 'w-[136px] sm:w-[172px] lg:w-[196px]'}`}
                 style={{ marginTop: 'var(--sag, 0px)' }}>
                 <div className="kyvro-swing" style={{ animationDelay: `${-((i * 1.37) % 5.5)}s`, animationDuration: `${5 + (i % 3) * 0.6}s` }}>
                   <button type="button" onPointerDown={(e) => { pointer.current = e.pointerType; }} onClick={() => tap(i)} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(-1)} onFocus={() => setHover(i)} onBlur={() => setHover(-1)}
@@ -191,7 +213,7 @@ export default function HangerRail({
                           {!p.cutoutHanger && (
                             <Hanger className={`relative z-[2] -mt-[2px] mx-auto block transition-all duration-300 ${front ? 'w-[62%]' : 'w-[22%]'}`} />
                           )}
-                          <div className={`relative h-[150px] sm:h-[190px] lg:h-[215px] w-full ${p.cutoutHanger ? '-mt-[3px]' : '-mt-[12px]'}`}>
+                          <div className={`relative h-[185px] sm:h-[235px] lg:h-[270px] w-full ${p.cutoutHanger ? '-mt-[3px]' : '-mt-[12px]'}`}>
                             {p.cutoutSide && (
                               <img src={p.cutoutSide} alt="" aria-hidden="true" loading="lazy" draggable={false}
                                 className={`absolute inset-0 h-full w-full object-contain object-top transition-transform duration-200 ease-in ${shadow}`}
