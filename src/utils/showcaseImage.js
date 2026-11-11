@@ -66,3 +66,49 @@ export async function transparentShowcase(file) {
   if (!file || !/^image\/(png|webp)$/.test(file.type)) return null;
   try { return await prepareShowcaseImage(file); } catch (e) { return null; }
 }
+
+// An AI picture on a plain white background -> the home page version without background.
+// The white that touches the picture's edges is removed (flood fill), so white parts inside the product stay;
+// the border pixels fade out softly. Then it is trimmed / resized like an upload.
+export async function whiteBgToShowcase(dataUrl) {
+  const img = new Image();
+  img.src = dataUrl;
+  await img.decode();
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const g = c.getContext('2d');
+  g.drawImage(img, 0, 0);
+  const id = g.getImageData(0, 0, c.width, c.height);
+  const { data, width: w, height: h } = id;
+  // background colour = average of the light border pixels
+  let sr = 0, sg = 0, sb = 0, n = 0;
+  const border = [];
+  for (let x = 0; x < w; x += 1) border.push(x, (h - 1) * w + x);
+  for (let y = 0; y < h; y += 1) border.push(y * w, y * w + w - 1);
+  for (const p of border) {
+    const i = p * 4;
+    if (data[i] + data[i + 1] + data[i + 2] > 600) { sr += data[i]; sg += data[i + 1]; sb += data[i + 2]; n += 1; }
+  }
+  if (!n) throw new Error('The AI picture has no white background. Try again.');
+  const bg = [sr / n, sg / n, sb / n];
+  const dist = (i) => Math.max(Math.abs(data[i] - bg[0]), Math.abs(data[i + 1] - bg[1]), Math.abs(data[i + 2] - bg[2]));
+  const NEAR = 22, SOFT = 48;
+  const seen = new Uint8Array(w * h);
+  const stack = [];
+  for (const p of border) if (!seen[p] && dist(p * 4) <= NEAR) { seen[p] = 1; stack.push(p); }
+  while (stack.length) {
+    const p = stack.pop();
+    data[p * 4 + 3] = 0;
+    const x = p % w, y = (p / w) | 0;
+    const nb = [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, y > 0 ? p - w : -1, y < h - 1 ? p + w : -1];
+    for (const q of nb) {
+      if (q < 0 || seen[q]) continue;
+      const d = dist(q * 4);
+      if (d <= NEAR) { seen[q] = 1; stack.push(q); }
+      else if (d <= SOFT) { seen[q] = 2; data[q * 4 + 3] = Math.round(((d - NEAR) / (SOFT - NEAR)) * 255); }
+    }
+  }
+  g.putImageData(id, 0, 0);
+  const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+  return prepareShowcaseImage(new File([blob], 'ai.png', { type: 'image/png' }));
+}
