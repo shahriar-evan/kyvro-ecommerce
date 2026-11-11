@@ -47,16 +47,23 @@ export function PriceTagHang({ price, originalPrice, formatPrice, rotate = -6 })
 function Rod({ variant }) {
   if (variant === 'curve') {
     return (
-      <svg className="pointer-events-none absolute inset-x-0 w-full" style={{ top: ROD_Y - 3, height: SAG + 10 }} viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
-        <defs>
-          <linearGradient id="kyvroRod" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0" stopColor="#d9dadc" />
-            <stop offset="0.45" stopColor="#9a9da3" />
-            <stop offset="1" stopColor="#c9cbce" />
-          </linearGradient>
-        </defs>
-        {/* quadratic curve: the middle drops by SAG (control point = 2 x SAG) */}
-        <path d="M0 6 Q500 194 1000 6" fill="none" stroke="url(#kyvroRod)" strokeWidth="6" vectorEffect="non-scaling-stroke" />
+      // a thick metal tube: soft shadow under it, the grey body, a light line along the top
+      // svg box: from ROD_Y - 10 px, SAG + 24 px high; the rod's middle is SAG px lower than its ends
+      <svg className="pointer-events-none absolute inset-x-0 w-full overflow-visible" style={{ top: ROD_Y - 10, height: SAG + 24 }} viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
+        {(() => {
+          const u = 100 / (SAG + 24); // svg units per px
+          const y0 = 10 * u;
+          const c = 2 * (10 + SAG) * u - y0; // quadratic control point: the middle of the curve is (y0 + c) / 2
+          const d = (dy) => `M0 ${y0 + dy * u} Q500 ${c + dy * u} 1000 ${y0 + dy * u}`;
+          return (
+            <>
+              <path d={d(5)} fill="none" stroke="rgba(0,0,0,.10)" strokeWidth="10" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+              <path d={d(0)} fill="none" stroke="#a7aab0" strokeWidth="13" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+              <path d={d(-1)} fill="none" stroke="#c4c7cb" strokeWidth="8" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+              <path d={d(-3)} fill="none" stroke="#eef0f2" strokeWidth="3" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+            </>
+          );
+        })()}
       </svg>
     );
   }
@@ -215,9 +222,10 @@ export default function HangerRail({
                           )}
                           <div className={`relative h-[185px] sm:h-[235px] lg:h-[270px] w-full ${p.cutoutHanger ? '-mt-[3px]' : '-mt-[12px]'}`}>
                             {p.cutoutSide && (
+                              // sized by height (not width), so a wide side photo (a puffer jacket) hangs as tall as the shirts
                               <img src={p.cutoutSide} alt="" aria-hidden="true" loading="lazy" draggable={false}
-                                className={`absolute inset-0 h-full w-full object-contain object-top transition-transform duration-200 ease-in ${shadow}`}
-                                style={{ transform: `scaleX(${front ? 0 : 1})` }} />
+                                className={`absolute left-1/2 top-0 h-full w-auto max-w-none transition-transform duration-200 ease-in ${shadow}`}
+                                style={{ transform: `translateX(-50%) scaleX(${front ? 0 : 1})` }} />
                             )}
                             <img src={p.cutout} alt={p.name} loading="lazy" draggable={false}
                               className={`absolute inset-0 h-full w-full object-contain object-top transition-transform duration-300 ease-out ${shadow}`}

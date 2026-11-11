@@ -146,6 +146,24 @@ export async function keyBgToShowcase(dataUrl) {
 }
 export const whiteBgToShowcase = keyBgToShowcase;
 
+// The same background-free picture mirrored left <-> right (Admin "Flip" on the side photo)
+export async function mirrorShowcaseImage(src) {
+  const img = await new Promise((resolve, reject) => {
+    const im = new Image();
+    im.crossOrigin = 'anonymous';
+    im.onload = () => resolve(im);
+    im.onerror = () => reject(new Error('This picture could not be opened.'));
+    im.src = src;
+  });
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const g = c.getContext('2d');
+  g.translate(c.width, 0); g.scale(-1, 1);
+  g.drawImage(img, 0, 0);
+  const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+  return prepareShowcaseImage(new File([blob], 'side.png', { type: 'image/png' }));
+}
+
 // Which flat background to ask the AI for, far from the product's colour: looks at the middle of the photo
 // (when the browser may read it), else at the colour name ("Bottle Green" -> magenta), else green.
 const KEYS = { green: [0, 255, 0], magenta: [255, 0, 255], blue: [0, 0, 255] };

@@ -41,7 +41,8 @@ const prompts = (bg) => ({
       + 'If a person wears it, remove the person and show only the garment. Do not add or change any text or logo. Photorealistic e-commerce product photo.',
     front: 'Show this exact same garment hanging on a simple wooden clothes hanger, seen straight from the front, hanging neatly and not folded. ' + keep(bg),
     side: 'Show this exact same garment hanging on a simple wooden clothes hanger, seen from the side as a full 90-degree side profile, '
-      + 'so only one sleeve and the side seam face the camera, as if it hangs on a clothing rail. ' + keep(bg),
+      + 'so only one sleeve and the side seam face the camera, as if it hangs on a clothing rail. '
+      + 'The front of the garment (collar opening, buttons / zip, hood front) must point to the RIGHT side of the picture, the back to the left. ' + keep(bg),
   },
   shoe: {
     clean: 'Keep this exact same shoe exactly as it is in the photo: same angle, same position, same size, same colours, laces, logos and sole. '

@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { getShowcase } from '../showcaseStore';
-import { prepareShowcaseImage, urlToShowcaseImage, keyBgToShowcase, pickKeyColour } from '../utils/showcaseImage';
+import { prepareShowcaseImage, urlToShowcaseImage, keyBgToShowcase, pickKeyColour, mirrorShowcaseImage } from '../utils/showcaseImage';
 import { makeAiPhoto } from '../aiPhoto';
-import { CUTOUTS, cutoutSrc } from '../data/cutouts';
+import { CUTOUTS, cutoutSrc, cutoutSideSrc } from '../data/cutouts';
 
 // Admin product form: the background-free "home page photo" of a product (hanging rail / shoe wheel)
 // plus up to 3 more angles (back, side) for the quick view.
@@ -65,7 +65,7 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
   if (value && value.image) shown = { src: value.image, side: value.side || null, hanger: !!value.hanger, extra: value.extra || [], from: value.auto ? 'auto' : 'new' };
   else if (value && (value.remove || value.off)) shown = null;
   else if (saved && saved.image) shown = { src: saved.image, side: saved.side || null, hanger: !!saved.hanger, extra: saved.extra || [], from: 'uploaded' };
-  else if (base && !(saved && saved.off)) shown = { src: cutoutSrc(base.id), side: null, hanger: !!base.hanger, extra: [], from: 'built-in' };
+  else if (base && !(saved && saved.off)) shown = { src: cutoutSrc(base.id), side: base.side ? cutoutSideSrc(base.id) : null, hanger: !!base.hanger, extra: [], from: 'built-in' };
 
   // the current state as an editable value (a built-in picture is turned into a data URL first)
   // 📌 pin: shown first on the home rail (1 = first). From the pending change, else from the saved entry.
@@ -87,7 +87,8 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
     const cur = shownRef.current;
     if (!cur) return null;
     const image = cur.from === 'built-in' ? await urlToShowcaseImage(cur.src) : cur.src;
-    return { image, side: cur.side, hanger: cur.hanger, extra: [...cur.extra], pin: pinRef.current };
+    const side = cur.from === 'built-in' && cur.side ? await urlToShowcaseImage(cur.side) : cur.side;
+    return { image, side, hanger: cur.hanger, extra: [...cur.extra], pin: pinRef.current };
   };
   const change = (next) => {
     shownRef.current = next && next.image ? { src: next.image, side: next.side || null, hanger: !!next.hanger, extra: next.extra || [], from: 'new' } : null;
@@ -137,6 +138,12 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
     });
   };
   const removeSide = () => run(async () => { const cur = await editable(); change({ ...cur, side: null }); });
+  // every side photo on the rail faces the same way (collar / buttons to the right); Flip mirrors one that does not
+  const flipSide = () => run(async () => {
+    const cur = await editable();
+    if (!cur || !cur.side) return;
+    change({ ...cur, side: await mirrorShowcaseImage(cur.side) });
+  });
   const removeExtra = (i) => run(async () => {
     const cur = await editable();
     cur.extra.splice(i, 1);
@@ -213,13 +220,20 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
         </div>
         {shown && (
           <div className="text-center">
-            {shown.side ? <Thumb src={shown.side} big onRemove={removeSide} /> : (
+            {shown.side ? (
+              <>
+                <Thumb src={shown.side} big onRemove={removeSide} />
+                <button type="button" disabled={busy} onClick={flipSide} title="Mirror the side photo: the collar / buttons must point to the RIGHT, like every piece on the rail"
+                  className="mt-1 w-32 rounded border border-gray-300 py-1 text-[11px] font-semibold text-gray-600 hover:border-[#D4AF37] hover:text-[#D4AF37] disabled:opacity-50">⇋ Flip</button>
+              </>
+            ) : (
               <button type="button" disabled={busy} onClick={() => sideRef.current && sideRef.current.click()}
                 className="h-36 w-32 rounded border border-dashed border-gray-300 text-[11px] font-semibold text-gray-500 px-2 hover:border-[#D4AF37] hover:text-[#D4AF37] disabled:opacity-50">
                 + Side photo<br /><span className="font-normal">(optional)</span>
               </button>
             )}
             <p className="mt-1 text-[10px] font-semibold text-gray-500">SIDE</p>
+            {shown.side && <p className="w-32 text-[10px] leading-tight text-gray-400">Collar / buttons must point RIGHT →</p>}
           </div>
         )}
         <div className="flex flex-col gap-2 text-xs">
