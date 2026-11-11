@@ -1327,29 +1327,32 @@ export default function App() {
     const target = products.find(p => p.id === id);
     if (!target || !canDeleteProduct(target)) {
       alert('You do not have permission to delete this product.');
-      return;
+      return false;
     }
     // Manager / Admin: a live product is not deleted at once, the Owner has to confirm first
     if (isCloud && adminRole !== 'owner' && isApproved(target)) {
-      if (target.deleteRequested) return;
+      if (target.deleteRequested) return false;
       if ((await askConfirm('This product is live on the shop. A delete request will be sent to the Owner, and it stays on the shop until the Owner confirms. Send the request?'))) {
         try {
           await requestProductDelete(id, { email: loggedInUserEmail, name: adminName });
           alert('Delete request sent to the Owner.');
+          return true;
         } catch (err) {
           alert('Could not send the request: ' + (err.code === 'permission-denied' ? 'you do not have permission (check the Firestore rules).' : err.message));
         }
       }
-      return;
+      return false;
     }
     if ((await askConfirm('Are you sure you want to delete this product?'))) {
       try {
         if (isCloud) await removeProduct(id);
         else setLocalProducts(localProducts.filter(p => p.id !== id));
+        return true;
       } catch (err) {
         alert('Could not delete the product: ' + (err.code === 'permission-denied' ? 'you do not have permission.' : err.message));
       }
     }
+    return false;
   };
 
   // Owner answers a delete request

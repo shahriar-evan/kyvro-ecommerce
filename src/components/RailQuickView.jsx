@@ -49,7 +49,11 @@ export default function RailQuickView({ items, index, setIndex, onClose, formatP
   const blocked = soldOut || needSize || needColor;
 
   return (
-    <div className="fixed inset-0 z-[65] overflow-y-auto bg-[#f2f1ef] text-black kyvro-fade" role="dialog" aria-modal="true" aria-label={p.name}>
+    <div className="fixed inset-0 z-[65] isolate overflow-y-auto bg-[#f2f1ef] text-black kyvro-fade" role="dialog" aria-modal="true" aria-label={p.name}>
+      <button type="button" onClick={onClose} aria-label="Go back" title="Back"
+        className="fixed left-4 top-4 sm:left-8 sm:top-6 z-10 flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full bg-[#D4AF37] text-black shadow-lg transition hover:scale-110 active:scale-95">
+        <ArrowLeft size={20} />
+      </button>
       <button type="button" onClick={onClose} className="fixed right-4 top-4 sm:right-8 sm:top-6 z-10 inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1.5 text-sm backdrop-blur hover:bg-white">
         Close <X size={18} />
       </button>
@@ -67,7 +71,7 @@ export default function RailQuickView({ items, index, setIndex, onClose, formatP
           ))}
           <div className="-mt-1 w-full max-w-[420px] aspect-[4/5]">
             <img src={photos[photo] || p.image} alt={p.name} draggable={false}
-              className={`h-full w-full object-contain ${photos[photo] === p.cutout ? 'object-top' : 'mix-blend-multiply'} drop-shadow-[0_28px_30px_rgba(0,0,0,.18)]`} />
+              className={`h-full w-full object-contain ${photos[photo] === p.cutout ? (hanging ? 'object-top' : 'object-center') : 'mix-blend-multiply'} drop-shadow-[0_28px_30px_rgba(0,0,0,.18)]`} />
           </div>
           {photos.length > 1 && (
             <div className="mt-4 flex gap-2">
