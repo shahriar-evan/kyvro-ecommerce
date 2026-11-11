@@ -38,7 +38,7 @@ total = 0
 for group, keys, box in (('men', MEN, (560, 700)), ('shoes', [(k, 0) for k in SHOES], (800, 560))):
     for key, hanger in keys:
         pid = key.rsplit('_', 1)[0]
-        im = Image.open(f'{S}/cut/png/{key}.png').convert('RGBA')
+        im = Image.open(f'{S}/cut/png2/{key}.png').convert('RGBA')
         im = clean(im); im.thumbnail(box, Image.LANCZOS)
         fn = f'{R}/public/cutouts/{pid}.webp'
         im.save(fn, 'WEBP', quality=82, method=6)

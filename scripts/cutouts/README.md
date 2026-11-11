@@ -16,8 +16,10 @@ Setup once: `brew install python@3.12`, `/opt/homebrew/bin/python3.12 -m venv ~/
    skin-coloured pixels, high = a model is in the photo).
 4. `sheet.py W men 0.03` / `women 0.03` / `shoes 0.2` makes contact sheets (`W/cut/sheets`) to pick from by eye:
    long pieces (jackets, hoodies, hanging shirts, katua, polo), no folded shirts, no models, clean edges.
-5. Put the picks in `MEN` / `SHOES` in `export.py` (`hanger` 1 = the photo shows its own hanger), run
-   `export.py W <repo>`: it cleans loose bits, writes `public/cutouts/*.webp` and `W/cut/chosen.json`.
+5. Put the picks in `MEN` / `SHOES` in `export.py`, then cut only those again with the better model:
+   `recut.py W birefnet-general-lite png2` (fills holes inside the garment, e.g. white stripes, from the original
+   photo; keeps white shoe soles). Then (`hanger` 1 = the photo shows its own hanger), run
+   `export.py W <repo>` (reads `W/cut/png2`): it cleans loose bits, writes `public/cutouts/*.webp` and `W/cut/chosen.json`.
 6. Copy `chosen.json` into `src/data/cutouts.js` and bump `CUTOUT_VERSION`.
 
 A product that is deleted or sold out is skipped on the site; with fewer than 6 cutouts a rail falls back to photo cards.

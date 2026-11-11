@@ -2,7 +2,7 @@
 // Made with rembg on Evan's Mac (scripts/cutouts/README.md). Order here = order on the rail.
 // hanger: the photo already shows its own hanger (only a wire is drawn); color: the colour in the photo.
 // A product that is gone or sold out is skipped; a rail with too few cutouts falls back to photo cards.
-export const CUTOUT_VERSION = 3; // bump when the pictures change (browser cache)
+export const CUTOUT_VERSION = 4; // bump when the pictures change (browser cache)
 export const cutoutSrc = (id) => `/cutouts/${id}.webp?v=${CUTOUT_VERSION}`;
 
 export const CUTOUTS = {
