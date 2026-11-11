@@ -1,9 +1,10 @@
 import React, { useRef, useState } from 'react';
 import { imageFileToDataURL } from '../utils/imageUpload';
+import { transparentShowcase } from '../utils/showcaseImage';
 
 // A small row of extra photos: thumbnails with a remove button, an "Add photos" button (several files at once)
 // and a box to paste an image link. value = ['url', ...], onChange(newList)
-export default function MorePhotos({ value = [], onChange, max = 5, title, hint, isDarkMode, compact = false }) {
+export default function MorePhotos({ value = [], onChange, max = 5, title, hint, isDarkMode, compact = false, onTransparent }) {
   const file = useRef(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -18,6 +19,7 @@ export default function MorePhotos({ value = [], onChange, max = 5, title, hint,
     setErr(''); setBusy(true);
     const out = [];
     for (const f of files) {
+      if (onTransparent) transparentShowcase(f).then((u) => { if (u) onTransparent(u); });
       try { out.push(await imageFileToDataURL(f, { maxSize: 800, quality: 0.72 })); } catch (x) { setErr(x.message || 'Upload failed.'); }
     }
     if (out.length) onChange([...list, ...out]);

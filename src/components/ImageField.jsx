@@ -1,8 +1,10 @@
 import React, { useRef, useState } from 'react';
 import { imageFileToDataURL } from '../utils/imageUpload';
+import { transparentShowcase } from '../utils/showcaseImage';
 
 // Product photo: paste an image link OR upload a photo from your device
-export default function ImageField({ value, onChange, isDarkMode }) {
+// onTransparent(url): called with the home page version when the upload is a transparent PNG / WebP
+export default function ImageField({ value, onChange, isDarkMode, onTransparent }) {
   const fileInput = useRef(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -16,6 +18,7 @@ export default function ImageField({ value, onChange, isDarkMode }) {
     if (!file) return;
     setError('');
     setBusy(true);
+    if (onTransparent) transparentShowcase(file).then((u) => { if (u) onTransparent(u); });
     try {
       onChange(await imageFileToDataURL(file));
     } catch (err) {

@@ -165,7 +165,8 @@ service cloud.firestore {
 
     // Home page showcase photo of a product (background-free picture on the hanging rails / shoe wheel).
     // Everyone can read it. Written by whoever may edit that product (Owner, the person who added it, or "Edit all" ON).
-    // image = png / webp data URL (transparent), hanger = the photo shows its own hanger, off = hide the built-in picture.
+    // image = png / webp data URL (transparent), hanger = the photo shows its own hanger, off = hide the built-in picture,
+    // extra = more angles for the quick view.
     // Document id = product id.
     match /showcase/{pid} {
       function canEditShowcase() {
@@ -174,11 +175,19 @@ service cloud.firestore {
               && (get(/databases/$(database)/documents/products/$(pid)).data.get('addedBy', '').lower() == myEmail()
                   || get(myDocPath()).data.get('editAll', false) == true));
       }
+      function showcaseImg(v, max) {
+        return v is string && v.size() <= max && v.matches('^data:image/(png|webp);base64,[A-Za-z0-9+/=]+$');
+      }
+      // extra = up to 3 more background-free angles (back, side), shown in the quick view
       function showcaseOk() {
         let d = request.resource.data;
-        return d.keys().hasOnly(['image', 'hanger', 'off', 'updatedAt', 'updatedBy'])
-          && (!('image' in d) || (d.image is string && d.image.size() <= 450000
-              && d.image.matches('^data:image/(png|webp);base64,[A-Za-z0-9+/=]+$')))
+        let ex = d.get('extra', []);
+        return d.keys().hasOnly(['image', 'hanger', 'off', 'extra', 'updatedAt', 'updatedBy'])
+          && (!('image' in d) || showcaseImg(d.image, 450000))
+          && ex is list && ex.size() <= 3
+          && (ex.size() < 1 || showcaseImg(ex[0], 250000))
+          && (ex.size() < 2 || showcaseImg(ex[1], 250000))
+          && (ex.size() < 3 || showcaseImg(ex[2], 250000))
           && d.get('hanger', false) is bool
           && d.get('off', false) is bool
           && d.get('updatedAt', '') is string && d.get('updatedAt', '').size() <= 40
