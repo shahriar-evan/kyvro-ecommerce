@@ -83,7 +83,7 @@ export default function ShoeOrbit({ products, formatPrice, onOpen, addToCart, on
   const wheelShift = -pos * 26;
 
   return (
-    <section className="relative w-full overflow-hidden bg-white text-black">
+    <section className="relative isolate w-full overflow-hidden bg-white text-black">
       <div className="pt-10 sm:pt-14 px-4 text-center">
         <p className="text-[10px] sm:text-xs tracking-[0.3em] uppercase">
           <span className="font-bold">STEP IN</span><span className="mx-3 text-gray-300">|</span><span className="font-semibold text-gray-500">Shoes</span>

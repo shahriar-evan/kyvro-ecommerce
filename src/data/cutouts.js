@@ -2,7 +2,7 @@
 // Made with rembg on Evan's Mac (scripts/cutouts/README.md). Order here = order on the rail.
 // hanger: the photo already shows its own hanger (only a wire is drawn); color: the colour in the photo.
 // A product that is gone or sold out is skipped; a rail with too few cutouts falls back to photo cards.
-export const CUTOUT_VERSION = 2; // bump when the pictures change (browser cache)
+export const CUTOUT_VERSION = 3; // bump when the pictures change (browser cache)
 export const cutoutSrc = (id) => `/cutouts/${id}.webp?v=${CUTOUT_VERSION}`;
 
 export const CUTOUTS = {
@@ -19,9 +19,9 @@ export const CUTOUTS = {
     { id: '1794600025000', hanger: true, color: "Navy" },
     { id: '1794400044000', hanger: true, color: "Design 2" },
     { id: '1794600005000', hanger: true, color: "Black" },
-    { id: '1794400051000', color: "Design 2" },
+    { id: '1794400043000', hanger: true, color: "Design 2" },
     { id: '1794400071000', hanger: true, color: "Design 2" },
-    { id: '1794400077000', color: "Design 1" },
+    { id: '1794400063000', color: "Design 4" },
   ],
   shoes: [
     { id: '1793322608288', color: "Olive Green & Sail White" },

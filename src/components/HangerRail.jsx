@@ -128,7 +128,7 @@ export default function HangerRail({
   const hovered = hover >= 0 ? products[hover] : null;
 
   return (
-    <section className="relative w-full overflow-hidden text-black lg:min-h-[calc(100vh-72px)] flex flex-col" style={{ background: TONES[tone] || TONES.grey }}>
+    <section className="relative isolate w-full overflow-hidden text-black lg:min-h-[calc(100vh-72px)] flex flex-col" style={{ background: TONES[tone] || TONES.grey }}>
       <div className="pt-10 sm:pt-14 px-4 text-center">
         <p className="text-[10px] sm:text-xs tracking-[0.3em] uppercase">
           <span className="font-bold">{label}</span>

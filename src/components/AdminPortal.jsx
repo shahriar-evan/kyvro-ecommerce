@@ -728,9 +728,24 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                     </div>
                   </div>
 
-                  <button type="submit" className="bg-[#D4AF37] text-black font-bold px-8 py-3 rounded text-xs uppercase tracking-widest hover:opacity-90 transition">
-                    {editingProductId ? 'Update Product' : 'Save Product to Store'}
-                  </button>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button type="submit" className="bg-[#D4AF37] text-black font-bold px-8 py-3 rounded text-xs uppercase tracking-widest hover:opacity-90 transition">
+                      {editingProductId ? 'Update Product' : 'Save Product to Store'}
+                    </button>
+                    {/* Remove this product (same rules as the Products list: Owner deletes, others send a delete request for a live product) */}
+                    {(() => {
+                      const ep = editingProductId && products.find((p) => p.id === editingProductId);
+                      if (!ep || !canDeleteProduct(ep)) return null;
+                      if (ep.deleteRequested) return <span className="text-xs font-semibold text-red-500">Delete requested · waiting for the Owner</span>;
+                      const label = ep.status === 'pending' ? 'Reject product' : (adminRole === 'owner' ? 'Delete product' : 'Request delete');
+                      return (
+                        <button type="button" onClick={async () => { if (await deleteProduct(ep.id)) { clearProductForm(); setAdminTab('products'); } }}
+                          className="border border-red-600 text-red-600 font-bold px-6 py-3 rounded text-xs uppercase tracking-widest hover:bg-red-600 hover:text-white transition">
+                          {label}
+                        </button>
+                      );
+                    })()}
+                  </div>
                 </form>
                 <aside className="hidden lg:block w-80 xl:w-96 shrink-0 lg:sticky lg:top-24">{(canSeeSupplier || !editingProductId) && supplierPanel}</aside>
                 </div>
