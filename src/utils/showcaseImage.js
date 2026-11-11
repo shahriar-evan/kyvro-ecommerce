@@ -1,9 +1,9 @@
 // Gets an uploaded background-free product photo ready for the home showcase:
 // checks it really is transparent, cuts off the empty edges, makes it at most 800 x 800 and saves it as
-// WebP (PNG where the browser cannot make WebP). Each photo stays under 230 KB so the main photo + 3 more
-// fit in one Firestore document (1 MB; rules: main under 450 KB, more under 250 KB each).
+// WebP (PNG where the browser cannot make WebP). Each photo stays under 190 KB so front + side + 3 more
+// fit in one Firestore document (1 MB; rules: front under 450 KB, side / more under 250 KB each).
 const MAX_SIDE = 800;
-const MAX_CHARS = 230000;
+const MAX_CHARS = 190000;
 
 const loadImage = (file) => new Promise((resolve, reject) => {
   const url = URL.createObjectURL(file);

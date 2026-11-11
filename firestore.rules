@@ -166,6 +166,7 @@ service cloud.firestore {
     // Home page showcase photo of a product (background-free picture on the hanging rails / shoe wheel).
     // Everyone can read it. Written by whoever may edit that product (Owner, the person who added it, or "Edit all" ON).
     // image = png / webp data URL (transparent), hanger = the photo shows its own hanger, off = hide the built-in picture,
+    // side = the product seen from the side (the rail shows it and turns it to the front on hover / tap),
     // extra = more angles for the quick view.
     // Document id = product id.
     match /showcase/{pid} {
@@ -182,8 +183,9 @@ service cloud.firestore {
       function showcaseOk() {
         let d = request.resource.data;
         let ex = d.get('extra', []);
-        return d.keys().hasOnly(['image', 'hanger', 'off', 'extra', 'updatedAt', 'updatedBy'])
+        return d.keys().hasOnly(['image', 'side', 'hanger', 'off', 'extra', 'updatedAt', 'updatedBy'])
           && (!('image' in d) || showcaseImg(d.image, 450000))
+          && (!('side' in d) || showcaseImg(d.side, 250000))
           && ex is list && ex.size() <= 3
           && (ex.size() < 1 || showcaseImg(ex[0], 250000))
           && (ex.size() < 2 || showcaseImg(ex[1], 250000))
