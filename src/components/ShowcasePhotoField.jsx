@@ -38,6 +38,8 @@ const LINKS = {
   billing: 'https://console.cloud.google.com/billing',
   usage: 'https://aistudio.google.com/usage',
   vercel: 'https://vercel.com/shahriar-evans-projects/kyvro-ecommerce/settings/environment-variables',
+  orCredits: 'https://openrouter.ai/settings/credits',
+  orKeys: 'https://openrouter.ai/settings/keys',
 };
 const A = ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#B8921F] underline">{children}</a>;
 
@@ -124,7 +126,7 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
     try {
       const raw = await makeAiPhoto({ source, view, kind });
       setAi({ view, cut: await whiteBgToShowcase(raw) });
-    } catch (ex) { setAi({ error: ex.message || 'Could not make the picture.', code: ex.code || 'failed' }); }
+    } catch (ex) { setAi({ error: ex.message || 'Could not make the picture.', code: ex.code || 'failed', provider: ex.provider || 'gemini' }); }
   };
   const useAi = (as) => run(async () => {
     const cur = (await editable()) || { image: null, side: null, hanger: false, extra: [] };
@@ -201,7 +203,7 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
         <div className={`mt-4 rounded border p-3 ${isDarkMode ? 'border-gray-700 bg-[#151515]' : 'border-amber-200 bg-amber-50/60'}`}>
           <p className={`text-xs font-semibold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>✨ Make with AI (Gemini)</p>
           <p className="mt-1 text-[11px] text-gray-500 leading-relaxed">
-            Pick one of this product's photos, then make the front or the side view. It takes about 10-30 seconds and uses your Gemini credit.
+            Pick one of this product's photos, then make the front or the side view. It takes about 10-30 seconds and uses your AI credit (OpenRouter or Gemini).
             <b> Check that colours, logos and text match the real product</b> before you use it (AI sometimes invents letters).
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -239,15 +241,19 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
           {ai && ai.error && (
             <div className="mt-3 rounded border border-red-300 bg-red-50 p-3 text-xs text-red-700 leading-relaxed">
               <p className="font-semibold">{ai.error}</p>
-              {ai.code === 'no-credit' && (
+              {ai.code === 'no-credit' && (ai.provider === 'openrouter' ? (
+                <p className="mt-1">Buy more credit, then try again: <A href={LINKS.orCredits}>OpenRouter → Credits (buy) →</A> · if the key has a limit, raise it in <A href={LINKS.orKeys}>OpenRouter → Keys</A>.</p>
+              ) : (
                 <p className="mt-1">Add credit or turn billing on, then try again: <A href={LINKS.billing}>Google Cloud billing →</A> · <A href={LINKS.usage}>AI Studio usage →</A></p>
-              )}
+              ))}
               {ai.code === 'no-key' && (
-                <p className="mt-1">Make a key at <A href={LINKS.key}>Google AI Studio → API keys</A>, then add it as <b>GEMINI_API_KEY</b> in <A href={LINKS.vercel}>Vercel → Environment Variables</A> (Production) and redeploy.</p>
+                <p className="mt-1">Make a key at <A href={LINKS.orKeys}>OpenRouter → Keys</A> (buy credit at <A href={LINKS.orCredits}>Credits</A>), then add it as <b>OPENROUTER_API_KEY</b> in <A href={LINKS.vercel}>Vercel → Environment Variables</A> (Production) and redeploy.</p>
               )}
-              {ai.code === 'bad-key' && (
+              {ai.code === 'bad-key' && (ai.provider === 'openrouter' ? (
+                <p className="mt-1">Make a new key at <A href={LINKS.orKeys}>OpenRouter → Keys</A> and replace <b>OPENROUTER_API_KEY</b> in <A href={LINKS.vercel}>Vercel</A>.</p>
+              ) : (
                 <p className="mt-1">Make a new key at <A href={LINKS.key}>Google AI Studio → API keys</A> and replace <b>GEMINI_API_KEY</b> in <A href={LINKS.vercel}>Vercel</A>.</p>
-              )}
+              ))}
             </div>
           )}
         </div>
