@@ -77,14 +77,6 @@ function Rod({ variant }) {
   );
 }
 
-// a side photo wider than a shirt's (width / height above 0.3) hangs a little shorter: at most 18 % shorter
-const sideFit = (e) => {
-  const im = e.currentTarget;
-  const r = im.naturalWidth / Math.max(1, im.naturalHeight);
-  const f = Math.max(0.82, Math.min(1, (0.3 / Math.max(r, 0.01)) ** 0.3));
-  im.style.height = `${(f * 100).toFixed(1)}%`;
-};
-
 export default function HangerRail({
   label = 'NEW COLLECTION', title, products, formatPrice, onOpen, onShopAll,
   tagline = [], variant = 'curve', tone = 'grey', card = 'portrait',
@@ -206,7 +198,7 @@ export default function HangerRail({
             style={{ paddingTop: ROD_Y - 8, paddingBottom: 28 }}>
             {products.map((p, i) => (
               <div key={p.id} data-hang onTransitionEnd={update}
-                className={`relative shrink-0 transition-[width] duration-500 ease-in-out ${!p.cutout ? 'w-[118px] sm:w-[150px] lg:w-[172px]'
+                className={`relative shrink-0 transition-[width] duration-500 ease-in-out ${!p.cutout ? (card === 'square' ? 'w-[160px] sm:w-[210px] lg:w-[250px]' : 'w-[158px] sm:w-[200px] lg:w-[230px]')
                   : (p.cutoutSide && hover !== i && tapped !== i) ? 'w-[78px] sm:w-[98px] lg:w-[112px]' : 'w-[136px] sm:w-[172px] lg:w-[196px]'}`}
                 style={{ marginTop: 'var(--sag, 0px)' }}>
                 <div className="kyvro-swing" style={{ animationDelay: `${-((i * 1.37) % 5.5)}s`, animationDuration: `${5 + (i % 3) * 0.6}s` }}>
@@ -234,9 +226,8 @@ export default function HangerRail({
                           <div className={`relative h-[185px] sm:h-[235px] lg:h-[270px] w-full ${p.cutoutHanger ? '-mt-[3px]' : '-mt-[12px]'}`}
                             style={p.cutoutSide ? { perspective: '900px' } : undefined}>
                             {p.cutoutSide && (
-                              // sized by height, so every piece hangs about as tall as the shirts; a wide side photo
-                              // (a puffer jacket with its hood) is made a little shorter so it does not look bigger (sideFit)
-                              <img src={p.cutoutSide} alt="" aria-hidden="true" loading="lazy" draggable={false} onLoad={sideFit}
+                              // sized by height, so every piece hangs exactly as tall as the shirts (jackets too)
+                              <img src={p.cutoutSide} alt="" aria-hidden="true" loading="lazy" draggable={false}
                                 className={`absolute left-1/2 top-0 h-full w-auto max-w-none transition-transform duration-[260ms] ${shadow}`}
                                 style={{ transform: front ? 'translateX(-50%) rotateY(-90deg)' : 'translateX(-50%)',
                                   transitionTimingFunction: front ? 'cubic-bezier(.5,0,.9,.5)' : 'cubic-bezier(.1,.5,.5,1)', transitionDelay: front ? '0ms' : '260ms' }} />
