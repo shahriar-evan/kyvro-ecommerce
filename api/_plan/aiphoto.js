@@ -30,6 +30,8 @@ const BACKGROUNDS = {
   white: 'pure plain white (#FFFFFF)',
 };
 const keep = (bg) => 'Keep the exact same product: same colours, fabric, pattern, print, buttons, zips, stitching and every detail. '
+  + 'Keep the exact same colour, shade, tone and fabric wash as in the photo: do not make it lighter, darker, brighter or a different hue. '
+  + 'Buttons, pockets, zips and the placket stay only where they are on the real garment: in a side view the buttons are only on the front edge, never on the back or on both edges. '
   + 'Do not add, change, translate or invent any text, letters, numbers, logos or brand names; if a logo is not visible from this angle, leave that area plain. '
   + `No person, no mannequin, no hands, no props, no extra items. The whole background must be one ${bg} colour, with no shadow, no floor, no gradient, `
   + 'and that colour must not appear on the product or as a colour cast on it. '

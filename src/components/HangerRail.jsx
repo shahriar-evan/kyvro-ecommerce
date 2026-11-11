@@ -198,7 +198,7 @@ export default function HangerRail({
             style={{ paddingTop: ROD_Y - 8, paddingBottom: 28 }}>
             {products.map((p, i) => (
               <div key={p.id} data-hang onTransitionEnd={update}
-                className={`relative shrink-0 transition-[width] duration-300 ease-out ${!p.cutout ? 'w-[118px] sm:w-[150px] lg:w-[172px]'
+                className={`relative shrink-0 transition-[width] duration-500 ease-in-out ${!p.cutout ? 'w-[118px] sm:w-[150px] lg:w-[172px]'
                   : (p.cutoutSide && hover !== i && tapped !== i) ? 'w-[78px] sm:w-[98px] lg:w-[112px]' : 'w-[136px] sm:w-[172px] lg:w-[196px]'}`}
                 style={{ marginTop: 'var(--sag, 0px)' }}>
                 <div className="kyvro-swing" style={{ animationDelay: `${-((i * 1.37) % 5.5)}s`, animationDuration: `${5 + (i % 3) * 0.6}s` }}>
@@ -220,16 +220,21 @@ export default function HangerRail({
                           {!p.cutoutHanger && (
                             <Hanger className={`relative z-[2] -mt-[2px] mx-auto block transition-all duration-300 ${front ? 'w-[62%]' : 'w-[22%]'}`} />
                           )}
-                          <div className={`relative h-[185px] sm:h-[235px] lg:h-[270px] w-full ${p.cutoutHanger ? '-mt-[3px]' : '-mt-[12px]'}`}>
+                          {/* the turn is a 3D spin: the side view swings away to the left while the front swings in from the
+                              right (every side photo shows the front of the piece pointing right), one after the other */}
+                          <div className={`relative h-[185px] sm:h-[235px] lg:h-[270px] w-full ${p.cutoutHanger ? '-mt-[3px]' : '-mt-[12px]'}`}
+                            style={p.cutoutSide ? { perspective: '900px' } : undefined}>
                             {p.cutoutSide && (
                               // sized by height (not width), so a wide side photo (a puffer jacket) hangs as tall as the shirts
                               <img src={p.cutoutSide} alt="" aria-hidden="true" loading="lazy" draggable={false}
-                                className={`absolute left-1/2 top-0 h-full w-auto max-w-none transition-transform duration-200 ease-in ${shadow}`}
-                                style={{ transform: `translateX(-50%) scaleX(${front ? 0 : 1})` }} />
+                                className={`absolute left-1/2 top-0 h-full w-auto max-w-none transition-transform duration-[260ms] ${shadow}`}
+                                style={{ transform: `translateX(-50%) rotateY(${front ? -90 : 0}deg)`, backfaceVisibility: 'hidden',
+                                  transitionTimingFunction: front ? 'cubic-bezier(.5,0,.9,.5)' : 'cubic-bezier(.1,.5,.5,1)', transitionDelay: front ? '0ms' : '260ms' }} />
                             )}
                             <img src={p.cutout} alt={p.name} loading="lazy" draggable={false}
-                              className={`absolute inset-0 h-full w-full object-contain object-top transition-transform duration-300 ease-out ${shadow}`}
-                              style={{ transform: `scaleX(${front ? 1 : 0})`, transitionDelay: front && p.cutoutSide ? '150ms' : '0ms' }} />
+                              className={`absolute inset-0 h-full w-full object-contain object-top transition-transform duration-[260ms] ${shadow}`}
+                              style={p.cutoutSide ? { transform: `rotateY(${front ? 0 : 90}deg)`, backfaceVisibility: 'hidden',
+                                transitionTimingFunction: front ? 'cubic-bezier(.1,.5,.5,1)' : 'cubic-bezier(.5,0,.9,.5)', transitionDelay: front ? '260ms' : '0ms' } : undefined} />
                           </div>
                         </>
                       );
