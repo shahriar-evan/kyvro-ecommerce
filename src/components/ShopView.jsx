@@ -4,6 +4,7 @@ import { Heart } from 'lucide-react';
 import WhatsAppButton from './WhatsAppButton';
 import { waOrderLink, waProductLines } from '../whatsappOrder';
 import StockLabel from './StockLabel';
+import ShoeWall from './ShoeWall';
 import { subLabel, SUB_CATEGORIES, COLLECTION_LABELS, DEFAULT_SUB_LABEL, hasSubCategories, hasSizeStock, totalStock } from '../data/catalog';
 
 export default function ShopView({ requestAdd, addToCart, filteredProducts, formatPrice, isDarkMode, products, searchQuery, selectedCategory, selectedSubCategory, setSelectedSubCategory, setCurrentView, setSearchQuery, setSelectedCategory, setSelectedProduct, setSortBy, sortBy, savedIds = [], toggleSaved = () => {} }) {
@@ -57,6 +58,11 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
             );
           })()}
 
+          {/* Shoes: the shoe wall (pairs on shelves, 2 / 4 / 6 a row) instead of the card grid */}
+          {selectedCategory === 'Shoes' ? (
+            <ShoeWall products={filteredProducts} formatPrice={formatPrice} isDarkMode={isDarkMode}
+              openProduct={(p) => { setSelectedProduct(p); setCurrentView('product-detail'); }} />
+          ) : (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             <div className="space-y-6 hidden lg:block">
               <div className={`p-6 rounded-lg border ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
@@ -170,6 +176,7 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
               </div>
             </div>
           </div>
+          )}
         </div>
     </>
   );

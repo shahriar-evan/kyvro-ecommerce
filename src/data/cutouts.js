@@ -3,7 +3,7 @@
 // hanger: the photo already shows its own hanger (only a wire is drawn); color: the colour in the photo.
 // A product that is gone or sold out is skipped; a rail with fewer than 4 falls back to photo cards.
 // Photos uploaded in the Admin product form (Firestore "showcase") replace these or add more (HomeShowcase.jsx).
-export const CUTOUT_VERSION = 9; // bump when the pictures change (browser cache)
+export const CUTOUT_VERSION = 10; // bump when the pictures change (browser cache)
 export const cutoutSrc = (id) => `/cutouts/${id}.webp?v=${CUTOUT_VERSION}`;
 // side: true = there is also a side-on picture (public/cutouts/<id>-side.webp); the piece hangs side-on and turns to the front on hover / tap
 export const cutoutSideSrc = (id) => `/cutouts/${id}-side.webp?v=${CUTOUT_VERSION}`;
@@ -49,5 +49,23 @@ export const CUTOUTS = {
     { id: '1794100030000', color: "Cool Grey & Ice Blue" },
     { id: '1794100032000', color: "Military Black & White" },
     { id: '1794100037000', color: "Valentine Crimson & White" },
+  ],
+  // only on the Shoes collection page (ShoeWall.jsx), not on the home wheel; made with rembg (Nov 2026)
+  shoeWall: [
+    { id: '1793322295581' },
+    { id: '1793322608288' },
+    { id: '1793323112976' },
+    { id: '1793323455142' },
+    { id: '1794100023000' },
+    { id: '1794100024000' },
+    { id: '1794100025000' },
+    { id: '1794100026000' },
+    { id: '1794100027000' },
+    { id: '1794100029000' },
+    { id: '1794100031000' },
+    { id: '1794100033000' },
+    { id: '1794100034000' },
+    { id: '1794100035000' },
+    { id: '1794100036000' },
   ],
 };

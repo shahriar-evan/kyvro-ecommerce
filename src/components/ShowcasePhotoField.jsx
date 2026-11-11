@@ -10,7 +10,7 @@ import { CUTOUTS, cutoutSrc, cutoutSideSrc } from '../data/cutouts';
 //   null (no change), { image (front), side, hanger, extra: [] }, { off: true } (hide built-in), { remove: true } (delete uploaded).
 // A transparent PNG / WebP uploaded as the main or a colour photo is added here by itself (see addAutoShowcase).
 export const MAX_EXTRA = 3;
-const builtIn = (id) => [...CUTOUTS.men, ...CUTOUTS.shoes].find((c) => c.id === String(id)) || null;
+const builtIn = (id) => [...CUTOUTS.men, ...CUTOUTS.shoes, ...(CUTOUTS.shoeWall || [])].find((c) => c.id === String(id)) || null;
 
 // a transparent main / colour / more photo was uploaded: first one = home page photo, then the extra angles
 export const addAutoShowcase = (value, url) => {
