@@ -65,7 +65,7 @@ function Rod({ variant }) {
 
 export default function HangerRail({
   label = 'NEW COLLECTION', title, products, formatPrice, onOpen, onShopAll,
-  tagline = [], variant = 'curve', tone = 'grey', tabs = null, activeTab, onTab,
+  tagline = [], variant = 'curve', tone = 'grey', card = 'portrait', tabs = null, activeTab, onTab,
 }) {
   const scRef = useRef(null);
   const barRef = useRef(null);
@@ -179,8 +179,9 @@ export default function HangerRail({
                           {['left-[14%]', 'right-[14%]'].map((c) => (
                             <span key={c} className={`absolute ${c} -top-[5px] z-[2] h-[12px] w-[7px] rounded-[2px] bg-gradient-to-b from-[#d6d7da] to-[#8f9298] shadow-sm`} />
                           ))}
-                          <div className={`aspect-[3/4] w-full overflow-hidden rounded-b-[8px] rounded-t-[2px] bg-white transition-shadow duration-300 ${hover === i ? 'shadow-[0_22px_30px_-10px_rgba(0,0,0,.35)]' : 'shadow-[0_10px_18px_-10px_rgba(0,0,0,.28)]'}`}>
-                            <img src={p.image} alt={p.name} loading="lazy" draggable={false} className="h-full w-full object-cover object-top" />
+                          <div className={`${card === 'square' ? 'aspect-square' : 'aspect-[3/4]'} w-full overflow-hidden rounded-b-[8px] rounded-t-[2px] bg-white transition-shadow duration-300 ${hover === i ? 'shadow-[0_22px_30px_-10px_rgba(0,0,0,.35)]' : 'shadow-[0_10px_18px_-10px_rgba(0,0,0,.28)]'}`}>
+                            {/* square cards (watches, bags, wallets) show the whole photo, never cut */}
+                            <img src={p.image} alt={p.name} loading="lazy" draggable={false} className={`h-full w-full ${card === 'square' ? 'object-contain' : 'object-cover object-top'}`} />
                           </div>
                         </div>
                       </>

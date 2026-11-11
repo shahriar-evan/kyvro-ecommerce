@@ -59,17 +59,17 @@ export default function HomeShowcase({ products, formatPrice, addToCart, openPro
   return (
     <>
       {men.length >= MIN && (
-        <HangerRail title="Men's Edit" products={men} formatPrice={formatPrice} onOpen={open(men)} onShopAll={() => openCollection('Men')}
+        <HangerRail title="Men's Collection" products={men} formatPrice={formatPrice} onOpen={open(men)} onShopAll={() => openCollection('Men')}
           tagline={['Shirts, tees and jackets.', 'Picked for everyday style.']} variant="curve" tone="grey" />
       )}
       {women.length >= MIN && (
-        <HangerRail title="Women's Edit" products={women} formatPrice={formatPrice} onOpen={open(women)} onShopAll={() => openCollection('Women')}
+        <HangerRail title="Women's Collection" products={women} formatPrice={formatPrice} onOpen={open(women)} onShopAll={() => openCollection('Women')}
           tagline={['Saree, three piece and more.', 'Made to stand out.']} variant="straight" tone="white" />
       )}
       {acc && (
         <HangerRail label="FINISH THE LOOK" title="Accessories" products={acc.items} formatPrice={formatPrice} onOpen={open(acc.items)}
           onShopAll={() => openCollection(...acc.open)} tagline={['Bags, watches and wallets.', 'The last detail counts.']}
-          variant="straight" tone="blue" tabs={accTabs.length > 1 ? accTabs : null} activeTab={acc.key} onTab={setAccKey} />
+          variant="straight" tone="blue" card="square" tabs={accTabs.length > 1 ? accTabs : null} activeTab={acc.key} onTab={setAccKey} />
       )}
       {shoes.length >= MIN && (
         <ShoeOrbit products={shoes} formatPrice={formatPrice} onOpen={open(shoes, false)} addToCart={addToCart} onShopAll={() => openCollection('Shoes')} />
