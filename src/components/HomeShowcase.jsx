@@ -4,7 +4,7 @@ import { isFoldedPhoto } from '../data/photoShape';
 import HangerRail from './HangerRail';
 import ShoeOrbit from './ShoeOrbit';
 import RailQuickView from './RailQuickView';
-import { CUTOUTS, cutoutSrc } from '../data/cutouts';
+import { CUTOUTS, cutoutSrc, cutoutSideSrc } from '../data/cutouts';
 import { loadShowcase } from '../showcaseStore';
 
 // Home page showcase (Classic theme), above "Shop by category":
@@ -58,7 +58,7 @@ const cutoutsFor = (products, rail, uploaded) => {
     seen.add(c.id);
     out.push(up && up.image
       ? { ...p, cutout: up.image, cutoutHanger: !!up.hanger, cutoutColor: null, cutoutExtra: up.extra || [], cutoutSide: up.side || null }
-      : { ...p, cutout: cutoutSrc(c.id), cutoutHanger: !!c.hanger, cutoutColor: c.color || null });
+      : { ...p, cutout: cutoutSrc(c.id), cutoutHanger: !!c.hanger, cutoutColor: c.color || null, cutoutSide: c.side ? cutoutSideSrc(c.id) : null });
   }
   const extra = rankBySales(products.filter((p) => !seen.has(String(p.id)) && totalStock(p) > 0 && railOf(p) === rail
     && uploaded[String(p.id)] && uploaded[String(p.id)].image));
@@ -79,7 +79,7 @@ const withCutout = (p, uploaded) => {
   const up = uploaded[id];
   if (up && up.image) return { ...p, cutout: up.image, cutoutHanger: !!up.hanger, cutoutColor: null, cutoutExtra: up.extra || [], cutoutSide: up.side || null };
   const c = [...CUTOUTS.men, ...CUTOUTS.shoes].find((x) => x.id === id);
-  if (c && !(up && up.off)) return { ...p, cutout: cutoutSrc(id), cutoutHanger: !!c.hanger, cutoutColor: c.color || null };
+  if (c && !(up && up.off)) return { ...p, cutout: cutoutSrc(id), cutoutHanger: !!c.hanger, cutoutColor: c.color || null, cutoutSide: c.side ? cutoutSideSrc(id) : null };
   return p;
 };
 const sectionItems = (products, col, sub, uploaded) => rankBySales(products.filter((p) => totalStock(p) > 0 && matchesCollectionPage(p, col, sub)))
@@ -128,13 +128,13 @@ export default function HomeShowcase({ products, formatPrice, addToCart, openPro
       )}
       {women.length >= MIN && (
         <HangerRail title="Women's Collection" products={womenShown} formatPrice={formatPrice} onOpen={open(womenShown)} onShopAll={() => openCollection('Women', womenSub)}
-          tagline={['Saree, three piece and more.', 'Made to stand out.']} variant="straight" tone="white"
+          tagline={['Saree, three piece and more.', 'Made to stand out.']} variant="curve" tone="white"
           filters={womenSections} filter={womenSub} onFilter={setWomenSub} />
       )}
       {acc && (
         <HangerRail label="FINISH THE LOOK" title="Accessories" products={acc.items} formatPrice={formatPrice} onOpen={open(acc.items)}
           onShopAll={() => openCollection(...acc.open)} tagline={['Bags, watches and wallets.', 'The last detail counts.']}
-          variant="straight" tone="blue" card="square" tabs={accTabs.length > 1 ? accTabs : null} activeTab={acc.key} onTab={setAccKey} />
+          variant="curve" tone="blue" card="square" tabs={accTabs.length > 1 ? accTabs : null} activeTab={acc.key} onTab={setAccKey} />
       )}
       {shoes.length >= MIN && (
         <ShoeOrbit products={shoes} formatPrice={formatPrice} onOpen={open(shoes, false)} addToCart={addToCart} onShopAll={() => openCollection('Shoes')} />
