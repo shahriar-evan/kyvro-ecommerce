@@ -68,20 +68,37 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
   else if (base && !(saved && saved.off)) shown = { src: cutoutSrc(base.id), side: null, hanger: !!base.hanger, extra: [], from: 'built-in' };
 
   // the current state as an editable value (a built-in picture is turned into a data URL first)
+  // the latest state, also right after a change that the form has not shown yet (two quick clicks must not undo each other)
+  const shownRef = useRef(shown);
+  shownRef.current = shown;
   const editable = async () => {
-    if (!shown) return null;
-    const image = shown.from === 'built-in' ? await urlToShowcaseImage(shown.src) : shown.src;
-    return { image, side: shown.side, hanger: shown.hanger, extra: [...shown.extra] };
+    const cur = shownRef.current;
+    if (!cur) return null;
+    const image = cur.from === 'built-in' ? await urlToShowcaseImage(cur.src) : cur.src;
+    return { image, side: cur.side, hanger: cur.hanger, extra: [...cur.extra] };
+  };
+  const change = (next) => {
+    shownRef.current = next && next.image ? { src: next.image, side: next.side || null, hanger: !!next.hanger, extra: next.extra || [], from: 'new' } : null;
+    onChange(next);
   };
 
-  const run = async (fn) => { setErr(''); setBusy(true); try { await fn(); } catch (ex) { setErr(ex.message || 'Could not use this picture.'); } setBusy(false); };
+  // changes run one after another, so two quick clicks (Confirm front, Confirm side) never undo each other
+  const queue = useRef(Promise.resolve());
+  const run = (fn) => {
+    queue.current = queue.current.then(async () => {
+      setErr(''); setBusy(true);
+      try { await fn(); } catch (ex) { setErr(ex.message || 'Could not use this picture.'); }
+      setBusy(false);
+    });
+    return queue.current;
+  };
 
   const pickMain = (e) => {
     const file = e.target.files && e.target.files[0]; e.target.value = '';
     if (!file) return;
     run(async () => {
       const image = await prepareShowcaseImage(file);
-      onChange({ image, side: shown ? shown.side : null, hanger: shown ? shown.hanger : false, extra: shown ? [...shown.extra] : [] });
+      change({ image, side: shown ? shown.side : null, hanger: shown ? shown.hanger : false, extra: shown ? [...shown.extra] : [] });
     });
   };
   const pickMore = (e) => {
@@ -94,7 +111,7 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
         if (cur.extra.length >= MAX_EXTRA) break;
         cur.extra.push(await prepareShowcaseImage(f));
       }
-      onChange(cur);
+      change(cur);
     });
   };
   const sideRef = useRef(null);
@@ -104,16 +121,16 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
     run(async () => {
       const cur = await editable();
       if (!cur) throw new Error('Upload the front photo first.');
-      onChange({ ...cur, side: await prepareShowcaseImage(file) });
+      change({ ...cur, side: await prepareShowcaseImage(file) });
     });
   };
-  const removeSide = () => run(async () => { const cur = await editable(); onChange({ ...cur, side: null }); });
+  const removeSide = () => run(async () => { const cur = await editable(); change({ ...cur, side: null }); });
   const removeExtra = (i) => run(async () => {
     const cur = await editable();
     cur.extra.splice(i, 1);
-    onChange(cur);
+    change(cur);
   });
-  const setHanger = (on) => run(async () => { const cur = await editable(); onChange({ ...cur, hanger: on }); });
+  const setHanger = (on) => run(async () => { const cur = await editable(); change({ ...cur, hanger: on }); });
   // Remove: an uploaded photo is deleted; a built-in one is switched off
   const removeAll = () => onChange(base ? { off: true } : { remove: true });
 
@@ -148,14 +165,20 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
     setAiBusy(null);
   };
   const dropAi = (view) => setAiRes((r) => { const n = { ...r }; delete n[view]; return n; });
-  // put a finished AI picture in the Front or Side slot (the other slot keeps what it has)
-  const useAi = (view, as) => run(async () => {
+  // Confirm: the AI front goes to Front, the AI side to Side (the other slot keeps what it has).
+  // A photo that was already in that slot is not lost: it moves to "More photos" (while there is room).
+  const useAi = (view) => run(async () => {
     const cut = aiRes[view];
     if (!cut) return;
+    const as = view === 'side' ? 'side' : 'front';
     const cur = (await editable()) || { image: null, side: null, hanger: false, extra: [] };
-    if (as === 'side' && !cur.image) throw new Error('Put a front photo in first (Use as front photo), then the side.');
+    if (as === 'side' && !cur.image) throw new Error('Confirm the front photo first, then the side.');
+    const old = as === 'side' ? cur.side : cur.image;
+    const extra = old && old !== cut && !cur.extra.includes(old) && cur.extra.length < MAX_EXTRA ? [...cur.extra, old] : cur.extra;
     // the AI front / side of a garment already shows a wooden hanger
-    onChange(as === 'side' ? { ...cur, side: cut } : { ...cur, image: cut, hanger: kind === 'garment' && view !== 'clean' ? true : cur.hanger });
+    change(as === 'side'
+      ? { ...cur, side: cut, extra }
+      : { ...cur, image: cut, extra, hanger: kind === 'garment' && view !== 'clean' ? true : cur.hanger });
     dropAi(view);
   });
 
@@ -266,15 +289,11 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
                 <p className="mt-1 text-[10px] font-semibold uppercase text-gray-500">{v === 'clean' ? 'AI photo' : `AI ${v}`}</p>
               </div>
               <div className="flex flex-col gap-2 text-xs">
-                <span className="text-gray-500">{v === 'clean' ? 'Background removed by AI.' : `AI ${v} photo, background removed.`} Does it match the real product?</span>
+                <span className="text-gray-500">{v === 'clean' ? 'Background removed by AI.' : `AI ${v} photo, background removed.`} Does it match the real product? Confirm puts it in the {v === 'side' ? 'SIDE' : 'FRONT'} box above (the photo that was there moves to More photos).</span>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" disabled={busy} onClick={() => useAi(v, v === 'side' ? 'side' : 'front')}
-                    className="rounded bg-[#D4AF37] px-3 py-2 font-bold text-black hover:opacity-90 disabled:opacity-50">{v === 'clean' ? 'Use this photo' : `Use as ${v} photo`}</button>
-                  {v !== 'clean' && (
-                    <button type="button" disabled={busy} onClick={() => useAi(v, v === 'side' ? 'front' : 'side')}
-                      title="Puts THIS picture in the other slot. To make a real new view, press the Make button above."
-                      className="rounded border border-[#D4AF37] px-3 py-2 font-semibold text-[#B8921F]">Put this one in the {v === 'side' ? 'Front' : 'Side'} slot</button>
-                  )}
+                  <button type="button" disabled={busy} onClick={() => useAi(v)}
+                    title={v === 'side' ? 'Puts this picture in the SIDE slot' : 'Puts this picture in the FRONT slot'}
+                    className="rounded bg-[#D4AF37] px-4 py-2 font-bold text-black hover:opacity-90 disabled:opacity-50">✓ Confirm{v === 'clean' ? '' : ` ${v}`}</button>
                   <button type="button" disabled={!!aiBusy} onClick={() => makeAi(v)} className="rounded border border-gray-300 px-3 py-2 disabled:opacity-50">Try again</button>
                   <button type="button" onClick={() => dropAi(v)} className="px-3 py-2 text-gray-500 hover:underline">Discard</button>
                 </div>
