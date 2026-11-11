@@ -118,11 +118,21 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
 
   // ---- Make with AI (Gemini, api/plan.js?action=ai-photo) ----
   const [srcPick, setSrcPick] = useState(0);
-  const [ai, setAi] = useState(null); // { view, cut } | { busy: view } | { error, code }
+  const [ai, setAi] = useState(null); // { view, cut } | { busy: view, at } | { error, code }
+  const [secs, setSecs] = useState(0); // seconds since "Make" was pressed (counter while waiting)
+  useEffect(() => {
+    if (!ai || !ai.busy) return undefined;
+    setSecs(0);
+    const t = setInterval(() => setSecs(Math.floor((Date.now() - ai.at) / 1000)), 250);
+    return () => clearInterval(t);
+  }, [ai && ai.busy, ai && ai.at]); // eslint-disable-line react-hooks/exhaustive-deps
   const source = sources[Math.min(srcPick, Math.max(0, sources.length - 1))];
+  // shoes: only "Remove background" (same angle); clothes: make a front or a side view
+  const views = kind === 'shoe' ? ['clean'] : ['front', 'side'];
+  const VIEW_LABEL = { clean: 'Remove background', front: 'Make front photo', side: 'Make side photo' };
   const makeAi = async (view) => {
     if (!source) return;
-    setAi({ busy: view });
+    setAi({ busy: view, at: Date.now() });
     try {
       const raw = await makeAiPhoto({ source, view, kind });
       setAi({ view, cut: await whiteBgToShowcase(raw) });
@@ -132,7 +142,7 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
     const cur = (await editable()) || { image: null, side: null, hanger: false, extra: [] };
     if (as === 'side' && !cur.image) throw new Error('Make or upload the front photo first.');
     // the AI front of a garment already shows a wooden hanger
-    onChange(as === 'side' ? { ...cur, side: ai.cut } : { ...cur, image: ai.cut, hanger: kind === 'garment' ? true : cur.hanger });
+    onChange(as === 'side' ? { ...cur, side: ai.cut } : { ...cur, image: ai.cut, hanger: kind === 'garment' && ai.view !== 'clean' ? true : cur.hanger });
     setAi(null);
   });
 
@@ -201,37 +211,52 @@ export default function ShowcasePhotoField({ productId, value, onChange, isDarkM
       )}
       {sources.length > 0 && (
         <div className={`mt-4 rounded border p-3 ${isDarkMode ? 'border-gray-700 bg-[#151515]' : 'border-amber-200 bg-amber-50/60'}`}>
-          <p className={`text-xs font-semibold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>✨ Make with AI (Gemini)</p>
+          <p className={`text-xs font-semibold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>{kind === 'shoe' ? '✨ Remove background with AI' : '✨ Make with AI'}</p>
           <p className="mt-1 text-[11px] text-gray-500 leading-relaxed">
-            Pick one of this product's photos, then make the front or the side view. It takes about 10-30 seconds and uses your AI credit (OpenRouter or Gemini).
+            {kind === 'shoe'
+              ? 'Pick one of this shoe\'s photos (the red one is picked): the AI keeps the shoe as it is and only removes the background. '
+              : 'Pick one of this product\'s photos (the red one is picked), then make the front or the side view. '}
+            It takes about 10-30 seconds and uses your AI credit.
             <b> Check that colours, logos and text match the real product</b> before you use it (AI sometimes invents letters).
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {sources.slice(0, 10).map((u, i) => (
               <button key={u.slice(0, 80) + i} type="button" onClick={() => setSrcPick(i)} aria-label={`Use photo ${i + 1}`}
-                className={`h-14 w-14 overflow-hidden rounded border-2 bg-white ${i === srcPick ? 'border-[#D4AF37]' : 'border-transparent'}`}>
+                className={`relative h-16 w-16 overflow-hidden rounded bg-white transition ${i === srcPick ? 'border-[3px] border-red-600 ring-2 ring-red-600/30 scale-105' : 'border-2 border-transparent opacity-80 hover:opacity-100'}`}>
                 <img src={u} alt="" className="h-full w-full object-cover" />
+                {i === srcPick && <span className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white">✓</span>}
               </button>
             ))}
           </div>
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
-            {['front', 'side'].map((v) => (
+            {views.map((v) => (
               <button key={v} type="button" disabled={!!(ai && ai.busy) || busy} onClick={() => makeAi(v)}
                 className="rounded bg-black px-3 py-2 font-semibold text-white hover:bg-gray-800 disabled:opacity-50">
-                {ai && ai.busy === v ? 'Making… (10-30 s)' : `Make ${v} photo`}
+                {ai && ai.busy === v ? `Making… ${secs}s` : VIEW_LABEL[v]}
               </button>
             ))}
           </div>
+          {ai && ai.busy && (
+            <div className="mt-3 max-w-sm">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                <div className="h-full rounded-full bg-red-600 transition-[width] duration-300" style={{ width: `${Math.min(95, (secs / 30) * 100)}%` }} />
+              </div>
+              <p className="mt-1 text-[11px] text-gray-500">{secs}s · usually 10-30 seconds, the photo shows here when it is ready{secs > 40 ? ' (taking longer than usual, please wait)' : ''}.</p>
+            </div>
+          )}
           {ai && ai.cut && (
             <div className="mt-3 flex flex-wrap items-start gap-3">
               <Thumb src={ai.cut} big />
               <div className="flex flex-col gap-2 text-xs">
-                <span className="text-gray-500">AI {ai.view} photo, background removed. Does it match the real product?</span>
+                <span className="text-gray-500">{ai.view === 'clean' ? 'Background removed by AI.' : `AI ${ai.view} photo, background removed.`} Does it match the real product?</span>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" disabled={busy} onClick={() => useAi(ai.view)}
-                    className="rounded bg-[#D4AF37] px-3 py-2 font-bold text-black hover:opacity-90 disabled:opacity-50">Use as {ai.view}</button>
-                  <button type="button" disabled={busy} onClick={() => useAi(ai.view === 'side' ? 'front' : 'side')}
-                    className="rounded border border-[#D4AF37] px-3 py-2 font-semibold text-[#B8921F]">Use as {ai.view === 'side' ? 'front' : 'side'} instead</button>
+                  <button type="button" disabled={busy} onClick={() => useAi(ai.view === 'side' ? 'side' : 'front')}
+                    className="rounded bg-[#D4AF37] px-3 py-2 font-bold text-black hover:opacity-90 disabled:opacity-50">{ai.view === 'clean' ? 'Use this photo' : `Use as ${ai.view} photo`}</button>
+                  {ai.view !== 'clean' && (
+                    <button type="button" disabled={busy} onClick={() => useAi(ai.view === 'side' ? 'front' : 'side')}
+                      title="Puts THIS picture in the other slot. To make a real new view, press the Make button above."
+                      className="rounded border border-[#D4AF37] px-3 py-2 font-semibold text-[#B8921F]">Put this one in the {ai.view === 'side' ? 'Front' : 'Side'} slot</button>
+                  )}
                   <button type="button" onClick={() => makeAi(ai.view)} className="rounded border border-gray-300 px-3 py-2">Try again</button>
                   <button type="button" onClick={() => setAi(null)} className="px-3 py-2 text-gray-500 hover:underline">Discard</button>
                 </div>

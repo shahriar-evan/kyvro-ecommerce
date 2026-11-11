@@ -3,7 +3,7 @@
 // white background. The Admin product form (ShowcasePhotoField) then removes the white background in the browser and
 // the team member decides to use it or not (nothing is saved here).
 //
-// Body: { source: 'https://…' or 'data:image/…;base64,…', view: 'front' | 'side', kind: 'garment' | 'shoe' }
+// Body: { source: 'https://…' or 'data:image/…;base64,…', view: 'front' | 'side' | 'clean' (only remove the background), kind: 'garment' | 'shoe' }
 // Answer: { image: 'data:image/png;base64,…', model } or { error, code } with code
 //   'no-key' (GEMINI_API_KEY missing), 'bad-key', 'no-credit' (quota / billing finished), 'daily-limit', 'no-image', 'bad-source'.
 //
@@ -26,11 +26,17 @@ const KEEP = 'Keep the exact same product: same colours, fabric, pattern, print,
   + 'Show the whole product centred with empty white space around it, sharp focus, soft even studio light, photorealistic e-commerce product photo.';
 const PROMPTS = {
   garment: {
+    clean: 'Keep this exact same garment exactly as it is in the photo: same angle, same shape, same colours, print, logos and details. '
+      + 'Only remove everything around it (background, floor, wall, other items) and put it on a pure plain white background (#FFFFFF) with no shadow. '
+      + 'If a person wears it, remove the person and show only the garment. Do not add or change any text or logo. Photorealistic e-commerce product photo.',
     front: 'Show this exact same garment hanging on a simple wooden clothes hanger, seen straight from the front, hanging neatly and not folded. ' + KEEP,
     side: 'Show this exact same garment hanging on a simple wooden clothes hanger, seen from the side as a full 90-degree side profile, '
       + 'so only one sleeve and the side seam face the camera, as if it hangs on a clothing rail. ' + KEEP,
   },
   shoe: {
+    clean: 'Keep this exact same shoe exactly as it is in the photo: same angle, same position, same size, same colours, laces, logos and sole. '
+      + 'Only remove everything around it (floor, rug, fur, shelf, box, hands, other shoes) and put it on a pure plain white background (#FFFFFF) '
+      + 'with no shadow. Do not redraw, restyle or change the shoe, do not add or change any text or logo. Photorealistic e-commerce product photo.',
     front: 'Show this exact same single shoe seen from the outer side (classic side profile, toe pointing left). ' + KEEP,
     side: 'Show this exact same single shoe seen at a three-quarter angle from the front. ' + KEEP,
   },
@@ -161,7 +167,7 @@ export default async function aiPhoto(req, res) {
   if (!orKey && !key) return res.status(503).json({ error: 'AI photos are not set up yet (no OPENROUTER_API_KEY or GEMINI_API_KEY in Vercel).', code: 'no-key', provider: 'openrouter' });
 
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-  const view = body.view === 'side' ? 'side' : 'front';
+  const view = ['front', 'side', 'clean'].includes(body.view) ? body.view : 'front';
   const kind = body.kind === 'shoe' ? 'shoe' : 'garment';
   const src = await readSource(body.source);
   if (!src) return res.status(400).json({ error: 'This photo could not be opened. Use a JPG / PNG / WebP photo or link.', code: 'bad-source' });
