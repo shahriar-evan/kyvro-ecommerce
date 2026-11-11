@@ -7,12 +7,16 @@
 // Answer: { image: 'data:image/png;base64,…', model } or { error, code } with code
 //   'no-key' (GEMINI_API_KEY missing), 'bad-key', 'no-credit' (quota / billing finished), 'daily-limit', 'no-image', 'bad-source'.
 //
-// Environment: GEMINI_API_KEY (Google AI Studio, billing on), optional GEMINI_IMAGE_MODEL, optional AI_PHOTO_DAILY_LIMIT (60).
+// Environment: OPENROUTER_API_KEY (openrouter.ai, prepaid credits; used first when set, same Nano Banana models)
+//   or GEMINI_API_KEY (Google AI Studio, billing on). Optional OPENROUTER_IMAGE_MODEL / GEMINI_IMAGE_MODEL,
+//   optional AI_PHOTO_DAILY_LIMIT (60). The answer's "provider" tells the Admin box which credit page to link.
 // Uses per day are counted in aiUsage/{YYYY-MM-DD} (server only; no client rule allows it).
 import { FS, accessToken, val } from '../_sslc.js';
 import { ownerEmails } from '../_owners.js';
 
 const GEMINI = 'https://generativelanguage.googleapis.com/v1beta/models';
+const OPENROUTER = 'https://openrouter.ai/api/v1/chat/completions';
+const orModels = () => [...new Set([process.env.OPENROUTER_IMAGE_MODEL, 'google/gemini-3.1-flash-image', 'google/gemini-2.5-flash-image', 'google/gemini-3.1-flash-lite-image'].filter(Boolean))];
 const models = () => [...new Set([process.env.GEMINI_IMAGE_MODEL, 'gemini-nano-banana-2.1', 'gemini-3.1-flash-image', 'gemini-2.5-flash-image'].filter(Boolean))];
 const dailyLimit = () => Math.max(1, parseInt(process.env.AI_PHOTO_DAILY_LIMIT || '60', 10) || 60);
 
@@ -113,12 +117,48 @@ async function callGemini(key, model, src, prompt) {
   return { error: `Gemini could not make the picture (${r.status}). Try again.`, code: 'failed' };
 }
 
+// one OpenRouter call (OpenAI-style chat with image output); same answers as callGemini
+async function callOpenRouter(key, model, src, prompt) {
+  const r = await fetch(OPENROUTER, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://kyvro.store', 'X-Title': 'Kyvro' },
+    body: JSON.stringify({
+      model,
+      modalities: ['image', 'text'],
+      messages: [{ role: 'user', content: [
+        { type: 'image_url', image_url: { url: `data:${src.mime};base64,${src.data}` } },
+        { type: 'text', text: prompt },
+      ] }],
+    }),
+  });
+  let j = {};
+  try { j = await r.json(); } catch (e) { /* not json */ }
+  const err = j.error || {};
+  const msg = String(err.message || '');
+  if (r.ok && !j.error) {
+    const m = ((j.choices || [])[0] || {}).message || {};
+    const url = (((m.images || [])[0] || {}).image_url || {}).url || '';
+    if (!/^data:image\//.test(url)) return { error: 'The AI did not send a picture back (it may have refused this photo). Try again or use another photo.', code: 'no-image' };
+    return { image: url };
+  }
+  const code = Number(err.code || r.status);
+  if (code === 402 || /credit|insufficient|balance|limit exceeded|key limit/i.test(msg)) {
+    return { error: 'Your OpenRouter credit is finished (or this key reached its limit).', code: 'no-credit' };
+  }
+  if (code === 401 || code === 403) return { error: 'The OpenRouter API key is not valid.', code: 'bad-key' };
+  if (code === 404 || /not a valid model|model.*(not found|does not exist|unavailable)|no endpoints/i.test(msg)) return { next: true };
+  if (code === 429) return { error: 'Too many AI requests right now. Wait a minute and try again.', code: 'failed' };
+  return { error: `The AI could not make the picture (${code}). Try again.`, code: 'failed' };
+}
+
 export default async function aiPhoto(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only.' });
   const who = await teamCaller(req);
   if (who.error) return res.status(who.status).json({ error: who.error });
+  const orKey = process.env.OPENROUTER_API_KEY;
   const key = process.env.GEMINI_API_KEY;
-  if (!key) return res.status(503).json({ error: 'AI photos are not set up yet (GEMINI_API_KEY is missing in Vercel).', code: 'no-key' });
+  const provider = orKey ? 'openrouter' : 'gemini';
+  if (!orKey && !key) return res.status(503).json({ error: 'AI photos are not set up yet (no OPENROUTER_API_KEY or GEMINI_API_KEY in Vercel).', code: 'no-key', provider: 'openrouter' });
 
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   const view = body.view === 'side' ? 'side' : 'front';
@@ -133,12 +173,16 @@ export default async function aiPhoto(req, res) {
     return res.status(429).json({ error: `Today's AI photo limit (${limit}) is used up. Try again tomorrow.`, code: 'daily-limit' });
   }
 
-  for (const model of models()) {
-    const out = await callGemini(key, model, src, PROMPTS[kind][view]);
+  const list = provider === 'openrouter' ? orModels() : models();
+  for (const model of list) {
+    const out = provider === 'openrouter'
+      ? await callOpenRouter(orKey, model, src, PROMPTS[kind][view])
+      : await callGemini(key, model, src, PROMPTS[kind][view]);
     if (out.next) continue;
-    if (out.error) return res.status(out.code === 'no-credit' ? 402 : 502).json({ error: out.error, code: out.code });
+    if (out.error) return res.status(out.code === 'no-credit' ? 402 : 502).json({ error: out.error, code: out.code, provider });
     await usage(token, day, 1);
-    return res.status(200).json({ image: out.image, model });
+    return res.status(200).json({ image: out.image, model, provider });
   }
-  return res.status(502).json({ error: 'No Gemini image model is available for this key. Set GEMINI_IMAGE_MODEL in Vercel.', code: 'failed' });
+  const envName = provider === 'openrouter' ? 'OPENROUTER_IMAGE_MODEL' : 'GEMINI_IMAGE_MODEL';
+  return res.status(502).json({ error: `No image model is available for this key. Set ${envName} in Vercel.`, code: 'failed', provider });
 }
