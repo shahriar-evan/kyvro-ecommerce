@@ -7,6 +7,7 @@ import WhatsAppButton from './WhatsAppButton';
 import { waOrderLink, waProductLines } from '../whatsappOrder';
 import { User, Shield, Truck, RefreshCw, ChevronRight, ArrowRight, Heart } from 'lucide-react';
 import ThemedHome from './ThemedHome';
+import HomeShowcase from './HomeShowcase';
 import heroBannerImg from '../assets/hero-banner.webp';
 import heroBanner1Img from '../assets/hero-banner1.webp';
 import heroBanner2Img from '../assets/hero-banner2.webp';
@@ -18,7 +19,7 @@ import sneakersImg from '../assets/Snekers.webp';
 const HERO_IMAGES = [heroBannerImg, heroBanner1Img, heroBanner2Img];
 const HERO_SECONDS = 15;
 
-export default function HomeView({ theme = 'classic', brandName = 'Kyvro', hideEmptyCategories = false, requestAdd, addToCart, banners, calculateDiscountPercent, currentBannerIndex, formatPrice, isDarkMode, products, setCurrentBannerIndex, setCurrentView, setSelectedCategory, setSelectedProduct, savedIds = [], toggleSaved = () => {} }) {
+export default function HomeView({ theme = 'classic', brandName = 'Kyvro', hideEmptyCategories = false, requestAdd, addToCart, banners, calculateDiscountPercent, currentBannerIndex, formatPrice, isDarkMode, products, setCurrentBannerIndex, setCurrentView, setSelectedCategory, setSelectedProduct, savedIds = [], toggleSaved = () => {}, openCollection }) {
   const [heroIdx, setHeroIdx] = useState(0);
   useEffect(() => {
     if (HERO_IMAGES.length < 2) return undefined;
@@ -68,38 +69,10 @@ export default function HomeView({ theme = 'classic', brandName = 'Kyvro', hideE
             )}
           </section>
 
-          {/* AUTOMATIC BANNERS SLIDER */}
-          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 sm:pt-16 pb-4">
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-800 select-none">
-              <SlideTrack index={currentBannerIndex} onIndex={setCurrentBannerIndex}
-                items={banners.map((img, idx) => (
-                  <div key={idx}>
-                    {/* the box takes the photo's own shape: nothing is cropped and there is no empty space */}
-                  <img src={img} alt={`Kyvro Banner ${idx + 1}`} className="block w-full h-auto" />
-                  <div className="absolute inset-x-0 bottom-1.5 sm:bottom-5 z-20 flex justify-center">
-                    <button
-                      onClick={() => setCurrentView('shop')}
-                      className="group relative overflow-hidden inline-flex items-center gap-1.5 sm:gap-2 rounded-full bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold pl-4 pr-2.5 sm:pl-7 sm:pr-4 py-1 sm:py-2.5 text-[9px] sm:text-xs uppercase tracking-[0.18em] shadow-[0_8px_22px_-8px_rgba(0,0,0,0.7)] ring-1 ring-white/40 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
-                    >
-                      <span className="pointer-events-none absolute inset-y-0 -left-full w-1/2 -skew-x-12 bg-white/40 transition-all duration-700 group-hover:left-[140%]" />
-                      <span className="relative">Shop Now</span>
-                      <ArrowRight size={12} className="relative transition-transform duration-300 group-hover:translate-x-0.5" />
-                    </button>
-                  </div>
-                  </div>
-                ))} />
-
-              <div className="absolute bottom-2 sm:bottom-4 right-4 sm:right-6 z-20 flex gap-1.5 sm:gap-2">
-                {banners.map((_, idx) => (
-                  <button 
-                    key={idx}
-                    onClick={() => setCurrentBannerIndex(idx)}
-                    className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full transition ${idx === currentBannerIndex ? 'bg-[#D4AF37] w-6 sm:w-8' : 'bg-white/50'}`}
-                  />
-                ))}
-              </div>
-            </div>
-          </section>
+          {/* Showcase: clothes on hanging rails (Men, Women, accessories) and the shoe wheel; quick view -> cart -> checkout */}
+          <HomeShowcase products={products} formatPrice={formatPrice} addToCart={addToCart}
+            openProduct={(p) => { setSelectedProduct(p); setCurrentView('product-detail'); }}
+            openCollection={openCollection || ((c) => { setSelectedCategory(c); setCurrentView('shop'); })} />
 
           {/* Shop by Category */}
           <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
@@ -258,6 +231,39 @@ export default function HomeView({ theme = 'classic', brandName = 'Kyvro', hideE
               })}
             </div>
           </section>
+          {/* AUTOMATIC BANNERS SLIDER (cover photos): the last section, just above the footer */}
+          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 sm:pb-20">
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-800 select-none">
+              <SlideTrack index={currentBannerIndex} onIndex={setCurrentBannerIndex}
+                items={banners.map((img, idx) => (
+                  <div key={idx}>
+                    {/* the box takes the photo's own shape: nothing is cropped and there is no empty space */}
+                  <img src={img} alt={`Kyvro Banner ${idx + 1}`} className="block w-full h-auto" />
+                  <div className="absolute inset-x-0 bottom-1.5 sm:bottom-5 z-20 flex justify-center">
+                    <button
+                      onClick={() => setCurrentView('shop')}
+                      className="group relative overflow-hidden inline-flex items-center gap-1.5 sm:gap-2 rounded-full bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold pl-4 pr-2.5 sm:pl-7 sm:pr-4 py-1 sm:py-2.5 text-[9px] sm:text-xs uppercase tracking-[0.18em] shadow-[0_8px_22px_-8px_rgba(0,0,0,0.7)] ring-1 ring-white/40 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+                    >
+                      <span className="pointer-events-none absolute inset-y-0 -left-full w-1/2 -skew-x-12 bg-white/40 transition-all duration-700 group-hover:left-[140%]" />
+                      <span className="relative">Shop Now</span>
+                      <ArrowRight size={12} className="relative transition-transform duration-300 group-hover:translate-x-0.5" />
+                    </button>
+                  </div>
+                  </div>
+                ))} />
+
+              <div className="absolute bottom-2 sm:bottom-4 right-4 sm:right-6 z-20 flex gap-1.5 sm:gap-2">
+                {banners.map((_, idx) => (
+                  <button 
+                    key={idx}
+                    onClick={() => setCurrentBannerIndex(idx)}
+                    className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full transition ${idx === currentBannerIndex ? 'bg-[#D4AF37] w-6 sm:w-8' : 'bg-white/50'}`}
+                  />
+                ))}
+              </div>
+            </div>
+          </section>
+
         </div>
     </>
   );
