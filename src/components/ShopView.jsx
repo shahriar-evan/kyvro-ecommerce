@@ -81,6 +81,20 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
   return (
     <>
         <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12 w-full">
+          {/* Inside a collection: tabs to jump to another collection (the Complete Collection page has its own chips) */}
+          {!allPage && (
+            <div className={`-mx-4 px-4 mb-6 flex gap-5 sm:gap-7 overflow-x-auto border-b ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`} style={{ scrollbarWidth: 'none' }} role="tablist" aria-label="Collections">
+              {[['All', 'All'], ['Men', "Men's"], ['Women', "Women's"], ['Winter', 'Winter'], ['Shoes', 'Shoes'], ['Wallets', 'Wallets'], ['Watches', 'Watches']].map(([col, label]) => {
+                const on = selectedCategory === col;
+                return (
+                  <button key={col} role="tab" aria-selected={on} onClick={() => { if (on && !selectedSubCategory) return; setSelectedCategory(col); try { window.scrollTo({ top: 0 }); } catch (e) { /* old browser */ } }}
+                    className={`shrink-0 -mb-px border-b-2 pb-3 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] transition ${on ? 'border-[#D4AF37] text-[#D4AF37]' : `border-transparent ${isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-black'}`}`}>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 border-b gap-4 mb-8">
             <div>
               <h1 className="text-2xl sm:text-3xl font-serif font-bold">
