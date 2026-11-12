@@ -112,5 +112,10 @@ def png(size, bg, f, a, circle=True, scale=BADGE_SCALE):
 # favicon PNGs: plain black hexagon on a clear background (fills the image)
 png(16, None, BLACK, GOLD, scale=100 / 92).save(os.path.join(PUB, 'favicon-16.png'))
 png(32, None, BLACK, GOLD, scale=100 / 92).save(os.path.join(PUB, 'favicon-32.png'))
+# Google Search shows a site icon that is a multiple of 48 px (it ignored the 16 / 32 px ones and kept an old icon),
+# and many crawlers ask for /favicon.ico: same hexagon at 48 / 96 / 192 px + a .ico with 16 / 32 / 48 inside
+for n in (48, 96, 192):
+    png(n, None, BLACK, GOLD, scale=100 / 92).save(os.path.join(PUB, f'favicon-{n}.png'))
+png(48, None, BLACK, GOLD, scale=100 / 92).save(os.path.join(PUB, 'favicon.ico'), sizes=[(16, 16), (32, 32), (48, 48)])
 # The iPhone icon and the share / push icon now show the K emblem: scripts/emblem-assets.py makes them.
 print('done, lockup width', W)

@@ -44,3 +44,5 @@
 .kyvro-noscroll { scrollbar-width: none; }
 .kyvro-noscroll::-webkit-scrollbar { display: none; }
 @media (prefers-reduced-motion: reduce) { .kyvro-swing { animation: none; } }
+/* first-visit logo screen (App.jsx): a short gold bar slides across */
+@keyframes kyvroLoad { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }

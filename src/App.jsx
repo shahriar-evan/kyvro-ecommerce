@@ -15,8 +15,8 @@ import { placeOrder, watchOrders, cancelMyOrder } from './orders';
 import { watchProfile, saveProfile, watchMyOrders, saveCartSummary } from './customerData';
 import { ensureSubscribed } from './subscribers';
 import PushPrompt from './components/PushPrompt';
-import { watchProducts, watchProductCosts, watchProductCommissions, setProductCommission, saveProductCost, removeProductCost, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
-import { watchStoreSettings, watchPlans } from './storeSettings';
+import { watchProducts, cachedProducts, watchProductCosts, watchProductCommissions, setProductCommission, saveProductCost, removeProductCost, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
+import { watchStoreSettings, cachedStoreSettings, watchPlans } from './storeSettings';
 import { visibleShopIds, normalizePlans, effectiveTier, shopIsPaid, basicDue, couponActive, couponAmountFor, cleanCouponCode } from './data/priceCheck';
 import { themePreviewFromUrl, cleanTheme, cleanMode } from './data/themes';
 import { watchSiteTheme } from './themeStore';
@@ -40,6 +40,7 @@ import sneakersImg from './assets/Snekers.webp';
 import AnnouncementBar from './components/AnnouncementBar';
 import BackButton from './components/BackButton';
 import Header from './components/Header';
+import KyvroMark from './components/KyvroMark';
 import MobileMenu from './components/MobileMenu';
 import CartDrawer from './components/CartDrawer';
 import HomeView from './components/HomeView';
@@ -85,7 +86,11 @@ export default function App() {
       return Array.isArray(saved) && !stale ? saved : INITIAL_PRODUCTS;
     } catch (e) { return INITIAL_PRODUCTS; }
   });
-  const [cloudProducts, setCloudProducts] = useState(null); // null = not in Firestore yet
+  // the last live list kept in this browser (productsStore cachedProducts) shows at once; Firestore replaces it
+  const [cloudProducts, setCloudProducts] = useState(() => cachedProducts()); // null = not in Firestore yet
+  // false until the live list (or the copy above) is here: a first visit shows a short logo screen instead of
+  // the old starter products, so the visitor never sees a different page first
+  const [productsReady, setProductsReady] = useState(() => cachedProducts() !== null);
   const isCloud = cloudProducts !== null;
   const products = isCloud ? cloudProducts : localProducts;
   // Customers only see approved products (an Admin's new product waits for Owner / Manager approval)
@@ -224,8 +229,10 @@ export default function App() {
   const savedIds = customerUser ? (Array.isArray(profile.saved) ? profile.saved : []) : guestSaved;
 
   // Banner text + discount rules: edited by the Owner in the admin panel (Firestore settings/store)
-  const [storeSettings, setStoreSettings] = useState(DEFAULT_STORE_SETTINGS);
-  const announcementText = storeSettings.announcementText;
+  // the last settings seen in this browser show at once (not the built-in defaults with their old offer text)
+  const [storeSettings, setStoreSettings] = useState(() => cachedStoreSettings() || DEFAULT_STORE_SETTINGS);
+  const [settingsReady, setSettingsReady] = useState(() => cachedStoreSettings() !== null);
+  const announcementText = settingsReady ? storeSettings.announcementText : '';
   const [currencyKey, setCurrencyKey] = useState("BDT");
   const curr = CURRENCIES[currencyKey];
 
@@ -597,6 +604,7 @@ export default function App() {
   useEffect(() => {
     try {
       const unsubscribe = watchProducts((list, isEmpty) => {
+        setProductsReady(true);
         let moved = false;
         try { moved = localStorage.getItem('kyvro_cloud') === '1'; } catch (e) {}
         if (!isEmpty) {
@@ -606,17 +614,24 @@ export default function App() {
           // Nothing in Firestore yet: keep the old list. If it was emptied on purpose, stay empty.
           setCloudProducts(moved ? [] : null);
         }
-      }, (err) => console.error('Could not load products:', err), { all: isAdminLoggedIn });
+      }, (err) => { setProductsReady(true); console.error('Could not load products:', err); }, { all: isAdminLoggedIn });
       return () => unsubscribe();
     } catch (err) {
       console.error('Could not load products:', err);
     }
   }, [isAdminLoggedIn]);
 
+  // a slow or blocked connection never keeps the logo screen up for more than 8 seconds
+  useEffect(() => {
+    if (productsReady) return undefined;
+    const t = setTimeout(() => setProductsReady(true), 8000);
+    return () => clearTimeout(t);
+  }, [productsReady]);
+
   // Live store settings (banner + discount rules) for every visitor
   useEffect(() => {
     try {
-      const unsubscribe = watchStoreSettings(setStoreSettings);
+      const unsubscribe = watchStoreSettings((d) => { setStoreSettings(d); setSettingsReady(true); });
       return () => unsubscribe();
     } catch (err) {
       console.error('Could not load store settings:', err);
@@ -1542,10 +1557,16 @@ export default function App() {
           <a href="/" className="mt-6 inline-flex px-6 py-3 rounded-full bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black text-xs font-bold uppercase tracking-widest">Go to Kyvro</a>
         </div>
       )}
-      {currentView === 'home' && !pathNotFound && <HomeView theme={activeTheme.theme} brandName={shopBrand ? shopBrand.name : 'Kyvro'} requestAdd={requestAdd} addToCart={addToCart} banners={banners} calculateDiscountPercent={calculateDiscountPercent} currentBannerIndex={currentBannerIndex} formatPrice={formatPrice} isDarkMode={isDarkMode} products={storefrontProducts} hideEmptyCategories={!!shopCtx} setCurrentBannerIndex={setCurrentBannerIndex} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} savedIds={savedIds} toggleSaved={toggleSaved} openCollection={(c, sub) => { setSelectedCategory(c); setSelectedSubCategory(sub || null); setCurrentView('shop'); }} />}
+      {!productsReady && (currentView === 'home' || currentView === 'shop') && !pathNotFound && (
+        <div className="flex min-h-[70vh] flex-col items-center justify-center gap-5" aria-busy="true" aria-label="Loading">
+          <KyvroMark dark={isDarkMode} className="h-14 animate-pulse" />
+          <span className="h-[2px] w-24 overflow-hidden rounded bg-black/10 dark:bg-white/10"><span className="block h-full w-1/2 animate-[kyvroLoad_1.1s_ease-in-out_infinite] bg-[#D4AF37]" /></span>
+        </div>
+      )}
+      {productsReady && currentView === 'home' && !pathNotFound && <HomeView theme={activeTheme.theme} brandName={shopBrand ? shopBrand.name : 'Kyvro'} requestAdd={requestAdd} addToCart={addToCart} banners={banners} calculateDiscountPercent={calculateDiscountPercent} currentBannerIndex={currentBannerIndex} formatPrice={formatPrice} isDarkMode={isDarkMode} products={storefrontProducts} hideEmptyCategories={!!shopCtx} setCurrentBannerIndex={setCurrentBannerIndex} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} savedIds={savedIds} toggleSaved={toggleSaved} openCollection={(c, sub) => { setSelectedCategory(c); setSelectedSubCategory(sub || null); setCurrentView('shop'); }} />}
 
       {/* SHOP CATALOG VIEW */}
-      {currentView === 'shop' && <ShopView selectedSubCategory={selectedSubCategory} setSelectedSubCategory={setSelectedSubCategory} requestAdd={requestAdd} addToCart={addToCart} filteredProducts={filteredProducts} formatPrice={formatPrice} isDarkMode={isDarkMode} products={storefrontProducts} searchQuery={searchQuery} selectedCategory={selectedCategory} setCurrentView={setCurrentView} setSearchQuery={setSearchQuery} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} setSortBy={setSortBy} sortBy={sortBy} savedIds={savedIds} toggleSaved={toggleSaved} />}
+      {productsReady && currentView === 'shop' && <ShopView selectedSubCategory={selectedSubCategory} setSelectedSubCategory={setSelectedSubCategory} requestAdd={requestAdd} addToCart={addToCart} filteredProducts={filteredProducts} formatPrice={formatPrice} isDarkMode={isDarkMode} products={storefrontProducts} searchQuery={searchQuery} selectedCategory={selectedCategory} setCurrentView={setCurrentView} setSearchQuery={setSearchQuery} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} setSortBy={setSortBy} sortBy={sortBy} savedIds={savedIds} toggleSaved={toggleSaved} />}
 
       {currentView === 'product-detail' && selectedProduct && <ProductDetail key={selectedProduct.id} product={selectedProduct} products={storefrontProducts} setSelectedProduct={setSelectedProduct} storeSettings={storeSettings} cartSubtotal={subtotal} cartUnits={cart.reduce((n, i) => n + (parseInt(i.quantity, 10) || 0), 0)} addToCart={addToCart} calculateDiscountPercent={calculateDiscountPercent} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} savedIds={savedIds} toggleSaved={toggleSaved} teamShop={isAdminLoggedIn && shopCtx ? shopDisplayName(shopCtx) : ''}
         onEdit={(() => {

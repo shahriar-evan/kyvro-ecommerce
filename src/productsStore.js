@@ -14,9 +14,36 @@ export function watchProducts(onData, onError, { all = false } = {}) {
   const source = all ? collection(db, "products") : query(collection(db, "products"), where("status", "==", "approved"));
   return onSnapshot(
     source,
-    (snap) => onData(snap.docs.map((d) => d.data()).sort((a, b) => Number(b.id) - Number(a.id)), snap.empty),
+    (snap) => {
+      const list = snap.docs.map((d) => d.data()).sort((a, b) => Number(b.id) - Number(a.id));
+      if (!snap.empty) saveProductCache(list);
+      onData(list, snap.empty);
+    },
     (err) => onError && onError(err)
   );
+}
+
+// The last approved product list is kept in this browser, so the next visit shows the real shop at once
+// (not the starter list) while Firestore sends the fresh one. Big uploaded photos (data URLs) are left out of
+// the copy to stay small; they come back a moment later with the live list.
+const CACHE_KEY = "kyvro_products_cache";
+const slim = (v) => {
+  if (typeof v === "string") return v.startsWith("data:") && v.length > 3000 ? "" : v;
+  if (Array.isArray(v)) return v.map(slim);
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, slim(x)]));
+  return v;
+};
+function saveProductCache(list) {
+  try {
+    const approved = list.filter((p) => (p.status || "approved") === "approved").map(slim);
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), list: approved }));
+  } catch (e) { /* storage full or blocked: no copy */ }
+}
+export function cachedProducts() {
+  try {
+    const c = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
+    return c && Array.isArray(c.list) && c.list.length ? c.list : null;
+  } catch (e) { return null; }
 }
 
 // Firestore does not accept "undefined" values, so strip them
