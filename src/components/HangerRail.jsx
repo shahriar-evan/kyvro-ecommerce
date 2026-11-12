@@ -81,6 +81,7 @@ export default function HangerRail({
   label = 'NEW COLLECTION', title, products, formatPrice, onOpen, onShopAll,
   tagline = [], variant = 'curve', tone = 'grey', card = 'portrait',
   filters = null, filter = null, onFilter = null, tabs = null, activeTab, onTab, // filters: section picker next to the title [{ key, label }], key null = All
+  full = true, // home: the rail fills the screen height on a computer; a collection page uses its natural height
 }) {
   const scRef = useRef(null);
   const barRef = useRef(null);
@@ -151,7 +152,7 @@ export default function HangerRail({
   };
 
   return (
-    <section className="relative isolate w-full overflow-hidden text-black lg:min-h-[calc(100vh-72px)] flex flex-col" style={{ background: TONES[tone] || TONES.grey }}>
+    <section className={`relative isolate w-full overflow-hidden text-black ${full ? 'lg:min-h-[calc(100vh-72px)]' : ''} flex flex-col`} style={{ background: TONES[tone] || TONES.grey }}>
       <div className="pt-10 sm:pt-14 px-4 text-center">
         <p className="text-[10px] sm:text-xs tracking-[0.3em] uppercase">
           <span className="font-bold">{label}</span>

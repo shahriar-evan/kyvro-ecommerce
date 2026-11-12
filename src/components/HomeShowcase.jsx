@@ -92,15 +92,53 @@ const sectionsOf = (products, col, skip = []) => flatSubCategories(col).filter((
   key: n, label: subLabel(n), count: products.filter((p) => totalStock(p) > 0 && matchesCollectionPage(p, col, n)).length,
 })).filter((x) => x.count > 0);
 
+const MEN_GROUPS = [inPage('Men', 'Shirt'), inPage('Men', 'T-Shirt'), inPage('Men', 'Jacket'), inPage('Men', 'Polo'), inPage('Men', 'Formal Shirt')];
+const WOMEN_GROUPS = [inPage('Women', 'Saree'), inPage('Women', 'Three Piece'), inPage('Women', 'Ladies Jacket'), inPage('Women', 'Tops')];
+
+// The pieces a Men / Women rail shows (home page and the top of that collection's page): a section = its products
+// (background-free first, pinned first); no section = the background-free pieces (pinned first), else a best-seller mix.
+export const collectionRailItems = (products, col, sub, uploaded) => {
+  if (sub) return sectionItems(products, col, sub, uploaded);
+  if (col === 'Men') { const cut = cutoutsFor(products, 'men', uploaded); return cut.length >= MIN_CUT ? cut : mix(products, MEN_GROUPS); }
+  if (col === 'Women') { const cut = cutoutsFor(products, 'women', uploaded); return cut.length >= MIN_CUT ? cut : mix(products, WOMEN_GROUPS); }
+  return [];
+};
+
+// The same hanging rail at the top of the Men / Women collection page (ShopView); the page lists the rest below.
+// onItems(ids) tells the page which products hang here, so its grid lists them last.
+export function CollectionRail({ products, collection, sub, formatPrice, addToCart, openProduct, onItems, onSeeAll }) {
+  const [uploaded, setUploaded] = useState({});
+  useEffect(() => { loadShowcase().then(setUploaded).catch(() => {}); }, []);
+  const items = useMemo(() => collectionRailItems(products, collection, sub, uploaded), [products, collection, sub, uploaded]);
+  const show = items.length >= MIN;
+  const key = show ? items.map((p) => p.id).join(',') : '';
+  useEffect(() => { if (onItems) onItems(key ? key.split(',') : []); }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [view, setView] = useState(null);
+  if (!show) return null;
+  const women = collection === 'Women';
+  return (
+    <>
+      <HangerRail title={women ? "Women's Collection" : "Men's Collection"} products={items} formatPrice={formatPrice}
+        onOpen={(index) => setView({ index })} onShopAll={onSeeAll} full={false}
+        tagline={women ? ['Saree, three piece and more.', 'Made to stand out.'] : ['Shirts, tees and jackets.', 'Picked for everyday style.']}
+        variant="curve" tone={women ? 'white' : 'grey'} />
+      {view && (
+        <RailQuickView items={items} index={view.index} hanging setIndex={(i) => setView({ index: i })}
+          onClose={() => setView(null)} formatPrice={formatPrice} addToCart={addToCart} openProduct={openProduct} />
+      )}
+    </>
+  );
+}
+
 export default function HomeShowcase({ products, formatPrice, addToCart, openProduct, openCollection }) {
   const [uploaded, setUploaded] = useState({});
   useEffect(() => { loadShowcase().then(setUploaded).catch(() => {}); }, []);
   const menCut = useMemo(() => cutoutsFor(products, 'men', uploaded), [products, uploaded]);
   const womenCut = useMemo(() => cutoutsFor(products, 'women', uploaded), [products, uploaded]);
   const shoesCut = useMemo(() => cutoutsFor(products, 'shoes', uploaded), [products, uploaded]);
-  const menMix = useMemo(() => mix(products, [inPage('Men', 'Shirt'), inPage('Men', 'T-Shirt'), inPage('Men', 'Jacket'), inPage('Men', 'Polo'), inPage('Men', 'Formal Shirt')]), [products]);
+  const menMix = useMemo(() => mix(products, MEN_GROUPS), [products]);
   const men = menCut.length >= MIN_CUT ? menCut : menMix;
-  const womenMix = useMemo(() => mix(products, [inPage('Women', 'Saree'), inPage('Women', 'Three Piece'), inPage('Women', 'Ladies Jacket'), inPage('Women', 'Tops')]), [products]);
+  const womenMix = useMemo(() => mix(products, WOMEN_GROUPS), [products]);
   const women = womenCut.length >= MIN_CUT ? womenCut : womenMix;
   // section picker (Men > T-Shirt, Women > Saree ...)
   const [menSub, setMenSub] = useState(null);
