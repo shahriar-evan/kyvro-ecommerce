@@ -5,16 +5,16 @@ export default function Footer({ onStartSelling, sellLabel = 'Start your own bus
   return (
     <>
       <footer className={`border-t pt-12 sm:pt-16 pb-12 mt-auto ${isDarkMode ? 'bg-[#121212] border-gray-800 text-gray-300' : 'bg-white border-gray-200 text-gray-700'}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8 sm:gap-10 text-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1.3fr_1fr_1fr_1fr] gap-8 sm:gap-10 text-xs">
           <div className="space-y-4">
             {/* logo + name: centered on a phone (one column), left from 640px (grid columns) */}
             <div className="flex items-center justify-center sm:justify-start gap-1.5">
               <KyvroMark dark={isDarkMode} title="Kyvro logo" className="h-11 sm:h-12 xl:h-11 w-auto shrink-0" />
               {/* same look as the header wordmark: Montserrat 600, wide spacing (font loaded in index.html); Bangla name in the normal font, not bold */}
               <span className={`flex items-center gap-2 whitespace-nowrap leading-none ${isDarkMode ? 'text-[#D4AF37]' : 'text-black'}`}>
-                <span className="text-[24px] font-semibold tracking-[0.3em] -mr-[0.3em] ml-1" style={{ fontFamily: 'Montserrat, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' }}>KYVRO</span>
-                <span className="text-[24px] leading-none" aria-hidden="true">&middot;</span>
-                <span className="text-[24px] font-normal" lang="bn">কাইভ্রো</span>
+                <span className="text-[28px] font-semibold tracking-[0.3em] -mr-[0.3em] ml-1" style={{ fontFamily: 'Montserrat, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' }}>KYVRO</span>
+                <span className="text-[28px] leading-none" aria-hidden="true">&middot;</span>
+                <span className="text-[28px] font-normal" lang="bn">কাইভ্রো</span>
               </span>
             </div>
             <p className="leading-relaxed">
