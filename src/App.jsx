@@ -24,7 +24,7 @@ import { shopExtrasOf, brandHex, SOCIALS, httpsLinkOk, contactOk, contactHref, c
 import { cleanPhone, ONLINE_PAY_ON, DELIVERY_AREAS, deliveryFee, paymentStatusFor, DEFAULT_STORE_SETTINGS, bestDiscount, nextReward, describeRule } from './data/shopConfig';
 import { INITIAL_PRODUCTS } from './data/products';
 import { CURRENCIES } from './data/currencies';
-import { hasSubCategories, defaultCategoryFor, matchesCollectionPage, hasSizeStock, stockForSize, orderedSizes, hasColorStock, stockFor, variantKey, needsChoice, imageFor } from './data/catalog';
+import { SUB_CATEGORIES, hasSubCategories, defaultCategoryFor, matchesCollectionPage, hasSizeStock, stockForSize, orderedSizes, hasColorStock, stockFor, variantKey, needsChoice, imageFor } from './data/catalog';
 import QuickAdd from './components/QuickAdd';
 import FeaturedShops from './components/FeaturedShops';
 import heroBannerImg from './assets/hero-banner.webp';
@@ -308,6 +308,27 @@ export default function App() {
     try { window.history.replaceState(window.history.state, '', window.location.pathname); } catch (e) { /* ignore */ }
     // on a shop link (kyvro.store/<shop>?product=ID, e.g. from a WhatsApp order) the list is empty until the shop loads
   }, [products, shopLoading, storefrontProducts.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Collection link (?c=saree, ?c=women, ?c=men/t-shirt ... for social posts): open that collection / section page.
+  // A section name alone opens the first collection that has it (t-shirt = Men; use women/t-shirt for the women's one).
+  useEffect(() => {
+    let raw = '';
+    try { raw = new URLSearchParams(window.location.search).get('c') || ''; } catch (e) { /* ignore */ }
+    if (!raw) return;
+    const slug = (x) => String(x || '').toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const COLS = { all: 'All', men: 'Men', mens: 'Men', women: 'Women', womens: 'Women', winter: 'Winter', shoes: 'Shoes', wallets: 'Wallets', watches: 'Watches' };
+    const subsOf = (col) => (SUB_CATEGORIES[col] || []).flatMap((it) => (it.group ? [it.group, ...it.items] : [it.name]));
+    const [a, b] = String(raw).split('/').map(slug);
+    let col = COLS[a] || null;
+    let sub = null;
+    const findSub = (s, cols) => { for (const c of cols) { const hit = subsOf(c).find((n) => slug(n) === s); if (hit) return [c, hit]; } return null; };
+    if (col && b) { const hit = findSub(b, [col]); if (hit) sub = hit[1]; }
+    else if (!col && a) { const hit = findSub(a, Object.keys(SUB_CATEGORIES)); if (hit) [col, sub] = hit; }
+    try { window.history.replaceState(window.history.state, '', window.location.pathname); } catch (e) { /* ignore */ }
+    if (!col) return; // unknown name: stay on the home page
+    setSelectedCategory(col); setSelectedSubCategory(sub); setSearchQuery(''); setCurrentView('shop');
+    try { window.scrollTo(0, 0); } catch (e) { /* ignore */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Page history: every page the customer opens (home, a collection + sub-category, a product ...) is also a browser
   // history entry, so the phone's Back button / swipe-back and the floating Back button go to the PREVIOUS page of the
