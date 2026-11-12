@@ -11,7 +11,10 @@ import { subLabel, SUB_CATEGORIES, COLLECTION_LABELS, DEFAULT_SUB_LABEL, hasSubC
 export default function ShopView({ requestAdd, addToCart, filteredProducts, formatPrice, isDarkMode, products, searchQuery, selectedCategory, selectedSubCategory, setSelectedSubCategory, setCurrentView, setSearchQuery, setSelectedCategory, setSelectedProduct, setSortBy, sortBy, savedIds = [], toggleSaved = () => {} }) {
   // Men / Women: the hanging rail from the home page hangs at the top (pinned pieces first); the rest of the
   // whole collection is listed below it (the rail pieces last), 4 cards a row, with the sections as chips on top (no side menu).
-  const railCol = selectedCategory === 'Men' || selectedCategory === 'Women';
+  // The Complete Collection (All) page works the same way: the Men's rail on top, collection chips instead of the side menu.
+  const allPage = selectedCategory === 'All';
+  const railCol = selectedCategory === 'Men' || selectedCategory === 'Women' || allPage;
+  const railCollection = allPage ? 'Men' : selectedCategory;
   const railOn = railCol && !String(searchQuery || '').trim();
   const [railIds, setRailIds] = useState([]);
   // the pieces on the rail are listed too, at the end (the others first)
@@ -111,6 +114,17 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
           </div>
 
           {/* Sub-categories as a chip row at the top (phones; Men / Women on every screen), products right below */}
+          {allPage && (() => {
+            const chip = (active) => `shrink-0 px-4 py-2 rounded-full text-xs font-semibold border transition ${active ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : isDarkMode ? 'border-gray-700 text-gray-300 hover:border-[#D4AF37]' : 'border-gray-300 text-gray-700 hover:border-[#D4AF37]'}`;
+            return (
+              <div className="lg:flex-wrap lg:overflow-visible -mx-4 px-4 mb-5 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+                <button onClick={() => setSelectedCategory('All')} className={chip(true)}>All</button>
+                {[['Men', "Men's"], ['Women', "Women's"], ['Winter', 'Winter'], ['Shoes', 'Shoes'], ['Wallets', 'Wallets'], ['Watches', 'Watches']].map(([col, label]) => (
+                  <button key={col} onClick={() => { setSelectedCategory(col); try { window.scrollTo({ top: 0 }); } catch (e) { /* old browser */ } }} className={chip(false)}>{label}</button>
+                ))}
+              </div>
+            );
+          })()}
           {hasSubCategories(selectedCategory) && (() => {
             const same = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
             const names = SUB_CATEGORIES[selectedCategory].flatMap((it) => (it.group ? [it.group, ...it.items] : [it.name]));
@@ -127,7 +141,7 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
         </div>
 
         {railOn && (
-          <CollectionRail products={products} collection={selectedCategory} sub={selectedSubCategory} formatPrice={formatPrice}
+          <CollectionRail products={products} collection={railCollection} sub={allPage ? null : selectedSubCategory} formatPrice={formatPrice}
             addToCart={addToCart} openProduct={openProduct} onItems={setRailIds} onSeeAll={seeAll} />
         )}
 
@@ -138,7 +152,7 @@ export default function ShopView({ requestAdd, addToCart, filteredProducts, form
               openProduct={openProduct} />
           ) : railCol ? (
             <>
-              {railOn && gridProducts.length > 0 && <h2 className="mb-6 text-xs font-semibold uppercase tracking-[0.25em] text-gray-500">More in this collection</h2>}
+              {railOn && gridProducts.length > 0 && <h2 className="mb-6 text-xs font-semibold uppercase tracking-[0.25em] text-gray-500">{allPage ? 'All products' : 'More in this collection'}</h2>}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 lg:gap-6">
                 {gridProducts.map(card)}
               </div>
