@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { CUTOUTS, cutoutSrc } from '../data/cutouts';
-import { loadShowcase } from '../showcaseStore';
+import { useShowcase } from './HomeShowcase';
 import { totalStock } from '../data/catalog';
 
 // Shoes collection page: every pair stands on its own small wall shelf.
@@ -34,8 +34,8 @@ function DensityIcon({ n, active }) {
 }
 
 export default function ShoeWall({ products, formatPrice, isDarkMode, openProduct }) {
-  const [uploaded, setUploaded] = useState({});
-  useEffect(() => { loadShowcase().then(setUploaded).catch(() => {}); }, []);
+  const showcase = useShowcase();
+  const uploaded = showcase || {};
   const [cols, setCols] = useState(() => {
     try { const v = Number(localStorage.getItem('kyvro_shoe_cols')); if (DENSITY.includes(v)) return v; } catch (e) { /* no storage */ }
     return 4;
@@ -80,7 +80,9 @@ export default function ShoeWall({ products, formatPrice, isDarkMode, openProduc
         </div>
       </div>
 
-      {products.length === 0 ? (
+      {!showcase ? (
+        <div aria-hidden="true" className="h-[420px]" />
+      ) : products.length === 0 ? (
         <p className="py-20 text-center text-sm text-gray-500">No shoes found.</p>
       ) : (
         <div className={`grid ${COLS[cols]} gap-x-6 sm:gap-x-10 lg:gap-x-14 ${ROW_GAP[cols]}`}>

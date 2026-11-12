@@ -5,7 +5,25 @@ import HangerRail from './HangerRail';
 import ShoeOrbit from './ShoeOrbit';
 import RailQuickView from './RailQuickView';
 import { CUTOUTS, cutoutSrc, cutoutSideSrc } from '../data/cutouts';
-import { loadShowcase } from '../showcaseStore';
+import { loadShowcase, showcaseNow } from '../showcaseStore';
+
+// start reading the uploaded photos as soon as the app loads (the rails wait for them)
+loadShowcase().catch(() => {});
+
+// The uploaded background-free photos decide which pieces hang and in what order (pins, hidden built-ins), so the
+// rails wait for them instead of showing the built-in set first and then jumping (null = still loading; 5 s at most).
+const EMPTY = {};
+export function useShowcase() {
+  const [data, setData] = useState(() => showcaseNow());
+  useEffect(() => {
+    if (data) return undefined;
+    let live = true;
+    const t = setTimeout(() => { if (live) setData((x) => x || {}); }, 5000);
+    loadShowcase().then((d) => { if (live) setData(d); }).catch(() => { if (live) setData((x) => x || {}); });
+    return () => { live = false; clearTimeout(t); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return data;
+}
 
 // Home page showcase (Classic theme), above "Shop by category":
 // Men rail, Women rail, Bags / Watches / Wallets rail, then the Shoes wheel.
@@ -107,13 +125,14 @@ export const collectionRailItems = (products, col, sub, uploaded) => {
 // The same hanging rail at the top of the Men / Women collection page (ShopView); the page lists the rest below.
 // onItems(ids) tells the page which products hang here, so its grid lists them last.
 export function CollectionRail({ products, collection, sub, formatPrice, addToCart, openProduct, onItems, onSeeAll }) {
-  const [uploaded, setUploaded] = useState({});
-  useEffect(() => { loadShowcase().then(setUploaded).catch(() => {}); }, []);
+  const showcase = useShowcase();
+  const uploaded = showcase || EMPTY;
   const items = useMemo(() => collectionRailItems(products, collection, sub, uploaded), [products, collection, sub, uploaded]);
   const show = items.length >= MIN;
   const key = show ? items.map((p) => p.id).join(',') : '';
   useEffect(() => { if (onItems) onItems(key ? key.split(',') : []); }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
   const [view, setView] = useState(null);
+  if (!showcase) return <section aria-hidden="true" className="w-full h-[560px] sm:h-[640px]" style={{ background: collection === 'Women' ? '#ffffff' : '#f1f1f0' }} />;
   if (!show) return null;
   const women = collection === 'Women';
   return (
@@ -131,8 +150,8 @@ export function CollectionRail({ products, collection, sub, formatPrice, addToCa
 }
 
 export default function HomeShowcase({ products, formatPrice, addToCart, openProduct, openCollection }) {
-  const [uploaded, setUploaded] = useState({});
-  useEffect(() => { loadShowcase().then(setUploaded).catch(() => {}); }, []);
+  const showcase = useShowcase();
+  const uploaded = showcase || EMPTY;
   const menCut = useMemo(() => cutoutsFor(products, 'men', uploaded), [products, uploaded]);
   const womenCut = useMemo(() => cutoutsFor(products, 'women', uploaded), [products, uploaded]);
   const shoesCut = useMemo(() => cutoutsFor(products, 'shoes', uploaded), [products, uploaded]);
@@ -156,6 +175,9 @@ export default function HomeShowcase({ products, formatPrice, addToCart, openPro
   const [view, setView] = useState(null); // { items, index, hanging }
 
   const open = (items, hanging = true) => (index) => setView({ items, index, hanging });
+
+  // first visit: keep the rail's place (same grey) until the uploaded photos are in, so nothing swaps in front of the visitor
+  if (!showcase) return <section aria-hidden="true" className="w-full h-[640px] sm:h-[720px] lg:h-[calc(100vh-72px)]" style={{ background: '#f1f1f0' }} />;
 
   return (
     <>

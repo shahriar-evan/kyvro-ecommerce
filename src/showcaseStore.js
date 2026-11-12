@@ -7,12 +7,22 @@ import "./firebase";
 // "off" hides a built-in picture (src/data/cutouts.js) without uploading a new one. Rules: firestore.rules (showcase).
 const db = getFirestore(getApp());
 
-export async function loadShowcase() {
-  const snap = await getDocs(collection(db, "showcase"));
-  const out = {};
-  snap.forEach((d) => { out[d.id] = d.data(); });
-  return out;
+// One read shared by every rail on the page (home, collection page, shoe wall); loadShowcase(true) reads again.
+let cached = null; // promise
+let loaded = null; // the data once it is in
+export function loadShowcase(fresh = false) {
+  if (!cached || fresh) {
+    cached = getDocs(collection(db, "showcase")).then((snap) => {
+      const out = {};
+      snap.forEach((d) => { out[d.id] = d.data(); });
+      loaded = out;
+      return out;
+    }).catch((e) => { cached = null; throw e; });
+  }
+  return cached;
 }
+// the showcase data if it has already been read, else null (lets a page render at once on the second visit)
+export const showcaseNow = () => loaded;
 
 export async function getShowcase(id) {
   const s = await getDoc(doc(db, "showcase", String(id)));
