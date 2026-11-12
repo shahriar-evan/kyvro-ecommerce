@@ -6,11 +6,22 @@ import { normalizePlans } from "./data/priceCheck";
 
 const db = getFirestore(getApp());
 
+// The last store settings seen in this browser (announcement text, maintenance mode ...), shown at once on the next
+// visit instead of the built-in defaults; the live ones replace them a moment later.
+const SETTINGS_KEY = "kyvro_settings_cache";
+export function cachedStoreSettings() {
+  try { const c = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "null"); return c ? normalizeSettings(c) : null; } catch (e) { return null; }
+}
+
 // Everyone (customers too) can read the store settings: banner text and discount rules
 export function watchStoreSettings(onData) {
   return onSnapshot(
     doc(db, "settings", "store"),
-    (snap) => onData(normalizeSettings(snap.exists() ? snap.data() : null)),
+    (snap) => {
+      const data = normalizeSettings(snap.exists() ? snap.data() : null);
+      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(data)); } catch (e) { /* no storage */ }
+      onData(data);
+    },
     () => {} // offline or blocked: keep the defaults
   );
 }
