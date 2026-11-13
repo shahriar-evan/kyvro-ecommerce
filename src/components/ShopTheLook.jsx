@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Pause, Play, X } from 'lucide-react';
-import { watchLooks } from '../looks';
+import { watchLooks, getLookColor, tryLookColor } from '../looks';
+import { auth, googleProvider } from '../firebase';
+import { signInWithPopup } from 'firebase/auth';
 import { totalStock, hasSizeStock, orderedSizes, stockFor, stockForColor, productColors, imageFor } from '../data/catalog';
 
 // Home page "Shop the Look" (Classic theme, between the Men's and Women's rails). Models (looks/{id}, made in
@@ -9,7 +11,7 @@ import { totalStock, hasSizeStock, orderedSizes, stockFor, stockForColor, produc
 // Prices come from the products the page already shows, so a shop link gets its own prices.
 let cache = null; // the looks, kept for the next visit to the home page
 
-function Piece({ n, p, pick, setPick, active, onHover, formatPrice, onAdd, onOpen }) {
+function Piece({ n, p, pick, setPick, active, onHover, formatPrice, onAdd, onOpen, onColor }) {
   const sized = hasSizeStock(p);
   const sizes = sized ? orderedSizes(Object.keys(p.sizeStock), p.gender) : [];
   const colors = productColors(p);
@@ -34,7 +36,7 @@ function Piece({ n, p, pick, setPick, active, onHover, formatPrice, onAdd, onOpe
         {out ? <p className="mt-1 text-xs font-bold text-red-600">Out of stock</p> : (
           <div className="mt-1.5 flex flex-wrap gap-1">
             {colors.length > 1 && colors.map((c) => (
-              <button key={c} type="button" disabled={stockForColor(p, c) <= 0} onClick={() => setPick({ ...pick, color: c, size: '' })}
+              <button key={c} type="button" disabled={stockForColor(p, c) <= 0} onClick={() => { setPick({ ...pick, color: c, size: '' }); if (onColor) onColor(c); }}
                 className={`px-2 py-0.5 rounded-full border text-[11px] disabled:opacity-30 disabled:line-through ${color === c ? 'border-black bg-black text-white' : 'border-gray-300'}`}>{c}</button>
             ))}
             {sizes.map((s) => (
@@ -62,6 +64,13 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart, ope
   const [pos, setPos] = useState(0);
   const [drag, setDrag] = useState(0);
   const [focus, setFocus] = useState(false); // tapped the middle model: only that look, bigger, with its dots
+  // colour try-on: swap = the model in another colour (by look); offer = a colour with no picture yet (Try button)
+  const [swap, setSwap] = useState({});
+  const [offer, setOffer] = useState(null);
+  const [trying, setTrying] = useState(null); // { at: start time } while the server makes it
+  const [tryMsg, setTryMsg] = useState(null);
+  const [, tick] = useState(0);
+  useEffect(() => { if (!trying) return undefined; const t = setInterval(() => tick((n) => n + 1), 1000); return () => clearInterval(t); }, [trying]);
   const stage = useRef(null);
   const [picks, setPicks] = useState({}); // productId -> { size, color }
   const [hot, setHot] = useState(null); // highlighted pin
@@ -70,17 +79,17 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart, ope
   const dragged = useRef(false);
   const count = shown.length;
   const at = count ? ((pos % count) + count) % count : 0;
-  useEffect(() => { setMsg(null); setHot(null); }, [at]);
+  useEffect(() => { setMsg(null); setHot(null); if (!trying) { setOffer(null); setTryMsg(null); } }, [at]); // eslint-disable-line react-hooks/exhaustive-deps
   // turns by itself every 10 s; stops while the visitor is in the pieces panel (picking a size), for 8 s after they touch it, or with Pause
   const SPIN = 10000;
   const [playing, setPlaying] = useState(true);
   const [hover, setHover] = useState(false);
   const holdUntil = useRef(0);
   useEffect(() => {
-    if (!playing || hover || focus || count < 2) return undefined;
+    if (!playing || hover || focus || trying || count < 2) return undefined;
     const t = setInterval(() => { if (Date.now() > holdUntil.current && !swipe.current) setPos((v) => v + 1); }, SPIN);
     return () => clearInterval(t);
-  }, [playing, hover, focus, count]);
+  }, [playing, hover, focus, trying, count]);
   const hold = () => { holdUntil.current = Date.now() + 8000; };
   if (!shown.length) return null;
   const i = Math.min(at, shown.length - 1);
@@ -104,6 +113,27 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart, ope
     if (!swipe.current) return;
     swipe.current = null;
     setPos((v) => v + Math.round(drag)); setDrag(0); hold();
+  };
+  // a colour picked in the panel: show the model in it if that picture exists, else offer to make it
+  const pickColor = async (lk, x, color) => {
+    hold(); setTryMsg(null);
+    const img = await getLookColor(lk.id, x.id, color);
+    if (img) { setSwap((s) => ({ ...s, [lk.id]: { image: img, label: `${x.p.name} · ${color}` } })); setOffer(null); return; }
+    setOffer({ lookId: lk.id, productId: x.id, color, name: x.p.name });
+  };
+  const makeColor = async () => {
+    if (!offer || trying) return;
+    if (!auth.currentUser) {
+      try { await signInWithPopup(auth, googleProvider); } catch (e) { setTryMsg({ type: 'err', text: 'Sign in with Google to try colours on the model.' }); return; }
+    }
+    const o = offer; setTrying({ at: Date.now() }); setTryMsg(null); hold();
+    try {
+      const j = await tryLookColor(o.lookId, o.productId, o.color);
+      setSwap((s) => ({ ...s, [o.lookId]: { image: j.image, label: `${o.name} · ${o.color}` } }));
+      setOffer(null);
+      if (typeof j.left === 'number') setTryMsg({ type: 'ok', text: `${j.left} colour tries left today. · আজ আরও ${j.left}টি।` });
+    } catch (e) { setTryMsg({ type: 'err', text: e.message }); }
+    setTrying(null);
   };
   const pinTap = (x) => {
     setHot(x.id);
@@ -150,7 +180,7 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart, ope
           <h2 className="mt-2 text-3xl sm:text-5xl font-serif font-bold">Wear the whole look.</h2>
           <p className="mt-2 text-sm text-gray-500">Styled head to toe from Kyvro. Drag to turn, tap a model to see each piece. · ঘুরিয়ে দেখুন, মডেলে ট্যাপ করুন।</p>
 
-          <div ref={stage} className={`relative h-[440px] sm:h-[560px] mt-4 select-none touch-pan-y ${focus ? '' : 'cursor-grab active:cursor-grabbing'}`}
+          <div ref={stage} className={`relative mt-4 select-none touch-pan-y transition-[height] duration-500 ${focus ? 'h-[620px] sm:h-[820px]' : 'h-[440px] sm:h-[560px] cursor-grab active:cursor-grabbing'}`}
             onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
             {!focus && shown.map((l, k) => {
               const r = ringOf(k);
@@ -164,7 +194,7 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart, ope
                     filter: r.blur > 0.2 ? `blur(${r.blur}px) saturate(0.9)` : 'none', opacity: r.opacity,
                     transition: drag ? 'none' : 'transform 0.7s cubic-bezier(.22,.8,.3,1), filter 0.7s, opacity 0.7s' }}>
                   <span className="relative block h-full aspect-[2/3]">
-                    <img src={l.image} alt={l.name || 'Look'} draggable={false} className="w-full h-full object-contain object-bottom drop-shadow-[0_18px_18px_rgba(0,0,0,0.18)] pointer-events-none" />
+                    <img src={(swap[l.id] && swap[l.id].image) || l.image} alt={l.name || 'Look'} draggable={false} className="w-full h-full object-contain object-bottom drop-shadow-[0_18px_18px_rgba(0,0,0,0.18)] pointer-events-none" />
                     {mid && !drag && l.pieces.map((x) => (
                       <span key={x.id} className="absolute -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/90 text-black text-[10px] font-bold flex items-center justify-center shadow ring-4 ring-white/30"
                         style={{ left: `${x.x}%`, top: `${x.y}%` }}>{x.n}</span>
@@ -183,9 +213,9 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart, ope
                   </div>
                   <button type="button" onClick={() => setFocus(false)} className="w-12 h-12 rounded-full border border-black/20 hover:border-black flex items-center justify-center" aria-label="Back to all looks"><X size={20} /></button>
                 </div>
-                <div className="absolute inset-x-0 top-14 bottom-8 flex justify-center">
+                <div className="absolute inset-x-0 top-12 bottom-6 flex justify-center">
                   <span className="relative block h-full aspect-[2/3]">
-                    <img src={look.image} alt={look.name || 'Look'} draggable={false} className="w-full h-full object-contain object-bottom drop-shadow-[0_18px_18px_rgba(0,0,0,0.18)]" />
+                    <img src={(swap[look.id] && swap[look.id].image) || look.image} alt={look.name || 'Look'} draggable={false} className="w-full h-full object-contain object-bottom drop-shadow-[0_18px_18px_rgba(0,0,0,0.18)]" />
                     {look.pieces.map((x) => (
                       <button key={x.id} type="button" onMouseEnter={() => setHot(x.id)} onClick={() => pinTap(x)} aria-label={`${x.n}: ${x.p.name}`}
                         style={{ left: `${x.x}%`, top: `${x.y}%` }}
@@ -194,6 +224,30 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart, ope
                   </span>
                 </div>
                 <p className="absolute bottom-0 inset-x-0 text-center text-[11px] tracking-[0.3em] text-gray-500">TAP A DOT TO SHOP THE PIECE</p>
+              </div>
+            )}
+            {trying && (
+              <div className="absolute inset-0 z-[300] flex items-center justify-center pointer-events-none">
+                <div className="px-5 py-3 rounded-2xl bg-white/90 backdrop-blur shadow-xl text-center">
+                  <p className="text-sm font-bold">Dressing the model in {offer ? offer.color : 'the new colour'}…</p>
+                  <p className="text-xs text-gray-500 mt-0.5">⏱ {Math.floor((Date.now() - trying.at) / 1000)} s · about 30-60 s · একটু অপেক্ষা করুন</p>
+                  <div className="mt-2 h-1 rounded-full bg-black/10 overflow-hidden"><div className="h-full bg-[#D4AF37] transition-all duration-1000" style={{ width: `${Math.min(95, ((Date.now() - trying.at) / 50000) * 90)}%` }} /></div>
+                </div>
+              </div>
+            )}
+            {(offer || (swap[look.id] && !trying) || tryMsg) && !drag && (
+              <div className="absolute left-1/2 -translate-x-1/2 bottom-3 z-[250] flex flex-col items-center gap-1.5 w-[min(92%,420px)]">
+                {offer && !trying && offer.lookId === look.id && (
+                  <button type="button" onClick={makeColor} className="px-4 py-2 rounded-full bg-black text-white text-xs font-bold shadow-lg hover:bg-[#1a1a1a]">
+                    ✨ See it in {offer.color} on the model{auth.currentUser ? '' : ' (sign in)'}
+                  </button>
+                )}
+                {swap[look.id] && !trying && (
+                  <button type="button" onClick={() => setSwap((s) => { const n = { ...s }; delete n[look.id]; return n; })} className="px-3 py-1 rounded-full bg-white/90 border border-black/10 text-[11px] font-semibold shadow">
+                    Showing {swap[look.id].label} · ↺ Original
+                  </button>
+                )}
+                {tryMsg && <p className={`px-3 py-1 rounded-full bg-white/90 text-[11px] font-semibold shadow ${tryMsg.type === 'ok' ? 'text-green-700' : 'text-red-600'}`}>{tryMsg.text}</p>}
               </div>
             )}
             <span className="absolute bottom-0 inset-x-[15%] h-6 rounded-[50%] bg-black/10 blur-xl -z-0" aria-hidden="true" />
@@ -224,7 +278,7 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart, ope
           </div>
           <div className="mt-2 flex-1">
             {look.pieces.map((x) => (
-              <Piece key={x.id} n={x.n} p={x.p} onOpen={() => openProduct && openProduct(x.p)} pick={picks[x.id] || {}} setPick={(v) => setPicks((s) => ({ ...s, [x.id]: v }))}
+              <Piece key={x.id} n={x.n} p={x.p} onOpen={() => openProduct && openProduct(x.p)} pick={picks[x.id] || {}} setPick={(v) => setPicks((s) => ({ ...s, [x.id]: v }))} onColor={(c) => pickColor(look, x, c)}
                 active={hot === x.id} onHover={() => setHot(x.id)} formatPrice={formatPrice}
                 onAdd={() => { const r = ready(x); if (!r) return; if (r.need) { setMsg({ type: 'err', text: `Pick a size for ${r.need}. · সাইজ বেছে নিন।` }); return; } addToCart(r.p, r.color, r.size, 1, false); setMsg({ type: 'ok', text: `${r.p.name} added to your cart.` }); }} />
             ))}
