@@ -27,7 +27,7 @@ import { watchSiteTheme, saveSiteTheme } from '../themeStore';
 import SellersPanel from './SellersPanel';
 import PlanMembers from './PlanMembers';
 import ShowcasePhotoField, { addAutoShowcase } from './ShowcasePhotoField';
-import { subLabel, allPlaces, COLLECTION_LABELS, SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
+import { COLLECTION_LABELS, SUB_CATEGORIES, allPlaces, hasColorStock, hasSizeStock, hasSubCategories, orderedSizes, stockForSize, subLabel, supplierOutFor, totalStock } from '../data/catalog';
 
 // Owner: the main site's theme (settings/theme), every theme allowed
 function SiteThemePage({ isDarkMode, staff }) {
@@ -481,12 +481,13 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                             {totalStock(p)} units
                             {hasSizeStock(p) && (
                               <p className="text-[10px] mt-0.5">
-                                {orderedSizes(Object.keys(p.sizeStock), p.gender).map(sz => `${sz}: ${p.sizeStock[sz]}`).join(' · ')}
+                                {orderedSizes(Object.keys(p.sizeStock), p.gender).map(sz => `${sz}: ${stockForSize(p, sz)}`).join(' · ')}
                               </p>
                             )}
                             {hasColorStock(p) && (
                               <p className="text-[10px] mt-0.5 leading-relaxed">
-                                {Object.entries(p.colorStock).map(([k, n]) => { const [sz, col] = k.split('|'); return `${sz ? sz + ' ' : ''}${col}: ${n}`; }).join(' · ')}
+                                {/* colours out of stock at the supplier count as 0 (stock sync) */}
+                                {Object.entries(p.colorStock).map(([k, n]) => { const [sz, col] = k.split('|'); return `${sz ? sz + ' ' : ''}${col}: ${supplierOutFor(p, col) ? 0 : n}`; }).join(' · ')}
                               </p>
                             )}
                             </div>
