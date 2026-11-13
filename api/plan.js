@@ -22,10 +22,11 @@ import billing from './_plan/billing.js';
 import sitemap from './_plan/sitemap.js';
 import removeShop from './_plan/removeshop.js';
 import aiPhoto from './_plan/aiphoto.js';
+import stock from './_plan/stock.js';
 
 export const config = { maxDuration: 60 };
 
-const ACTIONS = { init, callback, sync, reminders, 'seller-earnings': sellerEarnings, comp, warn, billing, sitemap, 'remove-shop': removeShop, 'ai-photo': aiPhoto };
+const ACTIONS = { init, callback, sync, reminders, 'seller-earnings': sellerEarnings, comp, warn, billing, sitemap, 'remove-shop': removeShop, 'ai-photo': aiPhoto, stock };
 
 export default async function handler(req, res) {
   const action = String((req.query && req.query.action) || '');

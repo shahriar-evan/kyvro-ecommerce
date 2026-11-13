@@ -50,6 +50,7 @@ import AlertCenter from './components/AlertCenter';
 import ProductDetail from './components/ProductDetail';
 import { getPaymentUrl } from './payment';
 import { productIdsForLink } from './data/supplierLink';
+import { callStock, backColours } from './stockSync';
 import { initAnalytics, trackPageView, trackViewContent, trackAddToCart, trackInitiateCheckout, trackPurchase } from './analytics';
 // Pages most visitors never open are loaded only when needed (smaller first download on phones)
 const AdminPortal = lazy(() => import('./components/AdminPortal'));
@@ -1362,6 +1363,8 @@ export default function App() {
   const canApproveProduct = (p) => isCloud && !isApproved(p) && (adminRole === 'owner' || adminCanApprove);
   const handleApproveProduct = async (p) => {
     try {
+      // taken off the website by the stock sync, or colours back in stock: the server also lets those colours be sold again
+      if (p.status === 'hidden' || backColours(p).length) { await callStock('approve', p.id); return; }
       await approveProduct(p, { email: loggedInUserEmail, name: adminName });
     } catch (err) {
       alert('Could not approve: ' + (err.code === 'permission-denied' ? 'you do not have permission (check the Firestore rules).' : err.message));

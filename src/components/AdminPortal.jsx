@@ -1,5 +1,6 @@
 import { auth } from '../firebase';
 import { productIdsForLink } from '../data/supplierLink';
+import { callStock, outColours, backColours, colourLabel } from '../stockSync';
 import React from 'react';
 import { askConfirm } from './AlertCenter';
 import AdminLogin from './AdminLogin';
@@ -48,7 +49,34 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
   const catList = [...products.reduce((m, p) => m.set(catLabel(p), (m.get(catLabel(p)) || 0) + 1), new Map())].sort((a, b) => a[0].localeCompare(b[0]));
   // Owner / Manager can also paste a supplier link (ShopBase, SelfShop...) to find the product it belongs to
   const linkIds = (adminRole === 'owner' || adminRole === 'manager') ? productIdsForLink(productSearch, productCosts) : null;
-  const searched = linkIds ? products.filter((p) => linkIds.has(String(p.id)))
+  // supplier stock sync: filter chips, the Owner / Manager "Check supplier stock" button, Hide and Approve per product
+  const [stockFilter, setStockFilter] = React.useState('');
+  const [stockBusy, setStockBusy] = React.useState('');
+  const [stockMsg, setStockMsg] = React.useState('');
+  const outCount = products.filter((p) => outColours(p).length && !backColours(p).length).length;
+  const backCount = products.filter((p) => backColours(p).length).length;
+  const stockOp = async (op, p) => {
+    if (op === 'hide' && !(await askConfirm(`Take "${p.name}" off the website? It comes back when someone approves it.`))) return;
+    setStockBusy(`${op}:${p.id}`);
+    try { await callStock(op, p.id); } catch (err) { alert(err.message); }
+    setStockBusy('');
+  };
+  const runStockCheck = async () => {
+    setStockBusy('check'); setStockMsg('Checking the suppliers…');
+    try {
+      let total = { checked: 0, changes: 0 }, r;
+      do {
+        r = await callStock('check');
+        total = { checked: total.checked + r.checked, changes: total.changes + (r.changes || []).length };
+        setStockMsg(`Checked ${total.checked} of ${r.total} products…`);
+      } while (!r.done);
+      setStockMsg(`Done: ${total.checked} products checked, ${total.changes} change(s).${r.shopbase === 'ok' ? '' : r.shopbase === 'not set' ? ' ShopBase skipped: its login is not set in Vercel.' : ' ShopBase login failed: check its phone and password in Vercel.'}`);
+    } catch (err) { setStockMsg(err.message); }
+    setStockBusy('');
+  };
+  const stockMatched = stockFilter === 'out' ? products.filter((p) => outColours(p).length && !backColours(p).length)
+    : stockFilter === 'back' ? products.filter((p) => backColours(p).length) : null;
+  const searched = stockMatched ? stockMatched : linkIds ? products.filter((p) => linkIds.has(String(p.id)))
     : psq ? products.filter((p) => [p.name, p.category, p.gender, p.brand, p.id, p.supplierName].some((v) => String(v || '').toLowerCase().includes(psq))) : products;
   const shownProducts = catFilter === 'All' ? searched : searched.filter((p) => catLabel(p) === catFilter);
   const isOwner = adminRole === 'owner';
@@ -375,6 +403,19 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                   {!psq && catFilter !== 'All' && <span className="text-xs text-gray-500 whitespace-nowrap">{shownProducts.length} product(s)</span>}
                 </div>
               )}
+              {adminTab === 'products' && (outCount > 0 || backCount > 0 || canSeeSupplier) && (
+                <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+                  {[['', 'All'], ['out', `Stock out at supplier (${outCount})`], ['back', `Back in stock (${backCount})`]].map(([k, label]) => (
+                    <button key={k || 'all'} type="button" onClick={() => setStockFilter(k)}
+                      className={`px-3 py-1.5 rounded-full border font-semibold ${stockFilter === k ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : isDarkMode ? 'border-gray-700 text-gray-300' : 'border-gray-300 text-gray-700'} ${k === 'back' && backCount ? 'ring-2 ring-green-500/50' : ''}`}>{label}</button>
+                  ))}
+                  {canSeeSupplier && (
+                    <button type="button" disabled={!!stockBusy} onClick={runStockCheck}
+                      className="ml-auto px-3 py-1.5 rounded border border-[#D4AF37] text-[#9A7A1A] dark:text-[#D4AF37] font-bold disabled:opacity-50">{stockBusy === 'check' ? 'Checking…' : 'Check supplier stock'}</button>
+                  )}
+                  {stockMsg && <p className="w-full text-gray-500">{stockMsg}</p>}
+                </div>
+              )}
               {adminTab === 'products' && (
                 <div className={`rounded-lg border overflow-x-auto ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-white border-gray-200 shadow-sm'}`}>
                   <table className="w-full text-left text-xs">
@@ -396,6 +437,23 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                             <div>
                               <span className="font-semibold">{p.name}</span>
                               {p.status === 'pending' && <span className="ml-2 bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 text-[10px] font-bold px-2 py-0.5 rounded inline-block whitespace-nowrap">PENDING</span>}
+                              {p.status === 'hidden' && <span className="ml-2 bg-gray-500/20 text-gray-700 dark:text-gray-300 text-[10px] font-bold px-2 py-0.5 rounded inline-block whitespace-nowrap">HIDDEN</span>}
+                              {outColours(p).length > 0 && (
+                                <p className="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
+                                  Stock out at supplier: {outColours(p).filter((c) => !backColours(p).includes(c)).map(colourLabel).join(', ') || '–'}
+                                  {p.status === 'approved' && !backColours(p).length && (
+                                    <button type="button" disabled={!!stockBusy} onClick={() => stockOp('hide', p)} className="ml-2 underline font-bold disabled:opacity-50">{stockBusy === `hide:${p.id}` ? 'Hiding…' : 'Hide from website'}</button>
+                                  )}
+                                </p>
+                              )}
+                              {backColours(p).length > 0 && (
+                                <p className="mt-1 text-[11px] font-semibold text-green-700 dark:text-green-400">
+                                  Back in stock: {backColours(p).map(colourLabel).join(', ')}
+                                  {canApproveProduct({ ...p, status: 'pending' }) && (
+                                    <button type="button" disabled={!!stockBusy} onClick={() => stockOp('approve', p)} className="ml-2 underline font-bold disabled:opacity-50">{stockBusy === `approve:${p.id}` ? 'Approving…' : p.status === 'hidden' ? 'Approve (show on website)' : 'Approve (sell again)'}</button>
+                                  )}
+                                </p>
+                              )}
                               {p.deleteRequested && <span className="ml-2 bg-red-500/20 text-red-600 dark:text-red-400 text-[10px] font-bold px-2 py-0.5 rounded">DELETE REQUESTED{(p.deleteRequestedByName || p.deleteRequestedBy) ? ` BY ${String(p.deleteRequestedByName || p.deleteRequestedBy).toUpperCase()}` : ''}</span>}
                               {(p.addedByName || p.addedBy) && <p className="text-[10px] text-gray-500 font-normal mt-0.5">Added by {p.addedByName || p.addedBy}</p>}
                             </div>
