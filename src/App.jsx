@@ -16,8 +16,8 @@ import { watchProfile, saveProfile, watchMyOrders, saveCartSummary } from './cus
 import { ensureSubscribed } from './subscribers';
 import PushPrompt from './components/PushPrompt';
 import { watchProducts, cachedProducts, watchProductCosts, watchProductCommissions, setProductCommission, saveProductCost, removeProductCost, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
-import { watchStoreSettings, cachedStoreSettings, watchPlans } from './storeSettings';
-import { visibleShopIds, normalizePlans, effectiveTier, shopIsPaid, basicDue, couponActive, couponAmountFor, cleanCouponCode } from './data/priceCheck';
+import { watchStoreSettings, cachedStoreSettings, watchPlans, watchPromos } from './storeSettings';
+import { visibleShopIds, normalizePlans, effectiveTier, shopIsPaid, basicDue, couponActive, couponAmountFor, cleanCouponCode, storeCouponActive, storeCouponAmount } from './data/priceCheck';
 import { themePreviewFromUrl, cleanTheme, cleanMode } from './data/themes';
 import { watchSiteTheme } from './themeStore';
 import { shopExtrasOf, brandHex, SOCIALS, httpsLinkOk, contactOk, contactHref, contactLabel, effectiveFeatures, FEATURES, shopDisplayName } from './data/shopBrand';
@@ -776,17 +776,23 @@ export default function App() {
   // a shop's promo code (Premium "coupons"): only on that shop's link; comes out of the shop's markup, never Kyvro's price
   const [couponCode, setCouponCode] = useState('');
   const [couponMsg, setCouponMsg] = useState(null);
-  const couponsOn = !!shopCtx && !!shopFeat.coupons && !!shopCtx.coupons && Object.keys(shopCtx.coupons).length > 0;
-  const appliedCoupon = couponsOn && couponCode ? couponActive(shopCtx, couponCode) : null;
-  const couponAmount = appliedCoupon ? couponAmountFor(cart, appliedCoupon, subtotal - discount) : 0;
+  // the main store (no shop link): the Owner's store promo codes (settings/promos), out of Kyvro's own price
+  const [storePromos, setStorePromos] = useState(null);
+  useEffect(() => (!shopCtx && currentView === 'checkout' && !storePromos ? watchPromos(setStorePromos) : undefined), [shopCtx, currentView]); // eslint-disable-line react-hooks/exhaustive-deps
+  const shopCouponsOn = !!shopCtx && !!shopFeat.coupons && !!shopCtx.coupons && Object.keys(shopCtx.coupons).length > 0;
+  const storeCouponsOn = !shopCtx && !!storePromos && Object.values(storePromos.codes || {}).some((c) => c && c.active === true);
+  const couponsOn = shopCouponsOn || storeCouponsOn;
+  const findCoupon = (code) => (shopCtx ? couponActive(shopCtx, code) : storeCouponActive(storePromos, code));
+  const appliedCoupon = couponsOn && couponCode ? findCoupon(couponCode) : null;
+  const couponAmount = !appliedCoupon ? 0 : shopCtx ? couponAmountFor(cart, appliedCoupon, subtotal - discount) : storeCouponAmount(appliedCoupon, subtotal - discount);
   const applyCoupon = (raw) => {
     const code = cleanCouponCode(raw);
     if (!code) { setCouponCode(''); setCouponMsg(null); return; }
-    const c = couponActive(shopCtx, code);
+    const c = findCoupon(code);
     if (!c) { setCouponCode(''); setCouponMsg({ type: 'err', text: 'This promo code is not valid. · প্রোমো কোডটি সঠিক নয়।' }); return; }
     if (subtotal - discount < c.minOrder) { setCouponCode(''); setCouponMsg({ type: 'err', text: `This code needs an order of at least ${formatPrice(c.minOrder)}.` }); return; }
     setCouponCode(code);
-    setCouponMsg({ type: 'ok', text: `${code} applied: ${c.percent}% off.` });
+    setCouponMsg({ type: 'ok', text: `${code} applied: ${c.percent}% off${c.maxOff ? ` (up to ${formatPrice(c.maxOff)})` : ''}.` });
   };
   useEffect(() => { setCouponCode(''); setCouponMsg(null); }, [shopCtx && shopCtx.slug]); // eslint-disable-line react-hooks/exhaustive-deps
   const grandTotal = subtotal - discount - couponAmount + deliveryCharge;
@@ -1598,7 +1604,7 @@ export default function App() {
       {/* SHOP CATALOG VIEW */}
       {productsReady && currentView === 'shop' && <ShopView selectedSubCategory={selectedSubCategory} setSelectedSubCategory={setSelectedSubCategory} requestAdd={requestAdd} addToCart={addToCart} filteredProducts={filteredProducts} formatPrice={formatPrice} isDarkMode={isDarkMode} products={storefrontProducts} searchQuery={searchQuery} selectedCategory={selectedCategory} setCurrentView={setCurrentView} setSearchQuery={setSearchQuery} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} setSortBy={setSortBy} sortBy={sortBy} savedIds={savedIds} toggleSaved={toggleSaved} />}
 
-      {currentView === 'product-detail' && selectedProduct && <ProductDetail key={selectedProduct.id} product={selectedProduct} products={storefrontProducts} setSelectedProduct={setSelectedProduct} storeSettings={storeSettings} cartSubtotal={subtotal} cartUnits={cart.reduce((n, i) => n + (parseInt(i.quantity, 10) || 0), 0)} addToCart={addToCart} calculateDiscountPercent={calculateDiscountPercent} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} savedIds={savedIds} toggleSaved={toggleSaved} teamShop={isAdminLoggedIn && shopCtx ? shopDisplayName(shopCtx) : ''}
+      {currentView === 'product-detail' && selectedProduct && <ProductDetail key={selectedProduct.id} canModerate={isAdminLoggedIn && (adminRole === 'owner' || adminRole === 'manager')} product={selectedProduct} products={storefrontProducts} setSelectedProduct={setSelectedProduct} storeSettings={storeSettings} cartSubtotal={subtotal} cartUnits={cart.reduce((n, i) => n + (parseInt(i.quantity, 10) || 0), 0)} addToCart={addToCart} calculateDiscountPercent={calculateDiscountPercent} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} savedIds={savedIds} toggleSaved={toggleSaved} teamShop={isAdminLoggedIn && shopCtx ? shopDisplayName(shopCtx) : ''}
         supplier={isAdminLoggedIn && (adminRole === 'owner' || adminRole === 'manager') ? (productCosts[String(selectedProduct.id)] || null) : null}
         onEdit={(() => {
           // the store's own product (not a shop link's priced copy), and only for team members allowed to edit it

@@ -5,6 +5,7 @@ import { deliveryFee, normalizeSettings, deliveryNote, freeDeliveryMissing, toBa
 import WhatsAppButton, { WhatsAppIcon } from './WhatsAppButton';
 import { waOrderLink, waProductLines } from '../whatsappOrder';
 import StockLabel from './StockLabel';
+import { ProductReviews, Stars } from './Reviews';
 import { rankBySales, hasSizeStock, hasColorStock, totalStock, stockForSize, stockFor, stockForColor, productColors, imageFor, orderedSizes } from '../data/catalog';
 
 // Photo slider: the photos sit side by side and slide in from the side.
@@ -132,7 +133,8 @@ function ZoomViewer({ photos, index, onIndex, onClose }) {
   );
 }
 
-export default function ProductDetail({ product, products, addToCart, calculateDiscountPercent, formatPrice, isDarkMode, setCurrentView, setSelectedProduct = () => {}, storeSettings = {}, cartSubtotal = 0, cartUnits = 0, savedIds = [], toggleSaved = () => {}, teamShop = '', onEdit = null, supplier = null }) {
+export default function ProductDetail({ product, products, addToCart, calculateDiscountPercent, formatPrice, isDarkMode, setCurrentView, setSelectedProduct = () => {}, storeSettings = {}, cartSubtotal = 0, cartUnits = 0, savedIds = [], toggleSaved = () => {}, teamShop = '', onEdit = null, supplier = null, canModerate = false }) {
+  const [rv, setRv] = useState(null); // { count, avg } from the reviews below
   // Always use the latest version of the product (admin may have changed stock)
   const live = (products || []).find((p) => p.id === product.id) || product;
   const sized = hasSizeStock(live);
@@ -283,6 +285,11 @@ export default function ProductDetail({ product, products, addToCart, calculateD
               )}
             </div>
             <h1 className="text-2xl sm:text-3xl font-serif font-bold mt-1">{live.name}</h1>
+            {rv && rv.count > 0 && (
+              <a href="#reviews" onClick={(e) => { e.preventDefault(); const el = document.getElementById('reviews'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }} className="mt-1 inline-flex items-center gap-1.5 text-xs text-gray-500 hover:underline">
+                <Stars value={rv.avg} size={14} /> <span className="font-semibold">{rv.avg.toFixed(1)}</span> ({rv.count} review{rv.count === 1 ? '' : 's'})
+              </a>
+            )}
           </div>
 
           <PriceTag price={live.price} originalPrice={live.originalPrice} formatPrice={formatPrice} isDarkMode={isDarkMode} size="lg" />
@@ -396,6 +403,8 @@ export default function ProductDetail({ product, products, addToCart, calculateD
       </div>
 
       {zoomOpen && <ZoomViewer photos={gallery.length ? gallery : [shownPhoto]} index={currentIdx} onIndex={setManualIdx} onClose={() => setZoomOpen(false)} />}
+
+      <ProductReviews productId={String(live.id)} isDarkMode={isDarkMode} canModerate={canModerate} onSummary={setRv} />
 
       {/* Related products */}
       {related.length > 0 && (

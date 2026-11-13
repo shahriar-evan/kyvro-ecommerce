@@ -7,7 +7,7 @@ import { formatDateTime, toDate } from '../utils/dates';
 import { phoneKey, emailKey } from '../data/shopConfig';
 import { watchBlocked, blockPhone, blockEmail, unblockPhone, unblockEmail } from '../blocklist';
 import { checkOrderPrices, orderVisibleIds, orderMarkup } from '../data/priceCheck';
-import { watchPlans } from '../storeSettings';
+import { watchPlans, watchPromos } from '../storeSettings';
 import { watchAllShops } from '../shops';
 
 const STATUS_STYLE = {
@@ -64,11 +64,13 @@ export default function OrdersPanel({ orders, products = [], productCosts = {}, 
   useEffect(() => watchAllShops((list) => setShops(Object.fromEntries(list.map((s) => [s.slug, s]))), () => {}), []);
   const [plans, setPlans] = useState(null);
   useEffect(() => watchPlans(setPlans), []);
+  const [promos, setPromos] = useState(null);
+  useEffect(() => watchPromos(setPromos), []);
   const productsById = Object.fromEntries(products.map((p) => [String(p.id), p]));
   const priceCheck = (o) => {
     if (o.status !== 'Pending' || !products.length) return { ok: true, problems: [] };
     const shop = o.shop ? shops[o.shop] : null;
-    return checkOrderPrices(o, productsById, shop, orderVisibleIds(o, shop, productsById, plans));
+    return checkOrderPrices(o, productsById, shop, orderVisibleIds(o, shop, productsById, plans), promos);
   };
 
   // ---- Dropshipping: cost, profit and the text to paste into the supplier's site ----
@@ -330,6 +332,7 @@ export default function OrdersPanel({ orders, products = [], productCosts = {}, 
     });
     lines.push('', `Subtotal: ${money(o.subtotal)}`);
     if (o.discount > 0) lines.push(`Discount${o.discountLabel ? ` (${o.discountLabel})` : ''}: -${money(o.discount)}`);
+    if (o.coupon && o.coupon.amount > 0) lines.push(`Promo ${o.coupon.code} (${o.coupon.percent}%): -${money(o.coupon.amount)}`);
     lines.push(`Delivery: ${o.shipping === 0 ? 'FREE' : money(o.shipping)}`, `TOTAL: ${money(o.total)}`, '');
     const toCollect = o.paymentStatus === 'Paid' ? 0 : Math.max(0, o.total - (Number(o.advancePaid) || 0));
     lines.push(`Payment: ${o.paymentMethod} (${o.paymentStatus})`, `Collect from customer: ${money(toCollect)}`);
@@ -565,6 +568,7 @@ export default function OrdersPanel({ orders, products = [], productCosts = {}, 
                 {o.paymentMethod !== 'Online Payment' && Number(o.shipping) > 0 && <p>Delivery charge advance: <strong className={Number(o.advancePaid) > 0 ? 'text-green-600' : 'text-red-600'}>{Number(o.advancePaid) > 0 ? `Paid ${formatPrice(o.advancePaid)}` : 'Not paid'}</strong></p>}
                 <p>Subtotal: {formatPrice(o.subtotal)}</p>
                 {o.discount > 0 && <p className="text-green-600">Discount{o.discountLabel ? ` (${o.discountLabel})` : ''}: - {formatPrice(o.discount)}</p>}
+                {o.coupon && o.coupon.amount > 0 && <p className="text-green-600">Promo {o.coupon.code} ({o.coupon.percent}%{o.shop ? ', from the shop markup' : ''}): - {formatPrice(o.coupon.amount)}</p>}
                 <p>Delivery: {o.shipping === 0 ? 'FREE' : formatPrice(o.shipping)}</p>
                 <p className="text-sm font-bold">Total: {formatPrice(o.total)}</p>
               </div>

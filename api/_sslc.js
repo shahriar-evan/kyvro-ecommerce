@@ -115,7 +115,9 @@ export async function verifyOrderPrices(order) {
       visible = orderVisibleIds(order, shop, everyone, plans);
     }
   }
-  return checkOrderPrices(order, productsById, shop, visible);
+  // a main store promo code: the Owner's codes in settings/promos
+  const promos = order.coupon && !order.shop ? await getDocument('settings/promos') : null;
+  return checkOrderPrices(order, productsById, shop, visible, promos);
 }
 
 // Writes the payment result into the order (+ a line in the activity trail). Only called after SSLCommerz confirmed it.

@@ -139,6 +139,13 @@ export const totalStock = (p) => {
     : parseInt(p?.stock, 10) || 0;
 };
 
+// Admin low-stock warning: a live product with only a few pieces left in total (LOW_STOCK_ADMIN or fewer), or with 0
+// (sold out on our side, not because the supplier ran out). Shown as chips in Admin > Products and on the Dashboard.
+export const LOW_STOCK_ADMIN = 5;
+const isLive = (p) => !!p && (p.status || 'approved') === 'approved';
+export const isLowStock = (p) => { const n = totalStock(p); return isLive(p) && n > 0 && n <= LOW_STOCK_ADMIN; };
+export const isNoStock = (p) => isLive(p) && totalStock(p) <= 0 && !supplierOutFor(p, '');
+
 export const stockForSize = (p, size) => {
   if (supplierOutFor(p, '')) return 0;
   if (anySupplierOut(p) && hasColorStock(p)) return liveColorStock(p).reduce((sum, [k, n]) => (k.split('|')[0] === String(size || '') ? sum + (parseInt(n, 10) || 0) : sum), 0);

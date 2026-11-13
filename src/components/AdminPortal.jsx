@@ -19,6 +19,7 @@ import MyProducts from './MyProducts';
 import StoreSettings from './StoreSettings';
 import PlanSettings from './PlanSettings';
 import SellerDashBannerSettings from './SellerDashBannerSettings';
+import StorePromoCodes from './StorePromoCodes';
 import SellerDashLayout from './SellerDashLayout';
 import { AdminDashboard, AdminAnalytics } from './AdminDashboard';
 import { LayoutDashboard, BarChart3, ShoppingBag, Package, PlusCircle, Boxes, Users, Store, UserCheck, Gem, ShieldCheck, Settings, Palette, ShoppingBasket } from 'lucide-react';
@@ -27,7 +28,7 @@ import { watchSiteTheme, saveSiteTheme } from '../themeStore';
 import SellersPanel from './SellersPanel';
 import PlanMembers from './PlanMembers';
 import ShowcasePhotoField, { addAutoShowcase } from './ShowcasePhotoField';
-import { COLLECTION_LABELS, SUB_CATEGORIES, allPlaces, hasColorStock, hasSizeStock, hasSubCategories, orderedSizes, stockForSize, subLabel, supplierOutFor, totalStock } from '../data/catalog';
+import { COLLECTION_LABELS, SUB_CATEGORIES, allPlaces, hasColorStock, hasSizeStock, hasSubCategories, orderedSizes, stockForSize, subLabel, supplierOutFor, totalStock, isLowStock, isNoStock, LOW_STOCK_ADMIN } from '../data/catalog';
 
 // Owner: the main site's theme (settings/theme), every theme allowed
 function SiteThemePage({ isDarkMode, staff }) {
@@ -55,6 +56,8 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
   const [stockMsg, setStockMsg] = React.useState('');
   const outCount = products.filter((p) => outColours(p).length && !backColours(p).length).length;
   const backCount = products.filter((p) => backColours(p).length).length;
+  const lowCount = products.filter(isLowStock).length;
+  const noneCount = products.filter(isNoStock).length;
   const stockOp = async (op, p) => {
     if (op === 'hide' && !(await askConfirm(`Take "${p.name}" off the website? It comes back when someone approves it.`))) return;
     setStockBusy(`${op}:${p.id}`);
@@ -75,7 +78,9 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
     setStockBusy('');
   };
   const stockMatched = stockFilter === 'out' ? products.filter((p) => outColours(p).length && !backColours(p).length)
-    : stockFilter === 'back' ? products.filter((p) => backColours(p).length) : null;
+    : stockFilter === 'back' ? products.filter((p) => backColours(p).length)
+    : stockFilter === 'low' ? products.filter(isLowStock).sort((a, b) => totalStock(a) - totalStock(b))
+    : stockFilter === 'none' ? products.filter(isNoStock) : null;
   const searched = stockMatched ? stockMatched : linkIds ? products.filter((p) => linkIds.has(String(p.id)))
     : psq ? products.filter((p) => [p.name, p.category, p.gender, p.brand, p.id, p.supplierName].some((v) => String(v || '').toLowerCase().includes(psq))) : products;
   const shownProducts = catFilter === 'All' ? searched : searched.filter((p) => catLabel(p) === catFilter);
@@ -359,14 +364,15 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                   ...(canManageTeam && !isOwner ? [{ key: 'plan-members', label: 'Plan Members', icon: Gem }] : []),
                   ...(canManageTeam ? [{ key: 'admins', label: isOwner ? 'Manage Admins' : 'Add Admin', icon: ShieldCheck }] : []),
                 ] },
-                ...(isOwner ? [{ title: 'Settings', items: [{ key: 'settings', label: 'Banner & Discount', icon: Settings }, { key: 'theme', label: 'Store Theme', icon: Palette }] }] : []),
+                ...(isOwner ? [{ title: 'Settings', items: [{ key: 'settings', label: 'Banner, Discount & Promo', icon: Settings }, { key: 'theme', label: 'Store Theme', icon: Palette }] }] : []),
               ]}>
-              {adminTab === 'dashboard' && <AdminDashboard orders={orders} products={products} adminRole={adminRole} adminName={adminName} formatPrice={formatPrice} isDarkMode={isDarkMode} goTab={goTab} canSeeProfit={canSeeSupplier} />}
+              {adminTab === 'dashboard' && <AdminDashboard orders={orders} products={products} adminRole={adminRole} adminName={adminName} formatPrice={formatPrice} isDarkMode={isDarkMode} goTab={goTab} canSeeProfit={canSeeSupplier} openStock={(k) => goTab('products', () => { setStockFilter(k); setCatFilter('All'); setProductSearch(''); })} />}
               {adminTab === 'theme' && isOwner && <SiteThemePage isDarkMode={isDarkMode} staff={{ email: loggedInUserEmail, name: adminName }} />}
               {adminTab === 'analytics' && <AdminAnalytics orders={orders} formatPrice={formatPrice} isDarkMode={isDarkMode} />}
               {adminTab === 'plan-members' && canManageTeam && <PlanMembers isOwner={isOwner} isDarkMode={isDarkMode} />}
               {adminTab === 'sellers' && isOwner && <SellersPanel orders={orders} products={products} isDarkMode={isDarkMode} formatPrice={formatPrice} loggedInUserEmail={loggedInUserEmail} adminName={adminName} />}
               {adminTab === 'settings' && isOwner && <StoreSettings products={products} settings={storeSettings} isDarkMode={isDarkMode} formatPrice={formatPrice} staff={{ email: loggedInUserEmail, name: adminName }} />}
+              {adminTab === 'settings' && isOwner && <div className="mt-5"><StorePromoCodes isDarkMode={isDarkMode} formatPrice={formatPrice} staff={{ email: loggedInUserEmail, name: adminName }} /></div>}
               {adminTab === 'settings' && isOwner && <div className="mt-5"><PlanSettings isDarkMode={isDarkMode} formatPrice={formatPrice} staff={{ email: loggedInUserEmail, name: adminName }} /></div>}
               {adminTab === 'settings' && isOwner && <div className="mt-5"><SellerDashBannerSettings isDarkMode={isDarkMode} staff={{ email: loggedInUserEmail, name: adminName }} /></div>}
 
@@ -403,11 +409,11 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                   {!psq && catFilter !== 'All' && <span className="text-xs text-gray-500 whitespace-nowrap">{shownProducts.length} product(s)</span>}
                 </div>
               )}
-              {adminTab === 'products' && (outCount > 0 || backCount > 0 || canSeeSupplier) && (
+              {adminTab === 'products' && (outCount > 0 || backCount > 0 || lowCount > 0 || noneCount > 0 || canSeeSupplier) && (
                 <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-                  {[['', 'All'], ['out', `Stock out at supplier (${outCount})`], ['back', `Back in stock (${backCount})`]].map(([k, label]) => (
+                  {[['', 'All'], ['low', `Low stock (${lowCount})`], ['none', `Sold out (${noneCount})`], ['out', `Stock out at supplier (${outCount})`], ['back', `Back in stock (${backCount})`]].map(([k, label]) => (
                     <button key={k || 'all'} type="button" onClick={() => setStockFilter(k)}
-                      className={`px-3 py-1.5 rounded-full border font-semibold ${stockFilter === k ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : isDarkMode ? 'border-gray-700 text-gray-300' : 'border-gray-300 text-gray-700'} ${k === 'back' && backCount ? 'ring-2 ring-green-500/50' : ''}`}>{label}</button>
+                      className={`px-3 py-1.5 rounded-full border font-semibold ${stockFilter === k ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : isDarkMode ? 'border-gray-700 text-gray-300' : 'border-gray-300 text-gray-700'} ${k === 'back' && backCount ? 'ring-2 ring-green-500/50' : ''} ${k === 'low' && lowCount && stockFilter !== 'low' ? 'ring-2 ring-orange-500/50' : ''}`}>{label}</button>
                   ))}
                   {canSeeSupplier && (
                     <button type="button" disabled={!!stockBusy} onClick={runStockCheck}
@@ -437,6 +443,8 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                             <div>
                               <span className="font-semibold">{p.name}</span>
                               {p.status === 'pending' && <span className="ml-2 bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 text-[10px] font-bold px-2 py-0.5 rounded inline-block whitespace-nowrap">PENDING</span>}
+                              {isLowStock(p) && <span className="ml-2 bg-orange-500/20 text-orange-700 dark:text-orange-400 text-[10px] font-bold px-2 py-0.5 rounded inline-block whitespace-nowrap">LOW STOCK: {totalStock(p)} LEFT</span>}
+                              {isNoStock(p) && <span className="ml-2 bg-red-500/20 text-red-600 dark:text-red-400 text-[10px] font-bold px-2 py-0.5 rounded inline-block whitespace-nowrap">SOLD OUT</span>}
                               {p.status === 'hidden' && <span className="ml-2 bg-gray-500/20 text-gray-700 dark:text-gray-300 text-[10px] font-bold px-2 py-0.5 rounded inline-block whitespace-nowrap">HIDDEN</span>}
                               {outColours(p).length > 0 && (
                                 <p className="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">

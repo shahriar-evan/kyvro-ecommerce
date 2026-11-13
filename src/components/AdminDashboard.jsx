@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Wallet, ShoppingBag, Package, Users, Store, Clock, TrendingUp } from 'lucide-react';
 import { toDate, formatDateTime } from '../utils/dates';
 import { watchAllShops } from '../shops';
+import { isLowStock, isNoStock, LOW_STOCK_ADMIN } from '../data/catalog';
 
 // Admin Portal > Dashboard and Analytics. Only numbers the team already sees in Orders / Products: order totals, counts,
 // product names. No supplier cost or profit here (profit stays in Team Stats for the Owner / Managers), and customers are
@@ -81,7 +82,7 @@ function RankBars({ rows, valueText, isDarkMode, empty = 'Nothing yet.' }) {
 const STATUS_ORDER = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
 const STATUS_STYLE = { Pending: 'bg-yellow-500/15 text-yellow-700', Processing: 'bg-blue-500/15 text-blue-600', Shipped: 'bg-purple-500/15 text-purple-600', Delivered: 'bg-green-500/15 text-green-700', Cancelled: 'bg-red-500/15 text-red-600' };
 
-export function AdminDashboard({ orders = [], products = [], adminRole, adminName, formatPrice, isDarkMode, goTab, canSeeProfit }) {
+export function AdminDashboard({ orders = [], products = [], adminRole, adminName, formatPrice, isDarkMode, goTab, canSeeProfit, openStock }) {
   const { card } = useCard(isDarkMode);
   const isOwner = adminRole === 'owner';
   const [shops, setShops] = useState(null);
@@ -103,6 +104,8 @@ export function AdminDashboard({ orders = [], products = [], adminRole, adminNam
       live: products.filter((p) => (p.status || 'approved') === 'approved').length,
       waiting: products.filter((p) => (p.status || 'approved') !== 'approved').length,
       customers: phones.size,
+      low: products.filter(isLowStock).length,
+      none: products.filter(isNoStock).length,
     };
   }, [orders, products]);
   const liveShops = shops ? shops.filter((x) => x.active !== false && x.status !== 'pending' && !x.killed) : [];
@@ -116,12 +119,14 @@ export function AdminDashboard({ orders = [], products = [], adminRole, adminNam
         <h2 className="text-xl sm:text-2xl font-bold">{hello}, {(adminName || 'Kyvro').split(' ')[0]}!</h2>
         <p className="text-xs text-gray-500">Everything at a glance. Money counts every order except cancelled and returned ones.</p>
       </div>
-      {(s.pending > 0 || s.cancelReq > 0 || s.waiting > 0) && (
+      {(s.pending > 0 || s.cancelReq > 0 || s.waiting > 0 || s.low > 0 || s.none > 0) && (
         <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-4 text-xs flex flex-wrap items-center gap-x-4 gap-y-2">
           <span className="font-bold uppercase tracking-wider text-amber-700 flex items-center gap-1.5"><Clock size={14} /> Needs you</span>
           {s.pending > 0 && <button type="button" onClick={() => goTab('orders')} className="underline font-semibold">{s.pending} new order{s.pending === 1 ? '' : 's'}</button>}
           {s.cancelReq > 0 && <button type="button" onClick={() => goTab('orders')} className="underline font-semibold">{s.cancelReq} cancel request{s.cancelReq === 1 ? '' : 's'}</button>}
           {s.waiting > 0 && <button type="button" onClick={() => goTab('products')} className="underline font-semibold">{s.waiting} product{s.waiting === 1 ? '' : 's'} waiting for approval</button>}
+          {s.low > 0 && <button type="button" onClick={() => (openStock ? openStock('low') : goTab('products'))} className="underline font-semibold text-orange-700">{s.low} product{s.low === 1 ? '' : 's'} low on stock (≤ {LOW_STOCK_ADMIN} left)</button>}
+          {s.none > 0 && <button type="button" onClick={() => (openStock ? openStock('none') : goTab('products'))} className="underline font-semibold text-red-600">{s.none} product{s.none === 1 ? '' : 's'} sold out</button>}
         </div>
       )}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">

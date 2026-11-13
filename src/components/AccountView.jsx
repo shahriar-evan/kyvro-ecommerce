@@ -7,6 +7,8 @@ import { CANCEL_WINDOW_MINUTES } from '../orders';
 import { imageFileToDataURL } from '../utils/imageUpload';
 import { watchMySubscription, setMySubscription } from '../subscribers';
 import { pushSupported, pushPermission, enablePush, disablePush, myPushOn } from '../push';
+import { ReviewForm } from './Reviews';
+import { watchMyReviews, reviewId } from '../reviews';
 
 const STATUS_STYLE = {
   Pending: 'bg-yellow-500/15 text-yellow-600',
@@ -33,6 +35,10 @@ export default function AccountView({
   const [msg, setMsg] = useState('');
   const [now, setNow] = useState(Date.now());
   const [sub, setSub] = useState({ exists: false, on: false });
+  // my reviews (Delivered orders show Write / Edit review per product)
+  const [myReviews, setMyReviews] = useState({});
+  const hasDelivered = myOrders.some((o) => o.status === 'Delivered');
+  useEffect(() => (customerUser && hasDelivered ? watchMyReviews(customerUser.uid, setMyReviews) : undefined), [customerUser, hasDelivered]);
   const [subBusy, setSubBusy] = useState(false);
   useEffect(() => {
     if (!customerUser || !customerUser.email) return undefined;
@@ -213,7 +219,11 @@ export default function AccountView({
               </div>
               <ul className="mt-3 text-xs space-y-1">
                 {(o.items || []).map((it, i) => (
-                  <li key={i}>{it.quantity} x {it.name}{it.size && it.size !== 'Standard' ? ` (${it.size})` : ''}</li>
+                  <li key={i}>{it.quantity} x {it.name}{it.size && it.size !== 'Standard' ? ` (${it.size})` : ''}
+                    {o.status === 'Delivered' && !o.returned && customerUser && i < 30 && (
+                      <div className="mt-0.5"><ReviewForm order={o} item={it} index={i} user={{ ...customerUser, displayName: displayName || customerUser.displayName }} existing={myReviews[reviewId(o.orderNumber, String(it.id))]} isDarkMode={isDarkMode} /></div>
+                    )}
+                  </li>
                 ))}
               </ul>
               <div className="mt-3 pt-3 border-t text-xs flex flex-wrap justify-between gap-2">
