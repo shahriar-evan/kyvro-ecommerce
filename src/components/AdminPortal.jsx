@@ -68,8 +68,10 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
   // "Hide all": tick several stock-out products (or Select all) and take them off the website in one go.
   // A product only some colours of which are out still sells the other colours, so "Fully out" picks only the ones
   // with nothing left to sell.
-  const canHide = (p) => outColours(p).length > 0 && p.status === 'approved' && !backColours(p).length;
-  const fullyOut = (p) => canHide(p) && totalStock(p) <= 0;
+  // only a product with nothing left to sell is hidden: when just some colours are out, those colours show "Out of stock"
+  // on the website and the other colours keep selling, so the product stays
+  const canHide = (p) => outColours(p).length > 0 && p.status === 'approved' && !backColours(p).length && (outColours(p).includes('*') || totalStock(p) <= 0);
+  const partOut = (p) => outColours(p).length > 0 && p.status === 'approved' && !backColours(p).length && !canHide(p);
   const [hidePick, setHidePick] = React.useState({});
   const pickedIds = Object.keys(hidePick).filter((id) => hidePick[id] && products.some((p) => String(p.id) === id && canHide(p)));
   const hideMany = async () => {
@@ -444,7 +446,6 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                   {stockFilter === 'out' && shownProducts.some(canHide) && (
                     <div className="w-full flex flex-wrap items-center gap-2 rounded-lg border border-red-500/40 bg-red-500/5 p-2.5">
                       <button type="button" onClick={() => setHidePick(Object.fromEntries(shownProducts.filter(canHide).map((p) => [String(p.id), true])))} className="px-3 py-1.5 rounded border border-gray-400 font-semibold">Select all ({shownProducts.filter(canHide).length})</button>
-                      <button type="button" onClick={() => setHidePick(Object.fromEntries(shownProducts.filter(fullyOut).map((p) => [String(p.id), true])))} className="px-3 py-1.5 rounded border border-gray-400 font-semibold" title="Only products with no colour or size left to sell">Fully out only ({shownProducts.filter(fullyOut).length})</button>
                       {pickedIds.length > 0 && <button type="button" onClick={() => setHidePick({})} className="px-2 py-1.5 underline text-gray-500">Clear</button>}
                       <button type="button" disabled={!pickedIds.length || !!stockBusy} onClick={hideMany} className="ml-auto px-4 py-1.5 rounded bg-red-600 text-white font-bold disabled:opacity-40">Hide selected ({pickedIds.length})</button>
                     </div>
@@ -538,7 +539,8 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                           </td>
                           <td className="p-4 align-middle">
                             {/* stock sync: any team member can take a product that is out of stock at the supplier off the website */}
-                            {outColours(p).length > 0 && p.status === 'approved' && !backColours(p).length && (
+                            {partOut(p) && <p className="mb-2 text-center text-[10px] text-gray-500 max-w-[11rem] mx-auto">Only the out colours show &quot;Out of stock&quot;; the other colours still sell. No need to hide.</p>}
+                            {canHide(p) && (
                               <div className="mb-2 flex justify-center">
                                 <button type="button" disabled={!!stockBusy} onClick={() => stockOp('hide', p)}
                                   className="px-3 py-1.5 rounded text-xs font-semibold border border-red-500 text-red-600 dark:text-red-400 hover:bg-red-500/10 transition whitespace-nowrap disabled:opacity-50">{stockBusy === `hide:${p.id}` ? 'Hiding…' : 'Hide from website'}</button>
