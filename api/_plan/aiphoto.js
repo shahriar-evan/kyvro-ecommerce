@@ -15,7 +15,7 @@
 // Uses per day are counted in aiUsage/{YYYY-MM-DD} (server only; no client rule allows it).
 import { FS, accessToken, val } from '../_sslc.js';
 import { ownerEmails } from '../_owners.js';
-import { makeLook } from './ailook.js';
+import { makeLook, lookColor } from './ailook.js';
 
 const GEMINI = 'https://generativelanguage.googleapis.com/v1beta/models';
 const OPENROUTER = 'https://openrouter.ai/api/v1/chat/completions';
@@ -174,6 +174,9 @@ async function callOpenRouter(key, model, src, prompt) {
 
 export default async function aiPhoto(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only.' });
+  // a customer trying another colour on a Shop the Look model (signed in, limited per day): ./ailook.js
+  const bodyC = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  if (bodyC.view === 'look-color') return lookColor(req, res, { body: bodyC, readSource });
   const who = await teamCaller(req);
   if (who.error) return res.status(who.status).json({ error: who.error });
   const body0 = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});

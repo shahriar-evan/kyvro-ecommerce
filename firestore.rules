@@ -795,6 +795,13 @@ service cloud.firestore {
       allow delete: if isOwner() || isManager();
     }
 
+    // Shop the Look colour pictures (made on the server when a customer tries a colour, api/_plan/ailook.js): everyone
+    // reads them, only the server writes (aiLookUsage counters have no rule = server only).
+    match /lookColors/{cid} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Customer reviews (src/reviews.js): reviews/{orderNumber}_{productId}. Everyone reads them (product page).
     // Only a signed-in customer writes one, for a product in their OWN Delivered order (item = its place in the
     // order's items). First name only, no phone / address. The writer can change or delete it; the Owner / a Manager delete.

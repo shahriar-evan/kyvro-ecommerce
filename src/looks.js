@@ -38,3 +38,26 @@ export async function saveLook(look, staff) {
 }
 
 export const deleteLook = (id) => deleteDoc(doc(db, "looks", id));
+
+// ---- Colour try-on (customers): a saved look's model in another colour of one of its products ----
+// lookColors/{look_product_colour} = a picture made earlier (public, free to show); a new one is made by the server
+// (api/plan.js?action=ai-photo view 'look-color', signed in, 10 a day per account).
+export const lookColorKey = (lookId, productId, color) => `${lookId}_${productId}_${String(color || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)}`;
+export async function getLookColor(lookId, productId, color) {
+  try {
+    const { getDoc } = await import("firebase/firestore");
+    const snap = await getDoc(doc(db, "lookColors", lookColorKey(lookId, productId, color)));
+    return snap.exists() ? snap.data().image || null : null;
+  } catch (e) { return null; }
+}
+export async function tryLookColor(lookId, productId, color) {
+  const { auth } = await import("./firebase");
+  const user = auth.currentUser;
+  const headers = { "Content-Type": "application/json" };
+  if (user) headers.Authorization = `Bearer ${await user.getIdToken()}`;
+  const r = await fetch("/api/plan?action=ai-photo", { method: "POST", headers, body: JSON.stringify({ view: "look-color", lookId, productId, color }) });
+  let j = {};
+  try { j = await r.json(); } catch (e) { /* not json */ }
+  if (!r.ok || !j.image) { const e = new Error(j.error || (r.status === 504 ? "That took too long. Please try again." : "Could not change the colour.")); e.code = j.code || ""; throw e; }
+  return j;
+}
