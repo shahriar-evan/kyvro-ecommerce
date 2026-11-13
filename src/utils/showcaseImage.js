@@ -13,7 +13,7 @@ const loadImage = (file) => new Promise((resolve, reject) => {
   img.src = url;
 });
 
-export async function prepareShowcaseImage(file) {
+export async function prepareShowcaseImage(file, { maxSide = MAX_SIDE, maxChars = MAX_CHARS } = {}) {
   if (!file || !/^image\/(png|webp)$/.test(file.type)) {
     throw new Error('Please upload a PNG or WebP picture with a transparent background.');
   }
@@ -38,7 +38,7 @@ export async function prepareShowcaseImage(file) {
   }
 
   const cw = maxX - minX + 1, ch = maxY - minY + 1;
-  let scale = Math.min(1, MAX_SIDE / Math.max(cw, ch));
+  let scale = Math.min(1, maxSide / Math.max(cw, ch));
   for (let i = 0; i < 6; i += 1) {
     const out = document.createElement('canvas');
     out.width = Math.max(1, Math.round(cw * scale)); out.height = Math.max(1, Math.round(ch * scale));
@@ -47,7 +47,7 @@ export async function prepareShowcaseImage(file) {
     og.drawImage(c, minX, minY, cw, ch, 0, 0, out.width, out.height);
     let url = out.toDataURL('image/webp', 0.85);
     if (!url.startsWith('data:image/webp')) url = out.toDataURL('image/png');
-    if (url.length <= MAX_CHARS) return url;
+    if (url.length <= maxChars) return url;
     scale *= 0.8;
   }
   throw new Error('This picture is too big even after making it smaller. Try a smaller file.');
@@ -197,4 +197,14 @@ export async function pickKeyColour(src, colourName = '') {
     if (/green|olive|khaki|army|mint|lime|teal|sage|bottle/.test(n)) return 'magenta';
     return 'green';
   }
+}
+
+// Shop the Look: a full-body model picture (transparent PNG / WebP file or data URL) -> at most 1100 px tall, under 450 KB
+export async function prepareLookImage(fileOrDataUrl) {
+  let file = fileOrDataUrl;
+  if (typeof fileOrDataUrl === 'string') {
+    const blob = await (await fetch(fileOrDataUrl)).blob();
+    file = new File([blob], 'look.png', { type: blob.type || 'image/png' });
+  }
+  return prepareShowcaseImage(file, { maxSide: 1100, maxChars: 450000 });
 }

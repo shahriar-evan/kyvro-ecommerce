@@ -4,6 +4,7 @@ import { isFoldedPhoto } from '../data/photoShape';
 import HangerRail from './HangerRail';
 import ShoeOrbit from './ShoeOrbit';
 import RailQuickView from './RailQuickView';
+import ShopTheLook from './ShopTheLook';
 import { CUTOUTS, cutoutSrc, cutoutSideSrc } from '../data/cutouts';
 import { loadShowcase, showcaseNow } from '../showcaseStore';
 
@@ -186,6 +187,7 @@ export default function HomeShowcase({ products, formatPrice, addToCart, openPro
           tagline={['Shirts, tees and jackets.', 'Picked for everyday style.']} variant="curve" tone="grey"
           filters={menSections} filter={menSub} onFilter={setMenSub} />
       )}
+      <ShopTheLook products={products} formatPrice={formatPrice} addToCart={addToCart} />
       {women.length >= MIN && (
         <HangerRail title="Women's Collection" products={womenShown} formatPrice={formatPrice} onOpen={open(womenShown)} onShopAll={() => openCollection('Women', womenSub)}
           tagline={['Saree, three piece and more.', 'Made to stand out.']} variant="curve" tone="white"

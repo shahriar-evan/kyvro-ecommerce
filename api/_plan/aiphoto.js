@@ -3,6 +3,7 @@
 // flat-colour background. The Admin product form (ShowcasePhotoField) then removes that background colour in the browser and
 // the team member decides to use it or not (nothing is saved here).
 //
+// view 'look' (Shop the Look, OpenAI): see ./ailook.js.
 // Body: { source: 'https://…' or 'data:image/…;base64,…', view: 'front' | 'side' | 'clean' (only remove the background), kind: 'garment' | 'shoe',
 //         bg: 'green' | 'magenta' | 'blue' | 'white' (the flat background colour to ask for; the browser removes it) }
 // Answer: { image: 'data:image/png;base64,…', model } or { error, code } with code
@@ -14,6 +15,7 @@
 // Uses per day are counted in aiUsage/{YYYY-MM-DD} (server only; no client rule allows it).
 import { FS, accessToken, val } from '../_sslc.js';
 import { ownerEmails } from '../_owners.js';
+import { makeLook } from './ailook.js';
 
 const GEMINI = 'https://generativelanguage.googleapis.com/v1beta/models';
 const OPENROUTER = 'https://openrouter.ai/api/v1/chat/completions';
@@ -68,11 +70,11 @@ async function teamCaller(req) {
   if (r.ok) {
     const f = Object.fromEntries(Object.entries((await r.json()).fields || {}).map(([k, v]) => [k, val(v)]));
     if (f.active === false) return { error: 'Your team access is off.', status: 403 };
-    return { email };
+    return { email, role: ['owner', 'manager'].includes(f.role) ? f.role : 'admin' };
   }
   if (r.status === 404 && claims.email_verified === true) {
     const owners = await ownerEmails(await accessToken());
-    if (owners.has(email)) return { email };
+    if (owners.has(email)) return { email, role: 'owner' };
   }
   return { error: 'Only the team can use this.', status: 403 };
 }
@@ -174,12 +176,22 @@ export default async function aiPhoto(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only.' });
   const who = await teamCaller(req);
   if (who.error) return res.status(who.status).json({ error: who.error });
+  const body0 = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  // Shop the Look: a model wearing several products (OpenAI), Owner / Manager only
+  if (body0.view === 'look') {
+    if (who.role === 'admin') return res.status(403).json({ error: 'Only the Owner or a Manager can make looks.' });
+    const token = await accessToken();
+    const day = new Date(Date.now() + 6 * 3600 * 1000).toISOString().slice(0, 10);
+    const limit = dailyLimit();
+    if ((await usage(token, day)) >= limit) return res.status(429).json({ error: `Today's AI photo limit (${limit}) is used up. Try again tomorrow.`, code: 'daily-limit' });
+    return makeLook(req, res, { body: body0, readSource, token, day, usage });
+  }
   const orKey = process.env.OPENROUTER_API_KEY;
   const key = process.env.GEMINI_API_KEY;
   const provider = orKey ? 'openrouter' : 'gemini';
   if (!orKey && !key) return res.status(503).json({ error: 'AI photos are not set up yet (no OPENROUTER_API_KEY or GEMINI_API_KEY in Vercel).', code: 'no-key', provider: 'openrouter' });
 
-  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  const body = body0;
   const view = ['front', 'side', 'clean'].includes(body.view) ? body.view : 'front';
   const kind = body.kind === 'shoe' ? 'shoe' : 'garment';
   const bg = BACKGROUNDS[body.bg] || BACKGROUNDS.green;
