@@ -76,7 +76,7 @@ async function teamCaller(req) {
     const owners = await ownerEmails(await accessToken());
     if (owners.has(email)) return { email, role: 'owner' };
   }
-  return { error: 'Only the team can use this.', status: 403 };
+  return { error: `Only the team can use this. You are signed in as ${email}, which is not a team account: sign out and sign in again with your Kyvro team / Owner Google account.`, status: 403 };
 }
 
 async function readSource(source) {

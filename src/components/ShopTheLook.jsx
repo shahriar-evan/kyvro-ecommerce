@@ -123,6 +123,8 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart, ope
   };
   const makeColor = async () => {
     if (!offer || trying) return;
+    // the login may still be loading right after the page opens: wait for it before asking to sign in
+    try { if (auth.authStateReady) await auth.authStateReady(); } catch (e) { /* old SDK */ }
     if (!auth.currentUser) {
       try { await signInWithPopup(auth, googleProvider); } catch (e) { setTryMsg({ type: 'err', text: 'Sign in with Google to try colours on the model.' }); return; }
     }
