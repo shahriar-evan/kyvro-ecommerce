@@ -15,7 +15,7 @@ import { placeOrder, watchOrders, cancelMyOrder } from './orders';
 import { watchProfile, saveProfile, watchMyOrders, saveCartSummary } from './customerData';
 import { ensureSubscribed } from './subscribers';
 import PushPrompt from './components/PushPrompt';
-import { watchProducts, cachedProducts, watchProductCosts, watchProductCommissions, setProductCommission, saveProductCost, removeProductCost, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
+import { watchProducts, loadCatalog, cachedProducts, watchProductCosts, watchProductCommissions, setProductCommission, saveProductCost, removeProductCost, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
 import { watchStoreSettings, cachedStoreSettings, watchPlans, watchPromos } from './storeSettings';
 import { visibleShopIds, normalizePlans, effectiveTier, shopIsPaid, basicDue, couponActive, couponAmountFor, cleanCouponCode, storeCouponActive, storeCouponAmount } from './data/priceCheck';
 import { themePreviewFromUrl, cleanTheme, cleanMode } from './data/themes';
@@ -624,8 +624,31 @@ export default function App() {
     if (displayName) setCheckoutForm(f => (f.fullName ? f : { ...f, fullName: displayName }));
   }, [displayName]);
 
-  // Live products from Firestore (everyone sees the same shop)
+  // Products. The team watches Firestore live (every product). Customers get the server's cached list (refreshed every
+  // 15 minutes; far fewer Firestore reads); if that fails they watch Firestore like before.
+  const onProducts = (list, isEmpty) => {
+    setProductsReady(true);
+    let moved = false;
+    try { moved = localStorage.getItem('kyvro_cloud') === '1'; } catch (e) {}
+    if (!isEmpty) {
+      try { localStorage.setItem('kyvro_cloud', '1'); } catch (e) {}
+      setCloudProducts(list);
+    } else {
+      setCloudProducts(moved ? [] : null);
+    }
+  };
   useEffect(() => {
+    if (isAdminLoggedIn || !accessChecked) return undefined;
+    let live = true;
+    let stop = null;
+    const load = () => loadCatalog().then((list) => { if (live && list.length) onProducts(list, false); else if (live && !stop) throw new Error('empty'); })
+      .catch(() => { if (live && !stop) stop = watchProducts(onProducts, (err) => { setProductsReady(true); console.error('Could not load products:', err); }); });
+    load();
+    const t = setInterval(() => { if (!stop) loadCatalog().then((list) => { if (live && list.length) onProducts(list, false); }).catch(() => {}); }, 15 * 60 * 1000);
+    return () => { live = false; clearInterval(t); if (stop) stop(); };
+  }, [isAdminLoggedIn, accessChecked]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!isAdminLoggedIn) return undefined;
     try {
       const unsubscribe = watchProducts((list, isEmpty) => {
         setProductsReady(true);

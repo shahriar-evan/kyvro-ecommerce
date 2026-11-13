@@ -10,6 +10,7 @@
 //   POST /api/plan?action=billing     my own plan payments (Subscription > Billing history)
 //   GET  /api/plan?action=sitemap     /sitemap.xml for Google (home, products, live shop links)
 //   POST /api/plan?action=remove-shop the Owner removes (30 days in Removed shops), restores or deletes a shop
+//   GET  /api/plan?action=catalog     public: every approved product, CDN-cached 15 min (saves Firestore reads)
 //   POST /api/plan?action=chat        public: the website help chat (order status with phone check, AI shopping answers)
 //   POST /api/plan?action=ai-photo    team: a front / side product photo made by Gemini (Admin product form, home page photo)
 import init from './_plan/init.js';
@@ -25,11 +26,12 @@ import removeShop from './_plan/removeshop.js';
 import aiPhoto from './_plan/aiphoto.js';
 import stock from './_plan/stock.js';
 import chat from './_plan/chat.js';
+import catalog from './_plan/catalog.js';
 
 // 300 s: a Premium (high quality) Shop the Look picture can take 1-3 minutes (Vercel fluid compute allows up to 300 s)
 export const config = { maxDuration: 300 };
 
-const ACTIONS = { init, callback, sync, reminders, 'seller-earnings': sellerEarnings, comp, warn, billing, sitemap, 'remove-shop': removeShop, 'ai-photo': aiPhoto, stock, chat };
+const ACTIONS = { init, callback, sync, reminders, 'seller-earnings': sellerEarnings, comp, warn, billing, sitemap, 'remove-shop': removeShop, 'ai-photo': aiPhoto, stock, chat, catalog };
 
 export default async function handler(req, res) {
   const action = String((req.query && req.query.action) || '');
