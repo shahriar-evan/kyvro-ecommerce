@@ -1,4 +1,4 @@
-import { FS, accessToken, val } from '../_sslc.js';
+import { FS, accessToken, val, quotaMsg } from '../_sslc.js';
 import { ownerEmails } from '../_owners.js';
 // POST /api/plan?action=ai-photo with { view: 'look', sources: [2-4 product photos], who: 'men' | 'women' }  (Owner / Manager)
 // "Shop the Look" (home page): one standing model wearing exactly these products, full body, on a TRANSPARENT background,
@@ -126,6 +126,7 @@ async function visitor(req) {
   const uid = String(c.user_id || c.sub || '');
   if (!uid || !/^[A-Za-z0-9]{10,128}$/.test(uid)) return null;
   const r = await fetch(`${FS}/documents/users/${uid}`, { headers: { Authorization: `Bearer ${idToken}` } });
+  if (r.status === 429) return { quota: true }; // the database's daily free limit, not a missing login
   if (r.status !== 200 && r.status !== 404) return null;
   const email = String(c.email || '').toLowerCase();
   let team = false;
@@ -168,6 +169,7 @@ export async function lookColor(req, res, { body, readSource }) {
   const have = await readDoc(token, `lookColors/${id}`);
   if (have && have.image) return res.status(200).json({ image: have.image, cached: true });
   const who = await visitor(req);
+  if (who && who.quota) return res.status(503).json({ error: quotaMsg(), code: 'quota' });
   if (!who) return res.status(401).json({ error: 'Please sign in with Google to try colours on the model.', code: 'sign-in' });
   if (!key) return res.status(503).json({ error: 'Colour try-on is not set up yet.', code: 'no-key' });
   const look = await readDoc(token, `looks/${lookId}`);
