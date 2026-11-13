@@ -11,7 +11,7 @@ import { totalStock, hasSizeStock, orderedSizes, stockFor, stockForColor, produc
 // Prices come from the products the page already shows, so a shop link gets its own prices.
 let cache = null; // the looks, kept for the next visit to the home page
 
-function Piece({ n, p, pick, setPick, active, onHover, formatPrice, onAdd, onOpen, onColor }) {
+function Piece({ n, p, pick, setPick, active, onHover, formatPrice, selected, onSelect, onOpen, onColor }) {
   const sized = hasSizeStock(p);
   const sizes = sized ? orderedSizes(Object.keys(p.sizeStock), p.gender) : [];
   const colors = productColors(p);
@@ -46,12 +46,17 @@ function Piece({ n, p, pick, setPick, active, onHover, formatPrice, onAdd, onOpe
           </div>
         )}
       </div>
-      {!out && <button type="button" onClick={onAdd} className="self-center shrink-0 w-9 h-9 rounded-full border border-black/20 hover:bg-black hover:text-white text-lg leading-none" aria-label={`Add ${p.name} to cart`}>+</button>}
+      {!out && (
+        <button type="button" role="checkbox" aria-checked={selected} onClick={onSelect} aria-label={`Select ${p.name}`}
+          className={`self-center shrink-0 w-7 h-7 rounded-md border-2 flex items-center justify-center transition ${selected ? 'bg-black border-black text-white' : 'border-black/25 hover:border-black'}`}>
+          {selected && <Check size={16} strokeWidth={3} />}
+        </button>
+      )}
     </div>
   );
 }
 
-export default function ShopTheLook({ products = [], formatPrice, addToCart, openProduct }) {
+export default function ShopTheLook({ products = [], formatPrice, addToCart, openProduct, bundle = true }) {
   const [looks, setLooks] = useState(cache);
   useEffect(() => watchLooks((l) => { cache = l; setLooks(l); }), []);
   const byId = useMemo(() => Object.fromEntries(products.map((p) => [String(p.id), p])), [products]);
@@ -79,7 +84,8 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart, ope
   const dragged = useRef(false);
   const count = shown.length;
   const at = count ? ((pos % count) + count) % count : 0;
-  useEffect(() => { setMsg(null); setHot(null); if (!trying) { setOffer(null); setTryMsg(null); } }, [at]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [chosen, setChosen] = useState({}); // pieces ticked for Add selected
+  useEffect(() => { setMsg(null); setHot(null); if (!trying) { setOffer(null); setTryMsg(null); } setChosen({}); }, [at]); // eslint-disable-line react-hooks/exhaustive-deps
   // turns by itself every 10 s; stops while the visitor is in the pieces panel (picking a size), for 8 s after they touch it, or with Pause
   const SPIN = 10000;
   const [playing, setPlaying] = useState(true);
@@ -154,16 +160,29 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart, ope
     if (hasSizeStock(p) && !pick.size) return { need: p.name };
     return { p, color, size: hasSizeStock(p) ? pick.size : undefined };
   };
-  const addAll = () => {
-    const list = look.pieces.map(ready).filter(Boolean);
-    const need = list.find((r) => r.need);
-    if (need) { setMsg({ type: 'err', text: `Pick a size for ${need.need}. · সাইজ বেছে নিন।` }); return; }
-    if (!list.length) { setMsg({ type: 'err', text: 'These pieces are out of stock right now.' }); return; }
-    list.forEach((r) => addToCart(r.p, r.color, r.size, 1, false));
-    setMsg({ type: 'ok', text: `${list.length} piece${list.length === 1 ? '' : 's'} added to your cart. · কার্টে যোগ হয়েছে।` });
-  };
   const inStock = look.pieces.filter((x) => totalStock(x.p) > 0);
   const total = inStock.reduce((n, x) => n + (Number(x.p.price) || 0), 0);
+  // the full look gets 10% off (main store only) when every piece of the look is sold here and in stock
+  const full = bundle && inStock.length === look.pieces.length && look.pieces.length === look.items.length && look.pieces.length >= 2;
+  const off = full ? Math.floor(total * 0.1) : 0;
+  const addList = (pieces, asLook) => {
+    const list = pieces.map(ready).filter(Boolean);
+    const need = list.find((r) => r.need);
+    if (need) { setMsg({ type: 'err', text: `Pick a size for ${need.need}. · সাইজ বেছে নিন।` }); return false; }
+    if (!list.length) { setMsg({ type: 'err', text: 'These pieces are out of stock right now.' }); return false; }
+    list.forEach((r) => addToCart(r.p, r.color, r.size, 1, false, asLook ? { id: look.id, n: look.pieces.length } : null));
+    return list.length;
+  };
+  const addAll = () => {
+    const n = addList(look.pieces, full);
+    if (n) setMsg({ type: 'ok', text: full ? `Full look added with 10% off (save ${formatPrice(off)}). · ১০% ছাড়ে কার্টে যোগ হয়েছে।` : `${n} piece${n === 1 ? '' : 's'} added to your cart. · কার্টে যোগ হয়েছে।` });
+  };
+  // pick one or more pieces (no discount)
+  const chosenList = look.pieces.filter((x) => chosen[x.id] && totalStock(x.p) > 0);
+  const addChosen = () => {
+    const n = addList(chosenList, false);
+    if (n) { setMsg({ type: 'ok', text: `${n} piece${n === 1 ? '' : 's'} added to your cart. · কার্টে যোগ হয়েছে।` }); setChosen({}); }
+  };
   // the ring: each look sits at an angle from the middle; the far ones get smaller, softer and further back
   const narrow = typeof window !== 'undefined' && window.innerWidth < 640;
   const ringOf = (k) => {
@@ -282,17 +301,25 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart, ope
             {look.pieces.map((x) => (
               <Piece key={x.id} n={x.n} p={x.p} onOpen={() => openProduct && openProduct(x.p)} pick={picks[x.id] || {}} setPick={(v) => setPicks((s) => ({ ...s, [x.id]: v }))} onColor={(c) => pickColor(look, x, c)}
                 active={hot === x.id} onHover={() => setHot(x.id)} formatPrice={formatPrice}
-                onAdd={() => { const r = ready(x); if (!r) return; if (r.need) { setMsg({ type: 'err', text: `Pick a size for ${r.need}. · সাইজ বেছে নিন।` }); return; } addToCart(r.p, r.color, r.size, 1, false); setMsg({ type: 'ok', text: `${r.p.name} added to your cart.` }); }} />
+                selected={!!chosen[x.id]} onSelect={() => setChosen((c) => ({ ...c, [x.id]: !c[x.id] }))} />
             ))}
           </div>
           <div className="pt-5">
             <div className="flex items-baseline justify-between text-sm">
               <span className="text-gray-500">Whole look{inStock.length < look.pieces.length ? ` (${inStock.length} in stock)` : ''}</span>
-              <span className="text-xl font-bold">{formatPrice(total)}</span>
+              <span className="text-right">
+                {off > 0 && <span className="mr-2 text-sm text-gray-400 line-through">{formatPrice(total)}</span>}
+                <span className="text-xl font-bold">{formatPrice(total - off)}</span>
+              </span>
             </div>
             <button type="button" onClick={addAll} disabled={!inStock.length}
               className="mt-3 w-full h-12 rounded-lg bg-black text-white text-sm font-bold uppercase tracking-wider hover:bg-[#1a1a1a] disabled:opacity-40 flex items-center justify-center gap-2">
-              Add full look to cart <ArrowRight size={16} />
+              {off > 0 ? <>Add full look · 10% off <span className="px-1.5 py-0.5 rounded bg-[#D4AF37] text-black text-[10px] normal-case tracking-normal">Save {formatPrice(off)}</span></> : <>Add full look to cart <ArrowRight size={16} /></>}
+            </button>
+            <div className="mt-3 flex items-center gap-2 text-[11px] text-gray-500"><span className="h-px flex-1 bg-black/10" />or tick one or more pieces{off > 0 ? ' (no discount)' : ''} · এক বা একাধিক বেছে নিন<span className="h-px flex-1 bg-black/10" /></div>
+            <button type="button" onClick={addChosen} disabled={!chosenList.length}
+              className="mt-2 w-full h-11 rounded-lg border-2 border-black text-sm font-bold uppercase tracking-wider hover:bg-black hover:text-white disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-black">
+              Add selected ({chosenList.length})
             </button>
             {msg && <p className={`mt-2 text-xs flex items-center gap-1 ${msg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{msg.type === 'ok' && <Check size={13} />}{msg.text}</p>}
           </div>

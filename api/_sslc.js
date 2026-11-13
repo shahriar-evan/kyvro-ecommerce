@@ -126,7 +126,14 @@ export async function verifyOrderPrices(order) {
   }
   // a main store promo code: the Owner's codes in settings/promos
   const promos = order.coupon && !order.shop ? await getDocument('settings/promos') : null;
-  return checkOrderPrices(order, productsById, shop, visible, promos);
+  // the full-look discount: the real pieces of each look it names
+  let lookItems = null;
+  if (order.lookOff && Array.isArray(order.lookOff.looks)) {
+    const ids = order.lookOff.looks.map(String).filter((id) => /^look-[0-9]{10,16}$/.test(id)).slice(0, 5);
+    const docs = await Promise.all(ids.map((id) => getDocument(`looks/${id}`)));
+    lookItems = Object.fromEntries(ids.map((id, i) => [id, docs[i] && docs[i].active !== false ? (docs[i].items || []).map((it) => String(it.id)) : []]));
+  }
+  return checkOrderPrices(order, productsById, shop, visible, promos, lookItems);
 }
 
 // Writes the payment result into the order (+ a line in the activity trail). Only called after SSLCommerz confirmed it.
