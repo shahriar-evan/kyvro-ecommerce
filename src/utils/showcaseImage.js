@@ -199,12 +199,76 @@ export async function pickKeyColour(src, colourName = '') {
   }
 }
 
-// Shop the Look: a full-body model picture (transparent PNG / WebP file or data URL) -> at most 1100 px tall, under 450 KB
-export async function prepareLookImage(fileOrDataUrl) {
-  let file = fileOrDataUrl;
-  if (typeof fileOrDataUrl === 'string') {
-    const blob = await (await fetch(fileOrDataUrl)).blob();
-    file = new File([blob], 'look.png', { type: blob.type || 'image/png' });
+// Shop the Look: a full-body model picture (transparent PNG / WebP file or data URL) -> a 2:3 transparent frame (the shape
+// the AI makes and the home page shows), the person bottom-aligned with a little space above the head, at most 1100 px
+// tall and under 450 KB. The same frame is sent to the AI for colour try-on, so the person keeps their size and place.
+const LOOK_TOP = 0.04, LOOK_BOTTOM = 0.02, LOOK_SIDE = 0.04;
+const blobImage = async (src) => {
+  if (typeof src !== 'string') return loadImage(src);
+  const blob = await (await fetch(src)).blob();
+  return loadImage(new File([blob], 'look.png', { type: blob.type || 'image/png' }));
+};
+// the visible part (alpha) of a picture: { c (canvas), x, y, w, h }
+function visibleBox(img) {
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const g = c.getContext('2d');
+  g.drawImage(img, 0, 0);
+  const { data, width, height } = g.getImageData(0, 0, c.width, c.height);
+  let clear = 0, minX = width, minY = height, maxX = -1, maxY = -1;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const a = data[(y * width + x) * 4 + 3];
+      if (a < 20) clear += 1;
+      else if (a > 40) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
+    }
   }
-  return prepareShowcaseImage(file, { maxSide: 1100, maxChars: 450000 });
+  if (clear / (width * height) < 0.03 || maxX < 0) {
+    throw new Error('This picture still has its background. Remove the background first (Mac: right-click the photo in Finder → Quick Actions → Remove Background), then upload the new PNG.');
+  }
+  return { c, x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+}
+// draws the visible part into a 2:3 frame; returns { url, rect } (rect = where the person sits, as fractions of the frame)
+function frame(b) {
+  for (let H = 1100; H >= 500; H = Math.round(H * 0.85)) {
+    const W = Math.round((H * 2) / 3);
+    const s = Math.min((H * (1 - LOOK_TOP - LOOK_BOTTOM)) / b.h, (W * (1 - 2 * LOOK_SIDE)) / b.w);
+    const dw = b.w * s, dh = b.h * s;
+    const dx = (W - dw) / 2, dy = H * (1 - LOOK_BOTTOM) - dh;
+    const out = document.createElement('canvas');
+    out.width = W; out.height = H;
+    const g = out.getContext('2d');
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(b.c, b.x, b.y, b.w, b.h, dx, dy, dw, dh);
+    let url = out.toDataURL('image/webp', 0.85);
+    if (!url.startsWith('data:image/webp')) url = out.toDataURL('image/png');
+    if (url.length <= 450000) return { url, rect: { x: dx / W, y: dy / H, w: dw / W, h: dh / H } };
+  }
+  throw new Error('This picture is too big even after making it smaller. Try a smaller file.');
+}
+export async function prepareLookImage(fileOrDataUrl) {
+  if (fileOrDataUrl instanceof File && !/^image\/(png|webp)$/.test(fileOrDataUrl.type)) throw new Error('Please upload a PNG or WebP picture with a transparent background.');
+  return frame(visibleBox(await blobImage(fileOrDataUrl))).url;
+}
+// is a saved look picture already in the 2:3 frame?
+export async function lookFramed(src) {
+  const img = await blobImage(src);
+  return Math.abs(img.naturalWidth / img.naturalHeight - 2 / 3) < 0.02;
+}
+// an older look picture (cut tight around the person) -> the 2:3 frame, with its pins moved so they stay on the same clothes.
+// On the page the old picture sat in a 2:3 box, fitted (contain) and bottom-aligned.
+export async function reframeLook(src, items) {
+  const img = await blobImage(src);
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  const k = Math.min((2 / 3) / (iw / ih), 1); // the old picture's width in the box (as a fraction), height fills when tall
+  const old = iw / ih <= 2 / 3 ? { x: (1 - k) / 2, y: 0, w: k, h: 1 } : { x: 0, y: 1 - ((2 / 3) / (iw / ih)), w: 1, h: (2 / 3) / (iw / ih) };
+  const b = visibleBox(img);
+  const { url, rect } = frame(b);
+  const moved = (items || []).map((it) => {
+    const px = ((it.x / 100 - old.x) / old.w) * iw, py = ((it.y / 100 - old.y) / old.h) * ih; // pixel in the old picture
+    const fx = (px - b.x) / b.w, fy = (py - b.y) / b.h; // place on the person
+    const c = (v) => Math.max(0, Math.min(100, Math.round(v * 100)));
+    return { ...it, x: c(rect.x + fx * rect.w), y: c(rect.y + fy * rect.h) };
+  });
+  return { image: url, items: moved };
 }

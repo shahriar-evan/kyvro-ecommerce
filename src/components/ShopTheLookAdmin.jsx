@@ -3,7 +3,7 @@ import { Sparkles, Upload, Trash2, Pencil, Plus, X } from 'lucide-react';
 import { askConfirm } from './AlertCenter';
 import { watchLooks, saveLook, deleteLook, LOOK_MAX_ITEMS, LOOK_MAX } from '../looks';
 import { makeAiLook } from '../aiPhoto';
-import { prepareLookImage } from '../utils/showcaseImage';
+import { prepareLookImage, lookFramed, reframeLook } from '../utils/showcaseImage';
 import { totalStock, rankBySales } from '../data/catalog';
 
 // Admin → Shop the Look (Owner / Manager). A look = a full-body model picture (transparent) + the 1-4 store products
@@ -88,6 +88,23 @@ export default function ShopTheLookAdmin({ products = [], isDarkMode, formatPric
   // ✨ Auto make: up to 4 men's looks from in-stock best sellers (jacket / shirt / tee / hoodie + cargo or pants + shoes),
   // saved and shown at once with pins in the usual places; change or delete any of them afterwards
   const [auto, setAuto] = useState('');
+  // older looks were cut tight around the person; colour try-on needs the 2:3 frame (one click fixes them, pins move along)
+  const [unframed, setUnframed] = useState([]);
+  useEffect(() => {
+    let live = true;
+    Promise.all((looks || []).map(async (l) => ((await lookFramed(l.image).catch(() => true)) ? null : l.id)))
+      .then((ids) => { if (live) setUnframed(ids.filter(Boolean)); });
+    return () => { live = false; };
+  }, [looks]);
+  const fixFrames = async () => {
+    setBusy('frame'); setMsg(null);
+    let done = 0;
+    for (const l of looks.filter((x) => unframed.includes(x.id))) {
+      try { const r = await reframeLook(l.image, l.items); await saveLook({ ...l, image: r.image, items: r.items }, staff); done += 1; } catch (e) { setMsg({ type: 'err', text: `${l.name || 'Look'}: ${e.message}` }); }
+    }
+    setBusy('');
+    setMsg((m) => m || { type: 'ok', text: `${done} look${done === 1 ? '' : 's'} ready for colour try-on.` });
+  };
   const autoPlan = () => {
     const pool = rankBySales(products.filter((p) => (p.status || 'approved') === 'approved' && MEN_SIDE(p) && totalStock(p) > 0));
     const of = (k) => pool.filter((p) => pieceKind(p) === k);
@@ -178,6 +195,12 @@ export default function ShopTheLookAdmin({ products = [], isDarkMode, formatPric
             </div>
           )}
         </div>
+        {!form && unframed.length > 0 && (
+          <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-xs flex flex-wrap items-center gap-2">
+            <span className="flex-1 min-w-[12rem]">{unframed.length} older look{unframed.length === 1 ? '' : 's'} must be fixed once so customers can try other colours on the model (same picture, just framed; pins move along).</span>
+            <button type="button" disabled={!!busy} onClick={fixFrames} className="px-3 py-1.5 rounded bg-[#D4AF37] text-black font-bold disabled:opacity-50">{busy === 'frame' ? 'Fixing…' : `Fix ${unframed.length} look${unframed.length === 1 ? '' : 's'}`}</button>
+          </div>
+        )}
         {!form && qualityPick}
         {!form && timer}
         {!form && msg && <p className={`text-xs ${msg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{msg.text}</p>}

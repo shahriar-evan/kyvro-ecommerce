@@ -42,7 +42,7 @@ export const deleteLook = (id) => deleteDoc(doc(db, "looks", id));
 // ---- Colour try-on (customers): a saved look's model in another colour of one of its products ----
 // lookColors/{look_product_colour} = a picture made earlier (public, free to show); a new one is made by the server
 // (api/plan.js?action=ai-photo view 'look-color', signed in, 10 a day per account).
-export const lookColorKey = (lookId, productId, color) => `${lookId}_${productId}_${String(color || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)}`;
+export const lookColorKey = (lookId, productId, color) => `v2_${lookId}_${productId}_${String(color || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)}`;
 export async function getLookColor(lookId, productId, color) {
   try {
     const { getDoc } = await import("firebase/firestore");
