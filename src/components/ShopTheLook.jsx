@@ -19,7 +19,7 @@ function Piece({ n, p, pick, setPick, active, onHover, formatPrice, selected, on
   const out = totalStock(p) <= 0;
   const left = (s) => stockFor(p, s, color);
   return (
-    <div id={`look-piece-${p.id}`} onMouseEnter={onHover} className={`py-4 border-b border-black/10 flex gap-3 transition ${active ? 'bg-[#D4AF37]/10 -mx-3 px-3 rounded-lg' : ''}`}>
+    <div id={`look-piece-${p.id}`} onMouseEnter={onHover} className={`py-4 flex gap-3 transition max-lg:min-w-[86%] max-lg:snap-start max-lg:pr-4 max-lg:mr-4 max-lg:border-r lg:border-b border-black/10 ${active ? 'bg-[#D4AF37]/10 lg:-mx-3 lg:px-3 rounded-lg' : ''}`}>
       <div className="relative w-20 h-24 shrink-0 rounded-md overflow-hidden bg-[#f1f1f0]">
         <button type="button" onClick={onOpen} className="block w-full h-full" aria-label={`Open ${p.name}`}>
           <img src={imageFor(p, color)} alt={p.name} loading="lazy" className={`w-full h-full object-cover hover:scale-105 transition ${out ? 'grayscale opacity-60' : ''}`} />
@@ -147,7 +147,7 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart, ope
     setHot(x.id);
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
       const el = document.getElementById(`look-piece-${x.id}`);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
     }
   };
 
@@ -200,7 +200,7 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart, ope
   return (
     <section className="w-full bg-white text-black border-t border-black/5" aria-label="Shop the look">
       <style>{'@keyframes kyLookBar{from{width:0}to{width:100%}}@keyframes fadeIn{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:none}}'}</style>
-      <div className="max-w-[1500px] mx-auto grid lg:grid-cols-[1fr_400px]">
+      <div className="max-w-[1500px] mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px]">
         <div className="relative px-4 sm:px-10 pt-10 pb-6 overflow-hidden">
           <p className="text-[11px] font-bold tracking-[0.35em] text-[#B8921F]">SHOP THE LOOK</p>
           <h2 className="mt-2 text-3xl sm:text-5xl font-serif font-bold">Wear the whole look.</h2>
@@ -281,7 +281,13 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart, ope
 
           <div className="mt-4 flex items-center gap-4">
             <button type="button" onClick={() => step(-1)} className="p-2 rounded-full border border-black/20 hover:border-black" aria-label="Previous look"><ArrowLeft size={18} /></button>
-            <div className="flex-1 flex gap-2 overflow-x-auto">
+            <div className="flex-1 flex justify-center lg:hidden" aria-hidden="true">
+              <span className="block w-1/2 h-0.5 bg-black/15 overflow-hidden">
+                <span key={`m-${pos}-${playing && !hover && !focus}`} className="block h-full bg-black"
+                  style={playing && !hover && !focus && count > 1 ? { animation: `kyLookBar ${SPIN}ms linear forwards` } : { width: `${((i + 1) / count) * 100}%` }} />
+              </span>
+            </div>
+            <div className="flex-1 hidden lg:flex gap-2 overflow-x-auto">
               {shown.map((l, k) => (
                 <button key={l.id} type="button" onClick={() => go(k)} className="min-w-[3rem] text-left">
                   <span className="block h-0.5 bg-black/15 overflow-hidden">
@@ -297,12 +303,12 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart, ope
           </div>
         </div>
 
-        <aside onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onFocus={() => setHover(true)} onBlur={() => setHover(false)} onTouchStart={hold} className="border-t lg:border-t-0 lg:border-l border-black/10 px-4 sm:px-8 py-8 flex flex-col lg:sticky lg:top-[88px] lg:self-start lg:max-h-[calc(100vh-96px)] lg:overflow-y-auto">
+        <aside onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onFocus={() => setHover(true)} onBlur={() => setHover(false)} onTouchStart={hold} className="min-w-0 border-t lg:border-t-0 lg:border-l border-black/10 px-4 sm:px-8 py-8 flex flex-col lg:sticky lg:top-[88px] lg:self-start lg:max-h-[calc(100vh-96px)] lg:overflow-y-auto">
           <div className="flex items-baseline justify-between">
             <h3 className="text-xl font-bold">In this look</h3>
             <span className="text-[11px] tracking-[0.2em] text-gray-500">{look.pieces.length} PIECE{look.pieces.length === 1 ? '' : 'S'}</span>
           </div>
-          <div className="mt-2 flex-1">
+          <div className="mt-2 flex-1 max-lg:flex max-lg:items-start max-lg:overflow-x-auto max-lg:snap-x max-lg:snap-mandatory max-lg:scroll-px-4 max-lg:-mx-4 max-lg:px-4 max-lg:[scrollbar-width:none]">
             {look.pieces.map((x) => (
               <Piece key={x.id} n={x.n} p={x.p} onOpen={() => openProduct && openProduct(x.p)} pick={picks[x.id] || {}} setPick={(v) => setPicks((s) => ({ ...s, [x.id]: v }))} onColor={(c) => pickColor(look, x, c)}
                 active={hot === x.id} onHover={() => setHot(x.id)} formatPrice={formatPrice}
