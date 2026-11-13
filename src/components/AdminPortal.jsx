@@ -1,4 +1,5 @@
 import { auth } from '../firebase';
+import { productIdsForLink } from '../data/supplierLink';
 import React from 'react';
 import { askConfirm } from './AlertCenter';
 import AdminLogin from './AdminLogin';
@@ -45,7 +46,10 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
   const [openId, setOpenId] = React.useState(null);
   const catLabel = (p) => (p.gender === p.category ? p.category : `${p.gender} / ${p.category}`);
   const catList = [...products.reduce((m, p) => m.set(catLabel(p), (m.get(catLabel(p)) || 0) + 1), new Map())].sort((a, b) => a[0].localeCompare(b[0]));
-  const searched = psq ? products.filter((p) => [p.name, p.category, p.gender, p.brand, p.id, p.supplierName].some((v) => String(v || '').toLowerCase().includes(psq))) : products;
+  // Owner / Manager can also paste a supplier link (ShopBase, SelfShop...) to find the product it belongs to
+  const linkIds = (adminRole === 'owner' || adminRole === 'manager') ? productIdsForLink(productSearch, productCosts) : null;
+  const searched = linkIds ? products.filter((p) => linkIds.has(String(p.id)))
+    : psq ? products.filter((p) => [p.name, p.category, p.gender, p.brand, p.id, p.supplierName].some((v) => String(v || '').toLowerCase().includes(psq))) : products;
   const shownProducts = catFilter === 'All' ? searched : searched.filter((p) => catLabel(p) === catFilter);
   const isOwner = adminRole === 'owner';
   // My Shop with unsaved ticks / prices: ask before switching to another tab

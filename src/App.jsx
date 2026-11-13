@@ -49,6 +49,7 @@ import Footer from './components/Footer';
 import AlertCenter from './components/AlertCenter';
 import ProductDetail from './components/ProductDetail';
 import { getPaymentUrl } from './payment';
+import { productIdsForLink } from './data/supplierLink';
 import { initAnalytics, trackPageView, trackViewContent, trackAddToCart, trackInitiateCheckout, trackPurchase } from './analytics';
 // Pages most visitors never open are loaded only when needed (smaller first download on phones)
 const AdminPortal = lazy(() => import('./components/AdminPortal'));
@@ -1410,7 +1411,11 @@ export default function App() {
     }
   };
 
+  // Owner / Manager: a pasted supplier link (ShopBase, SelfShop...) finds that product in any collection.
+  // productCosts is only loaded for those two roles, so for everyone else this stays null.
+  const linkIds = (isAdminLoggedIn && (adminRole === 'owner' || adminRole === 'manager')) ? productIdsForLink(searchQuery, productCosts) : null;
   const filteredProducts = storefrontProducts.filter(p => {
+    if (linkIds) return linkIds.has(String(p.id));
     let matchesCategory = true;
     if (hasSubCategories(selectedCategory)) {
       // Men: Shirt & Punjabi by default, Women: Sharee by default, or the chosen sub-category
