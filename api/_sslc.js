@@ -57,7 +57,13 @@ export async function accessToken() {
 }
 
 // Firestore answers 429 when the free plan's daily reads are used up (Spark: 50,000 a day, back at 14:00 Bangladesh time)
-export const QUOTA_MSG = 'The database daily free limit is used up (Firebase Spark plan). It comes back at 2 PM Bangladesh time, or upgrade the Firebase project to the Blaze plan.';
+// short: when it opens again (midnight Pacific = 08:00 UTC = 2 PM Bangladesh) and how long until then
+export function quotaMsg(now = Date.now()) {
+  const d = new Date(now); const next = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 8);
+  const left = Math.max(0, (next > now ? next : next + 86400000) - now);
+  const h = Math.floor(left / 3600000), m = Math.ceil((left % 3600000) / 60000);
+  return `Database limit used up for today. Opens again at 2 PM (in ${h ? `${h} h ` : ''}${m} min).`;
+}
 
 export const val = (f) => {
   if (!f) return undefined;

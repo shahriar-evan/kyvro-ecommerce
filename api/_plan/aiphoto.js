@@ -16,7 +16,7 @@
 import { FS, accessToken, val } from '../_sslc.js';
 import { ownerEmails } from '../_owners.js';
 import { makeLook, lookColor } from './ailook.js';
-import { QUOTA_MSG } from '../_sslc.js';
+import { quotaMsg } from '../_sslc.js';
 
 const GEMINI = 'https://generativelanguage.googleapis.com/v1beta/models';
 const OPENROUTER = 'https://openrouter.ai/api/v1/chat/completions';
@@ -80,7 +80,7 @@ async function teamCaller(req) {
   let why = '';
   try { why = ((await r.json()).error || {}).status || ''; } catch (e) { /* no body */ }
   console.error('ai-photo team check', email, r.status, why, claims.email_verified);
-  if (r.status === 429) return { error: QUOTA_MSG, status: 503 };
+  if (r.status === 429) return { error: quotaMsg(), status: 503 };
   return { error: `Only the team can use this (${r.status}${why ? ` ${why}` : ''}). You are signed in as ${email}, which is not a team account: sign out and sign in again with your Kyvro team / Owner Google account.`, status: 403 };
 }
 

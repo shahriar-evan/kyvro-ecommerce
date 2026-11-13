@@ -2,7 +2,7 @@
 // Every approved product in one answer, cached by Vercel's CDN for 15 minutes (and served stale while it refreshes),
 // so customers' visits do not each read ~260 product documents from Firestore (the free plan allows 50,000 reads a day).
 // The team still watches products live in Firestore (Admin). Prices are checked again on the server before payment.
-import { FS, accessToken, val, QUOTA_MSG } from '../_sslc.js';
+import { FS, accessToken, val, quotaMsg } from '../_sslc.js';
 
 const MAX_BYTES = 3800000; // Vercel answers at most ~4.5 MB; bigger = the browser reads Firestore itself
 
@@ -15,7 +15,7 @@ export default async function catalog(req, res) {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'products' }], where: { fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'approved' } } } } }),
     });
-    if (r.status === 429) return res.status(503).json({ error: QUOTA_MSG, code: 'quota' });
+    if (r.status === 429) return res.status(503).json({ error: quotaMsg(), code: 'quota' });
     if (!r.ok) return res.status(502).json({ error: 'Could not read the products.' });
     const rows = await r.json();
     const products = rows.filter((x) => x.document).map((x) => Object.fromEntries(Object.entries(x.document.fields || {}).map(([k, v]) => [k, val(v)])))
