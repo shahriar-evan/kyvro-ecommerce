@@ -245,8 +245,8 @@ export default function ChatWidget({ products = [], storeSettings, formatPrice, 
 
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 text-sm">
             <div className={`max-w-[88%] rounded-lg px-3 py-2 ${bubbleBot}`}>
-              হাই! 👋 কী খুঁজছেন লিখুন (যেমন "১০০০ টাকার নিচে কালো শার্ট"), অর্ডার কোড + ফোন নম্বর দিয়ে অর্ডারের অবস্থা জানুন, অথবা নিচের বাটনে চাপুন।
-              <span className="block mt-1 text-xs text-gray-500">Hi! Type what you are looking for, your order code + phone to check an order, or tap a button below.</span>
+              হাই! 👋 কী খুঁজছেন লিখুন: পণ্যের নাম, কোন রঙ, আর কত টাকার মধ্যে চান। অর্ডারের অবস্থা জানতে অর্ডার কোড + ফোন নম্বর লিখুন, অথবা নিচের বাটনে চাপুন।
+              <span className="block mt-1 text-xs text-gray-500">Hi! Tell us the product you want, the colour and your budget. To check an order, type your order code + phone, or tap a button below.</span>
             </div>
             {msgs.map((m, i) => (
               m.role === 'user'
@@ -309,7 +309,7 @@ export default function ChatWidget({ products = [], storeSettings, formatPrice, 
               <a href={wa} target="_blank" rel="noopener noreferrer" className={`${chip} text-green-600`}><WhatsAppIcon size={12} /> WhatsApp</a>
             </div>
             <form onSubmit={send} className="flex gap-2">
-              <input value={text} onChange={(e) => setText(e.target.value)} maxLength={500} placeholder="Type your question… / প্রশ্ন লিখুন" className={input} />
+              <input value={text} onChange={(e) => setText(e.target.value)} maxLength={500} placeholder="পণ্য, রঙ, বাজেট লিখুন… / Product, colour, budget…" className={input} />
               <button type="submit" disabled={busy || !text.trim()} aria-label="Send" className="shrink-0 rounded bg-[#D4AF37] px-3 text-black disabled:opacity-40"><Send size={16} /></button>
             </form>
           </div>
