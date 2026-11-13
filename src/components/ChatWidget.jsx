@@ -6,7 +6,8 @@ import { totalStock, supplierOutFor, productColors } from '../data/catalog';
 
 // The website's help chat (bottom-right button).
 //  - Quick buttons (delivery charge / time, Cash on Delivery, returns) answer here in the browser: free, no AI.
-//  - Track order: order code + phone → api/plan?action=chat op 'order' (status only; the phone must match the order).
+//  - Track order (button, or an order code + phone typed in the chat): api/plan?action=chat op 'order' (status only; the phone
+//    must match the order) → one friendly sentence (Bangla, then English) + the order card.
 //  - Anything typed → api/plan?action=chat op 'ask' (AI on OpenRouter) with this page's in-stock products and the store facts;
 //    the answer can show product cards that open the product.
 // Never sends or shows supplier data or anyone's personal details.
@@ -21,6 +22,51 @@ const RETURNS = {
   en: 'Please check the product in front of the delivery person. If anything is wrong, return it to them right then (you pay only the delivery charge). After the delivery person leaves, a return or exchange needs an extra delivery charge. Online payments for orders not delivered are refunded within 14 days to the same bKash / Nagad.',
   bn: 'ডেলিভারি ম্যানের সামনেই পণ্য চেক করুন। সমস্যা থাকলে তখনই ফেরত দিন (শুধু ডেলিভারি চার্জ দিতে হবে)। ডেলিভারি ম্যান চলে যাওয়ার পর রিটার্ন বা এক্সচেঞ্জে অতিরিক্ত ডেলিভারি চার্জ লাগবে। ডেলিভারি না হলে অনলাইন পেমেন্ট ১৪ দিনের মধ্যে একই বিকাশ / নগদে ফেরত দেওয়া হয়।',
 };
+
+const BN_DIGITS = '০১২৩৪৫৬৭৮৯';
+const bnNum = (s) => String(s).replace(/[0-9]/g, (d) => BN_DIGITS[d]);
+const dayText = (iso, bn) => {
+  const d = iso ? new Date(iso) : null;
+  if (!d || Number.isNaN(d.getTime())) return '';
+  return bn ? bnNum(d.toLocaleDateString('bn-BD', { day: 'numeric', month: 'long' })) : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+};
+// One friendly sentence (Bangla + English) for an order's status
+function statusSentence(o) {
+  const inside = o.area === 'Inside Dhaka';
+  const outside = o.area === 'Outside Dhaka';
+  const eta = inside ? ['১–২ দিনের', '1–2 days'] : outside ? ['৩–৪ দিনের', '3–4 days'] : ['২–৪ দিনের', '2–4 days'];
+  const when = dayText(o.statusAt);
+  const whenBn = dayText(o.statusAt, true);
+  const head = [`অর্ডার ${o.number}:`, `Order ${o.number}:`];
+  switch (o.status) {
+    case 'Processing':
+      return { bn: `${head[0]} আপনার অর্ডার কনফার্ম হয়েছে ✅ এখন প্যাকিং / প্রসেসিং চলছে। শিপ হওয়ার পর ${eta[0]} মধ্যে আপনার কাছে পৌঁছে যাবে।`,
+        en: `${head[1]} your order is confirmed ✅ and is being packed now. After it ships, it reaches you within ${eta[1]}.` };
+    case 'Shipped':
+      return { bn: `${head[0]} আপনার অর্ডার শিপ হয়ে গেছে 🚚${whenBn ? ` (${whenBn})` : ''}, ডেলিভারির পথে আছে। আগামী ${inside ? '১–২' : outside ? '২–৩' : '১–৩'} দিনের মধ্যে আপনার কাছে পৌঁছে যাবে।`,
+        en: `${head[1]} your order has shipped 🚚${when ? ` (${when})` : ''} and is on the way. It will reach you in the next ${inside ? '1–2' : outside ? '2–3' : '1–3'} days.` };
+    case 'Delivered':
+      return { bn: `${head[0]} আপনার অর্ডার ডেলিভার হয়ে গেছে 🎉${whenBn ? ` (${whenBn})` : ''}। Kyvro থেকে কেনার জন্য ধন্যবাদ!`,
+        en: `${head[1]} your order has been delivered 🎉${when ? ` (${when})` : ''}. Thank you for shopping with Kyvro!` };
+    case 'Cancelled':
+      return { bn: `${head[0]} এই অর্ডারটি বাতিল করা হয়েছে। কোনো প্রশ্ন থাকলে WhatsApp এ আমাদের জানান।`,
+        en: `${head[1]} this order was cancelled. If you have any question, message us on WhatsApp.`, wa: true };
+    default:
+      return { bn: `${head[0]} আমরা আপনার অর্ডার পেয়েছি 👍 খুব শীঘ্রই কনফার্ম করে প্রসেসিং শুরু হবে। তারপর ${eta[0]} মধ্যে ডেলিভারি।`,
+        en: `${head[1]} we have received your order 👍 We will confirm it and start processing soon, then delivery within ${eta[1]}.` };
+  }
+}
+
+// an order code and / or a Bangladeshi phone number typed in the chat
+const CODE_RE = /KYV[\s-]?(\d{6})[\s-]?(\d{4})/i;
+function findOrderBits(q) {
+  const m = q.match(CODE_RE);
+  const code = m ? `KYV-${m[1]}-${m[2]}` : '';
+  const rest = (m ? q.replace(m[0], ' ') : q).replace(/[০-৯]/g, (d) => String(BN_DIGITS.indexOf(d)));
+  const digits = (rest.match(/(?:\+?88)?[\s-]*0[\s-]*1(?:[\s-]*\d){9}/) || [''])[0].replace(/\D/g, '');
+  const phone = digits ? digits.slice(-11) : '';
+  return { code, phone: /^01[3-9]\d{8}$/.test(phone) ? phone : '' };
+}
 
 const api = async (body) => {
   const r = await fetch('/api/plan?action=chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -38,8 +84,11 @@ function catalogText(products) {
   }).join('\n');
 }
 
-// A bot message that appears like someone typing it: letter by letter (about 25 letters a second, at most ~6 s), then the Bangla line.
-function TypeText({ text, bn, animate, onTick, onDone }) {
+// A bot message that appears like someone typing it: letter by letter (about 25 letters a second, at most ~6 s).
+// With a Bangla line, the Bangla comes first and the English under it.
+function TypeText({ text: en, bn: bnText, animate, onTick, onDone }) {
+  const text = bnText || en;
+  const bn = bnText ? en : '';
   const full = text + (bn ? `\n${bn}` : '');
   const [n, setN] = useState(animate ? 0 : full.length);
   useEffect(() => {
@@ -76,6 +125,7 @@ export default function ChatWidget({ products = [], storeSettings, formatPrice, 
   const [track, setTrack] = useState(false);
   const [code, setCode] = useState('');
   const [phone, setPhone] = useState('');
+  const pending = useRef({ code: '', phone: '' }); // an order code / phone typed in the chat, waiting for the other half
   const endRef = useRef(null);
 
   useEffect(() => { if (endRef.current) endRef.current.scrollIntoView({ block: 'end' }); }, [msgs, track, busy, open]);
@@ -112,6 +162,24 @@ export default function ChatWidget({ products = [], storeSettings, formatPrice, 
     setBusy(true);
     const started = Date.now();
     let m;
+    const bits = findOrderBits(q);
+    if (bits.code || bits.phone) {
+      const code = bits.code || pending.current.code;
+      const ph = bits.phone || pending.current.phone;
+      if (code && ph) {
+        pending.current = { code: '', phone: '' };
+        m = await lookup(code, ph);
+      } else {
+        pending.current = { code, phone: ph };
+        m = code
+          ? { bn: 'ধন্যবাদ! এখন অর্ডারে দেওয়া ফোন নম্বরটি লিখুন।', text: 'Thanks! Now type the phone number used on the order.' }
+          : { bn: 'অর্ডারের অবস্থা দেখতে অর্ডার কোডটি লিখুন (যেমন KYV-261030-1234)।', text: 'To check your order, type the order code too (like KYV-261030-1234).' };
+      }
+      await wait(Math.max(0, 1600 - (Date.now() - started)));
+      setBusy(false);
+      botSay(m);
+      return;
+    }
     try {
       const r = await api({ op: 'ask', message: q, history, catalog: catalogText(products), faq: facts() });
       m = r.ok ? { text: r.reply, ids: r.ids || [] }
@@ -124,19 +192,26 @@ export default function ChatWidget({ products = [], storeSettings, formatPrice, 
     botSay(m);
   };
 
+  // order status → a bot message (sentence + the order card)
+  async function lookup(c, ph) {
+    try {
+      const r = await api({ op: 'order', order: String(c).trim().toUpperCase(), phone: ph });
+      if (r.ok && r.order) return { order: r.order, ...statusSentence(r.order), text: statusSentence(r.order).en };
+      if (r.error === 'bad-code') return { bn: 'অর্ডার কোড দেখতে এমন: KYV-261030-1234', text: 'The order code looks like KYV-261030-1234.' };
+      if (r.error === 'bad-phone') return { bn: 'অর্ডারে দেওয়া ফোন নম্বরটি লিখুন।', text: 'Please enter the phone number used on the order.' };
+      return { bn: 'অর্ডার কোড বা ফোন নম্বর মিলছে না। একবার চেক করে আবার লিখুন।', text: 'Order code and phone number do not match. Please check and try again.', wa: true };
+    } catch (err) {
+      return { bn: 'ইন্টারনেট সংযোগ নেই। আবার চেষ্টা করুন।', text: 'No internet connection. Please try again.' };
+    }
+  }
+
   const trackSubmit = async (e) => {
     e.preventDefault();
     if (busy) return;
     setBusy(true);
-    let m;
     const started = Date.now();
-    try {
-      const r = await api({ op: 'order', order: code.trim().toUpperCase(), phone });
-      if (r.ok && r.order) { m = { order: r.order, anim: false }; setTrack(false); setCode(''); setPhone(''); }
-      else m = { text: r.error === 'bad-code' ? 'The order code looks like KYV-261030-1234.' : r.error === 'bad-phone' ? 'Please enter the phone number used on the order.' : 'Order code and phone number do not match. Please check and try again.', bn: r.error === 'no-match' ? 'অর্ডার কোড বা ফোন নম্বর মিলছে না।' : '' };
-    } catch (err) {
-      m = { text: 'No internet connection. Please try again.' };
-    }
+    const m = await lookup(code, phone);
+    if (m.order) { setTrack(false); setCode(''); setPhone(''); }
     await wait(Math.max(0, 1500 - (Date.now() - started)));
     setBusy(false);
     botSay(m);
@@ -170,29 +245,25 @@ export default function ChatWidget({ products = [], storeSettings, formatPrice, 
 
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 text-sm">
             <div className={`max-w-[88%] rounded-lg px-3 py-2 ${bubbleBot}`}>
-              Hi! 👋 Looking for something? Type it (e.g. "black shirt under 1000") or tap a button below.
-              <span className="block mt-1 text-xs text-gray-500">হাই! কী খুঁজছেন লিখুন, অথবা নিচের বাটনে চাপুন।</span>
+              হাই! 👋 কী খুঁজছেন লিখুন (যেমন "১০০০ টাকার নিচে কালো শার্ট"), অর্ডার কোড + ফোন নম্বর দিয়ে অর্ডারের অবস্থা জানুন, অথবা নিচের বাটনে চাপুন।
+              <span className="block mt-1 text-xs text-gray-500">Hi! Type what you are looking for, your order code + phone to check an order, or tap a button below.</span>
             </div>
             {msgs.map((m, i) => (
               m.role === 'user'
                 ? <div key={m.key} className="ml-auto max-w-[85%] w-fit rounded-lg bg-[#D4AF37] px-3 py-2 text-black whitespace-pre-line">{m.text}</div>
                 : (
                   <div key={m.key} className={`max-w-[92%] rounded-lg px-3 py-2 ${bubbleBot}`}>
-                    {m.order ? (
-                      <div>
-                        <p className="font-bold">Order {m.order.number}</p>
-                        <p className="mt-1"><b>{m.order.status}</b>{STATUS_BN[m.order.status] ? <span className="text-xs text-gray-500"> · {STATUS_BN[m.order.status]}</span> : null}</p>
-                        <p className="text-xs text-gray-500 mt-1">{[m.order.paymentMethod, m.order.paymentStatus].filter(Boolean).join(' · ')}{m.order.total ? ` · ${formatPrice(m.order.total)}` : ''}</p>
-                        <ul className="mt-1.5 text-xs space-y-0.5">
+                    <TypeText text={m.text || ''} bn={m.bn || ''} animate={!!m.anim} onTick={scroll} onDone={() => { settle(m.key); setTimeout(scroll, 30); }} />
+                    {!m.anim && m.policy && setCurrentView && <button type="button" onClick={() => { setOpen(false); setCurrentView('refund'); window.scrollTo(0, 0); }} className="mt-1.5 text-xs font-semibold text-[#B8941F] underline">Read the full Return &amp; Refund Policy</button>}
+                    {!m.anim && m.wa && <a href={wa} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-green-600"><WhatsAppIcon size={13} /> WhatsApp</a>}
+                    {!m.anim && m.order && (
+                      <div className={`mt-2 rounded-lg border px-3 py-2 text-xs ${isDarkMode ? 'border-gray-700' : 'border-gray-300 bg-white'}`}>
+                        <p className="font-bold">{m.order.status}{STATUS_BN[m.order.status] ? <span className="font-normal text-gray-500"> · {STATUS_BN[m.order.status]}</span> : null}</p>
+                        <p className="text-gray-500 mt-0.5">{[...new Set([m.order.paymentMethod, m.order.paymentStatus].filter(Boolean))].join(' · ')}{m.order.total ? ` · ${formatPrice(m.order.total)}` : ''}</p>
+                        <ul className="mt-1 space-y-0.5">
                           {m.order.items.map((it, k) => <li key={k}>{it.qty} × {it.name}{[it.size, it.color].filter(Boolean).length ? ` (${[it.size, it.color].filter(Boolean).join(', ')})` : ''}</li>)}
                         </ul>
                       </div>
-                    ) : (
-                      <>
-                        <TypeText text={m.text || ''} bn={m.bn || ''} animate={!!m.anim} onTick={scroll} onDone={() => { settle(m.key); setTimeout(scroll, 30); }} />
-                        {!m.anim && m.policy && setCurrentView && <button type="button" onClick={() => { setOpen(false); setCurrentView('refund'); window.scrollTo(0, 0); }} className="mt-1.5 text-xs font-semibold text-[#B8941F] underline">Read the full Return &amp; Refund Policy</button>}
-                        {!m.anim && m.wa && <a href={wa} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-green-600"><WhatsAppIcon size={13} /> WhatsApp</a>}
-                      </>
                     )}
                     {!m.anim && Array.isArray(m.ids) && m.ids.map(byId).filter(Boolean).length > 0 && (
                       <div className="mt-2 grid grid-cols-2 gap-2">
@@ -211,7 +282,7 @@ export default function ChatWidget({ products = [], storeSettings, formatPrice, 
             ))}
             {track && (
               <form onSubmit={trackSubmit} className={`rounded-lg px-3 py-3 space-y-2 ${bubbleBot}`}>
-                <p className="text-xs font-semibold">Track your order · অর্ডার ট্র্যাক করুন</p>
+                <p className="text-xs font-semibold">অর্ডার ট্র্যাক করুন · Track your order</p>
                 <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Order code (KYV-261030-1234)" className={input} />
                 <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number on the order" inputMode="tel" className={input} />
                 <div className="flex gap-2">
