@@ -26,7 +26,8 @@ import aiPhoto from './_plan/aiphoto.js';
 import stock from './_plan/stock.js';
 import chat from './_plan/chat.js';
 
-export const config = { maxDuration: 60 };
+// 300 s: a Premium (high quality) Shop the Look picture can take 1-3 minutes (Vercel fluid compute allows up to 300 s)
+export const config = { maxDuration: 300 };
 
 const ACTIONS = { init, callback, sync, reminders, 'seller-earnings': sellerEarnings, comp, warn, billing, sitemap, 'remove-shop': removeShop, 'ai-photo': aiPhoto, stock, chat };
 

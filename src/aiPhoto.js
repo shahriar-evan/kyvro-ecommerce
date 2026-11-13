@@ -22,13 +22,13 @@ export async function makeAiPhoto({ source, view, kind, bg }) {
 }
 
 // Shop the Look (Owner / Manager): a model wearing these products, transparent PNG (OpenAI). sources = product photo URLs / data URLs.
-export async function makeAiLook({ sources, who }) {
+export async function makeAiLook({ sources, who, quality = 'medium', variant = 0 }) {
   const user = auth.currentUser;
   if (!user) { const e = new Error('Please sign in again.'); e.code = 'auth'; throw e; }
   const r = await fetch('/api/plan?action=ai-photo', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
-    body: JSON.stringify({ view: 'look', sources, who }),
+    body: JSON.stringify({ view: 'look', sources, who, quality, variant }),
   });
   let j = {};
   try { j = await r.json(); } catch (e) { /* not json */ }
