@@ -187,7 +187,7 @@ export default function HomeShowcase({ products, formatPrice, addToCart, openPro
           tagline={['Shirts, tees and jackets.', 'Picked for everyday style.']} variant="curve" tone="grey"
           filters={menSections} filter={menSub} onFilter={setMenSub} />
       )}
-      <ShopTheLook products={products} formatPrice={formatPrice} addToCart={addToCart} />
+      <ShopTheLook products={products} formatPrice={formatPrice} addToCart={addToCart} openProduct={openProduct} />
       {/* the shoes wheel right after the looks (finish the outfit), then Women and Accessories */}
       {shoes.length >= MIN && (
         <ShoeOrbit products={shoes} formatPrice={formatPrice} onOpen={open(shoes, false)} addToCart={addToCart} onShopAll={() => openCollection('Shoes')} />

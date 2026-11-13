@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Pause, Play, X } from 'lucide-react';
 import { watchLooks } from '../looks';
-import { totalStock, hasSizeStock, orderedSizes, stockFor, stockForColor, productColors } from '../data/catalog';
+import { totalStock, hasSizeStock, orderedSizes, stockFor, stockForColor, productColors, imageFor } from '../data/catalog';
 
 // Home page "Shop the Look" (Classic theme, between the Men's and Women's rails). Models (looks/{id}, made in
 // Admin → Shop the Look) stand side by side: the one in the middle is sharp, the others step back. Tap a model to
@@ -9,7 +9,7 @@ import { totalStock, hasSizeStock, orderedSizes, stockFor, stockForColor, produc
 // Prices come from the products the page already shows, so a shop link gets its own prices.
 let cache = null; // the looks, kept for the next visit to the home page
 
-function Piece({ n, p, pick, setPick, active, onHover, formatPrice, onAdd }) {
+function Piece({ n, p, pick, setPick, active, onHover, formatPrice, onAdd, onOpen }) {
   const sized = hasSizeStock(p);
   const sizes = sized ? orderedSizes(Object.keys(p.sizeStock), p.gender) : [];
   const colors = productColors(p);
@@ -19,12 +19,14 @@ function Piece({ n, p, pick, setPick, active, onHover, formatPrice, onAdd }) {
   return (
     <div id={`look-piece-${p.id}`} onMouseEnter={onHover} className={`py-4 border-b border-black/10 flex gap-3 transition ${active ? 'bg-[#D4AF37]/10 -mx-3 px-3 rounded-lg' : ''}`}>
       <div className="relative w-20 h-24 shrink-0 rounded-md overflow-hidden bg-[#f1f1f0]">
-        <img src={p.image} alt={p.name} loading="lazy" className={`w-full h-full object-cover ${out ? 'grayscale opacity-60' : ''}`} />
+        <button type="button" onClick={onOpen} className="block w-full h-full" aria-label={`Open ${p.name}`}>
+          <img src={imageFor(p, color)} alt={p.name} loading="lazy" className={`w-full h-full object-cover hover:scale-105 transition ${out ? 'grayscale opacity-60' : ''}`} />
+        </button>
         <span className="absolute top-1 left-1 w-5 h-5 rounded-full bg-white text-black text-[10px] font-bold flex items-center justify-center shadow">{n}</span>
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500">{p.category}</p>
-        <p className="text-sm font-semibold leading-snug line-clamp-2">{p.name}</p>
+        <button type="button" onClick={onOpen} className="text-left text-sm font-semibold leading-snug line-clamp-2 hover:underline">{p.name}</button>
         <p className="mt-0.5 text-sm">
           <span className="font-bold">{formatPrice(p.price)}</span>
           {p.originalPrice > p.price && <span className="ml-1.5 text-xs text-gray-400 line-through">{formatPrice(p.originalPrice)}</span>}
@@ -47,7 +49,7 @@ function Piece({ n, p, pick, setPick, active, onHover, formatPrice, onAdd }) {
   );
 }
 
-export default function ShopTheLook({ products = [], formatPrice, addToCart }) {
+export default function ShopTheLook({ products = [], formatPrice, addToCart, openProduct }) {
   const [looks, setLooks] = useState(cache);
   useEffect(() => watchLooks((l) => { cache = l; setLooks(l); }), []);
   const byId = useMemo(() => Object.fromEntries(products.map((p) => [String(p.id), p])), [products]);
@@ -69,8 +71,8 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart }) {
   const count = shown.length;
   const at = count ? ((pos % count) + count) % count : 0;
   useEffect(() => { setMsg(null); setHot(null); }, [at]);
-  // turns by itself every 3 s; stops while the visitor is in the pieces panel (picking a size), for 8 s after they touch it, or with Pause
-  const SPIN = 3000;
+  // turns by itself every 10 s; stops while the visitor is in the pieces panel (picking a size), for 8 s after they touch it, or with Pause
+  const SPIN = 10000;
   const [playing, setPlaying] = useState(true);
   const [hover, setHover] = useState(false);
   const holdUntil = useRef(0);
@@ -222,7 +224,7 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart }) {
           </div>
           <div className="mt-2 flex-1">
             {look.pieces.map((x) => (
-              <Piece key={x.id} n={x.n} p={x.p} pick={picks[x.id] || {}} setPick={(v) => setPicks((s) => ({ ...s, [x.id]: v }))}
+              <Piece key={x.id} n={x.n} p={x.p} onOpen={() => openProduct && openProduct(x.p)} pick={picks[x.id] || {}} setPick={(v) => setPicks((s) => ({ ...s, [x.id]: v }))}
                 active={hot === x.id} onHover={() => setHot(x.id)} formatPrice={formatPrice}
                 onAdd={() => { const r = ready(x); if (!r) return; if (r.need) { setMsg({ type: 'err', text: `Pick a size for ${r.need}. · সাইজ বেছে নিন।` }); return; } addToCart(r.p, r.color, r.size, 1, false); setMsg({ type: 'ok', text: `${r.p.name} added to your cart.` }); }} />
             ))}
