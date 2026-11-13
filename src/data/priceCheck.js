@@ -152,6 +152,18 @@ export const couponActive = (shop, code, now = Date.now()) => {
 // the amount off: percent of (products after the store discount), capped at the shop's markup; whole taka
 export const couponAmountFor = (items, coupon, net) => (!coupon || net < coupon.minOrder ? 0
   : Math.max(0, Math.min(Math.floor((net * coupon.percent) / 100), Math.floor(itemsMarkup(items)))));
+// ---- Main store promo codes (Owner: Admin > Settings > Promo codes): settings/promos.codes =
+// { CODE: { percent 1-50, minOrder, maxOff (৳, 0 = no cap), endsAt, active } } (at most STORE_COUPON_MAX). Only on the
+// main store (never on a shop link, shops have their own). The discount comes out of Kyvro's own price.
+// Same checks in firestore.rules (orders create: couponOk) and checkOrderPrices below.
+export const STORE_COUPON_MAX = 20;
+export const storeCouponActive = (promos, code, now = Date.now()) => {
+  const base = couponActive({ coupons: promos && promos.codes }, code, now);
+  if (!base) return null;
+  return { ...base, maxOff: Math.max(0, parseInt(promos.codes[code].maxOff, 10) || 0) };
+};
+export const storeCouponAmount = (coupon, net) => (!coupon || net < coupon.minOrder ? 0
+  : Math.max(0, Math.min(Math.floor((net * coupon.percent) / 100), coupon.maxOff > 0 ? coupon.maxOff : Infinity)));
 export const orderMarkup = (o) => Math.max(0, itemsMarkup(o && o.items) - (o && o.coupon ? Number(o.coupon.amount) || 0 : 0));
 export const basicDue = (shop, plans, now = Date.now()) => !!shop && shop.kind === 'seller' && shop.basicFree === false
   && shop.planExempt !== true && basicCharging(plans) && !shopIsPaid(shop, now) && toMillis(shop.basicUntil) <= now;
@@ -186,7 +198,7 @@ export function orderVisibleIds(order, shop, productsById, plans, now = Date.now
 //   productsById: { [id]: product }   shop: the shops/{slug} document, or null / undefined when it does not exist
 //   visible: the shop's visibleShopIds() (null = no limit): a product hidden by an expired plan cannot be bought
 // Returns { ok, problems: [text], subtotal } (subtotal = what the items really cost)
-export function checkOrderPrices(order, productsById, shop, visible = null) {
+export function checkOrderPrices(order, productsById, shop, visible = null, promos = null) {
   const problems = [];
   let subtotal = 0;
   const inShop = !!order.shop;
@@ -213,13 +225,15 @@ export function checkOrderPrices(order, productsById, shop, visible = null) {
   }
   if (!problems.length && Number(order.subtotal) !== subtotal) problems.push(`Subtotal ${order.subtotal}, should be ${subtotal}`);
   // the shop's promo code: it must exist (and run) on the shop, and take no more than allowed (never past the markup)
+  // a main store order: the Owner's store promo code (settings/promos), never more than its % and its ৳ cap
   if (order.coupon) {
     const code = String(order.coupon.code || '');
-    const c = inShop && shop ? couponActive(shop, code, toMillis(order.createdAt) || Date.now()) : null;
+    const at = toMillis(order.createdAt) || Date.now();
+    const c = inShop ? (shop ? couponActive(shop, code, at) : null) : storeCouponActive(promos, code, at);
     const net = (Number(order.subtotal) || 0) - (Number(order.discount) || 0);
-    if (!c) problems.push(`Promo code ${code || '?'} is not valid for this shop`);
+    if (!c) problems.push(`Promo code ${code || '?'} is not valid ${inShop ? 'for this shop' : 'on the main store'}`);
     else {
-      const most = couponAmountFor(order.items, c, net);
+      const most = inShop ? couponAmountFor(order.items, c, net) : storeCouponAmount(c, net);
       if (Number(order.coupon.percent) !== c.percent) problems.push(`Promo code ${code}: ${order.coupon.percent}% should be ${c.percent}%`);
       if (Number(order.coupon.amount) > most) problems.push(`Promo code ${code}: ${order.coupon.amount} off, at most ${most}`);
     }

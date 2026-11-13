@@ -75,3 +75,19 @@ export function watchMySubscription(uid, onData) {
     () => onData(null)
   );
 }
+
+// ---- Main store promo codes (settings/promos). Everyone can read (checkout checks the code), only the Owner saves ----
+export function watchPromos(onData) {
+  return onSnapshot(
+    doc(db, "settings", "promos"),
+    (snap) => onData(snap.exists() ? { codes: (snap.data() && snap.data().codes) || {} } : { codes: {} }),
+    () => onData({ codes: {} })
+  );
+}
+export async function savePromos(codes, staff) {
+  await setDoc(doc(db, "settings", "promos"), {
+    codes,
+    updatedAt: serverTimestamp(),
+    updatedByName: (staff && (staff.name || staff.email)) || "",
+  });
+}
