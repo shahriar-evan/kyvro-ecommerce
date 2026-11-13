@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { MessageCircle, X, Send, Truck, Clock, Wallet, RotateCcw, PackageSearch } from 'lucide-react';
 import { WhatsAppIcon } from './WhatsAppButton';
 import { WHATSAPP_NUMBER, deliveryNote, ONLINE_PAY_ON } from '../data/shopConfig';
-import { totalStock, supplierOutFor, productColors } from '../data/catalog';
+import { totalStock, supplierOutFor, productColors, imageFor, stockForColor } from '../data/catalog';
 
 // The website's help chat (bottom-right button).
 //  - Quick buttons (delivery charge / time, Cash on Delivery, returns) answer here in the browser: free, no AI.
@@ -74,6 +74,22 @@ const api = async (body) => {
   try { j = await r.json(); } catch (e) { /* not json */ }
   return { ok: r.ok, ...j };
 };
+
+// colour words a customer may type (Bangla / Banglish / English) -> words found in our colour names
+const COLOUR_WORDS = [
+  [/কালো|kalo|black/i, 'black'], [/সাদা|shada|sada|white/i, 'white'], [/লাল|lal\b|red/i, 'red'], [/নেভি|navy/i, 'navy'],
+  [/নীল|nil\b|blue/i, 'blue'], [/সবুজ|sobuj|green|olive/i, 'green|olive'], [/হলুদ|holud|yellow/i, 'yellow'], [/গোলাপি|golapi|pink/i, 'pink'],
+  [/মেরুন|maroon/i, 'maroon'], [/বাদামি|brown/i, 'brown'], [/ধূসর|ছাই|grey|gray/i, 'grey|gray'], [/বেগুনি|purple/i, 'purple'],
+  [/কমলা|orange/i, 'orange'], [/ক্রিম|cream|beige/i, 'cream|beige'],
+];
+// the product's colour that matches what the customer typed (in stock first), or ''
+export function colourFromText(p, q) {
+  const hit = COLOUR_WORDS.find(([re]) => re.test(q || ''));
+  if (!hit) return '';
+  const re = new RegExp(hit[1], 'i');
+  const list = productColors(p).filter((c) => re.test(c));
+  return list.find((c) => stockForColor(p, c) > 0) || list[0] || '';
+}
 
 // in-stock products of this page, one short line each: id|name|category|price|colours
 function catalogText(products) {
@@ -182,7 +198,7 @@ export default function ChatWidget({ products = [], storeSettings, formatPrice, 
     }
     try {
       const r = await api({ op: 'ask', message: q, history, catalog: catalogText(products), faq: facts() });
-      m = r.ok ? { text: r.reply, ids: r.ids || [] }
+      m = r.ok ? { text: r.reply, ids: r.ids || [], colors: r.colors || {}, q }
         : { text: r.error === 'too-fast' ? 'Please wait a moment and try again.' : 'Sorry, I cannot answer right now. Please use the buttons below or tap WhatsApp to talk to us.', wa: true };
     } catch (err) {
       m = { text: 'No internet connection. Please try again.' };
@@ -267,14 +283,14 @@ export default function ChatWidget({ products = [], storeSettings, formatPrice, 
                     )}
                     {!m.anim && Array.isArray(m.ids) && m.ids.map(byId).filter(Boolean).length > 0 && (
                       <div className="mt-2 grid grid-cols-2 gap-2">
-                        {m.ids.map(byId).filter(Boolean).map((p) => (
+                        {m.ids.map(byId).filter(Boolean).map((p) => { const col = (m.colors && m.colors[String(p.id)]) || colourFromText(p, m.q); return (
                           <button key={p.id} type="button" onClick={() => { onOpenProduct(p); setOpen(window.innerWidth >= 640); }}
                             className={`text-left rounded-lg border overflow-hidden transition hover:border-[#D4AF37] ${isDarkMode ? 'border-gray-800 bg-[#121212]' : 'border-gray-200 bg-white'}`}>
-                            <div className={`aspect-square ${isDarkMode ? 'bg-[#161616]' : 'bg-gray-50'}`}>{p.image && <img src={p.image} alt="" loading="lazy" className="w-full h-full object-cover" />}</div>
-                            <p className="px-2 pt-1.5 text-[11px] leading-tight line-clamp-2">{p.name}</p>
+                            <div className={`aspect-square ${isDarkMode ? 'bg-[#161616]' : 'bg-gray-50'}`}>{imageFor(p, col) && <img src={imageFor(p, col)} alt="" loading="lazy" className="w-full h-full object-cover" />}</div>
+                            <p className="px-2 pt-1.5 text-[11px] leading-tight line-clamp-2">{p.name}{col && <span className="text-gray-500"> · {col}</span>}</p>
                             <p className="px-2 pb-1.5 text-xs font-bold text-[#B8941F]">{formatPrice(p.price)}</p>
                           </button>
-                        ))}
+                        ); })}
                       </div>
                     )}
                   </div>
