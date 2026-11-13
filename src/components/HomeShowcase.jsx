@@ -27,7 +27,7 @@ export function useShowcase() {
 }
 
 // Home page showcase (Classic theme), above "Shop by category":
-// Men rail, Women rail, Bags / Watches / Wallets rail, then the Shoes wheel.
+// Men rail, Shop the Look, the Shoes wheel, Women rail, then Bags / Watches / Wallets.
 // Each rail shows a mix of the best sellers of its categories (not every product).
 const LIMIT = 14;
 const MIN = 3; // a rail with fewer products is not shown
@@ -188,6 +188,10 @@ export default function HomeShowcase({ products, formatPrice, addToCart, openPro
           filters={menSections} filter={menSub} onFilter={setMenSub} />
       )}
       <ShopTheLook products={products} formatPrice={formatPrice} addToCart={addToCart} />
+      {/* the shoes wheel right after the looks (finish the outfit), then Women and Accessories */}
+      {shoes.length >= MIN && (
+        <ShoeOrbit products={shoes} formatPrice={formatPrice} onOpen={open(shoes, false)} addToCart={addToCart} onShopAll={() => openCollection('Shoes')} />
+      )}
       {women.length >= MIN && (
         <HangerRail title="Women's Collection" products={womenShown} formatPrice={formatPrice} onOpen={open(womenShown)} onShopAll={() => openCollection('Women', womenSub)}
           tagline={['Saree, three piece and more.', 'Made to stand out.']} variant="curve" tone="white"
@@ -197,9 +201,6 @@ export default function HomeShowcase({ products, formatPrice, addToCart, openPro
         <HangerRail label="FINISH THE LOOK" title="Accessories" products={acc.items} formatPrice={formatPrice} onOpen={open(acc.items)}
           onShopAll={() => openCollection(...acc.open)} tagline={['Bags, watches and wallets.', 'The last detail counts.']}
           variant="curve" tone="blue" card="square" tabs={accTabs.length > 1 ? accTabs : null} activeTab={acc.key} onTab={setAccKey} />
-      )}
-      {shoes.length >= MIN && (
-        <ShoeOrbit products={shoes} formatPrice={formatPrice} onOpen={open(shoes, false)} addToCart={addToCart} onShopAll={() => openCollection('Shoes')} />
       )}
 
       {view && (
