@@ -90,7 +90,10 @@ async function teamMember(req) {
     const owners = await ownerEmails(await accessToken());
     if (owners.has(email)) return { email, role: 'owner', canApprove: true, name: claims.name || email };
   }
-  return null;
+  let why = '';
+  try { why = ((await r.json()).error || {}).status || ''; } catch (e) { /* no body */ }
+  console.error('stock team check', email, r.status, why, claims.email_verified);
+  return { denied: `${email} · ${r.status}${why ? ` ${why}` : ''}${claims.email_verified === true ? '' : ' · email not verified'}` };
 }
 
 // ---------- suppliers ----------
@@ -237,7 +240,7 @@ export default async function stock(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
     const me = await teamMember(req);
-    if (!me) return res.status(403).json({ error: 'Only the team can use this.' });
+    if (!me || me.denied) return res.status(403).json({ error: `Only the team can use this.${me && me.denied ? ` (${me.denied})` : ''}` });
     const op = String(body.op || '');
     if (op === 'check') {
       if (me.role === 'admin') return res.status(403).json({ error: 'Only the Owner or a Manager can run the stock check.' });
