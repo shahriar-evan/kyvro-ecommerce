@@ -64,6 +64,25 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
     try { await callStock(op, p.id); } catch (err) { alert(err.message); }
     setStockBusy('');
   };
+  // "Hide all": tick several stock-out products (or Select all) and take them off the website in one go.
+  // A product only some colours of which are out still sells the other colours, so "Fully out" picks only the ones
+  // with nothing left to sell.
+  const canHide = (p) => outColours(p).length > 0 && p.status === 'approved' && !backColours(p).length;
+  const fullyOut = (p) => canHide(p) && totalStock(p) <= 0;
+  const [hidePick, setHidePick] = React.useState({});
+  const pickedIds = Object.keys(hidePick).filter((id) => hidePick[id] && products.some((p) => String(p.id) === id && canHide(p)));
+  const hideMany = async () => {
+    const list = products.filter((p) => pickedIds.includes(String(p.id)));
+    if (!list.length) return;
+    if (!(await askConfirm(`Take ${list.length} product${list.length === 1 ? '' : 's'} off the website? They come back when someone approves them.`, { danger: true, confirmText: `Hide ${list.length}` }))) return;
+    let done = 0; const failed = [];
+    for (const p of list) {
+      setStockBusy(`hide:${p.id}`); setStockMsg(`Hiding ${done + 1} of ${list.length}…`);
+      try { await callStock('hide', p.id); done += 1; } catch (err) { failed.push(`${p.name}: ${err.message}`); }
+    }
+    setStockBusy(''); setHidePick({});
+    setStockMsg(`${done} product${done === 1 ? '' : 's'} hidden.${failed.length ? ` Not hidden: ${failed.join('; ')}` : ''}`);
+  };
   const runStockCheck = async () => {
     setStockBusy('check'); setStockMsg('Checking the suppliers…');
     try {
@@ -419,6 +438,14 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                     <button type="button" disabled={!!stockBusy} onClick={runStockCheck}
                       className="ml-auto px-3 py-1.5 rounded border border-[#D4AF37] text-[#9A7A1A] dark:text-[#D4AF37] font-bold disabled:opacity-50">{stockBusy === 'check' ? 'Checking…' : 'Check supplier stock'}</button>
                   )}
+                  {stockFilter === 'out' && shownProducts.some(canHide) && (
+                    <div className="w-full flex flex-wrap items-center gap-2 rounded-lg border border-red-500/40 bg-red-500/5 p-2.5">
+                      <button type="button" onClick={() => setHidePick(Object.fromEntries(shownProducts.filter(canHide).map((p) => [String(p.id), true])))} className="px-3 py-1.5 rounded border border-gray-400 font-semibold">Select all ({shownProducts.filter(canHide).length})</button>
+                      <button type="button" onClick={() => setHidePick(Object.fromEntries(shownProducts.filter(fullyOut).map((p) => [String(p.id), true])))} className="px-3 py-1.5 rounded border border-gray-400 font-semibold" title="Only products with no colour or size left to sell">Fully out only ({shownProducts.filter(fullyOut).length})</button>
+                      {pickedIds.length > 0 && <button type="button" onClick={() => setHidePick({})} className="px-2 py-1.5 underline text-gray-500">Clear</button>}
+                      <button type="button" disabled={!pickedIds.length || !!stockBusy} onClick={hideMany} className="ml-auto px-4 py-1.5 rounded bg-red-600 text-white font-bold disabled:opacity-40">Hide selected ({pickedIds.length})</button>
+                    </div>
+                  )}
                   {stockMsg && <p className="w-full text-gray-500">{stockMsg}</p>}
                 </div>
               )}
@@ -439,6 +466,9 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                         <React.Fragment key={p.id}>
                         <tr className={`hover:bg-gray-100 dark:hover:bg-[#1a1a1a] ${p.deleteRequested ? 'bg-red-500/10' : ''}`}>
                           <td className="p-4 flex items-center gap-3">
+                            {stockFilter === 'out' && canHide(p) && (
+                              <input type="checkbox" checked={!!hidePick[String(p.id)]} onChange={(e) => setHidePick((h) => ({ ...h, [String(p.id)]: e.target.checked }))} aria-label={`Select ${p.name} to hide`} className="w-4 h-4 accent-red-600 shrink-0" />
+                            )}
                             <img src={p.image} alt={p.name} className="w-10 h-10 object-cover rounded" />
                             <div>
                               <span className="font-semibold">{p.name}</span>
