@@ -123,13 +123,27 @@ export const sizePresetsFor = (gender) => {
 // Product has per-size stock (e.g. { M: 20, XL: 10, L: 15 })
 export const hasSizeStock = (p) => !!p && !!p.sizeStock && Object.keys(p.sizeStock).length > 0;
 
-export const totalStock = (p) =>
-  hasSizeStock(p)
+// Supplier stock sync (api/_plan/stock.js, server only): supplierOut = {colour: true}, '*' = the whole product.
+// Those colours count as stock 0 everywhere in the shop until someone approves them back.
+export const supplierOutFor = (p, color) =>
+  !!p && !!p.supplierOut && (p.supplierOut['*'] === true || (!!color && p.supplierOut[color] === true));
+const anySupplierOut = (p) => !!p && !!p.supplierOut && Object.values(p.supplierOut).some((v) => v === true);
+// colorStock without the colours the supplier no longer has
+const liveColorStock = (p) => Object.entries(p.colorStock).filter(([k]) => !supplierOutFor(p, k.split('|')[1]));
+
+export const totalStock = (p) => {
+  if (supplierOutFor(p, '')) return 0;
+  if (anySupplierOut(p) && hasColorStock(p)) return liveColorStock(p).reduce((sum, [, n]) => sum + (parseInt(n, 10) || 0), 0);
+  return hasSizeStock(p)
     ? Object.values(p.sizeStock).reduce((sum, n) => sum + (parseInt(n, 10) || 0), 0)
     : parseInt(p?.stock, 10) || 0;
+};
 
-export const stockForSize = (p, size) =>
-  hasSizeStock(p) ? parseInt(p.sizeStock[size], 10) || 0 : parseInt(p?.stock, 10) || 0;
+export const stockForSize = (p, size) => {
+  if (supplierOutFor(p, '')) return 0;
+  if (anySupplierOut(p) && hasColorStock(p)) return liveColorStock(p).reduce((sum, [k, n]) => (k.split('|')[0] === String(size || '') ? sum + (parseInt(n, 10) || 0) : sum), 0);
+  return hasSizeStock(p) ? parseInt(p.sizeStock[size], 10) || 0 : parseInt(p?.stock, 10) || 0;
+};
 
 // ---- Stock per size AND color (e.g. M + White = 5, M + Red = 7) -------------
 // colorStock = { 'M|White': 5, 'M|Red': 7, 'L|White': 3 }. Products without sizes use an empty size: '|Red'.
@@ -140,12 +154,14 @@ export const variantKey = (size, color) => `${size || ''}|${color || ''}`;
 // How many are available for this exact size + color (falls back to the per-size / total stock)
 export const stockFor = (p, size, color) => {
   if (!p) return 0;
+  if (supplierOutFor(p, color)) return 0;
   if (hasColorStock(p)) return parseInt(p.colorStock[variantKey(hasSizeStock(p) ? size : '', color)], 10) || 0;
   return stockForSize(p, size);
 };
 
 // Total of one color across all sizes (used when no size is picked yet)
 export const stockForColor = (p, color) => {
+  if (supplierOutFor(p, color)) return 0;
   if (!hasColorStock(p)) return totalStock(p);
   return Object.entries(p.colorStock).reduce((sum, [k, n]) => (k.split('|')[1] === color ? sum + (parseInt(n, 10) || 0) : sum), 0);
 };

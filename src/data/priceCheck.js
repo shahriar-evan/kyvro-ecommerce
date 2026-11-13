@@ -197,6 +197,8 @@ export function checkOrderPrices(order, productsById, shop, visible = null) {
     const q = Number(it.quantity);
     if (!Number.isInteger(q) || q < 1) { problems.push(`${name}: wrong quantity`); continue; }
     if (!p || (p.status || 'approved') !== 'approved') { problems.push(`${name}: not for sale in the store`); continue; }
+    // out of stock at the supplier (stock sync): refused until someone approves it back
+    if (p.supplierOut && (p.supplierOut['*'] === true || (it.color && p.supplierOut[it.color] === true))) { problems.push(`${name}: out of stock`); continue; }
     const base = Number(p.price) || 0;
     let expected = base;
     if (inShop && shop) {
