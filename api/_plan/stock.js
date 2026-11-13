@@ -15,7 +15,7 @@
 //   ShopBase  needs a reseller login: Vercel env SHOPBASE_USERNAME (phone) + SHOPBASE_PASSWORD, set by the Owner.
 //             Without them ShopBase links are skipped (nothing changes for those colours).
 // A link that cannot be read counts as "in stock", so a supplier hiccup never takes products down.
-import { FS, accessToken, val } from '../_sslc.js';
+import { FS, accessToken, val, QUOTA_MSG } from '../_sslc.js';
 import { ownerEmails, emailOwners } from '../_owners.js';
 
 const TIME_BUDGET_MS = 45000;
@@ -93,6 +93,7 @@ async function teamMember(req) {
   let why = '';
   try { why = ((await r.json()).error || {}).status || ''; } catch (e) { /* no body */ }
   console.error('stock team check', email, r.status, why, claims.email_verified);
+  if (r.status === 429) return { denied: 'quota' };
   return { denied: `${email} · ${r.status}${why ? ` ${why}` : ''}${claims.email_verified === true ? '' : ' · email not verified'}` };
 }
 
@@ -240,6 +241,7 @@ export default async function stock(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
     const me = await teamMember(req);
+    if (me && me.denied === 'quota') return res.status(503).json({ error: QUOTA_MSG });
     if (!me || me.denied) return res.status(403).json({ error: `Only the team can use this.${me && me.denied ? ` (${me.denied})` : ''}` });
     const op = String(body.op || '');
     if (op === 'check') {

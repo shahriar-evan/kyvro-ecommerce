@@ -23,6 +23,17 @@ export function watchProducts(onData, onError, { all = false } = {}) {
   );
 }
 
+// Customers: the approved products from the server's cached list (one request instead of ~260 Firestore reads per visit).
+// Resolves to the list, or rejects (then the caller watches Firestore as before).
+export async function loadCatalog() {
+  const r = await fetch("/api/plan?action=catalog");
+  if (!r.ok) throw new Error(`catalog ${r.status}`);
+  const j = await r.json();
+  const list = Array.isArray(j.products) ? j.products : [];
+  if (list.length) saveProductCache(list);
+  return list;
+}
+
 // The last approved product list is kept in this browser, so the next visit shows the real shop at once
 // (not the starter list) while Firestore sends the fresh one. Big uploaded photos (data URLs) are left out of
 // the copy to stay small; they come back a moment later with the live list.

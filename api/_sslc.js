@@ -56,6 +56,9 @@ export async function accessToken() {
   return cached.token;
 }
 
+// Firestore answers 429 when the free plan's daily reads are used up (Spark: 50,000 a day, back at 14:00 Bangladesh time)
+export const QUOTA_MSG = 'The database daily free limit is used up (Firebase Spark plan). It comes back at 2 PM Bangladesh time, or upgrade the Firebase project to the Blaze plan.';
+
 export const val = (f) => {
   if (!f) return undefined;
   if ('stringValue' in f) return f.stringValue;
