@@ -38,13 +38,13 @@ function catalogText(products) {
   }).join('\n');
 }
 
-// A bot message that appears like someone typing it: letter by letter (about 2-3 s for a long answer), then the Bangla line.
+// A bot message that appears like someone typing it: letter by letter (about 25 letters a second, at most ~6 s), then the Bangla line.
 function TypeText({ text, bn, animate, onTick, onDone }) {
   const full = text + (bn ? `\n${bn}` : '');
   const [n, setN] = useState(animate ? 0 : full.length);
   useEffect(() => {
     if (!animate) return undefined;
-    const step = Math.max(1, Math.ceil(full.length / 120)); // at most ~120 ticks of 22 ms, whatever the length
+    const step = Math.max(1, Math.ceil(full.length / 150)); // about 25 letters a second; a long answer at most ~6 s
     const t = setInterval(() => {
       setN((v) => {
         const next = Math.min(full.length, v + step);
@@ -52,7 +52,7 @@ function TypeText({ text, bn, animate, onTick, onDone }) {
         return next;
       });
       if (onTick) onTick();
-    }, 22);
+    }, 40);
     return () => clearInterval(t);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const main = full.slice(0, Math.min(n, text.length));
