@@ -38,6 +38,36 @@ function catalogText(products) {
   }).join('\n');
 }
 
+// A bot message that appears like someone typing it: letter by letter (about 2-3 s for a long answer), then the Bangla line.
+function TypeText({ text, bn, animate, onTick, onDone }) {
+  const full = text + (bn ? `\n${bn}` : '');
+  const [n, setN] = useState(animate ? 0 : full.length);
+  useEffect(() => {
+    if (!animate) return undefined;
+    const step = Math.max(1, Math.ceil(full.length / 120)); // at most ~120 ticks of 22 ms, whatever the length
+    const t = setInterval(() => {
+      setN((v) => {
+        const next = Math.min(full.length, v + step);
+        if (next >= full.length) { clearInterval(t); setTimeout(() => onDone && onDone(), 0); }
+        return next;
+      });
+      if (onTick) onTick();
+    }, 22);
+    return () => clearInterval(t);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const main = full.slice(0, Math.min(n, text.length));
+  const rest = bn && n > text.length + 1 ? full.slice(text.length + 1, n) : '';
+  const typing = n < full.length;
+  return (
+    <>
+      <p className="whitespace-pre-line">{main}{typing && n <= text.length && <span className="ml-0.5 inline-block w-1.5 h-3.5 align-middle bg-current opacity-60 animate-pulse" />}</p>
+      {rest && <p className="mt-1 text-xs text-gray-500">{rest}{typing && <span className="ml-0.5 inline-block w-1 h-3 align-middle bg-current opacity-60 animate-pulse" />}</p>}
+    </>
+  );
+}
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
 export default function ChatWidget({ products = [], storeSettings, formatPrice, isDarkMode, onOpenProduct, shopName = '', raise = false, setCurrentView }) {
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState([]);
@@ -50,8 +80,19 @@ export default function ChatWidget({ products = [], storeSettings, formatPrice, 
 
   useEffect(() => { if (endRef.current) endRef.current.scrollIntoView({ block: 'end' }); }, [msgs, track, busy, open]);
 
-  const add = (m) => setMsgs((prev) => [...prev, m].slice(-40));
-  const quick = (label, en, bn, extra) => { add({ role: 'user', text: label }); add({ role: 'bot', text: en, bn, ...extra }); };
+  const scroll = () => { if (endRef.current) endRef.current.scrollIntoView({ block: 'end' }); };
+  const add = (m) => setMsgs((prev) => [...prev, { key: `${Date.now()}-${Math.random()}`, ...m }].slice(-40));
+  const settle = (key) => setMsgs((prev) => prev.map((m) => (m.key === key ? { ...m, anim: false } : m)));
+  // bot answers: "typing…" dots first, then the text types itself out
+  const botSay = (m) => add({ role: 'bot', anim: true, ...m });
+  const quick = async (label, en, bn, extra) => {
+    if (busy) return;
+    add({ role: 'user', text: label });
+    setBusy(true);
+    await wait(1400 + Math.random() * 1200);
+    setBusy(false);
+    botSay({ text: en, bn, ...extra });
+  };
   const delivery = () => { const d = deliveryNote(storeSettings); quick('Delivery charge?', d.en, d.bn); };
 
   const wa = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hello Kyvro${shopName ? ` (${shopName})` : ''}, I need help.`)}`;
@@ -69,28 +110,36 @@ export default function ChatWidget({ products = [], storeSettings, formatPrice, 
     add({ role: 'user', text: q });
     setText('');
     setBusy(true);
+    const started = Date.now();
+    let m;
     try {
       const r = await api({ op: 'ask', message: q, history, catalog: catalogText(products), faq: facts() });
-      if (r.ok) add({ role: 'bot', text: r.reply, ids: r.ids || [] });
-      else add({ role: 'bot', text: r.error === 'too-fast' ? 'Please wait a moment and try again.' : 'Sorry, I cannot answer right now. Please use the buttons below or tap WhatsApp to talk to us.', wa: true });
+      m = r.ok ? { text: r.reply, ids: r.ids || [] }
+        : { text: r.error === 'too-fast' ? 'Please wait a moment and try again.' : 'Sorry, I cannot answer right now. Please use the buttons below or tap WhatsApp to talk to us.', wa: true };
     } catch (err) {
-      add({ role: 'bot', text: 'No internet connection. Please try again.' });
+      m = { text: 'No internet connection. Please try again.' };
     }
+    await wait(Math.max(0, 1500 - (Date.now() - started)));
     setBusy(false);
+    botSay(m);
   };
 
   const trackSubmit = async (e) => {
     e.preventDefault();
     if (busy) return;
     setBusy(true);
+    let m;
+    const started = Date.now();
     try {
       const r = await api({ op: 'order', order: code.trim().toUpperCase(), phone });
-      if (r.ok && r.order) { add({ role: 'bot', order: r.order }); setTrack(false); setCode(''); setPhone(''); }
-      else add({ role: 'bot', text: r.error === 'bad-code' ? 'The order code looks like KYV-261030-1234.' : r.error === 'bad-phone' ? 'Please enter the phone number used on the order.' : 'Order code and phone number do not match. Please check and try again.', bn: r.error === 'no-match' ? 'অর্ডার কোড বা ফোন নম্বর মিলছে না।' : '' });
+      if (r.ok && r.order) { m = { order: r.order, anim: false }; setTrack(false); setCode(''); setPhone(''); }
+      else m = { text: r.error === 'bad-code' ? 'The order code looks like KYV-261030-1234.' : r.error === 'bad-phone' ? 'Please enter the phone number used on the order.' : 'Order code and phone number do not match. Please check and try again.', bn: r.error === 'no-match' ? 'অর্ডার কোড বা ফোন নম্বর মিলছে না।' : '' };
     } catch (err) {
-      add({ role: 'bot', text: 'No internet connection. Please try again.' });
+      m = { text: 'No internet connection. Please try again.' };
     }
+    await wait(Math.max(0, 1500 - (Date.now() - started)));
     setBusy(false);
+    botSay(m);
   };
 
   const byId = (id) => products.find((p) => String(p.id) === String(id));
@@ -126,9 +175,9 @@ export default function ChatWidget({ products = [], storeSettings, formatPrice, 
             </div>
             {msgs.map((m, i) => (
               m.role === 'user'
-                ? <div key={i} className="ml-auto max-w-[85%] w-fit rounded-lg bg-[#D4AF37] px-3 py-2 text-black whitespace-pre-line">{m.text}</div>
+                ? <div key={m.key} className="ml-auto max-w-[85%] w-fit rounded-lg bg-[#D4AF37] px-3 py-2 text-black whitespace-pre-line">{m.text}</div>
                 : (
-                  <div key={i} className={`max-w-[92%] rounded-lg px-3 py-2 ${bubbleBot}`}>
+                  <div key={m.key} className={`max-w-[92%] rounded-lg px-3 py-2 ${bubbleBot}`}>
                     {m.order ? (
                       <div>
                         <p className="font-bold">Order {m.order.number}</p>
@@ -140,13 +189,12 @@ export default function ChatWidget({ products = [], storeSettings, formatPrice, 
                       </div>
                     ) : (
                       <>
-                        <p className="whitespace-pre-line">{m.text}</p>
-                        {m.bn && <p className="mt-1 text-xs text-gray-500">{m.bn}</p>}
-                        {m.policy && setCurrentView && <button type="button" onClick={() => { setOpen(false); setCurrentView('refund'); window.scrollTo(0, 0); }} className="mt-1.5 text-xs font-semibold text-[#B8941F] underline">Read the full Return &amp; Refund Policy</button>}
-                        {m.wa && <a href={wa} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-green-600"><WhatsAppIcon size={13} /> WhatsApp</a>}
+                        <TypeText text={m.text || ''} bn={m.bn || ''} animate={!!m.anim} onTick={scroll} onDone={() => { settle(m.key); setTimeout(scroll, 30); }} />
+                        {!m.anim && m.policy && setCurrentView && <button type="button" onClick={() => { setOpen(false); setCurrentView('refund'); window.scrollTo(0, 0); }} className="mt-1.5 text-xs font-semibold text-[#B8941F] underline">Read the full Return &amp; Refund Policy</button>}
+                        {!m.anim && m.wa && <a href={wa} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-green-600"><WhatsAppIcon size={13} /> WhatsApp</a>}
                       </>
                     )}
-                    {Array.isArray(m.ids) && m.ids.map(byId).filter(Boolean).length > 0 && (
+                    {!m.anim && Array.isArray(m.ids) && m.ids.map(byId).filter(Boolean).length > 0 && (
                       <div className="mt-2 grid grid-cols-2 gap-2">
                         {m.ids.map(byId).filter(Boolean).map((p) => (
                           <button key={p.id} type="button" onClick={() => { onOpenProduct(p); setOpen(window.innerWidth >= 640); }}
@@ -172,17 +220,21 @@ export default function ChatWidget({ products = [], storeSettings, formatPrice, 
                 </div>
               </form>
             )}
-            {busy && <div className={`w-fit rounded-lg px-3 py-2 text-xs text-gray-500 ${bubbleBot}`}>Typing…</div>}
+            {busy && (
+              <div className={`w-fit rounded-lg px-3 py-2.5 flex items-center gap-1 ${bubbleBot}`} aria-label="Typing">
+                {[0, 150, 300].map((d) => <span key={d} className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: `${d}ms` }} />)}
+              </div>
+            )}
             <div ref={endRef} />
           </div>
 
           <div className={`border-t px-3 pt-2 pb-2 ${isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}>
             <div className="flex gap-1.5 overflow-x-auto pb-2 [scrollbar-width:none]">
-              <button type="button" className={chip} onClick={delivery}><Truck size={12} /> Delivery charge</button>
-              <button type="button" className={chip} onClick={() => quick('Delivery time?', DELIVERY_TIME.en, DELIVERY_TIME.bn)}><Clock size={12} /> Delivery time</button>
-              <button type="button" className={chip} onClick={() => quick('Cash on Delivery?', COD.en, COD.bn)}><Wallet size={12} /> Cash on Delivery</button>
-              <button type="button" className={chip} onClick={() => quick('Return policy?', RETURNS.en, RETURNS.bn, { policy: true })}><RotateCcw size={12} /> Returns</button>
-              <button type="button" className={chip} onClick={() => setTrack(true)}><PackageSearch size={12} /> Track order</button>
+              <button type="button" className={chip} disabled={busy} onClick={delivery}><Truck size={12} /> Delivery charge</button>
+              <button type="button" className={chip} disabled={busy} onClick={() => quick('Delivery time?', DELIVERY_TIME.en, DELIVERY_TIME.bn)}><Clock size={12} /> Delivery time</button>
+              <button type="button" className={chip} disabled={busy} onClick={() => quick('Cash on Delivery?', COD.en, COD.bn)}><Wallet size={12} /> Cash on Delivery</button>
+              <button type="button" className={chip} disabled={busy} onClick={() => quick('Return policy?', RETURNS.en, RETURNS.bn, { policy: true })}><RotateCcw size={12} /> Returns</button>
+              <button type="button" className={chip} disabled={busy} onClick={() => setTrack(true)}><PackageSearch size={12} /> Track order</button>
               <a href={wa} target="_blank" rel="noopener noreferrer" className={`${chip} text-green-600`}><WhatsAppIcon size={12} /> WhatsApp</a>
             </div>
             <form onSubmit={send} className="flex gap-2">
