@@ -34,7 +34,7 @@ function toBlob(src) {
 }
 
 // { image } / { next } / { error, code }
-async function callOpenAI(key, model, sources, prompt, q, fmt = 'png') {
+async function callOpenAI(key, model, sources, prompt, q, fmt = 'png', fidelity = '') {
   const form = new FormData();
   form.append('model', model);
   form.append('prompt', prompt);
@@ -45,6 +45,8 @@ async function callOpenAI(key, model, sources, prompt, q, fmt = 'png') {
   if (fmt === 'webp') form.append('output_compression', '80');
   form.append('quality', quality(q));
   form.append('n', '1');
+  // keep the person (face, body) of the first picture as it is (colour try-on)
+  if (fidelity) form.append('input_fidelity', fidelity);
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 280000); // Premium (high) can take 1-3 minutes
   try {
@@ -57,6 +59,7 @@ async function callOpenAI(key, model, sources, prompt, q, fmt = 'png') {
       if (!b64) return { error: 'OpenAI did not send a picture back. Try again or use other photos.', code: 'no-image' };
       return { image: `data:image/${fmt};base64,${b64}` };
     }
+    if (fidelity && /input_fidelity/i.test(msg)) return { retryPlain: true };
     if (/model/i.test(msg) && (r.status === 404 || /does not exist|not found|invalid model|not supported|unknown/i.test(msg))) return { next: true };
     if (/verif/i.test(msg)) return { error: 'OpenAI asks you to verify your organization before it makes pictures: platform.openai.com/settings/organization/general → Verify Organization.', code: 'verify' };
     if (r.status === 429 && /quota|billing|credit/i.test(msg)) return { error: 'Your OpenAI credit is finished.', code: 'no-credit' };
@@ -97,7 +100,8 @@ export async function makeLook(req, res, { body, readSource, token, day, usage }
 // (public read, server writes) and shown to everybody after that for free. New pictures: at most LOOK_COLOR_PER_USER (10)
 // per signed-in account a day (aiLookUsage/{uid}_{day}, server only; the team has no limit) and LOOK_COLOR_DAILY_LIMIT (100) in all.
 
-export const colorKey = (lookId, productId, color) => `${lookId}_${productId}_${String(color || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)}`;
+// v2: pictures made from the 2:3 frame with high input fidelity (the first ones changed the person)
+export const colorKey = (lookId, productId, color) => `v2_${lookId}_${productId}_${String(color || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)}`;
 const perUser = () => Math.max(1, parseInt(process.env.LOOK_COLOR_PER_USER || '10', 10) || 10);
 const allDay = () => Math.max(1, parseInt(process.env.LOOK_COLOR_DAILY_LIMIT || '100', 10) || 100);
 const fsVal = (v) => (typeof v === 'number' ? { integerValue: String(v) } : { stringValue: String(v) });
@@ -131,6 +135,21 @@ async function visitor(req) {
     else if (c.email_verified === true) team = (await ownerEmails(await accessToken())).has(email);
   }
   return { uid, team };
+}
+
+// width / height of a PNG or WebP (base64 data), or null
+function picSize(src) {
+  try {
+    const b = Buffer.from(src.data.slice(0, 200), 'base64');
+    if (b.toString('ascii', 1, 4) === 'PNG') return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) };
+    if (b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP') {
+      const t = b.toString('ascii', 12, 16);
+      if (t === 'VP8X') return { w: 1 + b.readUIntLE(24, 3), h: 1 + b.readUIntLE(27, 3) };
+      if (t === 'VP8L') { const v = b.readUInt32LE(21); return { w: 1 + (v & 0x3fff), h: 1 + ((v >> 14) & 0x3fff) }; }
+      if (t === 'VP8 ') return { w: b.readUInt16LE(26) & 0x3fff, h: b.readUInt16LE(28) & 0x3fff };
+    }
+  } catch (e) { /* not a picture */ }
+  return null;
 }
 
 const PIECE = (p) => {
@@ -168,14 +187,21 @@ export async function lookColor(req, res, { body, readSource }) {
   const model = await readSource(look.image);
   const item = await readSource(fix((product.colorImages || {})[color] || product.image));
   if (!model || !item) return res.status(400).json({ error: 'The pictures could not be opened.' });
+  // the model picture must be in the 2:3 frame the AI uses, else the person gets cut or changed
+  const sz = picSize(model);
+  if (!sz || Math.abs(sz.w / sz.h - 2 / 3) > 0.02) return res.status(409).json({ error: 'This look is being updated. Please try again a little later.', code: 'needs-frame' });
   const kind = PIECE(product);
-  const prompt = `Edit the FIRST picture (a person wearing an outfit, transparent background). Change ONLY the ${kind} the person wears: `
-    + `replace it with exactly the ${kind} shown in the SECOND picture, in the colour "${color}", with its exact colour, shade, fabric, pattern, print and details. `
-    + 'Keep everything else exactly the same: the same person, face, hair, skin, body, pose, hands, the other clothes and shoes, the framing, size and position. '
-    + 'Natural fit and realistic fabric folds. Do not add or change any text or logo. Keep the fully transparent background with no floor and no shadow. Photorealistic.';
+  const prompt = `This is a precise clothing edit, not a new photo. The FIRST picture is the original: keep it exactly as it is, pixel for pixel, `
+    + `except ONE garment. Replace only the ${kind} the person wears with the exact ${kind} from the SECOND picture, in the colour "${color}": `
+    + 'the same product with its exact colour, shade, fabric, pattern, stripes, print, collar, buttons and details, fitted naturally on the same body with realistic folds. '
+    + 'Do NOT change the person: the very same face, identity, skin tone, hair, expression, body shape and height, pose, arms and hands. '
+    + 'Do NOT change anything else: the other clothes, the shoes, the framing, the size and position of the person, the empty space above the head and below the feet. '
+    + 'The whole person stays fully inside the picture from the top of the head to the shoes. Do not add or change any text or logo. '
+    + 'Keep the fully transparent background with no floor and no shadow. Photorealistic.';
   for (const m of models()) {
-    const out = await callOpenAI(key, m, [model, item], prompt, 'medium', 'webp');
-    if (out.next) continue;
+    let out = await callOpenAI(key, m, [model, item], prompt, 'medium', 'webp', 'high');
+    if (out.retryPlain) out = await callOpenAI(key, m, [model, item], prompt, 'medium', 'webp');
+    if (out.next || out.retryPlain) continue;
     if (out.error) return res.status(502).json({ error: out.code === 'no-credit' ? 'Colour try-on is not available right now.' : out.error, code: out.code });
     if (out.image.length > 950000) return res.status(502).json({ error: 'The picture came out too big. Try again.' });
     // the picture is paid for: hand it back even if keeping it fails
