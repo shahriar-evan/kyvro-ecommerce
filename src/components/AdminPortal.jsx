@@ -441,9 +441,6 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                               {outColours(p).length > 0 && (
                                 <p className="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
                                   Stock out at supplier: {outColours(p).filter((c) => !backColours(p).includes(c)).map(colourLabel).join(', ') || '–'}
-                                  {p.status === 'approved' && !backColours(p).length && (
-                                    <button type="button" disabled={!!stockBusy} onClick={() => stockOp('hide', p)} className="ml-2 underline font-bold disabled:opacity-50">{stockBusy === `hide:${p.id}` ? 'Hiding…' : 'Hide from website'}</button>
-                                  )}
                                 </p>
                               )}
                               {backColours(p).length > 0 && (
@@ -499,6 +496,13 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                             </div>
                           </td>
                           <td className="p-4 align-middle">
+                            {/* stock sync: any team member can take a product that is out of stock at the supplier off the website */}
+                            {outColours(p).length > 0 && p.status === 'approved' && !backColours(p).length && (
+                              <div className="mb-2 flex justify-center">
+                                <button type="button" disabled={!!stockBusy} onClick={() => stockOp('hide', p)}
+                                  className="px-3 py-1.5 rounded text-xs font-semibold border border-red-500 text-red-600 dark:text-red-400 hover:bg-red-500/10 transition whitespace-nowrap disabled:opacity-50">{stockBusy === `hide:${p.id}` ? 'Hiding…' : 'Hide from website'}</button>
+                              </div>
+                            )}
                             <div className="flex flex-nowrap items-center justify-center gap-2 whitespace-nowrap">
                             {canApproveProduct(p) && <button onClick={() => handleApproveProduct(p)} className="px-3 py-1.5 rounded text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition">Approve</button>}
                             {canEditProduct(p)
