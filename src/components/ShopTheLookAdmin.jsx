@@ -138,7 +138,7 @@ export default function ShopTheLookAdmin({ products = [], isDarkMode, formatPric
         await saveLook({ name: l.name, who: 'men', image, active: true, order: (looks || []).length + k,
           items: l.items.map(([kind, p]) => ({ id: String(p.id), ...PIN[kind] })) }, staff);
         done += 1;
-      } catch (e) { failed.push(`${l.name}: ${e.message}`); if (/credit|key|verify/i.test(e.message)) break; }
+      } catch (e) { failed.push(`${l.name}: ${e.message}`); if (/credit|key|verify|team|sign in/i.test(e.message)) break; }
     }
     setBusy(''); setAuto(''); setStartedAt(0);
     setMsg({ type: failed.length ? 'err' : 'ok', text: `${done} look${done === 1 ? '' : 's'} made and shown on the home page. Check each one (Edit to move pins or make again).${failed.length ? ` Not made: ${failed.join('; ')}` : ''}` });
