@@ -10,6 +10,7 @@
 //   POST /api/plan?action=billing     my own plan payments (Subscription > Billing history)
 //   GET  /api/plan?action=sitemap     /sitemap.xml for Google (home, products, live shop links)
 //   POST /api/plan?action=remove-shop the Owner removes (30 days in Removed shops), restores or deletes a shop
+//   POST /api/plan?action=chat        public: the website help chat (order status with phone check, AI shopping answers)
 //   POST /api/plan?action=ai-photo    team: a front / side product photo made by Gemini (Admin product form, home page photo)
 import init from './_plan/init.js';
 import callback from './_plan/callback.js';
@@ -23,10 +24,11 @@ import sitemap from './_plan/sitemap.js';
 import removeShop from './_plan/removeshop.js';
 import aiPhoto from './_plan/aiphoto.js';
 import stock from './_plan/stock.js';
+import chat from './_plan/chat.js';
 
 export const config = { maxDuration: 60 };
 
-const ACTIONS = { init, callback, sync, reminders, 'seller-earnings': sellerEarnings, comp, warn, billing, sitemap, 'remove-shop': removeShop, 'ai-photo': aiPhoto, stock };
+const ACTIONS = { init, callback, sync, reminders, 'seller-earnings': sellerEarnings, comp, warn, billing, sitemap, 'remove-shop': removeShop, 'ai-photo': aiPhoto, stock, chat };
 
 export default async function handler(req, res) {
   const action = String((req.query && req.query.action) || '');

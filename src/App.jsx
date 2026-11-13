@@ -57,6 +57,7 @@ const AdminPortal = lazy(() => import('./components/AdminPortal'));
 const CheckoutView = lazy(() => import('./components/CheckoutView'));
 const PolicyPages = lazy(() => import('./components/PolicyPages'));
 const OrderSuccess = lazy(() => import('./components/OrderSuccess'));
+const ChatWidget = lazy(() => import('./components/ChatWidget'));
 const AccountView = lazy(() => import('./components/AccountView'));
 const SellPricing = lazy(() => import('./components/SellPricing'));
 const OrderTracking = lazy(() => import('./components/OrderTracking'));
@@ -1654,6 +1655,13 @@ export default function App() {
             <button type="button" onClick={sellAction} className="shrink-0 w-full sm:w-auto bg-gradient-to-b from-[#E9CB6B] via-[#D4AF37] to-[#B8921F] text-black font-bold px-8 py-3 rounded text-xs uppercase tracking-widest shadow hover:opacity-90 transition">{hasMyShop ? 'My Shop' : 'Start selling'}</button>
           </div>
         </section>
+      )}
+      {productsReady && !['admin', 'checkout'].includes(currentView) && !/[?&]themePreview=/.test(window.location.search) && (
+        <Suspense fallback={null}>
+          <ChatWidget products={storefrontProducts} storeSettings={storeSettings} formatPrice={formatPrice} isDarkMode={isDarkMode} shopName={shopBrand ? shopBrand.name : ''}
+            raise={currentView === 'product-detail'} setCurrentView={setCurrentView}
+            onOpenProduct={(p) => { setSelectedProduct(p); setCurrentView('product-detail'); window.scrollTo(0, 0); }} />
+        </Suspense>
       )}
       <Footer onStartSelling={sellAction} sellLabel={sellLabel} navHas={navHas} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} customerUser={customerUser} onSignIn={handleCustomerSignIn} goAccount={goAccount} />
 

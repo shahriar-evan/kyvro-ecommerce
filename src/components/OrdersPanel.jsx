@@ -277,7 +277,7 @@ export default function OrdersPanel({ orders, products = [], productCosts = {}, 
   };
 
   const cancelConfirmText = (o) => isPaidOrder(o)
-    ? `Cancel order ${o.orderNumber}?\n\nThis order is already PAID online. Cancelling does NOT refund the customer automatically: refund them yourself (SSLCommerz panel or bKash) after cancelling.`
+    ? `Cancel order ${o.orderNumber}?\n\nThis order is already PAID online. Cancelling does NOT refund the customer automatically: refund them yourself (UddoktaPay panel, or bKash / Nagad) after cancelling.`
     : `Cancel order ${o.orderNumber}?`;
   const sendCancelRequest = (o) => {
     const text = (reqText[o.id] || '').trim();
