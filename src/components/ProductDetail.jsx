@@ -132,7 +132,7 @@ function ZoomViewer({ photos, index, onIndex, onClose }) {
   );
 }
 
-export default function ProductDetail({ product, products, addToCart, calculateDiscountPercent, formatPrice, isDarkMode, setCurrentView, setSelectedProduct = () => {}, storeSettings = {}, cartSubtotal = 0, cartUnits = 0, savedIds = [], toggleSaved = () => {}, teamShop = '', onEdit = null }) {
+export default function ProductDetail({ product, products, addToCart, calculateDiscountPercent, formatPrice, isDarkMode, setCurrentView, setSelectedProduct = () => {}, storeSettings = {}, cartSubtotal = 0, cartUnits = 0, savedIds = [], toggleSaved = () => {}, teamShop = '', onEdit = null, supplier = null }) {
   // Always use the latest version of the product (admin may have changed stock)
   const live = (products || []).find((p) => p.id === product.id) || product;
   const sized = hasSizeStock(live);
@@ -146,6 +146,10 @@ export default function ProductDetail({ product, products, addToCart, calculateD
 
   const [size, setSize] = useState('');
   const [color, setColor] = useState(byColor ? firstColorFor('') : (colors[0] || ''));
+  // supplier page for the picked colour (its own link when the supplier lists colours separately), else the main link
+  const httpsOnly = (u) => (typeof u === 'string' && /^https:\/\//i.test(u.trim()) ? u.trim() : '');
+  const supplierUrl = supplier ? (httpsOnly(supplier.colorLinks && supplier.colorLinks[color]) || httpsOnly(supplier.supplierLink) || httpsOnly(Object.values(supplier.colorLinks || {})[0])) : '';
+  const supplierName = (supplier && supplier.supplierName) || 'Supplier';
   const [qty, setQty] = useState(1);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
@@ -260,11 +264,22 @@ export default function ProductDetail({ product, products, addToCart, calculateD
             <div className="flex items-center justify-between gap-3">
               <span className="text-[11px] text-[#D4AF37] uppercase tracking-wider">{live.gender === live.category ? live.category : `${live.gender} / ${live.category}`}</span>
               {/* Team only (Owner, or a member allowed to edit this product): opens it in the Admin edit form */}
-              {onEdit && (
+              {(onEdit || supplierUrl) && (
+                <div className="shrink-0 flex items-center gap-2">
+                  {/* Owner / Manager only: one click to this product (the picked colour) on the supplier's site; Admins and customers never get this */}
+                  {supplierUrl && (
+                    <a href={supplierUrl} target="_blank" rel="noopener noreferrer" title={`Open on ${supplierName}${color ? ` (${color})` : ''}`}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] font-bold uppercase tracking-wider transition ${isDarkMode ? 'border-gray-500 text-gray-200 hover:bg-white/10' : 'border-gray-400 text-gray-700 hover:bg-gray-100'}`}>
+                      <span aria-hidden="true">↗</span> {supplierName}
+                    </a>
+                  )}
+                  {onEdit && (
                 <button type="button" onClick={onEdit}
                   className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-[11px] font-bold uppercase tracking-wider transition ${isDarkMode ? 'border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10' : 'border-[#D4AF37] text-[#9A7A1A] hover:bg-[#D4AF37]/10'}`}>
                   <span aria-hidden="true">✎</span> Edit product
                 </button>
+                  )}
+                </div>
               )}
             </div>
             <h1 className="text-2xl sm:text-3xl font-serif font-bold mt-1">{live.name}</h1>
