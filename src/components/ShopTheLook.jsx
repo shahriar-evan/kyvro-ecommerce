@@ -179,7 +179,12 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart, ope
   };
   // pick one or more pieces (no discount)
   const chosenList = look.pieces.filter((x) => chosen[x.id] && totalStock(x.p) > 0);
+  // every piece ticked = the full look (10% off on the main store)
+  const allChosen = full && chosenList.length === look.pieces.length;
+  const chosenTotal = chosenList.reduce((sum, x) => sum + (Number(x.p.price) || 0), 0);
+  const chosenOff = allChosen ? off : 0;
   const addChosen = () => {
+    if (allChosen) { addAll(); setChosen({}); return; }
     const n = addList(chosenList, false);
     if (n) { setMsg({ type: 'ok', text: `${n} piece${n === 1 ? '' : 's'} added to your cart. · কার্টে যোগ হয়েছে।` }); setChosen({}); }
   };
@@ -316,10 +321,19 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart, ope
               className="mt-3 w-full h-12 rounded-lg bg-black text-white text-sm font-bold uppercase tracking-wider hover:bg-[#1a1a1a] disabled:opacity-40 flex items-center justify-center gap-2">
               {off > 0 ? <>Add full look · 10% off <span className="px-1.5 py-0.5 rounded bg-[#D4AF37] text-black text-[10px] normal-case tracking-normal">Save {formatPrice(off)}</span></> : <>Add full look to cart <ArrowRight size={16} /></>}
             </button>
-            <div className="mt-3 flex items-center gap-2 text-[11px] text-gray-500"><span className="h-px flex-1 bg-black/10" />or tick one or more pieces{off > 0 ? ' (no discount)' : ''} · এক বা একাধিক বেছে নিন<span className="h-px flex-1 bg-black/10" /></div>
+            <div className="mt-3 flex items-center gap-2 text-[11px] text-gray-500"><span className="h-px flex-1 bg-black/10" />{full ? 'Or tick pieces · select the whole look for 10% off' : 'Or tick the pieces you want'}<span className="h-px flex-1 bg-black/10" /></div>
+            {chosenList.length > 0 && (
+              <div className="mt-2 flex items-baseline justify-between text-sm">
+                <span className="text-gray-500">Selected ({chosenList.length}){allChosen ? ' · whole look' : ''}</span>
+                <span className="text-right">
+                  {chosenOff > 0 && <span className="mr-2 text-sm text-gray-400 line-through">{formatPrice(chosenTotal)}</span>}
+                  <span className="text-lg font-bold">{formatPrice(chosenTotal - chosenOff)}</span>
+                </span>
+              </div>
+            )}
             <button type="button" onClick={addChosen} disabled={!chosenList.length}
-              className="mt-2 w-full h-11 rounded-lg border-2 border-black text-sm font-bold uppercase tracking-wider hover:bg-black hover:text-white disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-black">
-              Add selected ({chosenList.length})
+              className="mt-2 w-full h-11 rounded-lg border-2 border-black text-sm font-bold uppercase tracking-wider hover:bg-black hover:text-white disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-black flex items-center justify-center gap-2">
+              Add selected ({chosenList.length}){chosenOff > 0 && <span className="px-1.5 py-0.5 rounded bg-[#D4AF37] text-black text-[10px] normal-case tracking-normal">10% off · Save {formatPrice(chosenOff)}</span>}
             </button>
             {msg && <p className={`mt-2 text-xs flex items-center gap-1 ${msg.type === 'ok' ? 'text-green-600' : 'text-red-500'}`}>{msg.type === 'ok' && <Check size={13} />}{msg.text}</p>}
           </div>
