@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Pause, Play } from 'lucide-react';
 import { watchLooks } from '../looks';
 import { totalStock, hasSizeStock, orderedSizes, stockFor, stockForColor, productColors } from '../data/catalog';
 
@@ -59,12 +59,25 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart }) {
   const [picks, setPicks] = useState({}); // productId -> { size, color }
   const [hot, setHot] = useState(null); // highlighted pin
   const [msg, setMsg] = useState(null);
-  const swipe = useRef(null); // phone: swipe left / right for the next look
+  const swipe = useRef(null); // drag (mouse) / swipe (phone) start
+  const dragged = useRef(false);
   useEffect(() => { setMsg(null); setHot(null); }, [at]);
+  // turns by itself every 3 s; stops while the visitor is in the pieces panel (picking a size), for 8 s after they touch it, or with Pause
+  const SPIN = 3000;
+  const [playing, setPlaying] = useState(true);
+  const [hover, setHover] = useState(false);
+  const holdUntil = useRef(0);
+  const count = shown.length;
+  useEffect(() => {
+    if (!playing || hover || count < 2) return undefined;
+    const t = setInterval(() => { if (Date.now() > holdUntil.current) setAt((a) => (a + 1) % count); }, SPIN);
+    return () => clearInterval(t);
+  }, [playing, hover, count]);
+  const hold = () => { holdUntil.current = Date.now() + 8000; };
   if (!shown.length) return null;
   const i = Math.min(at, shown.length - 1);
   const look = shown[i];
-  const go = (k) => setAt((k + shown.length) % shown.length);
+  const go = (k) => { hold(); setAt((k + shown.length) % shown.length); };
 
   const ready = (x) => {
     const p = x.p;
@@ -91,24 +104,27 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart }) {
 
   return (
     <section className="w-full bg-white text-black border-t border-black/5" aria-label="Shop the look">
+      <style>{'@keyframes kyLookBar{from{width:0}to{width:100%}}'}</style>
       <div className="max-w-[1500px] mx-auto grid lg:grid-cols-[1fr_400px]">
         <div className="relative px-4 sm:px-10 pt-10 pb-6 overflow-hidden">
           <p className="text-[11px] font-bold tracking-[0.35em] text-[#B8921F]">SHOP THE LOOK</p>
           <h2 className="mt-2 text-3xl sm:text-5xl font-serif font-bold">Wear the whole look.</h2>
           <p className="mt-2 text-sm text-gray-500">Styled head to toe from Kyvro. Tap a model, then pick your size. · পুরো লুক এক ক্লিকে।</p>
 
-          <div className="relative h-[440px] sm:h-[560px] mt-4 select-none" onTouchStart={(e) => { swipe.current = e.touches[0].clientX; }}
-            onTouchEnd={(e) => { const dx = e.changedTouches[0].clientX - (swipe.current ?? e.changedTouches[0].clientX); swipe.current = null; if (Math.abs(dx) > 40) go(i + (dx < 0 ? 1 : -1)); }}>
+          <div className="relative h-[440px] sm:h-[560px] mt-4 select-none touch-pan-y cursor-grab active:cursor-grabbing"
+            onPointerDown={(e) => { swipe.current = e.clientX; dragged.current = false; hold(); }}
+            onPointerUp={(e) => { if (swipe.current == null) return; const dx = e.clientX - swipe.current; swipe.current = null; if (Math.abs(dx) > 40) { dragged.current = true; go(i + (dx < 0 ? 1 : -1)); } }}
+            onPointerLeave={() => { swipe.current = null; }}>
             {around.map((d) => {
               const k = (i + d + shown.length * 3) % shown.length;
               const l = shown[k];
               const mid = d === 0;
-              const shift = d * (typeof window !== 'undefined' && window.innerWidth < 640 ? 38 : 24);
+              const shift = d * (typeof window !== 'undefined' && window.innerWidth < 640 ? 62 : 72) - Math.sign(d) * (Math.abs(d) - 1) * 12;
               return (
-                <button key={`${l.id}-${d}`} type="button" onClick={() => go(k)} aria-label={mid ? l.name || 'Look' : `Show ${l.name || 'this look'}`}
+                <button key={`${l.id}-${d}`} type="button" onClick={() => { if (dragged.current) { dragged.current = false; return; } go(k); }} aria-label={mid ? l.name || 'Look' : `Show ${l.name || 'this look'}`}
                   className="absolute bottom-0 left-1/2 h-full transition-all duration-500 ease-out"
                   style={{ transform: `translateX(calc(-50% + ${shift}%)) scale(${mid ? 1 : 0.8 - Math.abs(d) * 0.05})`, transformOrigin: 'bottom center',
-                    zIndex: 10 - Math.abs(d), filter: mid ? 'none' : `blur(${Math.abs(d) * 2}px)`, opacity: mid ? 1 : 0.55 - Math.abs(d) * 0.12, cursor: mid ? 'default' : 'pointer' }}>
+                    zIndex: 10 - Math.abs(d), filter: mid ? 'none' : `blur(${Math.abs(d) * 2.5}px) saturate(0.9)`, opacity: mid ? 1 : 0.8 - Math.abs(d) * 0.2, cursor: mid ? 'default' : 'pointer' }}>
                   <span className="relative block h-full aspect-[2/3]">
                     <img src={l.image} alt={l.name || 'Look'} draggable={false} className="w-full h-full object-contain object-bottom drop-shadow-[0_18px_18px_rgba(0,0,0,0.18)]" />
                     {mid && l.pieces.map((x) => (
@@ -128,16 +144,20 @@ export default function ShopTheLook({ products = [], formatPrice, addToCart }) {
             <div className="flex-1 flex gap-2 overflow-x-auto">
               {shown.map((l, k) => (
                 <button key={l.id} type="button" onClick={() => go(k)} className="min-w-[3rem] text-left">
-                  <span className={`block h-0.5 ${k === i ? 'bg-black' : 'bg-black/15'}`} />
+                  <span className="block h-0.5 bg-black/15 overflow-hidden">
+                    {k === i && <span key={`${at}-${playing && !hover}`} className="block h-full bg-black"
+                      style={playing && !hover && count > 1 ? { animation: `kyLookBar ${SPIN}ms linear forwards` } : { width: '100%' }} />}
+                  </span>
                   <span className={`block mt-1.5 text-[11px] tracking-wider whitespace-nowrap ${k === i ? 'font-bold' : 'text-gray-400'}`}>{String(k + 1).padStart(2, '0')}{k === i && l.name ? `  ${l.name}` : ''}</span>
                 </button>
               ))}
             </div>
+            {count > 1 && <button type="button" onClick={() => setPlaying((v) => !v)} className="p-2" aria-label={playing ? 'Pause' : 'Play'}>{playing ? <Pause size={16} /> : <Play size={16} />}</button>}
             <button type="button" onClick={() => go(i + 1)} className="p-2 rounded-full border border-black/20 hover:border-black" aria-label="Next look"><ArrowRight size={18} /></button>
           </div>
         </div>
 
-        <aside className="border-t lg:border-t-0 lg:border-l border-black/10 px-4 sm:px-8 py-8 flex flex-col">
+        <aside onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onFocus={() => setHover(true)} onBlur={() => setHover(false)} onTouchStart={hold} className="border-t lg:border-t-0 lg:border-l border-black/10 px-4 sm:px-8 py-8 flex flex-col">
           <div className="flex items-baseline justify-between">
             <h3 className="text-xl font-bold">In this look</h3>
             <span className="text-[11px] tracking-[0.2em] text-gray-500">{look.pieces.length} PIECE{look.pieces.length === 1 ? '' : 'S'}</span>

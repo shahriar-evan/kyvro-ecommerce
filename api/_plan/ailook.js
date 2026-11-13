@@ -4,18 +4,27 @@
 // the picture and the team member saves the look (looks/{id}) if it is right.
 //
 // Environment: OPENAI_API_KEY (platform.openai.com, prepaid credit). Optional OPENAI_IMAGE_MODEL, OPENAI_IMAGE_QUALITY
-// (low | medium | high, default medium). Counted in the same aiUsage/{day} as the other AI photos.
+// (low | medium | high, default medium; the Admin can ask for 'high' = Premium). Counted in the same aiUsage/{day} as the other AI photos.
 const OPENAI_EDITS = 'https://api.openai.com/v1/images/edits';
 const models = () => [...new Set([process.env.OPENAI_IMAGE_MODEL, 'gpt-image-1.5', 'gpt-image-1', 'gpt-image-1-mini'].filter(Boolean))];
-const quality = () => (['low', 'medium', 'high'].includes(process.env.OPENAI_IMAGE_QUALITY) ? process.env.OPENAI_IMAGE_QUALITY : 'medium');
+const quality = (q) => (['medium', 'high'].includes(q) ? q : ['low', 'medium', 'high'].includes(process.env.OPENAI_IMAGE_QUALITY) ? process.env.OPENAI_IMAGE_QUALITY : 'medium');
 
-const lookPrompt = (who, n) => `Create one photorealistic full-body fashion photo of a single ${who === 'women' ? 'young South Asian woman' : 'young South Asian man'} `
-  + `standing naturally, relaxed pose, facing the camera, whole body visible from head to shoes, centred, with some empty space above the head and below the feet. `
-  + `The person wears EXACTLY the ${n} clothing items / products shown in the ${n} input pictures, all together as one outfit: `
-  + 'keep each item\'s exact colour, shade, fabric, pattern, print, buttons, collar, pockets and every detail. Do not change, add, translate or invent any text, '
-  + 'letters, numbers, logos or brand names. Do not add any other clothing item, bag, hat, jewellery or accessory that is not in the pictures '
-  + '(if no shoes or trousers are given, use plain simple neutral ones). '
-  + 'Fully TRANSPARENT background: no floor, no wall, no shadow on the ground, no props, no text. Soft even studio light, sharp focus, e-commerce lookbook photo.';
+// a different person and pose each time (the Admin sends a number), so several looks do not look like one model
+const MEN = ['short neat black hair, light stubble', 'textured medium black hair, clean shaven', 'short fade haircut, trimmed beard', 'wavy dark hair, clean shaven'];
+const WOMEN = ['long straight black hair', 'shoulder-length wavy dark hair', 'hair in a neat low bun', 'long loose curls'];
+const POSES = ['standing relaxed, one hand in a pocket', 'standing straight, arms relaxed at the sides', 'mid-step walking pose toward the camera', 'standing with weight on one leg, slight three-quarter turn'];
+const lookPrompt = (who, n, v = 0) => {
+  const person = who === 'women' ? `a young South Asian woman in her twenties, ${WOMEN[v % 4]}` : `a young South Asian man in his twenties, ${MEN[v % 4]}`;
+  return `High-end fashion lookbook photograph of ${person}, ${POSES[Math.floor(v / 4) % 4]}, full body from head to shoes, centred, `
+  + 'with some empty space above the head and below the feet. Shot on a full-frame camera with an 85mm lens at eye level, soft diffused studio key light '
+  + 'with gentle fill, natural realistic shadows on the body and clothes. A real human: natural realistic face with true-to-life skin texture and pores, '
+  + 'natural eyes and expression, realistic hair, correct hands with five fingers, natural body proportions. Calm confident expression, looking at the camera. '
+  + `The person wears EXACTLY the ${n} items shown in the ${n} input pictures, all together as one outfit, with a natural fit and realistic fabric folds and drape: `
+  + 'keep each item\'s exact colour, shade, fabric texture, pattern, print, stitching, buttons, zips, collar and pockets. Do not change, add, translate or invent '
+  + 'any text, letters, numbers, logos or brand names. No other clothing, bag, hat, glasses, jewellery or accessory that is not in the pictures '
+  + '(if no trousers or shoes are given, use plain simple neutral ones). '
+  + 'Fully TRANSPARENT background: no floor, no wall, no shadow on the ground, no props, no text, no watermark. Ultra sharp, premium e-commerce campaign quality.';
+};
 
 function toBlob(src) {
   const buf = Buffer.from(src.data, 'base64');
@@ -23,7 +32,7 @@ function toBlob(src) {
 }
 
 // { image } / { next } / { error, code }
-async function callOpenAI(key, model, sources, prompt) {
+async function callOpenAI(key, model, sources, prompt, q) {
   const form = new FormData();
   form.append('model', model);
   form.append('prompt', prompt);
@@ -31,10 +40,10 @@ async function callOpenAI(key, model, sources, prompt) {
   form.append('size', '1024x1536');
   form.append('background', 'transparent');
   form.append('output_format', 'png');
-  form.append('quality', quality());
+  form.append('quality', quality(q));
   form.append('n', '1');
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 57000);
+  const t = setTimeout(() => ctrl.abort(), 280000); // Premium (high) can take 1-3 minutes
   try {
     const r = await fetch(OPENAI_EDITS, { method: 'POST', signal: ctrl.signal, headers: { Authorization: `Bearer ${key}` }, body: form });
     let j = {};
@@ -69,9 +78,9 @@ export async function makeLook(req, res, { body, readSource, token, day, usage }
     if (!src) return res.status(400).json({ error: 'A product photo could not be opened. Use JPG / PNG / WebP photos.', code: 'bad-source' });
     sources.push(src);
   }
-  const prompt = lookPrompt(body.who === 'women' ? 'women' : 'men', sources.length);
+  const prompt = lookPrompt(body.who === 'women' ? 'women' : 'men', sources.length, Math.max(0, parseInt(body.variant, 10) || 0));
   for (const model of models()) {
-    const out = await callOpenAI(key, model, sources, prompt);
+    const out = await callOpenAI(key, model, sources, prompt, body.quality);
     if (out.next) continue;
     if (out.error) return res.status(out.code === 'no-credit' ? 402 : 502).json({ error: out.error, code: out.code, provider: 'openai' });
     await usage(token, day, 1);
