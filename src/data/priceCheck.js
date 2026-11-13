@@ -164,6 +164,32 @@ export const storeCouponActive = (promos, code, now = Date.now()) => {
 };
 export const storeCouponAmount = (coupon, net) => (!coupon || net < coupon.minOrder ? 0
   : Math.max(0, Math.min(Math.floor((net * coupon.percent) / 100), coupon.maxOff > 0 ? coupon.maxOff : Infinity)));
+// ---- Shop the Look "full look" discount (main store only, not with a promo code): every piece of a look added together
+// (cart / order items carry look = the look id) gets LOOK_OFF_PERCENT % off those pieces. Whole sets only: a look bought
+// twice counts twice; a missing piece = no discount. lookItems: { lookId: [productId, ...] } (from looks/{id}.items;
+// in the browser the cart line also keeps lookN = how many pieces the look has, for the cart total before the order).
+// The other automatic discounts are counted on the rest of the products only. Same check: firestore.rules (amount at most
+// 10% of the subtotal) and checkOrderPrices below (the exact amount from the real looks).
+export const LOOK_OFF_PERCENT = 10;
+export function lookOffFor(items, lookItems = null) {
+  const groups = {};
+  (items || []).forEach((it) => { if (it && it.look) (groups[it.look] = groups[it.look] || []).push(it); });
+  let amount = 0, base = 0; const looks = [];
+  Object.entries(groups).forEach(([lookId, list]) => {
+    const want = lookItems ? (lookItems[lookId] || []).map(String) : null;
+    const n = want ? want.length : Math.max(0, ...list.map((it) => parseInt(it.lookN, 10) || 0));
+    const ids = [...new Set(list.map((it) => String(it.id)))];
+    if (!n || ids.length < n || (want && !want.every((id) => ids.includes(id)))) return;
+    const pick = want || ids;
+    const sets = Math.min(...pick.map((id) => list.filter((it) => String(it.id) === id).reduce((q, it) => q + (parseInt(it.quantity, 10) || 0), 0)));
+    if (!(sets >= 1)) return;
+    const setPrice = pick.reduce((sum, id) => sum + (Number((list.find((it) => String(it.id) === id) || {}).price) || 0), 0);
+    base += setPrice * sets;
+    amount += Math.floor((setPrice * sets * LOOK_OFF_PERCENT) / 100);
+    looks.push(lookId);
+  });
+  return { amount, base, looks };
+}
 export const orderMarkup = (o) => Math.max(0, itemsMarkup(o && o.items) - (o && o.coupon ? Number(o.coupon.amount) || 0 : 0));
 export const basicDue = (shop, plans, now = Date.now()) => !!shop && shop.kind === 'seller' && shop.basicFree === false
   && shop.planExempt !== true && basicCharging(plans) && !shopIsPaid(shop, now) && toMillis(shop.basicUntil) <= now;
@@ -198,7 +224,7 @@ export function orderVisibleIds(order, shop, productsById, plans, now = Date.now
 //   productsById: { [id]: product }   shop: the shops/{slug} document, or null / undefined when it does not exist
 //   visible: the shop's visibleShopIds() (null = no limit): a product hidden by an expired plan cannot be bought
 // Returns { ok, problems: [text], subtotal } (subtotal = what the items really cost)
-export function checkOrderPrices(order, productsById, shop, visible = null, promos = null) {
+export function checkOrderPrices(order, productsById, shop, visible = null, promos = null, lookItems = null) {
   const problems = [];
   let subtotal = 0;
   const inShop = !!order.shop;
@@ -236,6 +262,15 @@ export function checkOrderPrices(order, productsById, shop, visible = null, prom
       const most = inShop ? couponAmountFor(order.items, c, net) : storeCouponAmount(c, net);
       if (Number(order.coupon.percent) !== c.percent) problems.push(`Promo code ${code}: ${order.coupon.percent}% should be ${c.percent}%`);
       if (Number(order.coupon.amount) > most) problems.push(`Promo code ${code}: ${order.coupon.amount} off, at most ${most}`);
+    }
+  }
+  // the full-look discount: main store only, never with a promo code, and exactly what the looks give
+  if (order.lookOff) {
+    const got = Number(order.lookOff.amount) || 0;
+    if (inShop || order.coupon) problems.push('Full look discount is only for the main store, without a promo code');
+    else if (lookItems) {
+      const want = lookOffFor(order.items, lookItems).amount;
+      if (got > want) problems.push(`Full look discount ${got}, should be at most ${want}`);
     }
   }
   return { ok: problems.length === 0, problems, subtotal };

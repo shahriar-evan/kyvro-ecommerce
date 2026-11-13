@@ -17,7 +17,7 @@ import { ensureSubscribed } from './subscribers';
 import PushPrompt from './components/PushPrompt';
 import { watchProducts, loadCatalog, cachedProducts, watchProductCosts, watchProductCommissions, setProductCommission, saveProductCost, removeProductCost, saveProduct, removeProduct, requestProductDelete, rejectProductDelete, approveProduct, migrateProducts } from './productsStore';
 import { watchStoreSettings, cachedStoreSettings, watchPlans, watchPromos } from './storeSettings';
-import { visibleShopIds, normalizePlans, effectiveTier, shopIsPaid, basicDue, couponActive, couponAmountFor, cleanCouponCode, storeCouponActive, storeCouponAmount } from './data/priceCheck';
+import { visibleShopIds, normalizePlans, effectiveTier, shopIsPaid, basicDue, couponActive, couponAmountFor, cleanCouponCode, storeCouponActive, storeCouponAmount, lookOffFor } from './data/priceCheck';
 import { themePreviewFromUrl, cleanTheme, cleanMode } from './data/themes';
 import { watchSiteTheme } from './themeStore';
 import { shopExtrasOf, brandHex, SOCIALS, httpsLinkOk, contactOk, contactHref, contactLabel, effectiveFeatures, FEATURES, shopDisplayName } from './data/shopBrand';
@@ -703,7 +703,8 @@ export default function App() {
     return Math.round(((originalPrice - price) / originalPrice) * 100);
   };
 
-  const addToCart = (product, selectedColor, selectedSize, quantity = 1, goCheckout = false) => {
+  // look = { id, n } when the piece is added as part of a Shop the Look full look (for the full-look discount)
+  const addToCart = (product, selectedColor, selectedSize, quantity = 1, goCheckout = false, look = null) => {
     const live = retail(product);
     if (!live) { alert('This product is not available in this shop.'); return; }
     const size = selectedSize || (live.sizes && live.sizes[0]);
@@ -726,10 +727,10 @@ export default function App() {
     setCart(prev => {
       const existing = prev.find(item => item.cartItemId === cartItemId);
       if (existing) {
-        return prev.map(item => item.cartItemId === cartItemId ? { ...item, quantity: item.quantity + qty } : item);
+        return prev.map(item => item.cartItemId === cartItemId ? { ...item, quantity: item.quantity + qty, ...(look ? { look: look.id, lookN: look.n } : {}) } : item);
       }
       const { colorImages, colorGallery, images, ...rest } = live; // extra photos stay out of the cart (keeps it small)
-      return [...prev, { ...rest, image: imageFor(live, color), cartItemId, selectedColor: color, selectedSize: size, quantity: qty }];
+      return [...prev, { ...rest, image: imageFor(live, color), cartItemId, selectedColor: color, selectedSize: size, quantity: qty, ...(look ? { look: look.id, lookN: look.n } : {}) }];
     });
     trackAddToCart({ ...live, selectedColor: color }, qty);
     if (visitorLocked) {
@@ -789,13 +790,15 @@ export default function App() {
   };
 
   const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  // Shop the Look full-look discount (main store only; the other discounts count only the rest of the products)
+  const lookOff = shopCtx ? { amount: 0, base: 0, looks: [] } : lookOffFor(cart);
   // Automatic discount (rules are set by the Owner), taken off the product total, not the delivery charge
-  const discountInfo = bestDiscount(subtotal, storeSettings);
+  const discountInfo = bestDiscount(subtotal - lookOff.base, storeSettings);
   const discount = discountInfo.amount;
   // Flat delivery charge; free above the Owner's minimum (see data/shopConfig.js and Admin > Store Settings)
   const deliveryCharge = deliveryFee(checkoutForm.deliveryArea, checkoutForm.paymentMethod, subtotal - discount, storeSettings, cart.reduce((n, i) => n + (parseInt(i.quantity, 10) || 0), 0));
   const discountLabel = discountInfo.rule ? describeRule(discountInfo.rule) : '';
-  const reward = nextReward(subtotal, storeSettings);
+  const reward = nextReward(subtotal - lookOff.base, storeSettings);
   // a shop's promo code (Premium "coupons"): only on that shop's link; comes out of the shop's markup, never Kyvro's price
   const [couponCode, setCouponCode] = useState('');
   const [couponMsg, setCouponMsg] = useState(null);
@@ -806,11 +809,13 @@ export default function App() {
   const storeCouponsOn = !shopCtx && !!storePromos && Object.values(storePromos.codes || {}).some((c) => c && c.active === true);
   const couponsOn = shopCouponsOn || storeCouponsOn;
   const findCoupon = (code) => (shopCtx ? couponActive(shopCtx, code) : storeCouponActive(storePromos, code));
-  const appliedCoupon = couponsOn && couponCode ? findCoupon(couponCode) : null;
+  // a promo code does not go with the full-look discount
+  const appliedCoupon = couponsOn && couponCode && !lookOff.amount ? findCoupon(couponCode) : null;
   const couponAmount = !appliedCoupon ? 0 : shopCtx ? couponAmountFor(cart, appliedCoupon, subtotal - discount) : storeCouponAmount(appliedCoupon, subtotal - discount);
   const applyCoupon = (raw) => {
     const code = cleanCouponCode(raw);
     if (!code) { setCouponCode(''); setCouponMsg(null); return; }
+    if (lookOff.amount > 0) { setCouponCode(''); setCouponMsg({ type: 'err', text: 'A promo code cannot be used with the full look 10% off. · ফুল লুকের ছাড়ের সাথে প্রোমো কোড চলবে না।' }); return; }
     const c = findCoupon(code);
     if (!c) { setCouponCode(''); setCouponMsg({ type: 'err', text: 'This promo code is not valid. · প্রোমো কোডটি সঠিক নয়।' }); return; }
     if (subtotal - discount < c.minOrder) { setCouponCode(''); setCouponMsg({ type: 'err', text: `This code needs an order of at least ${formatPrice(c.minOrder)}.` }); return; }
@@ -818,7 +823,7 @@ export default function App() {
     setCouponMsg({ type: 'ok', text: `${code} applied: ${c.percent}% off${c.maxOff ? ` (up to ${formatPrice(c.maxOff)})` : ''}.` });
   };
   useEffect(() => { setCouponCode(''); setCouponMsg(null); }, [shopCtx && shopCtx.slug]); // eslint-disable-line react-hooks/exhaustive-deps
-  const grandTotal = subtotal - discount - couponAmount + deliveryCharge;
+  const grandTotal = subtotal - discount - couponAmount - lookOff.amount + deliveryCharge;
   useEffect(() => { if (currentView === 'checkout' && cart.length) trackInitiateCheckout(cart, subtotal - discount); }, [currentView]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCheckoutSubmit = async (e) => {
@@ -883,12 +888,14 @@ export default function App() {
         quantity: item.quantity,
         size: item.selectedSize || '',
         color: item.selectedColor || '',
-        image: typeof item.image === 'string' && /^https?:\/\//.test(item.image) && item.image.length < 400 ? item.image : ''
+        image: typeof item.image === 'string' && /^https?:\/\//.test(item.image) && item.image.length < 400 ? item.image : '',
+        ...(item.look && lookOff.looks.includes(item.look) ? { look: item.look } : {})
       })),
       subtotal,
       discount,
       discountLabel,
       ...(couponAmount > 0 ? { coupon: { code: appliedCoupon.code, percent: appliedCoupon.percent, amount: couponAmount } } : {}),
+      ...(lookOff.amount > 0 ? { lookOff: { amount: lookOff.amount, looks: lookOff.looks.slice(0, 5) } } : {}),
       deliveryArea: checkoutForm.deliveryArea,
       shipping: deliveryCharge,
       total: grandTotal,
@@ -1604,7 +1611,7 @@ export default function App() {
 
       {/* CART SLIDE-OVER DRAWER */}
       {quickAdd && <QuickAdd product={quickAdd.product} goCheckout={quickAdd.goCheckout} onConfirm={confirmQuickAdd} onClose={() => setQuickAdd(null)} formatPrice={formatPrice} isDarkMode={isDarkMode} />}
-      {isCartOpen && <CartDrawer storeSettings={storeSettings} cart={cart} formatPrice={formatPrice} isDarkMode={isDarkMode} removeFromCart={removeFromCart} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} subtotal={subtotal} discount={discount} discountLabel={discountLabel} reward={reward} updateCartQty={updateCartQty} />}
+      {isCartOpen && <CartDrawer storeSettings={storeSettings} cart={cart} formatPrice={formatPrice} isDarkMode={isDarkMode} removeFromCart={removeFromCart} setCurrentView={setCurrentView} setIsCartOpen={setIsCartOpen} subtotal={subtotal} discount={discount} discountLabel={discountLabel} lookOff={lookOff.amount} reward={reward} updateCartQty={updateCartQty} />}
 
       <Suspense fallback={<PageLoading />}>
       {/* HOME VIEW */}
@@ -1622,7 +1629,7 @@ export default function App() {
           <span className="h-[2px] w-24 overflow-hidden rounded bg-black/10 dark:bg-white/10"><span className="block h-full w-1/2 animate-[kyvroLoad_1.1s_ease-in-out_infinite] bg-[#D4AF37]" /></span>
         </div>
       )}
-      {productsReady && currentView === 'home' && !pathNotFound && <HomeView theme={activeTheme.theme} brandName={shopBrand ? shopBrand.name : 'Kyvro'} requestAdd={requestAdd} addToCart={addToCart} banners={banners} calculateDiscountPercent={calculateDiscountPercent} currentBannerIndex={currentBannerIndex} formatPrice={formatPrice} isDarkMode={isDarkMode} products={storefrontProducts} hideEmptyCategories={!!shopCtx} setCurrentBannerIndex={setCurrentBannerIndex} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} savedIds={savedIds} toggleSaved={toggleSaved} openCollection={(c, sub) => { setSelectedCategory(c); setSelectedSubCategory(sub || null); setCurrentView('shop'); }} />}
+      {productsReady && currentView === 'home' && !pathNotFound && <HomeView lookBundle={!shopCtx} theme={activeTheme.theme} brandName={shopBrand ? shopBrand.name : 'Kyvro'} requestAdd={requestAdd} addToCart={addToCart} banners={banners} calculateDiscountPercent={calculateDiscountPercent} currentBannerIndex={currentBannerIndex} formatPrice={formatPrice} isDarkMode={isDarkMode} products={storefrontProducts} hideEmptyCategories={!!shopCtx} setCurrentBannerIndex={setCurrentBannerIndex} setCurrentView={setCurrentView} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} savedIds={savedIds} toggleSaved={toggleSaved} openCollection={(c, sub) => { setSelectedCategory(c); setSelectedSubCategory(sub || null); setCurrentView('shop'); }} />}
 
       {/* SHOP CATALOG VIEW */}
       {productsReady && currentView === 'shop' && <ShopView selectedSubCategory={selectedSubCategory} setSelectedSubCategory={setSelectedSubCategory} requestAdd={requestAdd} addToCart={addToCart} filteredProducts={filteredProducts} formatPrice={formatPrice} isDarkMode={isDarkMode} products={storefrontProducts} searchQuery={searchQuery} selectedCategory={selectedCategory} setCurrentView={setCurrentView} setSearchQuery={setSearchQuery} setSelectedCategory={selectCategory} setSelectedProduct={setSelectedProduct} setSortBy={setSortBy} sortBy={sortBy} savedIds={savedIds} toggleSaved={toggleSaved} />}
@@ -1646,7 +1653,7 @@ export default function App() {
       {currentView === 'account' && <AccountView sellPlan={sellPlan} products={products} isStaff={isAdminLoggedIn} customerUser={customerUser} displayName={displayName} photoURL={photoURL} activeTab={accountTab} setActiveTab={setAccountTab} onSignIn={handleCustomerSignIn} onSignOut={handleCustomerSignOut} onSaveProfile={handleSaveProfile} onCancelOrder={handleCancelMyOrder} myOrders={myOrders} savedProducts={savedProducts} toggleSaved={toggleSaved} formatPrice={formatPrice} isDarkMode={isDarkMode} setCurrentView={setCurrentView} setSelectedProduct={setSelectedProduct} />}
 
       {/* CHECKOUT (guest checkout, no login needed) */}
-      {currentView === 'checkout' && <CheckoutView storeSettings={storeSettings} cart={cart} checkoutForm={checkoutForm} setCheckoutForm={setCheckoutForm} checkoutError={checkoutError} deliveryCharge={deliveryCharge} grandTotal={grandTotal} formatPrice={formatPrice} handleCheckoutSubmit={handleCheckoutSubmit} isDarkMode={isDarkMode} placingOrder={placingOrder} removeFromCart={removeFromCart} updateCartQty={updateCartQty} setCurrentView={setCurrentView} subtotal={subtotal} discount={discount} discountLabel={discountLabel} reward={reward} customerUser={customerUser} authReady={authReady} onSignIn={handleCustomerSignIn} couponsOn={couponsOn} couponCode={couponCode} couponAmount={couponAmount} couponPercent={appliedCoupon ? appliedCoupon.percent : 0} couponMsg={couponMsg} onApplyCoupon={applyCoupon} />}
+      {currentView === 'checkout' && <CheckoutView lookOff={lookOff.amount} storeSettings={storeSettings} cart={cart} checkoutForm={checkoutForm} setCheckoutForm={setCheckoutForm} checkoutError={checkoutError} deliveryCharge={deliveryCharge} grandTotal={grandTotal} formatPrice={formatPrice} handleCheckoutSubmit={handleCheckoutSubmit} isDarkMode={isDarkMode} placingOrder={placingOrder} removeFromCart={removeFromCart} updateCartQty={updateCartQty} setCurrentView={setCurrentView} subtotal={subtotal} discount={discount} discountLabel={discountLabel} reward={reward} customerUser={customerUser} authReady={authReady} onSignIn={handleCustomerSignIn} couponsOn={couponsOn} couponCode={couponCode} couponAmount={couponAmount} couponPercent={appliedCoupon ? appliedCoupon.percent : 0} couponMsg={couponMsg} onApplyCoupon={applyCoupon} />}
 
       {/* ORDER CONFIRMATION */}
       {['privacy', 'terms', 'refund'].includes(currentView) && <PolicyPages page={currentView} isDarkMode={isDarkMode} setCurrentView={setCurrentView} />}

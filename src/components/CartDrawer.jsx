@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { ShoppingBag, X, ChevronRight, Trash2 } from 'lucide-react';
 import { deliveryNote, freeDeliveryMissing, normalizeSettings } from '../data/shopConfig';
 
-export default function CartDrawer({ storeSettings, cart, formatPrice, isDarkMode, removeFromCart, setCurrentView, setIsCartOpen, subtotal, discount = 0, discountLabel = '', reward = null, updateCartQty }) {
+export default function CartDrawer({ storeSettings, cart, formatPrice, isDarkMode, removeFromCart, setCurrentView, setIsCartOpen, subtotal, discount = 0, discountLabel = '', lookOff = 0, reward = null, updateCartQty }) {
   const panelRef = useRef(null);
   // Touching / clicking anywhere outside the cart closes it, and that touch still works on the page underneath
   // (the dark backdrop does not block clicks, so a menu link, a product, etc. opens straight away).
@@ -74,19 +74,27 @@ export default function CartDrawer({ storeSettings, cart, formatPrice, isDarkMod
             {cart.length > 0 && (
               <div className="border-t pt-4 space-y-3">
                 <div className="space-y-1.5 text-sm">
-                  <div className={`flex justify-between ${discount > 0 ? 'text-sm' : 'text-base font-bold'}`}>
+                  <div className={`flex justify-between ${discount > 0 || lookOff > 0 ? 'text-sm' : 'text-base font-bold'}`}>
                     <span>Subtotal</span>
-                    <span className={discount > 0 ? '' : 'text-[#D4AF37]'}>{formatPrice(subtotal)}</span>
+                    <span className={discount > 0 || lookOff > 0 ? '' : 'text-[#D4AF37]'}>{formatPrice(subtotal)}</span>
                   </div>
-                  {discount > 0 && (
+                  {lookOff > 0 && (
+                    <div className="flex justify-between text-sm text-green-600 font-semibold">
+                      <span>Full look 10% off</span>
+                      <span>- {formatPrice(lookOff)}</span>
+                    </div>
+                  )}
+                  {(discount > 0 || lookOff > 0) && (
                     <>
-                      <div className="flex justify-between text-sm text-green-600 font-semibold">
-                        <span>Discount ({discountLabel})</span>
-                        <span>- {formatPrice(discount)}</span>
-                      </div>
+                      {discount > 0 && (
+                        <div className="flex justify-between text-sm text-green-600 font-semibold">
+                          <span>Discount ({discountLabel})</span>
+                          <span>- {formatPrice(discount)}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between text-base font-bold">
                         <span>After discount</span>
-                        <span className="text-[#D4AF37]">{formatPrice(subtotal - discount)}</span>
+                        <span className="text-[#D4AF37]">{formatPrice(subtotal - discount - lookOff)}</span>
                       </div>
                     </>
                   )}

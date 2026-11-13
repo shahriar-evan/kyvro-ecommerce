@@ -19,7 +19,7 @@ import sneakersImg from '../assets/Snekers.webp';
 const HERO_IMAGES = [heroBannerImg, heroBanner1Img, heroBanner2Img];
 const HERO_SECONDS = 15;
 
-export default function HomeView({ theme = 'classic', brandName = 'Kyvro', hideEmptyCategories = false, requestAdd, addToCart, banners, calculateDiscountPercent, currentBannerIndex, formatPrice, isDarkMode, products, setCurrentBannerIndex, setCurrentView, setSelectedCategory, setSelectedProduct, savedIds = [], toggleSaved = () => {}, openCollection }) {
+export default function HomeView({ theme = 'classic', brandName = 'Kyvro', hideEmptyCategories = false, lookBundle = true, requestAdd, addToCart, banners, calculateDiscountPercent, currentBannerIndex, formatPrice, isDarkMode, products, setCurrentBannerIndex, setCurrentView, setSelectedCategory, setSelectedProduct, savedIds = [], toggleSaved = () => {}, openCollection }) {
   const [heroIdx, setHeroIdx] = useState(0);
   useEffect(() => {
     if (HERO_IMAGES.length < 2) return undefined;
@@ -70,7 +70,7 @@ export default function HomeView({ theme = 'classic', brandName = 'Kyvro', hideE
           </section>
 
           {/* Showcase: clothes on hanging rails (Men, Women, accessories) and the shoe wheel; quick view -> cart -> checkout */}
-          <HomeShowcase products={products} formatPrice={formatPrice} addToCart={addToCart}
+          <HomeShowcase products={products} formatPrice={formatPrice} addToCart={addToCart} lookBundle={lookBundle}
             openProduct={(p) => { setSelectedProduct(p); setCurrentView('product-detail'); }}
             openCollection={openCollection || ((c) => { setSelectedCategory(c); setCurrentView('shop'); })} />
 

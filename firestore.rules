@@ -945,7 +945,7 @@ service cloud.firestore {
       function validNewOrder() {
         let d = request.resource.data;
         let c = d.customer;
-        return d.keys().hasOnly(['orderNumber', 'createdAt', 'customer', 'items', 'subtotal', 'discount', 'discountLabel', 'deliveryArea', 'shipping', 'total', 'paymentMethod', 'paymentStatus', 'status', 'uid', 'email', 'manualPay', 'shop', 'soldBy', 'coupon'])
+        return d.keys().hasOnly(['orderNumber', 'createdAt', 'customer', 'items', 'subtotal', 'discount', 'discountLabel', 'deliveryArea', 'shipping', 'total', 'paymentMethod', 'paymentStatus', 'status', 'uid', 'email', 'manualPay', 'shop', 'soldBy', 'coupon', 'lookOff'])
           && d.keys().hasAll(['orderNumber', 'createdAt', 'customer', 'items', 'subtotal', 'discount', 'discountLabel', 'deliveryArea', 'shipping', 'total', 'paymentMethod', 'paymentStatus', 'status'])
           && (siteOpen() || isStaff())
           // signed in: the order must carry the customer's own uid + email. Guest (not signed in): no uid / email at all.
@@ -991,7 +991,8 @@ service cloud.firestore {
                     && d.manualPay.trxId is string && d.manualPay.trxId.matches('^[A-Za-z0-9]{6,20}$'))
                 : !('manualPay' in d))
           && couponOk(d)
-          && d.total == d.subtotal - d.discount - d.get('coupon', {'amount': 0}).amount + d.shipping;
+          && lookOffOk(d)
+          && d.total == d.subtotal - d.discount - d.get('coupon', {'amount': 0}).amount - d.get('lookOff', {'amount': 0}).amount + d.shipping;
       }
       // a shop's promo code (shops/{shop}.coupons[code]): switched on, same percent (at most 50), the order reaches its
       // minimum and the amount is at most that percent of the products. Kept short (the rules engine allows 1000 steps per
@@ -1003,6 +1004,13 @@ service cloud.firestore {
         return !('coupon' in d) || (d.coupon.keys().hasOnly(['code', 'percent', 'amount']) && couponValid(d.coupon, d.subtotal - d.discount,
           ('shop' in d) ? get(/databases/$(database)/documents/shops/$(d.shop)).data.get('coupons', {}).get(d.coupon.code, {})
                         : get(/databases/$(database)/documents/settings/promos).data.get('codes', {}).get(d.coupon.code, {})));
+      }
+      // Shop the Look full-look discount: main store only, never with a promo code, at most 10% of the products.
+      // The exact amount (from the looks' real pieces) is checked by the payment server and the Orders panel.
+      function lookOffOk(d) {
+        return !('lookOff' in d) || (!('shop' in d) && !('coupon' in d) && d.lookOff.keys().hasOnly(['amount', 'looks'])
+          && d.lookOff.amount is int && d.lookOff.amount >= 1 && d.lookOff.amount <= d.subtotal * 10 / 100
+          && d.lookOff.looks is list && d.lookOff.looks.size() >= 1 && d.lookOff.looks.size() <= 5);
       }
       function couponValid(k, net, c) {
         return c.get('active', false) == true && k.percent == c.get('percent', 0) && k.percent <= 50

@@ -21,6 +21,7 @@ function PromoBox({ couponCode, couponMsg, onApply, isDarkMode }) {
 }
 
 export default function CheckoutView({
+  lookOff = 0,
   storeSettings, cart, checkoutForm, setCheckoutForm, checkoutError, deliveryCharge, grandTotal, formatPrice,
   handleCheckoutSubmit, isDarkMode, placingOrder, removeFromCart, updateCartQty, setCurrentView, subtotal, discount = 0, discountLabel = '', customerUser = null, authReady = true, onSignIn, reward = null, couponsOn = false, couponCode = '', couponAmount = 0, couponPercent = 0, couponMsg = null, onApplyCoupon = () => {},
 }) {
@@ -188,6 +189,11 @@ export default function CheckoutView({
             <div className="flex justify-between font-semibold">
               <span>Subtotal</span><span>{formatPrice(subtotal)}</span>
             </div>
+            {lookOff > 0 && (
+              <div className="flex justify-between font-semibold text-green-600">
+                <span>Full look 10% off · ফুল লুক ছাড়</span><span>- {formatPrice(lookOff)}</span>
+              </div>
+            )}
             {discount > 0 && (
               <div className="flex justify-between font-semibold text-green-600">
                 <span>Discount ({discountLabel})</span><span>- {formatPrice(discount)}</span>

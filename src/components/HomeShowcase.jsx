@@ -150,7 +150,7 @@ export function CollectionRail({ products, collection, sub, formatPrice, addToCa
   );
 }
 
-export default function HomeShowcase({ products, formatPrice, addToCart, openProduct, openCollection }) {
+export default function HomeShowcase({ products, formatPrice, addToCart, openProduct, openCollection, lookBundle = true }) {
   const showcase = useShowcase();
   const uploaded = showcase || EMPTY;
   const menCut = useMemo(() => cutoutsFor(products, 'men', uploaded), [products, uploaded]);
@@ -187,7 +187,7 @@ export default function HomeShowcase({ products, formatPrice, addToCart, openPro
           tagline={['Shirts, tees and jackets.', 'Picked for everyday style.']} variant="curve" tone="grey"
           filters={menSections} filter={menSub} onFilter={setMenSub} />
       )}
-      <ShopTheLook products={products} formatPrice={formatPrice} addToCart={addToCart} openProduct={openProduct} />
+      <ShopTheLook products={products} formatPrice={formatPrice} addToCart={addToCart} openProduct={openProduct} bundle={lookBundle} />
       {/* the shoes wheel right after the looks (finish the outfit), then Women and Accessories */}
       {shoes.length >= MIN && (
         <ShoeOrbit products={shoes} formatPrice={formatPrice} onOpen={open(shoes, false)} addToCart={addToCart} onShopAll={() => openCollection('Shoes')} />
