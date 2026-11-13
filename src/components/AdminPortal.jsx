@@ -27,7 +27,7 @@ import { watchSiteTheme, saveSiteTheme } from '../themeStore';
 import SellersPanel from './SellersPanel';
 import PlanMembers from './PlanMembers';
 import ShowcasePhotoField, { addAutoShowcase } from './ShowcasePhotoField';
-import { subLabel, allPlaces, COLLECTION_LABELS, SUB_CATEGORIES, hasSubCategories, hasSizeStock, hasColorStock, totalStock, orderedSizes } from '../data/catalog';
+import { COLLECTION_LABELS, SUB_CATEGORIES, allPlaces, hasColorStock, hasSizeStock, hasSubCategories, orderedSizes, stockForSize, subLabel, supplierOutFor, totalStock } from '../data/catalog';
 
 // Owner: the main site's theme (settings/theme), every theme allowed
 function SiteThemePage({ isDarkMode, staff }) {
@@ -441,9 +441,6 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                               {outColours(p).length > 0 && (
                                 <p className="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
                                   Stock out at supplier: {outColours(p).filter((c) => !backColours(p).includes(c)).map(colourLabel).join(', ') || '–'}
-                                  {p.status === 'approved' && !backColours(p).length && (
-                                    <button type="button" disabled={!!stockBusy} onClick={() => stockOp('hide', p)} className="ml-2 underline font-bold disabled:opacity-50">{stockBusy === `hide:${p.id}` ? 'Hiding…' : 'Hide from website'}</button>
-                                  )}
                                 </p>
                               )}
                               {backColours(p).length > 0 && (
@@ -481,12 +478,13 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                             {totalStock(p)} units
                             {hasSizeStock(p) && (
                               <p className="text-[10px] mt-0.5">
-                                {orderedSizes(Object.keys(p.sizeStock), p.gender).map(sz => `${sz}: ${p.sizeStock[sz]}`).join(' · ')}
+                                {orderedSizes(Object.keys(p.sizeStock), p.gender).map(sz => `${sz}: ${stockForSize(p, sz)}`).join(' · ')}
                               </p>
                             )}
                             {hasColorStock(p) && (
                               <p className="text-[10px] mt-0.5 leading-relaxed">
-                                {Object.entries(p.colorStock).map(([k, n]) => { const [sz, col] = k.split('|'); return `${sz ? sz + ' ' : ''}${col}: ${n}`; }).join(' · ')}
+                                {/* colours out of stock at the supplier count as 0 (stock sync) */}
+                                {Object.entries(p.colorStock).map(([k, n]) => { const [sz, col] = k.split('|'); return `${sz ? sz + ' ' : ''}${col}: ${supplierOutFor(p, col) ? 0 : n}`; }).join(' · ')}
                               </p>
                             )}
                             </div>
@@ -498,6 +496,13 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                             </div>
                           </td>
                           <td className="p-4 align-middle">
+                            {/* stock sync: any team member can take a product that is out of stock at the supplier off the website */}
+                            {outColours(p).length > 0 && p.status === 'approved' && !backColours(p).length && (
+                              <div className="mb-2 flex justify-center">
+                                <button type="button" disabled={!!stockBusy} onClick={() => stockOp('hide', p)}
+                                  className="px-3 py-1.5 rounded text-xs font-semibold border border-red-500 text-red-600 dark:text-red-400 hover:bg-red-500/10 transition whitespace-nowrap disabled:opacity-50">{stockBusy === `hide:${p.id}` ? 'Hiding…' : 'Hide from website'}</button>
+                              </div>
+                            )}
                             <div className="flex flex-nowrap items-center justify-center gap-2 whitespace-nowrap">
                             {canApproveProduct(p) && <button onClick={() => handleApproveProduct(p)} className="px-3 py-1.5 rounded text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition">Approve</button>}
                             {canEditProduct(p)
