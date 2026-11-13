@@ -767,6 +767,34 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Shop the Look (home page, src/looks.js): a model picture + the products in it with pin places. Public read,
+    // the Owner / a Manager write (Admin → Shop the Look).
+    match /looks/{lid} {
+      function lookItemOk(it) {
+        return it is map && it.keys().hasOnly(['id', 'x', 'y']) && it.id is string && it.id.matches('^[A-Za-z0-9_-]{1,60}$')
+          && it.x is int && it.x >= 0 && it.x <= 100 && it.y is int && it.y >= 0 && it.y <= 100;
+      }
+      function lookOk() {
+        let d = request.resource.data;
+        return lid.matches('^look-[0-9]{10,16}$')
+          && d.keys().hasOnly(['name', 'who', 'image', 'items', 'order', 'active', 'updatedAt', 'updatedByName'])
+          && d.name is string && d.name.size() <= 40
+          && d.who in ['men', 'women']
+          && d.image is string && d.image.size() <= 450000 && d.image.matches('^data:image/(png|webp);base64,[A-Za-z0-9+/=]+$')
+          && d.items is list && d.items.size() >= 1 && d.items.size() <= 4
+          && lookItemOk(d.items[0])
+          && (d.items.size() < 2 || lookItemOk(d.items[1]))
+          && (d.items.size() < 3 || lookItemOk(d.items[2]))
+          && (d.items.size() < 4 || lookItemOk(d.items[3]))
+          && d.order is int && d.order >= 0 && d.order <= 999
+          && d.active is bool
+          && d.updatedByName is string && d.updatedByName.size() <= 80;
+      }
+      allow read: if true;
+      allow create, update: if (isOwner() || isManager()) && lookOk();
+      allow delete: if isOwner() || isManager();
+    }
+
     // Customer reviews (src/reviews.js): reviews/{orderNumber}_{productId}. Everyone reads them (product page).
     // Only a signed-in customer writes one, for a product in their OWN Delivered order (item = its place in the
     // order's items). First name only, no phone / address. The writer can change or delete it; the Owner / a Manager delete.

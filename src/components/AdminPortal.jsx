@@ -20,9 +20,10 @@ import StoreSettings from './StoreSettings';
 import PlanSettings from './PlanSettings';
 import SellerDashBannerSettings from './SellerDashBannerSettings';
 import StorePromoCodes from './StorePromoCodes';
+import ShopTheLookAdmin from './ShopTheLookAdmin';
 import SellerDashLayout from './SellerDashLayout';
 import { AdminDashboard, AdminAnalytics } from './AdminDashboard';
-import { LayoutDashboard, BarChart3, ShoppingBag, Package, PlusCircle, Boxes, Users, Store, UserCheck, Gem, ShieldCheck, Settings, Palette, ShoppingBasket } from 'lucide-react';
+import { LayoutDashboard, BarChart3, ShoppingBag, Package, PlusCircle, Boxes, Users, Store, UserCheck, Gem, ShieldCheck, Settings, Palette, ShoppingBasket, Shirt } from 'lucide-react';
 import ThemePicker from './ThemePicker';
 import { watchSiteTheme, saveSiteTheme } from '../themeStore';
 import SellersPanel from './SellersPanel';
@@ -372,6 +373,7 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                   { key: 'products', label: `Products (${products.length})`, icon: Package, count: pendingCount },
                   ...((canAddProduct || editingProductId) ? [{ key: 'add-product', label: editingProductId ? 'Edit Product' : 'Add Product', icon: PlusCircle }] : []),
                   { key: 'my-products', label: `My Products (${products.filter((p) => p.addedBy && String(p.addedBy).toLowerCase() === String(loggedInUserEmail || '').toLowerCase()).length})`, icon: Boxes },
+                  ...(canManageTeam ? [{ key: 'looks', label: 'Shop the Look', icon: Shirt }] : []),
                 ] },
                 { title: 'Team & Shops', items: [
                   { key: 'stats', label: isOwner ? 'Team Stats' : 'My Stats', icon: Users },
@@ -386,6 +388,7 @@ export default function AdminPortal({ adminCanCreateShop = false, adminTab, dele
                 ...(isOwner ? [{ title: 'Settings', items: [{ key: 'settings', label: 'Banner, Discount & Promo', icon: Settings }, { key: 'theme', label: 'Store Theme', icon: Palette }] }] : []),
               ]}>
               {adminTab === 'dashboard' && <AdminDashboard orders={orders} products={products} adminRole={adminRole} adminName={adminName} formatPrice={formatPrice} isDarkMode={isDarkMode} goTab={goTab} canSeeProfit={canSeeSupplier} openStock={(k) => goTab('products', () => { setStockFilter(k); setCatFilter('All'); setProductSearch(''); })} />}
+              {adminTab === 'looks' && canManageTeam && <ShopTheLookAdmin products={products} isDarkMode={isDarkMode} formatPrice={formatPrice} staff={{ email: loggedInUserEmail, name: adminName }} />}
               {adminTab === 'theme' && isOwner && <SiteThemePage isDarkMode={isDarkMode} staff={{ email: loggedInUserEmail, name: adminName }} />}
               {adminTab === 'analytics' && <AdminAnalytics orders={orders} formatPrice={formatPrice} isDarkMode={isDarkMode} />}
               {adminTab === 'plan-members' && canManageTeam && <PlanMembers isOwner={isOwner} isDarkMode={isDarkMode} />}
