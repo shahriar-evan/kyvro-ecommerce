@@ -12,6 +12,8 @@
 //   POST /api/plan?action=remove-shop the Owner removes (30 days in Removed shops), restores or deletes a shop
 //   GET  /api/plan?action=catalog     public: every approved product, CDN-cached 15 min (saves Firestore reads)
 //   POST /api/plan?action=chat        public: the website help chat (order status with phone check, AI shopping answers)
+//   POST /api/plan?action=media-upload team: upload token for a product's extra photo / video (Vercel Blob, media kit)
+//   POST /api/plan?action=media-delete team: delete one media kit file
 //   POST /api/plan?action=ai-photo    team: a front / side product photo made by Gemini (Admin product form, home page photo)
 import init from './_plan/init.js';
 import callback from './_plan/callback.js';
@@ -27,11 +29,12 @@ import aiPhoto from './_plan/aiphoto.js';
 import stock from './_plan/stock.js';
 import chat from './_plan/chat.js';
 import catalog from './_plan/catalog.js';
+import { mediaUpload, mediaDelete } from './_plan/media.js';
 
 // 300 s: a Premium (high quality) Shop the Look picture can take 1-3 minutes (Vercel fluid compute allows up to 300 s)
 export const config = { maxDuration: 300 };
 
-const ACTIONS = { init, callback, sync, reminders, 'seller-earnings': sellerEarnings, comp, warn, billing, sitemap, 'remove-shop': removeShop, 'ai-photo': aiPhoto, stock, chat, catalog };
+const ACTIONS = { init, callback, sync, reminders, 'seller-earnings': sellerEarnings, comp, warn, billing, sitemap, 'remove-shop': removeShop, 'ai-photo': aiPhoto, stock, chat, catalog, 'media-upload': mediaUpload, 'media-delete': mediaDelete };
 
 export default async function handler(req, res) {
   const action = String((req.query && req.query.action) || '');

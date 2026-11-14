@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@vercel/blob": "^2.9.0",
     "firebase": "^13.1.0",
     "lucide-react": "^0.469.0",
     "qrcode-generator": "^1.4.4",

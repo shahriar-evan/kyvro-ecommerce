@@ -767,6 +767,19 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Product media kit (product page "Marketing kit", src/productMedia.js): extra photos + videos of a product (files in
+    // Vercel Blob, uploaded through api/plan.js?action=media-upload) that sellers and the team download for Facebook /
+    // Instagram. Team + sellers read; any team member (Owner, Manager, Admin) adds or removes files.
+    match /productMedia/{pid} {
+      allow read: if isStaff() || (signedIn() && exists(/databases/$(database)/documents/sellers/$(request.auth.uid)));
+      allow create, update: if isStaff()
+        && pid.matches('^[A-Za-z0-9_-]{1,60}$')
+        && request.resource.data.keys().hasOnly(['photos', 'videos', 'updatedAt', 'updatedBy'])
+        && request.resource.data.get('photos', []) is list && request.resource.data.get('photos', []).size() <= 40
+        && request.resource.data.get('videos', []) is list && request.resource.data.get('videos', []).size() <= 15;
+      allow delete: if isStaff();
+    }
+
     // Shop the Look (home page, src/looks.js): a model picture + the products in it with pin places. Public read,
     // the Owner / a Manager write (Admin → Shop the Look).
     match /looks/{lid} {
