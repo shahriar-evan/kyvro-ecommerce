@@ -30,7 +30,9 @@ export default function RailQuickView({ items, index, setIndex, onClose, formatP
   const photos = useMemo(() => {
     if (!p) return [];
     // the background-free picture first while the colour in it is the chosen one
-    const main = p.cutout && (!color || color === p.cutoutColor || !p.cutoutColor) ? p.cutout : imageFor(p, color);
+    // (a home page photo uploaded in Admin has no colour saved, so once a colour with its own photo is picked, that photo shows)
+    const ownPhoto = !!(color && p.colorImages && p.colorImages[color]);
+    const main = p.cutout && (!color || color === p.cutoutColor || !ownPhoto) ? p.cutout : imageFor(p, color);
     // more background-free angles (Admin "More photos") come right after it
     const more = main === p.cutout ? (p.cutoutExtra || []) : [];
     const rest = (Array.isArray(p.images) ? p.images : []).filter((u) => u && u !== main);
