@@ -22,8 +22,11 @@ const lookPrompt = (who, n, v = 0) => {
   + 'with gentle fill, natural realistic shadows on the body and clothes. A real human: natural realistic face with true-to-life skin texture and pores, '
   + 'natural eyes and expression, realistic hair, correct hands with five fingers, natural body proportions. Calm confident expression, looking at the camera. '
   + `The person wears EXACTLY the ${n} items shown in the ${n} input pictures, all together as one outfit, with a natural fit and realistic fabric folds and drape: `
-  + 'keep each item\'s exact colour, shade, fabric texture, pattern, print, stitching, buttons, zips, collar and pockets. Do not change, add, translate or invent '
-  + 'any text, letters, numbers, logos or brand names. No other clothing, bag, hat, glasses, jewellery or accessory that is not in the pictures '
+  + 'keep each item\'s exact colour, shade, fabric texture, pattern, print, stitching, buttons, zips, collar and pockets. '
+  + 'TEXT ON THE CLOTHES: any words, letters, numbers or logos printed on an item must be copied EXACTLY as in its input picture: the same words '
+  + 'spelled letter for letter, the same font, size, colour, place on the garment and direction, readable and never mirrored, scrambled, misspelled or '
+  + 'shortened (for example a trouser printed "I LOVE MY GIRLFRIEND" must still read "I LOVE MY GIRLFRIEND"). If a text cannot be copied exactly, '
+  + 'keep that area as in the picture rather than inventing letters. Do not add, translate or invent any other text, logo or brand name. No other clothing, bag, hat, glasses, jewellery or accessory that is not in the pictures '
   + '(if no trousers or shoes are given, use plain simple neutral ones). '
   + 'Fully TRANSPARENT background: no floor, no wall, no shadow on the ground, no props, no text, no watermark. Ultra sharp, premium e-commerce campaign quality.';
 };
@@ -86,7 +89,9 @@ export async function makeLook(req, res, { body, readSource, token, day, usage }
   }
   const prompt = lookPrompt(body.who === 'women' ? 'women' : 'men', sources.length, Math.max(0, parseInt(body.variant, 10) || 0));
   for (const model of models()) {
-    const out = await callOpenAI(key, model, sources, prompt, body.quality);
+    // high input fidelity keeps the products' prints and text closer to the photos
+    let out = await callOpenAI(key, model, sources, prompt, body.quality, 'png', 'high');
+    if (out.retryPlain) out = await callOpenAI(key, model, sources, prompt, body.quality);
     if (out.next) continue;
     if (out.error) return res.status(out.code === 'no-credit' ? 402 : 502).json({ error: out.error, code: out.code, provider: 'openai' });
     await usage(token, day, 1);
