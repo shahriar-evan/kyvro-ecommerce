@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { X, ArrowLeft, ArrowRight } from 'lucide-react';
-import { hasSizeStock, stockFor, totalStock, orderedSizes, productColors, imageFor } from '../data/catalog';
+import { hasSizeStock, hasColorStock, stockFor, stockForColor, stockForSize, totalStock, orderedSizes, productColors, imageFor, colorOfPhoto } from '../data/catalog';
+import StockLabel from './StockLabel';
 import PriceTag from './PriceTag';
 import { Hanger } from './HangerRail';
 
@@ -50,6 +51,17 @@ export default function RailQuickView({ items, index, setIndex, onClose, formatP
     onClose();
     addToCart(p, color || undefined, size || undefined, 1, goCheckout);
   };
+  // tapping a colour's photo picks that colour (its photo then comes first); a general photo just shows
+  const pickPhoto = (i) => {
+    const c = colorOfPhoto(p, photos[i]);
+    if (c && c !== color && colors.includes(c)) { setColor(c); setPhoto(0); setSize(null); return; }
+    setPhoto(i);
+  };
+  // same stock line as the product cards / product page (follows the colour and size picked)
+  const sized = hasSizeStock(p);
+  const stockCount = hasColorStock(p)
+    ? (sized ? (size ? stockFor(p, size, color) : (color ? stockForColor(p, color) : totalStock(p))) : stockFor(p, '', color))
+    : (sized && size ? stockForSize(p, size) : totalStock(p));
   const btnText = soldOut ? 'Sold out' : needColor ? 'Select a colour' : needSize ? 'Select a size' : 'Add to cart';
   const blocked = soldOut || needSize || needColor;
 
@@ -81,7 +93,7 @@ export default function RailQuickView({ items, index, setIndex, onClose, formatP
           {photos.length > 1 && (
             <div className="mt-4 flex gap-2">
               {photos.map((u, i) => (
-                <button key={u + i} type="button" onClick={() => setPhoto(i)} aria-label={`Photo ${i + 1}`}
+                <button key={u + i} type="button" onClick={() => pickPhoto(i)} aria-label={`Photo ${i + 1}`}
                   className={`h-14 w-14 overflow-hidden rounded-lg border bg-white ${photo === i ? 'border-black' : 'border-gray-200'}`}>
                   <img src={u} alt="" className={`h-full w-full ${isCut(u) ? 'object-contain p-1' : 'object-cover'}`} loading="lazy" />
                 </button>
@@ -95,6 +107,7 @@ export default function RailQuickView({ items, index, setIndex, onClose, formatP
           <p className="text-[11px] tracking-[0.25em] text-gray-500">{String(index + 1).padStart(2, '0')} / {String(items.length).padStart(2, '0')}</p>
           <h2 className="mt-2 text-2xl sm:text-3xl font-bold leading-tight">{p.name}</h2>
           <div className="mt-2"><PriceTag price={p.price} originalPrice={p.originalPrice} formatPrice={formatPrice} isDarkMode={false} /></div>
+          <StockLabel count={stockCount} text={p.stockText} className="mt-3" />
 
           {colors.length > 1 && (
             <>

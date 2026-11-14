@@ -180,6 +180,16 @@ export const rankBySales = (list) => [...list].sort((a, b) => ((parseInt(b.sold,
 // photo of the chosen color (falls back to the main image)
 export const imageFor = (p, color) => (color && p?.colorImages && p.colorImages[color]) || p?.image;
 
+// which colour a photo belongs to (its colour photo or one of its extra colour photos), or '' when it is a general photo.
+// Swiping / tapping a photo on the product page or quick view picks that colour.
+export const colorOfPhoto = (p, url) => {
+  if (!p || !url) return '';
+  const cols = productColors(p);
+  const direct = cols.find((c) => p.colorImages && p.colorImages[c] === url);
+  if (direct) return direct;
+  return cols.find((c) => p.colorGallery && Array.isArray(p.colorGallery[c]) && p.colorGallery[c].includes(url)) || '';
+};
+
 export const productColors = (p) => (Array.isArray(p?.colors) ? p.colors.filter(Boolean) : []);
 
 // Does the customer have to choose something (size or color) before this can go in the cart?

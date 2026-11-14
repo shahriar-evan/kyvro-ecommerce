@@ -7,7 +7,7 @@ import { waOrderLink, waProductLines } from '../whatsappOrder';
 import StockLabel from './StockLabel';
 import { ProductReviews, Stars } from './Reviews';
 import ProductMediaKit from './ProductMediaKit';
-import { rankBySales, hasSizeStock, hasColorStock, totalStock, stockForSize, stockFor, stockForColor, productColors, imageFor, orderedSizes } from '../data/catalog';
+import { rankBySales, hasSizeStock, hasColorStock, totalStock, stockForSize, stockFor, stockForColor, productColors, imageFor, orderedSizes, colorOfPhoto } from '../data/catalog';
 
 // Photo slider: the photos sit side by side and slide in from the side.
 // Works with a finger on a phone, mouse drag, and a two-finger sideways swipe on a laptop trackpad.
@@ -206,6 +206,15 @@ export default function ProductDetail({ product, products, addToCart, calculateD
     setManualIdx(null);
     setQty(1);
   };
+  // swiping / tapping to a colour's photo picks that colour (a general photo keeps the colour)
+  const showPhoto = (i) => {
+    setManualIdx(i);
+    const c = colorOfPhoto(live, gallery[i]);
+    if (!c || c === color || !colors.includes(c)) return;
+    setColor(c);
+    setQty(1);
+    if (size && byColor && colorLeftFor(size, c) <= 0) setSize('');
+  };
   // the green line follows the choice: size M + blue -> only the pieces of M blue
   const labelCount = byColor
     ? (sized ? (size ? stockFor(live, size, color) : (color ? stockForColor(live, color) : total)) : stockFor(live, '', color))
@@ -240,12 +249,12 @@ export default function ProductDetail({ product, products, addToCart, calculateD
       <button onClick={() => setCurrentView('shop')} className="text-xs text-gray-500 hover:text-[#D4AF37] mb-6">&larr; Back to shop</button>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
-        <PhotoSlider photos={gallery.length ? gallery : [shownPhoto]} index={currentIdx} onIndex={setManualIdx} alt={live.name} onTap={() => setZoomOpen(true)}
+        <PhotoSlider photos={gallery.length ? gallery : [shownPhoto]} index={currentIdx} onIndex={showPhoto} alt={live.name} onTap={() => setZoomOpen(true)}
           className={`relative self-start md:sticky md:top-28 w-full h-[430px] sm:h-[540px] rounded-lg overflow-hidden border select-none ${isDarkMode ? 'bg-[#161616] border-gray-800' : 'bg-gray-100 border-gray-200'}`}>
           {gallery.length > 1 && (
             <div className="absolute bottom-3 inset-x-0 z-10 flex justify-center gap-1.5">
               {gallery.map((_, i) => (
-                <button key={i} type="button" aria-label={`Photo ${i + 1}`} onClick={() => setManualIdx(i)} className={`h-2 rounded-full transition-all ${i === currentIdx ? 'w-5 bg-[#D4AF37]' : 'w-2 bg-white/70'}`} />
+                <button key={i} type="button" aria-label={`Photo ${i + 1}`} onClick={() => showPhoto(i)} className={`h-2 rounded-full transition-all ${i === currentIdx ? 'w-5 bg-[#D4AF37]' : 'w-2 bg-white/70'}`} />
               ))}
             </div>
           )}
@@ -403,7 +412,7 @@ export default function ProductDetail({ product, products, addToCart, calculateD
         </div>
       </div>
 
-      {zoomOpen && <ZoomViewer photos={gallery.length ? gallery : [shownPhoto]} index={currentIdx} onIndex={setManualIdx} onClose={() => setZoomOpen(false)} />}
+      {zoomOpen && <ZoomViewer photos={gallery.length ? gallery : [shownPhoto]} index={currentIdx} onIndex={showPhoto} onClose={() => setZoomOpen(false)} />}
 
       {mediaKit && <ProductMediaKit product={live} photos={gallery} canEdit={mediaKit === 'team'} isDarkMode={isDarkMode} formatPrice={formatPrice} />}
 
