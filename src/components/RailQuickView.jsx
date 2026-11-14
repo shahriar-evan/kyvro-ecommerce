@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { X, ArrowLeft, ArrowRight } from 'lucide-react';
-import { hasSizeStock, hasColorStock, stockFor, stockForColor, stockForSize, totalStock, orderedSizes, productColors, imageFor, colorOfPhoto } from '../data/catalog';
+import { hasSizeStock, hasColorStock, stockFor, stockForColor, stockForSize, totalStock, orderedSizes, productColors, colorOfPhoto } from '../data/catalog';
 import StockLabel from './StockLabel';
 import PriceTag from './PriceTag';
 import { Hanger } from './HangerRail';
@@ -12,6 +12,7 @@ export default function RailQuickView({ items, index, setIndex, onClose, formatP
   const [size, setSize] = useState(null);
   const [color, setColor] = useState(null);
   const [photo, setPhoto] = useState(0);
+  const swipe = useRef(null); // where a finger / mouse drag on the big photo started
 
   const colors = productColors(p);
   useEffect(() => { setSize(null); setColor(p && p.cutoutColor && colors.includes(p.cutoutColor) ? p.cutoutColor : (colors.length > 1 ? null : colors[0] || null)); setPhoto(0); }, [p && p.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -28,17 +29,14 @@ export default function RailQuickView({ items, index, setIndex, onClose, formatP
     return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = old; };
   }, [index, items.length, onClose, setIndex]);
 
+  // one fixed list (swiping never reshuffles it): the background-free picture + its angles, then the main photo,
+  // each colour's photo (in the colour order), then the other photos
   const photos = useMemo(() => {
     if (!p) return [];
-    // the background-free picture first while the colour in it is the chosen one
-    // (a home page photo uploaded in Admin has no colour saved, so once a colour with its own photo is picked, that photo shows)
-    const ownPhoto = !!(color && p.colorImages && p.colorImages[color]);
-    const main = p.cutout && (!color || color === p.cutoutColor || !ownPhoto) ? p.cutout : imageFor(p, color);
-    // more background-free angles (Admin "More photos") come right after it
-    const more = main === p.cutout ? (p.cutoutExtra || []) : [];
-    const rest = (Array.isArray(p.images) ? p.images : []).filter((u) => u && u !== main);
-    return [main, ...more, ...rest].slice(0, 6);
-  }, [p, color]);
+    const ci = p.colorImages || {};
+    const list = [p.cutout, ...(p.cutout ? (p.cutoutExtra || []) : []), p.image, ...colors.map((c) => ci[c]), ...(Array.isArray(p.images) ? p.images : [])];
+    return [...new Set(list.filter(Boolean))].slice(0, 12);
+  }, [p && p.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!p) return null;
   const isCut = (u) => !!u && (u === p.cutout || (p.cutoutExtra || []).includes(u));
@@ -53,9 +51,16 @@ export default function RailQuickView({ items, index, setIndex, onClose, formatP
   };
   // tapping a colour's photo picks that colour (its photo then comes first); a general photo just shows
   const pickPhoto = (i) => {
-    const c = colorOfPhoto(p, photos[i]);
-    if (c && c !== color && colors.includes(c)) { setColor(c); setPhoto(0); setSize(null); return; }
     setPhoto(i);
+    const c = colorOfPhoto(p, photos[i]);
+    if (c && c !== color && colors.includes(c)) { setColor(c); setSize(null); }
+  };
+  // a colour button shows that colour's photo (the hanger picture stays while it is that colour)
+  const pickColor = (c) => {
+    setColor(c); setSize(null);
+    const own = (p.colorImages || {})[c];
+    const at = own && !(p.cutout && p.cutoutColor === c) ? photos.indexOf(own) : -1;
+    setPhoto(at >= 0 ? at : 0);
   };
   // same stock line as the product cards / product page (follows the colour and size picked)
   const sized = hasSizeStock(p);
@@ -86,12 +91,22 @@ export default function RailQuickView({ items, index, setIndex, onClose, formatP
               <Hanger className="-mt-1 w-40 sm:w-56" />
             </>
           ))}
-          <div className="-mt-1 w-full max-w-[420px] aspect-[4/5]">
+          <div className="-mt-1 w-full max-w-[420px] aspect-[4/5] touch-pan-y select-none cursor-grab active:cursor-grabbing"
+            onPointerDown={(e) => { swipe.current = { x: e.clientX, y: e.clientY }; }}
+            onPointerUp={(e) => {
+              const st = swipe.current; swipe.current = null;
+              if (!st || photos.length < 2) return;
+              const dx = e.clientX - st.x, dy = e.clientY - st.y;
+              if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
+              // right to left = next photo, left to right = previous one (wraps around)
+              pickPhoto((photo + (dx < 0 ? 1 : -1) + photos.length) % photos.length);
+            }}
+            onPointerCancel={() => { swipe.current = null; }}>
             <img src={photos[photo] || p.image} alt={p.name} draggable={false}
               className={`h-full w-full object-contain ${isCut(photos[photo]) ? (hanging ? 'object-top' : 'object-center') : 'mix-blend-multiply'} drop-shadow-[0_28px_30px_rgba(0,0,0,.18)]`} />
           </div>
           {photos.length > 1 && (
-            <div className="mt-4 flex gap-2">
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
               {photos.map((u, i) => (
                 <button key={u + i} type="button" onClick={() => pickPhoto(i)} aria-label={`Photo ${i + 1}`}
                   className={`h-14 w-14 overflow-hidden rounded-lg border bg-white ${photo === i ? 'border-black' : 'border-gray-200'}`}>
@@ -114,7 +129,7 @@ export default function RailQuickView({ items, index, setIndex, onClose, formatP
               <p className="mt-6 text-[11px] tracking-[0.2em] text-gray-500">COLOUR</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {colors.map((c) => (
-                  <button key={c} type="button" onClick={() => { setColor(c); setPhoto(0); setSize(null); }}
+                  <button key={c} type="button" onClick={() => pickColor(c)}
                     className={`rounded-full border px-3.5 py-1.5 text-xs transition duration-300 ${color === c ? 'border-black bg-black text-white' : 'border-gray-300 bg-white hover:border-black'}`}>{c}</button>
                 ))}
               </div>

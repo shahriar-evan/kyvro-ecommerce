@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Sparkles, Upload, Trash2, Pencil, Plus, X } from 'lucide-react';
+import { Sparkles, Upload, Trash2, Pencil, Plus, X, ChevronUp, ChevronDown } from 'lucide-react';
 import { askConfirm } from './AlertCenter';
 import { watchLooks, saveLook, deleteLook, LOOK_MAX_ITEMS, LOOK_MAX } from '../looks';
 import { makeAiLook } from '../aiPhoto';
@@ -57,10 +57,24 @@ export default function ShopTheLookAdmin({ products = [], isDarkMode, formatPric
   const live = (p) => p && (p.status || 'approved') === 'approved';
   const found = q.trim().length < 2 ? [] : products.filter((p) => live(p) && `${p.name} ${p.category} ${p.gender}`.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 12);
 
-  const start = (look) => { setForm(look ? { ...look, items: look.items.map((it) => ({ ...it })) } : { ...EMPTY }); setMsg(null); setPinFor(0); setQ(''); };
+  // Position = place on the home page, 1 = first (looks are already sorted by order)
+  const start = (look) => {
+    const list = looks || [];
+    const pos = look ? list.findIndex((l) => l.id === look.id) + 1 : list.length + 1;
+    setForm(look ? { ...look, pos, items: look.items.map((it) => ({ ...it })) } : { ...EMPTY, pos });
+    setMsg(null); setPinFor(0); setQ('');
+  };
   const addItem = (p) => setForm((f) => (f.items.length >= LOOK_MAX_ITEMS || f.items.some((it) => it.id === String(p.id)) ? f
     : { ...f, items: [...f.items, { id: String(p.id), x: 50, y: 25 + f.items.length * 20 }] }));
   const removeItem = (i) => setForm((f) => ({ ...f, items: f.items.filter((_, k) => k !== i) }));
+  // move a product up / down: its number (1-4) and pin number change with it, the pin stays where it was placed
+  const moveItem = (i, d) => setForm((f) => {
+    const j = i + d;
+    if (j < 0 || j >= f.items.length) return f;
+    const items = [...f.items];
+    [items[i], items[j]] = [items[j], items[i]];
+    return { ...f, items };
+  });
   const place = (e) => {
     if (!form.items[pinFor]) return;
     const r = e.currentTarget.getBoundingClientRect();
@@ -170,7 +184,17 @@ export default function ShopTheLookAdmin({ products = [], isDarkMode, formatPric
     if (!form.items.length) { setMsg({ type: 'err', text: 'Pick the products in this look.' }); return; }
     if (!form.id && (looks || []).length >= LOOK_MAX) { setMsg({ type: 'err', text: `At most ${LOOK_MAX} looks. Delete one first.` }); return; }
     setBusy('save'); setMsg(null);
-    try { await saveLook(form, staff); setForm(null); } catch (e) {
+    try {
+      // put this look at its Position and number every look 0, 1, 2 … so Position 4 really is the 4th look
+      const others = (looks || []).filter((l) => l.id !== form.id);
+      const at = Math.max(1, Math.min(others.length + 1, parseInt(form.pos, 10) || others.length + 1)) - 1;
+      const { pos, ...mine } = form;
+      const ordered = [...others.slice(0, at), mine, ...others.slice(at)];
+      await saveLook({ ...mine, order: at }, staff);
+      // only the looks whose number changed are written again
+      await Promise.all(ordered.map((l, k) => (l === mine || l.order === k ? null : saveLook({ ...l, order: k }, staff))));
+      setForm(null);
+    } catch (e) {
       setMsg({ type: 'err', text: e.code === 'permission-denied' ? 'Could not save (only the Owner or a Manager; or the picture is too big).' : e.message });
     }
     setBusy('');
@@ -237,7 +261,7 @@ export default function ShopTheLookAdmin({ products = [], isDarkMode, formatPric
                   <input className={`${input} w-full mt-1`} maxLength={40} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Eid Ready" />
                 </label>
                 <label className="text-xs font-semibold text-gray-500">Position
-                  <input type="number" min="0" max="999" className={`${input} w-full mt-1`} value={form.order} onChange={(e) => setForm((f) => ({ ...f, order: e.target.value }))} />
+                  <input type="number" min="1" max={Math.max(1, (looks || []).length + (form.id ? 0 : 1))} className={`${input} w-full mt-1`} value={form.pos ?? ''} onChange={(e) => setForm((f) => ({ ...f, pos: e.target.value }))} />
                 </label>
               </div>
               <div className="flex gap-2 text-xs">
@@ -260,6 +284,10 @@ export default function ShopTheLookAdmin({ products = [], isDarkMode, formatPric
                           {looks.some((l) => l.id !== form.id && l.items.some((x) => x.id === it.id)) && (
                             <p className="text-[10px] text-[#B8921F] font-semibold">Already in: {looks.filter((l) => l.id !== form.id && l.items.some((x) => x.id === it.id)).map((l) => l.name || 'Look').join(', ')}</p>
                           )}
+                        </div>
+                        <div className="flex flex-col shrink-0">
+                          <button type="button" disabled={i === 0} onClick={() => { moveItem(i, -1); if (pinFor === i) setPinFor(i - 1); else if (pinFor === i - 1) setPinFor(i); }} className="p-0.5 disabled:opacity-25" aria-label="Move up" title="Move up"><ChevronUp size={14} /></button>
+                          <button type="button" disabled={i === form.items.length - 1} onClick={() => { moveItem(i, 1); if (pinFor === i) setPinFor(i + 1); else if (pinFor === i + 1) setPinFor(i); }} className="p-0.5 disabled:opacity-25" aria-label="Move down" title="Move down"><ChevronDown size={14} /></button>
                         </div>
                         <button type="button" onClick={() => removeItem(i)} className="p-1 text-red-500" aria-label="Remove"><X size={14} /></button>
                       </div>
