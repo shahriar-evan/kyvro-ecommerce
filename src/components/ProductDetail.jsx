@@ -6,6 +6,7 @@ import WhatsAppButton, { WhatsAppIcon } from './WhatsAppButton';
 import { waOrderLink, waProductLines } from '../whatsappOrder';
 import StockLabel from './StockLabel';
 import { ProductReviews, Stars } from './Reviews';
+import ProductMediaKit from './ProductMediaKit';
 import { rankBySales, hasSizeStock, hasColorStock, totalStock, stockForSize, stockFor, stockForColor, productColors, imageFor, orderedSizes } from '../data/catalog';
 
 // Photo slider: the photos sit side by side and slide in from the side.
@@ -133,7 +134,7 @@ function ZoomViewer({ photos, index, onIndex, onClose }) {
   );
 }
 
-export default function ProductDetail({ product, products, addToCart, calculateDiscountPercent, formatPrice, isDarkMode, setCurrentView, setSelectedProduct = () => {}, storeSettings = {}, cartSubtotal = 0, cartUnits = 0, savedIds = [], toggleSaved = () => {}, teamShop = '', onEdit = null, supplier = null, canModerate = false }) {
+export default function ProductDetail({ product, products, addToCart, calculateDiscountPercent, formatPrice, isDarkMode, setCurrentView, setSelectedProduct = () => {}, storeSettings = {}, cartSubtotal = 0, cartUnits = 0, savedIds = [], toggleSaved = () => {}, teamShop = '', onEdit = null, supplier = null, canModerate = false, mediaKit = null }) {
   const [rv, setRv] = useState(null); // { count, avg } from the reviews below
   // Always use the latest version of the product (admin may have changed stock)
   const live = (products || []).find((p) => p.id === product.id) || product;
@@ -403,6 +404,8 @@ export default function ProductDetail({ product, products, addToCart, calculateD
       </div>
 
       {zoomOpen && <ZoomViewer photos={gallery.length ? gallery : [shownPhoto]} index={currentIdx} onIndex={setManualIdx} onClose={() => setZoomOpen(false)} />}
+
+      {mediaKit && <ProductMediaKit product={live} photos={gallery} canEdit={mediaKit === 'team'} isDarkMode={isDarkMode} formatPrice={formatPrice} />}
 
       <ProductReviews productId={String(live.id)} isDarkMode={isDarkMode} canModerate={canModerate} onSummary={setRv} />
 

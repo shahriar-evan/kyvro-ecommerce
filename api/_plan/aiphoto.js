@@ -60,7 +60,7 @@ const prompts = (bg) => ({
 
 // The caller must be on the team: an active entry in admins/{email} (read with their own login, so the token is real),
 // or the Owner (no entry needed: the read then answers 404, which Firestore only does for a valid login).
-async function teamCaller(req) {
+export async function teamCaller(req) {
   const auth = req.headers.authorization || '';
   const idToken = auth.startsWith('Bearer ') ? auth.slice(7) : '';
   let claims = {};
