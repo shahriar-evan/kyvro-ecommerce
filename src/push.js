@@ -2,6 +2,7 @@ import { getApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { getMessaging, getToken, deleteToken, isSupported, onMessage } from "firebase/messaging";
 import { VAPID_KEY } from "./pushConfig";
+import "./firebase"; // Firestore must be set up (local cache) before getFirestore()
 
 const db = getFirestore(getApp());
 const OFF_KEY = "kyvro_push_off";     // the customer switched notifications off on this device
